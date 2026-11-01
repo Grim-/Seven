@@ -1,0 +1,9 @@
+{
+  "id": "mind",
+  "name": "Mind",
+  "description": "The agent's own mind: memories it keeps (pinned ones are in every chat, the rest it recalls), thoughts it has, and reasoning it runs in its own style. You can read its thoughts in Data; it can't.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": false,
+  "permission": "custom"
+}

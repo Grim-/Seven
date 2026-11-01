@@ -1,0 +1,273 @@
+{
+ "id": "bodyweight-basics",
+ "title": "No-Equipment Workout",
+ "subtitle": "3 days a week, alternate A and B, rest a day between. Rest 45-60 sec between sets.",
+ "before": [
+  {
+   "title": "Warm-up (5 min)",
+   "text": "30 sec each: jumping jacks or marching in place, arm circles, hip circles, bodyweight squats."
+  }
+ ],
+ "workouts": [
+  {
+   "id": "a",
+   "label": "Workout A",
+   "exercises": [
+    {
+     "name": "Push-up",
+     "dose": "3 x 8-15",
+     "figures": [
+      "<svg viewBox=\"0 0 200 110\"><line class=\"g\" x1=\"10\" y1=\"92\" x2=\"190\" y2=\"92\"/><circle class=\"h\" cx=\"40\" cy=\"52\" r=\"8\"/><path class=\"l\" d=\"M48 58 L150 72 L182 90\"/><path class=\"l\" d=\"M62 62 L62 92\"/><text x=\"10\" y=\"14\">UP: body straight</text></svg>",
+      "<svg viewBox=\"0 0 200 110\"><line class=\"g\" x1=\"10\" y1=\"92\" x2=\"190\" y2=\"92\"/><circle class=\"h\" cx=\"40\" cy=\"78\" r=\"8\"/><path class=\"l\" d=\"M48 82 L150 86 L182 90\"/><path class=\"l\" d=\"M62 84 L80 70 L62 92\"/><text x=\"10\" y=\"14\">DOWN: chest near floor</text></svg>"
+     ],
+     "steps": [
+      "Hands under shoulders, a bit wider.",
+      "Body one straight line, head to heels.",
+      "Lower chest toward floor, elbows about 45° from your body.",
+      "Push back up."
+     ],
+     "tips": [
+      {
+       "kind": "easy",
+       "label": "Too hard?",
+       "text": "Knees on floor, or hands on a counter or wall."
+      },
+      {
+       "kind": "avoid",
+       "label": "Avoid:",
+       "text": "sagging hips, flared elbows."
+      }
+     ]
+    },
+    {
+     "name": "Bodyweight squat",
+     "dose": "3 x 15-20",
+     "figures": [
+      "<svg viewBox=\"0 0 200 130\"><line class=\"g\" x1=\"10\" y1=\"120\" x2=\"190\" y2=\"120\"/><circle class=\"h\" cx=\"100\" cy=\"20\" r=\"9\"/><path class=\"l\" d=\"M100 30 L100 70 L92 118 M100 70 L108 118 M100 40 L80 60\"/><text x=\"10\" y=\"14\">START</text></svg>",
+      "<svg viewBox=\"0 0 200 130\"><line class=\"g\" x1=\"10\" y1=\"120\" x2=\"190\" y2=\"120\"/><circle class=\"h\" cx=\"88\" cy=\"46\" r=\"9\"/><path class=\"l\" d=\"M92 56 L110 88 L86 92 L86 118 M110 88 L136 88 L136 118 M95 62 L130 60\"/><path class=\"ar\" d=\"M150 50 L150 90 M144 84 L150 92 L156 84\"/><text x=\"10\" y=\"14\">BOTTOM: sit back</text></svg>"
+     ],
+     "steps": [
+      "Feet shoulder-width, toes slightly out.",
+      "Push hips back like sitting in a chair.",
+      "Go down until thighs are about parallel to the floor.",
+      "Drive through your whole foot to stand."
+     ],
+     "tips": [
+      {
+       "kind": "easy",
+       "label": "Too hard?",
+       "text": "Squat down to a chair and lightly touch it."
+      },
+      {
+       "kind": "avoid",
+       "label": "Avoid:",
+       "text": "knees caving in, heels lifting."
+      }
+     ]
+    },
+    {
+     "name": "Glute bridge",
+     "dose": "3 x 15",
+     "figures": [
+      "<svg viewBox=\"0 0 200 110\"><line class=\"g\" x1=\"10\" y1=\"92\" x2=\"190\" y2=\"92\"/><circle class=\"h\" cx=\"26\" cy=\"84\" r=\"8\"/><path class=\"l\" d=\"M36 88 L110 88 L140 62 L150 90\"/><text x=\"10\" y=\"14\">START: lie flat</text></svg>",
+      "<svg viewBox=\"0 0 200 110\"><line class=\"g\" x1=\"10\" y1=\"92\" x2=\"190\" y2=\"92\"/><circle class=\"h\" cx=\"26\" cy=\"84\" r=\"8\"/><path class=\"l\" d=\"M36 88 L100 60 L140 62 L150 90\"/><path class=\"ar\" d=\"M100 40 L100 22 M94 28 L100 20 L106 28\"/><text x=\"10\" y=\"14\">TOP: hips high</text></svg>"
+     ],
+     "steps": [
+      "Lie on your back, knees bent, feet flat near your butt.",
+      "Push through heels and lift hips until shoulders-to-knees is a straight line.",
+      "Squeeze your butt for 1 sec at the top.",
+      "Lower slowly."
+     ],
+     "tips": [
+      {
+       "kind": "avoid",
+       "label": "Avoid:",
+       "text": "arching your lower back. Squeeze glutes instead."
+      }
+     ]
+    },
+    {
+     "name": "Plank",
+     "dose": "3 x 20-45 sec",
+     "figures": [
+      "<svg viewBox=\"0 0 200 110\"><line class=\"g\" x1=\"10\" y1=\"92\" x2=\"190\" y2=\"92\"/><circle class=\"h\" cx=\"34\" cy=\"56\" r=\"8\"/><path class=\"l\" d=\"M42 62 L150 78 L184 90 M60 68 L60 90 L44 90\"/><text x=\"10\" y=\"14\">Straight line</text></svg>"
+     ],
+     "steps": [
+      "Forearms on floor, elbows under shoulders.",
+      "Legs straight, toes on floor.",
+      "Squeeze abs and glutes, keep hips level with your back.",
+      "Breathe normally."
+     ],
+     "tips": [
+      {
+       "kind": "easy",
+       "label": "Too hard?",
+       "text": "Drop to your knees."
+      },
+      {
+       "kind": "avoid",
+       "label": "Avoid:",
+       "text": "hips sagging or piking up."
+      }
+     ]
+    },
+    {
+     "name": "Reverse lunge",
+     "dose": "2 x 10 each leg",
+     "figures": [
+      "<svg viewBox=\"0 0 200 130\"><line class=\"g\" x1=\"10\" y1=\"120\" x2=\"190\" y2=\"120\"/><circle class=\"h\" cx=\"100\" cy=\"20\" r=\"9\"/><path class=\"l\" d=\"M100 30 L100 70 L92 118 M100 70 L108 118\"/><text x=\"10\" y=\"14\">START: standing</text></svg>",
+      "<svg viewBox=\"0 0 200 130\"><line class=\"g\" x1=\"10\" y1=\"120\" x2=\"190\" y2=\"120\"/><circle class=\"h\" cx=\"100\" cy=\"34\" r=\"9\"/><path class=\"l\" d=\"M100 44 L100 82 L120 90 L120 118 M100 82 L60 100 L44 118\"/><path class=\"ar\" d=\"M70 60 L50 70 M56 62 L48 72 L58 74\"/><text x=\"10\" y=\"14\">STEP BACK, drop</text></svg>"
+     ],
+     "steps": [
+      "Step one foot straight back.",
+      "Lower until both knees bend about 90°.",
+      "Front heel pushes you back up.",
+      "Switch legs, or finish one side first."
+     ],
+     "tips": [
+      {
+       "kind": "easy",
+       "label": "Too hard?",
+       "text": "Hold a wall for balance."
+      },
+      {
+       "kind": "avoid",
+       "label": "Avoid:",
+       "text": "front knee shooting past toes, leaning forward."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "b",
+   "label": "Workout B",
+   "exercises": [
+    {
+     "name": "Pike push-up",
+     "dose": "3 x 6-12",
+     "figures": [
+      "<svg viewBox=\"0 0 200 130\"><line class=\"g\" x1=\"10\" y1=\"120\" x2=\"190\" y2=\"120\"/><circle class=\"h\" cx=\"120\" cy=\"80\" r=\"8\"/><path class=\"l\" d=\"M118 88 L96 44 L50 118 M96 44 L146 118\"/><text x=\"10\" y=\"14\">UP: upside-down V</text></svg>",
+      "<svg viewBox=\"0 0 200 130\"><line class=\"g\" x1=\"10\" y1=\"120\" x2=\"190\" y2=\"120\"/><circle class=\"h\" cx=\"120\" cy=\"104\" r=\"8\"/><path class=\"l\" d=\"M118 110 L96 60 L50 118 M96 60 L146 118\"/><text x=\"10\" y=\"14\">DOWN: head to floor</text></svg>"
+     ],
+     "steps": [
+      "Start in a push-up position, walk feet in and lift hips high.",
+      "Bend elbows and lower the top of your head toward the floor between your hands.",
+      "Press back up to the V."
+     ],
+     "tips": [
+      {
+       "kind": "easy",
+       "label": "Too hard?",
+       "text": "Do fewer reps or a shallower dip."
+      },
+      {
+       "kind": "avoid",
+       "label": "Avoid:",
+       "text": "letting hips drop into a regular push-up."
+      }
+     ]
+    },
+    {
+     "name": "Split squat",
+     "dose": "3 x 10 each leg",
+     "figures": [
+      "<svg viewBox=\"0 0 200 130\"><line class=\"g\" x1=\"10\" y1=\"120\" x2=\"190\" y2=\"120\"/><circle class=\"h\" cx=\"100\" cy=\"20\" r=\"9\"/><path class=\"l\" d=\"M100 30 L100 72 L130 118 M100 72 L70 118\"/><text x=\"10\" y=\"14\">START: long stance</text></svg>",
+      "<svg viewBox=\"0 0 200 130\"><line class=\"g\" x1=\"10\" y1=\"120\" x2=\"190\" y2=\"120\"/><circle class=\"h\" cx=\"100\" cy=\"42\" r=\"9\"/><path class=\"l\" d=\"M100 52 L100 88 L130 96 L130 118 M100 88 L62 108 L52 118\"/><text x=\"10\" y=\"14\">DOWN: back knee low</text></svg>"
+     ],
+     "steps": [
+      "Big step forward, feet stay in place the whole set.",
+      "Lower straight down until back knee nearly touches the floor.",
+      "Push up through the front heel.",
+      "Finish all reps, then switch legs."
+     ],
+     "tips": [
+      {
+       "kind": "easy",
+       "label": "Too hard?",
+       "text": "Hold a wall or chair, go less deep."
+      }
+     ]
+    },
+    {
+     "name": "Superman hold",
+     "dose": "3 x 30 sec",
+     "figures": [
+      "<svg viewBox=\"0 0 200 110\"><line class=\"g\" x1=\"10\" y1=\"92\" x2=\"190\" y2=\"92\"/><circle class=\"h\" cx=\"24\" cy=\"70\" r=\"8\"/><path class=\"l\" d=\"M32 76 L120 88 L184 74 M32 74 L10 60\"/><text x=\"10\" y=\"14\">Arms + legs lifted</text></svg>"
+     ],
+     "steps": [
+      "Lie face down, arms stretched forward.",
+      "Lift arms, chest and legs a few inches off the floor.",
+      "Look at the floor, keep your neck long.",
+      "Squeeze your back and butt, hold, breathe."
+     ],
+     "tips": [
+      {
+       "kind": "easy",
+       "label": "Too hard?",
+       "text": "Lift just arms, then just legs."
+      }
+     ]
+    },
+    {
+     "name": "Dead bug",
+     "dose": "3 x 10 per side",
+     "figures": [
+      "<svg viewBox=\"0 0 200 110\"><line class=\"g\" x1=\"10\" y1=\"92\" x2=\"190\" y2=\"92\"/><circle class=\"h\" cx=\"26\" cy=\"84\" r=\"8\"/><path class=\"l\" d=\"M36 86 L110 86 L136 58 L164 58 M40 82 L40 40 M110 86 L84 58 L56 58\"/><text x=\"10\" y=\"14\">START: arms up, knees 90°</text></svg>",
+      "<svg viewBox=\"0 0 200 110\"><line class=\"g\" x1=\"10\" y1=\"92\" x2=\"190\" y2=\"92\"/><circle class=\"h\" cx=\"26\" cy=\"84\" r=\"8\"/><path class=\"l\" d=\"M36 86 L110 86 L180 86 M40 82 L10 70 M110 86 L84 58 L56 58 M40 82 L40 40\"/><text x=\"10\" y=\"14\">Opposite arm + leg reach out</text></svg>"
+     ],
+     "steps": [
+      "Lie on back, arms straight up, knees bent 90° over hips.",
+      "Lower one arm overhead and the opposite leg straight out, slowly.",
+      "Return and switch sides."
+     ],
+     "tips": [
+      {
+       "kind": "avoid",
+       "label": "Avoid:",
+       "text": "lower back lifting off the floor. Press it down."
+      }
+     ]
+    },
+    {
+     "name": "Calf raise",
+     "dose": "3 x 20",
+     "figures": [
+      "<svg viewBox=\"0 0 200 130\"><line class=\"g\" x1=\"10\" y1=\"120\" x2=\"190\" y2=\"120\"/><circle class=\"h\" cx=\"100\" cy=\"20\" r=\"9\"/><path class=\"l\" d=\"M100 30 L100 76 L100 116\"/><text x=\"10\" y=\"14\">START: flat</text></svg>",
+      "<svg viewBox=\"0 0 200 130\"><line class=\"g\" x1=\"10\" y1=\"120\" x2=\"190\" y2=\"120\"/><circle class=\"h\" cx=\"100\" cy=\"14\" r=\"9\"/><path class=\"l\" d=\"M100 24 L100 70 L100 108 L108 118\"/><path class=\"ar\" d=\"M130 60 L130 30 M124 38 L130 28 L136 38\"/><text x=\"10\" y=\"14\">TOP: on toes</text></svg>"
+     ],
+     "steps": [
+      "Stand tall, hold a wall for balance.",
+      "Rise onto your toes as high as you can.",
+      "Pause 1 sec, lower slowly."
+     ],
+     "tips": [
+      {
+       "kind": "easy",
+       "label": "Harder?",
+       "text": "Do it on one foot."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "after": [
+  {
+   "title": "Low-energy day version (haven't eaten much)",
+   "text": "Skip the finisher. Do 1 set only of: wall or knee push-ups x 8, chair squats x 10, glute bridges x 10, plank on knees 15 sec, 20-30 min easy walk. Stop before it feels hard. Stop right away if you feel dizzy, shaky, or see spots, then sit down and drink water."
+  },
+  {
+   "title": "Joint pain rule",
+   "text": "Dull, mild ache that eases as you warm up: OK to go on, use smaller range or an easier version. Sharp pain, swelling, redness, heat, a joint that locks or gives way, or pain that keeps getting worse: stop that move and get it checked."
+  },
+  {
+   "title": "Finisher (5 min)",
+   "text": "As many rounds as you can, aim for 2-3: 10 squats, 5 clean push-ups, 20 sec plank. Drop to knees when your hips start to drive."
+  },
+  {
+   "title": "Getting stronger",
+   "text": "Stop each set with 1-2 reps left. When every set hits the top of the rep range, add reps, lower for 3 slow seconds, or move to a harder version."
+  }
+ ]
+}

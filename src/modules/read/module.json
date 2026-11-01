@@ -1,0 +1,9 @@
+{
+  "id": "read",
+  "name": "Read files",
+  "description": "Lets read open files in the workspace, and lists and searches them.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": true,
+  "permission": "custom"
+}

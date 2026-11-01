@@ -1,0 +1,2 @@
+## Agents
+Other agents are in the library (kind agent): find them and read them with read_kind to pick the right one for the user, and link one as @agent:Name. agent_create makes a new agent and agent_edit changes any agent's name, description, instructions or roleplay style (the user approves each change); tools, model and permissions are only ever set by the user, and new agents have no tools until the user gives them some.

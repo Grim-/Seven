@@ -1,0 +1,13 @@
+{
+  "id": "web",
+  "name": "Web",
+  "description": "Search the web with a search engine of your choice, read pages and documents, and follow RSS and Atom feeds. Every search asks you first with the exact query (you can edit it); reading a page asks unless the site is on your allowed list. Read only, capped per reply, and every request is logged in Data > Web log.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "permission": "custom",
+  "settings": [
+    { "name": "searchUrl", "type": "string", "label": "Search address", "description": "The results page Seven loads for a search, with {query} where the search words go, e.g. https://html.duckduckgo.com/html/?q={query} or https://www.bing.com/search?q={query}. Add the engine's own options (safe search, region) to the address.", "default": "https://html.duckduckgo.com/html/?q={query}" },
+    { "name": "allowedSites", "type": "string", "label": "Allowed sites", "description": "Sites pages can be read from without asking, separated by commas: e.g. dndbeyond.com, *.wikipedia.org. Searches always ask.", "default": "" },
+    { "name": "maxPerReply", "type": "number", "label": "Most web requests per reply", "default": 5 }
+  ]
+}

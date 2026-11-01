@@ -1,0 +1,8 @@
+{
+  "id": "world",
+  "name": "World",
+  "description": "Puts the agent in a world: it is one record there, can read every record, change its own, search, and use the world's shared board. Link the agent to its record below.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "permission": "custom"
+}

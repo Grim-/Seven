@@ -1,0 +1,8 @@
+{
+  "id": "core",
+  "name": "Core",
+  "description": "The Library: everything Seven keeps, as entries of every kind (pages, files, skills, worlds, agents' minds and add-on kinds). Find, read and tag any entry; write pages with text and items (lists, checklists, tables); link anything to anything with @kind:Name. Show anything you can link in the chat, and save HTML pages you write. Copy attached files into the workspace.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "permission": "custom"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "weather",
+  "name": "Weather",
+  "description": "Current weather and the coming days from Open-Meteo (free, no key). A Weather card for boards, and a weather tool for agents.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": false,
+  "permission": "none",
+  "settings": [
+    { "name": "place", "type": "string", "label": "Your town or city", "description": "Used by the Weather card, and by the tool when no place is given." },
+    { "name": "fahrenheit", "type": "boolean", "label": "Fahrenheit and mph", "default": false }
+  ],
+  "kinds": [
+    {
+      "type": "forecast",
+      "label": "Weather",
+      "plural": "Weather",
+      "icon": "cloud-sun",
+      "description": "the weather where you are, now and for the coming days",
+      "view": "weather.html",
+      "widget": "weather.html",
+      "single": true
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+import { createContext, useContext, type FocusEvent, type ReactNode } from 'react'
+import { cn } from '../../lib/cn'
+
+export interface GridColumn {
+  label: string
+  width: string
+  right?: boolean
+}
+
+const Template = createContext('')
+
+export function GridTable({ columns, empty, children }: { columns: GridColumn[]; empty?: string | false; children: ReactNode }) {
+  const template = columns.map((c) => c.width).join(' ')
+  return (
+    <Template.Provider value={template}>
+      <div className="flex min-w-0 flex-col overflow-x-auto">
+        <div style={{ gridTemplateColumns: template }} className="grid w-full gap-x-3 border-b border-line/30 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+          {columns.map((c) => (
+            <span key={c.label} className={cn('leading-tight', c.right && 'text-right')}>
+              {c.label}
+            </span>
+          ))}
+        </div>
+        {children}
+        {empty && <div className="px-3.5 py-3 text-[12.5px] text-faint">{empty}</div>}
+      </div>
+    </Template.Provider>
+  )
+}
+
+export function GridRow({ onClick, selected, onBlur, children }: { onClick?: () => void; selected?: boolean; onBlur?: (e: FocusEvent<HTMLDivElement>) => void; children: ReactNode }) {
+  const template = useContext(Template)
+  const className = cn('grid w-full items-center gap-x-3 border-b border-line/20 px-3.5 py-1.5 text-left', onClick && 'hover:bg-white/[0.03]', selected && 'bg-accent/10')
+  if (onClick)
+    return (
+      <button onClick={onClick} style={{ gridTemplateColumns: template }} className={className}>
+        {children}
+      </button>
+    )
+  return (
+    <div onBlur={onBlur} style={{ gridTemplateColumns: template }} className={className}>
+      {children}
+    </div>
+  )
+}

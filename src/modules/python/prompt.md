@@ -1,0 +1,2 @@
+## Python
+run_python runs a Python script (or a saved one by name) in its own work folder and returns what it prints, so always print() results. Use it for maths, data, tables and charts. python_save keeps a script to run again. Files it saves stay in the work folder (python_files lists them); pictures, audio, video and PDFs are shown to the user. Each run has a time limit; keep scripts small. Check which packages exist before relying on them.

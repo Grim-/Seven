@@ -1,0 +1,145 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Composer mockup</title><style>
+:root{--bg:#090a0d;--card:#11141c;--line:rgba(245,158,11,.35);--line2:rgba(245,158,11,.6);--accent:#ffc919;--teal:rgb(0,229,255);--purple:#a855f7;--alert:#ef4444;--ok:#34d399;--dim:#a1a1aa;--faint:#52525b;--sans:'Segoe UI',Inter,system-ui,sans-serif;--mono:ui-monospace,'Cascadia Mono',Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#fff;font-family:var(--sans);font-size:13px}
+.page{max-width:1500px;margin:0 auto;padding:28px 24px 80px}
+h1{font:600 13px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin:0 0 6px}
+h2{font:700 12px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
+.lead,.what{color:var(--dim);max-width:960px;line-height:1.55;margin:0 0 18px}
+.sec{border-top:1px solid var(--line);padding:22px 0 26px}
+.lbl{font:600 10px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin:0 0 6px}
+.mono{font-family:var(--mono)}.dim{color:var(--dim)}.faint{color:var(--faint)}.acc{color:var(--accent)}
+.view{display:grid;grid-template-columns:260px minmax(0,1fr) 270px;gap:14px;height:640px;border:1px solid var(--line);background:#07080b;padding:12px}
+.side,.send{border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.4);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.08)}
+.tabs span{flex:1;text-align:center;padding:7px 0;font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);cursor:pointer}
+.tabs span.on{color:var(--accent);box-shadow:inset 0 -2px var(--accent)}
+.search{margin:8px;padding:6px 8px;border:1px solid rgba(255,255,255,.12);color:var(--faint);font-size:12px}
+.list{overflow:auto;padding:0 8px 8px;display:flex;flex-direction:column;gap:4px}
+.item{display:flex;align-items:center;gap:8px;padding:6px 7px;border:1px solid rgba(255,255,255,.07);cursor:grab;font-size:12.5px}
+.item:hover{border-color:var(--line2);background:rgba(255,201,25,.04)}
+.tag{font:700 9px var(--mono);letter-spacing:.12em;padding:1px 5px;border:1px solid;flex-shrink:0}
+.t-page{color:var(--teal);border-color:rgba(0,229,255,.45)}.t-sheet{color:var(--ok);border-color:rgba(52,211,153,.45)}.t-place{color:var(--accent);border-color:var(--line2)}.t-repo{color:#f472b6;border-color:rgba(244,114,182,.45)}.t-card{color:var(--purple);border-color:rgba(168,85,247,.5)}.t-act{color:var(--accent);border-color:var(--line2)}.t-map{color:#93c5fd;border-color:rgba(147,197,253,.45)}.t-pic{color:#fde68a;border-color:rgba(253,230,138,.45)}
+.paperwrap{overflow:auto;display:flex;justify-content:center;padding:6px}
+.paper{width:100%;max-width:720px;min-height:100%;background:linear-gradient(#f3ead6,#eadfc5);color:#1d1a14;padding:34px 40px 60px;box-shadow:0 10px 40px rgba(0,0,0,.6);position:relative}
+.paper.over{outline:2px dashed var(--accent);outline-offset:-8px}
+.paper h3{margin:0 0 4px;font:700 20px Georgia,serif}
+.paper .sub{font:11px var(--mono);color:#7a6d55;margin-bottom:18px}
+.para{font:15px/1.6 Georgia,serif;margin:0 0 12px;outline:none}
+.block{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:8px 10px;background:rgba(0,0,0,.06);border-left:3px solid #8a7a58;font-size:13px;cursor:grab;position:relative}
+.block .pic{width:38px;height:38px;flex-shrink:0;background:#c9b88f;display:flex;align-items:center;justify-content:center;font:700 14px var(--mono);color:#3b3020}
+.block b{display:block;font-size:13.5px}
+.block .ln{font:11px var(--mono);color:#6b5f48}
+.block .x{position:absolute;right:6px;top:6px;font:11px var(--mono);color:#8a7a58;opacity:0;cursor:pointer}
+.block:hover .x{opacity:1}
+.blockpic{margin:0 0 12px;position:relative;cursor:grab}.blockpic .img{height:220px;background:radial-gradient(circle at 30% 40%,#6aa9c9,#1e4459 55%,#0d1b24);display:flex;align-items:flex-end;padding:8px;color:#e8f6ff;font:11px var(--mono)}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px}.duo .img{height:150px}
+.face{width:150px;height:200px;border:1px solid #7c3aed;background:linear-gradient(#1a1430,#0d0a18);color:#fff;padding:8px;font-size:11px;display:inline-flex;flex-direction:column;margin:0 10px 12px 0;vertical-align:top}.face .a{height:80px;background:radial-gradient(circle,#ffb35a,#7a2a0b);margin-bottom:6px}.face b{font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.b-sheet{border-color:#2f9e74}.b-page{border-color:#1a8fa3}.b-place{border-color:#b98a10}.b-repo{border-color:#c2417f}.b-card{border-color:#7c3aed}.b-act{border-color:#b45309}
+.roll{margin-left:auto;font:700 10px var(--mono);letter-spacing:.1em;padding:2px 6px;border:1px solid #8a7a58;color:#5a4d36;cursor:pointer}
+.hint{font:11px var(--mono);color:#9a8b6c;margin-top:18px;border-top:1px dashed #bfae88;padding-top:10px}
+.agenttext{display:none;white-space:pre-wrap;font:12.5px/1.55 var(--mono);color:#1d1a14}
+.paper.raw .agenttext{display:block}.paper.raw .doc{display:none}
+.send .body{padding:10px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+.btn{display:block;text-align:center;padding:8px;font:700 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--line2);color:var(--accent);cursor:pointer;background:rgba(255,201,25,.05)}
+.btn.pri{background:var(--accent);color:#000}
+.sel{padding:6px 8px;border:1px solid rgba(255,255,255,.14);font-size:12.5px;display:flex;justify-content:space-between}
+.tog{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);cursor:pointer}
+.tog i{width:28px;height:15px;border:1px solid var(--line2);position:relative}.tog i::after{content:'';position:absolute;left:2px;top:2px;width:9px;height:9px;background:var(--faint);transition:.15s}
+.tog.on i::after{left:15px;background:var(--accent)}
+.chat{width:760px;border:1px solid var(--line);background:#07080b;position:relative;height:520px;display:flex;flex-direction:column}
+.msgs{flex:1;padding:14px;color:var(--dim)}
+.composer{display:flex;gap:6px;padding:10px;border-top:1px solid rgba(255,255,255,.08)}
+.composer .in{flex:1;border:1px solid rgba(255,255,255,.14);padding:9px;color:var(--faint)}
+.tool{width:36px;border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;color:var(--dim);cursor:pointer}
+.tool.on{border-color:var(--accent);color:var(--accent)}
+.menu{position:absolute;left:96px;bottom:58px;width:300px;border:1px solid var(--line2);background:#0b0d12;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+.menu div{padding:8px 10px;font-size:12.5px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer}
+.menu div:hover{background:rgba(255,201,25,.06)}
+.modal{position:absolute;inset:30px 40px 70px;border:1px solid var(--line2);background:#0b0d12;display:none;flex-direction:column}
+.modal.on{display:flex}
+.modal .paper{max-width:none;min-height:0;flex:1;overflow:auto;padding:22px 28px}
+.mbar{display:flex;gap:8px;padding:8px;border-top:1px solid rgba(255,255,255,.08)}.mbar .btn{flex:1}
+</style></head><body><div class="page">
+<h1>Composer · mockup</h1>
+<p class="lead">A view of its own beside Data, Agents and Tools. One sheet of paper you write on and drop things onto. Send it to start a chat or into a chat, or save it as a page. A pad is a page, so it's one source of truth whichever agent narrates.</p>
+
+<div class="sec"><h2>1 · The Composer view</h2>
+<p class="what">Every kind is drawn by its own surface: pictures as pictures, cards as cards, characters with portraits. Drag anything from the side panel (or from Data, Files, the map, a hand) onto the paper; type between blocks. Right-click a block for Open, Roll again, Edit, Take out. Try dragging items across, and the "What the agent gets" switch.</p>
+<div class="view">
+ <div class="side">
+  <div class="tabs"><span class="on">Library</span><span>Draw</span><span>Play</span><span>Cards</span></div>
+  <div class="search">Search pages, characters, places…</div>
+  <div class="list" id="lib"></div>
+ </div>
+ <div class="paperwrap"><div class="paper" id="paper">
+  <div class="doc">
+   <h3>The sea cave</h3><div class="sub">draft · not saved</div>
+   <div id="blocks"></div>
+   <div class="hint">drop anything here · type @ to link · drag blocks to reorder</div>
+  </div>
+  <div class="agenttext" id="raw"></div>
+ </div></div>
+ <div class="send"><div class="tabs"><span class="on">Send</span></div><div class="body">
+  <div class="tog" id="tog"><i></i>What the agent gets</div>
+  <div><div class="lbl">Start a chat</div><div class="sel">The Keeper <span class="faint">▾</span></div></div>
+  <span class="btn pri">Start the chat</span>
+  <div><div class="lbl">Or send into</div><div class="sel">Coast trip · The Keeper <span class="faint">▾</span></div></div>
+  <span class="btn">Send to chat</span>
+  <div class="lbl" style="margin-top:8px">Page</div>
+  <span class="btn">Save as page</span>
+  <span class="btn">Open a page</span>
+  <span class="btn" style="color:var(--dim);border-color:rgba(255,255,255,.14)">Clear the paper</span>
+  <p class="dim" style="font-size:11.5px;line-height:1.5;margin:4px 0 0">Repos marked <b class="acc">when sent</b> roll on Send. A card on the paper is its prompt and isn't used up.</p>
+ </div></div>
+</div></div>
+
+<div class="sec"><h2>2 · In a chat</h2>
+<p class="what">"Set the scene" becomes the Composer button. It opens a page in the modal editor (the same paper, with Send into this chat) or takes you to the Composer view.</p>
+<div class="chat">
+ <div class="msgs">…the waves thump against the cliffs like a heartbeat.</div>
+ <div class="menu" id="menu" style="display:none"><div id="openp">Open a page here…</div><div>New paper here</div><div>Open the Composer</div></div>
+ <div class="modal" id="modal"><div class="paper"><h3>Cave rules</h3><div class="sub">page · opened here</div><div id="mblocks"></div></div><div class="mbar"><span class="btn pri">Send into this chat</span><span class="btn">Save the page</span><span class="btn" id="mclose">Close</span></div></div>
+ <div class="composer"><span class="tool">📎</span><span class="tool">⤮</span><span class="tool on" id="ctool">✎</span><span class="tool">🎲</span><span class="in">Message the Keeper…</span><span class="btn pri" style="padding:8px 14px">Send</span></div>
+</div></div>
+</div>
+<script>
+const LIB=[
+ {t:'page',tag:'PAGE',n:'Scenario: The Drowned King',l:'These are instructions for a scenario',link:'@page:scenario_the_drowned_king'},
+ {t:'sheet',tag:'PC',n:'Valerius "V" Vane',l:'Air genasi · rogue 3',link:'@sheet:valerius_v_vane'},
+ {t:'sheet',tag:'NPC',n:'Caelum',l:'Fisherman · knows the cave',link:'@sheet:caelum'},
+ {t:'place',tag:'PLACE',n:'The Sea Cave',l:'Emos Domain › The Coast',link:'@place:the_sea_cave'},
+ {t:'map',tag:'MAP',n:'Emos coast',l:'3 layers',link:'@map:emos_coast'},
+ {t:'repo',tag:'REPO',n:'Cave dangers',l:'roll now or when sent',link:'@repo:cave_dangers#random',roll:'A rising tide floods the lower tunnels.'},
+ {t:'card',tag:'CARD',n:'Light a torch',l:'Generic · prompt',link:'@cards.card:light_a_torch'},
+ {t:'pic',tag:'PICTURE',n:'Cave mouth at dusk',l:'picture',link:'@file:cave_mouth.png'},
+ {t:'card',tag:'CARD',n:'Fireball',l:'Action · Intelligence',link:'@cards.card:fireball',face:true},
+ {t:'act',tag:'ACTION',n:'Climb down the wet rocks',l:'Dexterity · 0.6',link:'Climb down the wet rocks (any)\n- dexterity 0.6\npass: You reach the floor.\nfail: You slip.'}
+]
+const blocks=[{text:'The party arrives at the cave mouth at dusk. Keep the tone eerie and slow.'},LIB[8],LIB[0],LIB[1],LIB[3],LIB[9]]
+const lib=document.getElementById('lib')
+LIB.forEach((x,i)=>{const d=document.createElement('div');d.className='item';d.draggable=true;d.innerHTML=`<span class="tag t-${x.t}">${x.tag}</span><span>${x.n}</span>`;d.ondragstart=e=>e.dataTransfer.setData('i',i);lib.appendChild(d)})
+const paper=document.getElementById('paper')
+paper.ondragover=e=>{e.preventDefault();paper.classList.add('over')}
+paper.ondragleave=()=>paper.classList.remove('over')
+paper.ondrop=e=>{e.preventDefault();paper.classList.remove('over');const i=e.dataTransfer.getData('i');if(i!=='')blocks.push({...LIB[i]});draw()}
+function blockEl(b,i,list){
+ if(b.text!==undefined){const p=document.createElement('p');p.className='para';p.contentEditable=true;p.textContent=b.text;p.oninput=()=>b.text=p.textContent;return p}
+ if(b.t==='pic'){const d=document.createElement('div');d.className='blockpic';d.innerHTML=`<div class="img">${b.n}</div>`;return d}
+ if(b.face){const d=document.createElement('div');d.className='face';d.innerHTML=`<div class="a"></div><b>${b.n}</b><span style="color:var(--teal);font:10px var(--mono)">${b.l}</span><span style="margin-top:4px;color:#c9ccd4">An explosive ball of fire at a target.</span>`;return d}
+ const d=document.createElement('div');d.className='block b-'+b.t
+ d.innerHTML=`<span class="pic">${b.tag[0]}</span><span><b>${b.n}</b><span class="ln">${b.l}</span></span>${b.t==='repo'?`<span class="roll">${b.rolled?'ROLLED':'WHEN SENT'}</span>`:''}<span class="x">✕</span>`
+ if(b.t==='repo')d.querySelector('.roll').onclick=()=>{b.rolled=!b.rolled;draw()}
+ d.querySelector('.x').onclick=()=>{list.splice(i,1);draw()}
+ return d}
+function text(){return blocks.map(b=>b.text!==undefined?b.text:b.t==='repo'&&b.rolled?b.roll:b.link).join('\n\n')}
+function draw(){const el=document.getElementById('blocks');el.innerHTML='';blocks.forEach((b,i)=>el.appendChild(blockEl(b,i,blocks)));document.getElementById('raw').textContent=text()}
+document.getElementById('tog').onclick=e=>{e.currentTarget.classList.toggle('on');paper.classList.toggle('raw')}
+const mb=[{text:'Inside the cave, light is scarce: describe only what a torch would show.'},LIB[5],LIB[7]]
+function drawM(){const el=document.getElementById('mblocks');el.innerHTML='';mb.forEach((b,i)=>el.appendChild(blockEl(b,i,mb)))}
+const menu=document.getElementById('menu')
+document.getElementById('ctool').onclick=()=>menu.style.display=menu.style.display==='none'?'block':'none'
+document.getElementById('openp').onclick=()=>{menu.style.display='none';drawM();document.getElementById('modal').classList.add('on')}
+document.getElementById('mclose').onclick=()=>document.getElementById('modal').classList.remove('on')
+draw()
+</script></body></html>

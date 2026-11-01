@@ -1,0 +1,9 @@
+{
+  "id": "dice",
+  "name": "Dice",
+  "description": "Roll dice (1d20, 2d6+3, 4d6kh3, exploding dice and more) and action checks against a character's D&D sheet. Real random rolls, so nobody has to make them up.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": false,
+  "permission": "none"
+}

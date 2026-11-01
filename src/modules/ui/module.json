@@ -1,0 +1,9 @@
+{
+  "id": "ui",
+  "name": "Ask and notify",
+  "description": "Ask you multiple-choice questions, ask you for data to work from (paste, a web page, library entries or a file), offer reply buttons and show notifications.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": false,
+  "permission": "custom"
+}

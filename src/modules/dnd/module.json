@@ -1,0 +1,9 @@
+{
+  "id": "dnd",
+  "name": "D&D",
+  "description": "A D&D 5e compendium: spells, classes, features, races, equipment, conditions and monsters from the free SRD 5.1, plus your own entries and imports. Agents can look any of them up.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "permission": "none",
+  "tools": false
+}

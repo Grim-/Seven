@@ -1,0 +1,8 @@
+{
+  "id": "story",
+  "name": "Story presentation",
+  "description": "Lets the agent present things like a game or a comic: dialogue boxes with character pictures, comic panels, dramatic reveals, and voiced scenes played out on stage.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "permission": "custom"
+}

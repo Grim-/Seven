@@ -1,0 +1,8 @@
+{
+  "id": "present",
+  "name": "Presentation",
+  "description": "Lets the agent show things as presentations instead of plain text: cards in the chat, in the side panel, or filling the chat for a moment.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "permission": "custom"
+}

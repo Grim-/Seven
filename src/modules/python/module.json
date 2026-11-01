@@ -1,0 +1,46 @@
+{
+  "id": "python",
+  "name": "Python",
+  "description": "Runs Python code in its own work folder with a time limit, for maths, data and charts without full command access, and keeps saved scripts (encrypted) that you or agents can run again. Pictures, audio, video and PDFs the code saves show in the chat. This is not a security sandbox: the code runs with your user's rights.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "permission": "custom",
+  "panel": {
+    "label": "Python",
+    "icon": "terminal"
+  },
+  "toolPermissions": {
+    "run_python": "ask",
+    "python_save": "none",
+    "python_files": "none"
+  },
+  "settings": [
+    {
+      "name": "pythonPath",
+      "type": "string",
+      "label": "Python",
+      "description": "Leave empty to use Seven's own environment (set it up below) or else py/python from PATH. Or give a python.exe, for example a venv's Scripts\\python.exe.",
+      "default": ""
+    },
+    {
+      "name": "workFolder",
+      "type": "folder",
+      "label": "Work folder",
+      "description": "Where scripts run and files they save land. Leave empty for .seven\\sandbox\\python. Files here are not encrypted.",
+      "default": ""
+    },
+    {
+      "name": "timeout",
+      "type": "number",
+      "label": "Time limit (seconds)",
+      "default": 30
+    }
+  ],
+  "actions": [
+    {
+      "name": "setup_env",
+      "label": "Set up environment",
+      "description": "Creates Seven's own Python environment and installs numpy, pandas, networkx, pillow, opencv-python, piexif, stegano, fpdf2, graphviz, jinja2, folium, mido, gTTS, trimesh, d20, requests, beautifulsoup4, crayons and colorama. Run it again to update them. Takes a few minutes. Scripts use it unless a Python path is set above."
+    }
+  ]
+}

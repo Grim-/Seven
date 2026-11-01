@@ -1,0 +1,48 @@
+{
+  "id": "cards",
+  "name": "Cards",
+  "description": "Cards to play in stories: each is a prebuilt prompt, an action rolled against a character's stats, or a decision. Card sets are templates; card decks are the cards someone holds.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": false,
+  "permission": "none",
+  "kinds": [
+    {
+      "type": "layout",
+      "label": "Card layout",
+      "plural": "Card layouts",
+      "icon": "layout-template",
+      "description": "the fields cards of one kind have and where each shows on the card",
+      "view": "cards.html",
+      "widget": "cards.html"
+    },
+    {
+      "type": "card",
+      "label": "Card",
+      "plural": "Cards",
+      "icon": "rectangle-vertical",
+      "description": "a card: a generic prompt, an action or a decision, with a face from its layout",
+      "view": "cards.html",
+      "widget": "cards.html"
+    },
+    {
+      "type": "set",
+      "label": "Card set",
+      "plural": "Card sets",
+      "icon": "layers",
+      "description": "a template: cards with how many of each",
+      "rollable": true,
+      "view": "cards.html",
+      "widget": "cards.html"
+    },
+    {
+      "type": "deck",
+      "label": "Card deck",
+      "plural": "Card decks",
+      "icon": "wallet-cards",
+      "description": "the cards someone holds: gained and used up in play",
+      "view": "cards.html",
+      "widget": "cards.html"
+    }
+  ]
+}

@@ -1,0 +1,294 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Actions and decisions mockup</title><style>
+:root{--bg:#090a0d;--card:#11141c;--line:rgba(245,158,11,.35);--line2:rgba(245,158,11,.6);--accent:#ffc919;--soft:#e39d07;--teal:rgb(0,229,255);--purple:#a855f7;--alert:#ef4444;--ok:#34d399;--dim:#a1a1aa;--faint:#52525b;--sans:'Segoe UI',Inter,system-ui,sans-serif;--mono:ui-monospace,'Cascadia Mono',Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#fff;font-family:var(--sans);font-size:13px}
+.page{max-width:1500px;margin:0 auto;padding:28px 24px 80px}
+h1{font:600 13px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin:0 0 6px}
+h2{font:700 12px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
+.lead{color:var(--dim);max-width:960px;line-height:1.55;margin:0 0 24px}
+.sec{border-top:1px solid var(--line);padding:22px 0 26px}
+.what{color:var(--dim);margin:0 0 14px;max-width:960px;line-height:1.5}
+.lbl{font:600 10px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.mono{font-family:var(--mono)}.dim{color:var(--dim)}.faint{color:var(--faint)}.acc{color:var(--accent)}.teal{color:var(--teal)}
+.notch{clip-path:polygon(0 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%)}
+.btn{display:inline-flex;align-items:center;gap:6px;font:600 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#000;background:var(--accent);padding:5px 10px;clip-path:polygon(0 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%);border:none}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line2)}
+.chip{font:11px var(--mono);border:1px solid var(--line);padding:2px 7px;background:rgba(245,158,11,.05);display:inline-block}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font:600 9.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--teal);border:1px solid rgba(0,229,255,.35);padding:1px 5px}
+.av{width:22px;height:22px;border:1px solid var(--teal);display:inline-flex;align-items:center;justify-content:center;font:700 10px var(--mono);color:var(--teal);background:rgba(9,10,13,.9);clip-path:polygon(0 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%)}
+.av.p{border-color:var(--purple);color:var(--purple)}
+.av.big{width:28px;height:28px;font-size:12px}
+
+.shell{display:grid;grid-template-columns:230px minmax(0,1fr) 330px;height:620px;border:1px solid #1d2230;background:#07080b}
+.col{border-right:1px solid #1d2230;display:flex;flex-direction:column;min-height:0}
+.col:last-child{border-right:none;border-left:1px solid #1d2230}
+.colh{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #1d2230;font:600 10.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--soft)}
+.colh .sp{flex:1}
+.tree{padding:6px 0;overflow:auto}
+.ti{display:flex;align-items:center;gap:6px;padding:4px 12px;cursor:default;white-space:nowrap}
+.ti:hover{background:rgba(245,158,11,.06)}
+.ti.on{background:rgba(245,158,11,.1);box-shadow:inset 2px 0 var(--accent)}
+.ti .car{width:10px;color:var(--faint);font:10px var(--mono)}
+.ti .n{flex:1;overflow:hidden;text-overflow:ellipsis}
+.ti .noshape{font:9px var(--mono);color:var(--faint);letter-spacing:.1em}
+.layers{border-top:1px solid #1d2230;margin-top:auto}
+.lr{display:grid;grid-template-columns:12px 18px 1fr 54px;gap:6px;align-items:center;padding:5px 12px;font-size:12px}
+.lr .grip{color:var(--faint);font:10px var(--mono);cursor:grab}
+.lr .eye{width:14px;height:10px;border:1px solid var(--teal);border-radius:50%;position:relative}
+.lr .eye:after{content:'';position:absolute;left:4px;top:2px;width:4px;height:4px;border-radius:50%;background:var(--teal)}
+.lr .eye.off{border-color:var(--faint)}.lr .eye.off:after{background:transparent}
+.lr .op{height:3px;background:#1c2029;position:relative}.lr .op i{position:absolute;inset:0 auto 0 0;background:var(--soft)}
+.lr.child{padding-left:30px}
+.lr .k{font:9px var(--mono);color:var(--faint);letter-spacing:.1em;margin-left:4px}
+
+.view{position:relative;flex:1;overflow:hidden;background:#05070a}
+.view canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+.view svg{position:absolute;inset:0;width:100%;height:100%}
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;border:1px solid var(--line);background:rgba(9,10,13,.9)}
+.zoom span{width:28px;height:26px;display:flex;align-items:center;justify-content:center;font:12px var(--mono);color:var(--accent);border-bottom:1px solid var(--line)}
+.zoom span:last-child{border:none;font-size:9px}
+.crumb{position:absolute;left:10px;top:10px;font:11px var(--mono);color:var(--dim);background:rgba(9,10,13,.85);border:1px solid #1d2230;padding:4px 8px}
+.modebar{position:absolute;left:10px;bottom:10px;display:flex;gap:6px}
+.hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);font:11px var(--mono);color:var(--teal);background:rgba(9,10,13,.9);border:1px solid rgba(0,229,255,.35);padding:4px 10px}
+
+.pc{display:flex;flex-direction:column;gap:12px;padding:12px;overflow:auto}
+.path{font:11px var(--mono);color:var(--dim)}
+.path b{color:#fff;font-weight:600}
+.ptitle{font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:15px}
+.field .lbl{margin-bottom:4px}
+.now{border:1px solid rgba(0,229,255,.25);background:rgba(0,229,255,.04);padding:8px 10px;line-height:1.5}
+.by{display:flex;align-items:center;gap:6px;font:10.5px var(--mono);color:var(--faint);margin-top:6px}
+.who{display:flex;gap:10px;align-items:center}
+.who .w{display:flex;align-items:center;gap:6px}
+.inside .ti{padding:3px 0}
+.row2{display:flex;gap:6px;flex-wrap:wrap}
+
+.surfaces{display:grid;grid-template-columns:minmax(0,520px) 300px minmax(0,1fr);gap:18px;align-items:start}
+.chatbox{background:rgba(255,255,255,.015);border-left:2px solid var(--faint);padding:10px 12px}
+.card{border:1px solid var(--line);border-left:2px solid var(--accent);background:rgba(0,0,0,.6);clip-path:polygon(0 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%)}
+.ch{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(245,158,11,.2)}
+.ct{font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.cb{padding:10px 12px}
+.tile{width:300px;height:230px;border:1px solid var(--line);background:rgba(9,10,13,.85);clip-path:polygon(0 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%);display:flex;flex-direction:column;overflow:hidden}
+.tile .tt{font:600 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--soft);padding:7px 10px;border-bottom:1px solid var(--line);display:flex;gap:8px}
+.tile .tb{flex:1;min-height:0;position:relative}
+.stagebox{background:rgba(0,0,0,.85);border:1px solid #1d2230;height:320px;position:relative;overflow:hidden}
+.stagebox:after{content:'ESC';position:absolute;right:10px;top:8px;font:10px var(--mono);color:var(--faint)}
+.mini{position:relative;overflow:hidden;background:#05070a}
+.mini canvas,.mini svg{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+.agent{font:11.5px/1.55 var(--mono);color:#cfd3dc;background:#0b0d12;border:1px dashed #2a2f3a;padding:10px 12px;white-space:pre-wrap;margin:0}
+.thumbs{display:flex;gap:12px;align-items:end}
+.th{width:96px;height:72px;border:1px solid var(--line)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.pt{width:22px;height:22px;flex:none;background-size:cover;background-position:center;border:1px solid var(--teal);clip-path:polygon(0 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%)}
+.pt.p{border-color:var(--purple)}.pt.big{width:44px;height:44px}
+.char{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:8px;border:1px solid #1d2230;background:rgba(255,255,255,.015)}
+.char .nm{display:flex;align-items:baseline;gap:6px}.char .nm b{font-weight:600}
+.char .sub{font:10.5px var(--mono);color:var(--faint);letter-spacing:.06em}
+.hp{display:flex;align-items:center;gap:6px;font:10.5px var(--mono);color:var(--dim);margin-top:4px}
+.hp .bar{flex:1;height:4px;background:#1c2029;position:relative}.hp .bar i{position:absolute;inset:0 auto 0 0;background:var(--ok)}
+.hp .bar i.low{background:var(--alert)}
+.st6{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid #1d2230;text-align:center;margin-top:6px;font:11px var(--mono)}
+.st6 div{padding:2px 0;border-right:1px solid #1d2230}.st6 div:last-child{border:none}
+.st6 b{display:block;font:600 9px var(--mono);color:var(--soft);letter-spacing:.1em}
+.cond{font:600 9px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--alert);border:1px solid rgba(239,68,68,.45);padding:0 4px}
+.wears{font:10px var(--mono);color:var(--teal)}
+</style><style>
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start}
+.dc{border:1px solid var(--line);border-left:2px solid var(--accent);background:rgba(0,0,0,.6);clip-path:polygon(0 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%)}
+.dch{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(245,158,11,.2)}
+.dcb{padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+.q{font-weight:600;font-size:14px;line-height:1.4}
+.who2{display:flex;align-items:center;gap:8px;font:11px var(--mono);color:var(--dim)}
+.rollrow{display:grid;grid-template-columns:110px 1fr 120px 64px;gap:10px;align-items:center;padding:6px 8px;border:1px solid #1d2230;background:rgba(255,255,255,.015)}
+.rollrow.pass{border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.05)}
+.rollrow.fail{border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.04)}
+.die{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;font:700 15px var(--mono);border:1px solid var(--accent);color:var(--accent);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}
+.math{font:12px var(--mono);color:var(--dim)}
+.math b{color:#fff}
+.verdict{font:700 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;text-align:right}
+.ok{color:var(--ok)}.bad{color:var(--alert)}
+.outcome{border:1px solid rgba(0,229,255,.3);background:rgba(0,229,255,.05);padding:8px 10px;line-height:1.5}
+.outcome .lbl{margin-bottom:3px;color:var(--teal)}
+.mode{display:inline-flex;border:1px solid var(--line)}
+.mode span{padding:2px 8px;font:600 10px var(--mono);letter-spacing:.12em;color:var(--dim)}
+.mode span.on{background:rgba(245,158,11,.15);color:var(--accent)}
+.form{display:grid;gap:8px}
+.in{border:1px solid #2a2f3a;background:rgba(0,0,0,.5);padding:5px 8px;font-size:12.5px;color:#fff;min-height:28px}
+.in.mono{font-family:var(--mono);font-size:11.5px}
+.crow{display:grid;grid-template-columns:150px 90px 70px 1fr;gap:6px;align-items:center}
+.chance{font:11px var(--mono);color:var(--teal);text-align:right}
+.bar2{height:4px;background:#1c2029;position:relative;margin-top:3px}.bar2 i{position:absolute;inset:0 auto 0 0;background:var(--teal)}
+.agent{font:11.5px/1.55 var(--mono);color:#cfd3dc;background:#0b0d12;border:1px dashed #2a2f3a;padding:10px 12px;white-space:pre-wrap;margin:0}
+.chip2{display:inline-flex;font:11px var(--mono);border:1px solid rgba(0,229,255,.35);color:var(--teal);padding:1px 6px;background:rgba(0,229,255,.06)}
+.msg{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.bub{border:1px solid rgba(0,229,255,.25);background:rgba(0,229,255,.05);padding:8px 10px;max-width:560px;line-height:1.5}
+.small{font-size:11.5px}
+</style>
+<style>
+.two{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+.kind{font:700 9.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;padding:1px 6px;border:1px solid}
+.kind.a{color:var(--accent);border-color:var(--line2);background:rgba(245,158,11,.08)}
+.kind.d{color:var(--purple);border-color:rgba(168,85,247,.5);background:rgba(168,85,247,.08)}
+.dc.dec{border-left-color:var(--purple)}
+.backdrop{position:relative;background:rgba(0,0,0,.75);border:1px solid #1d2230;padding:26px;display:flex;justify-content:center}
+.modal{width:560px;border:1px solid var(--line2);background:#0a0b0f;clip-path:polygon(0 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%);box-shadow:0 0 40px rgba(245,158,11,.12)}
+.mh{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(245,158,11,.2)}
+.mb{padding:14px;display:flex;flex-direction:column;gap:12px}
+.hero{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:center}
+.port{width:64px;height:64px;border:1px solid var(--teal);background:#0d1218;clip-path:polygon(0 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%);display:flex;align-items:end;justify-content:center;overflow:hidden}
+.port svg{width:52px;height:52px}
+.bigdie{width:58px;height:58px;display:inline-flex;align-items:center;justify-content:center;font:700 22px var(--mono);border:2px solid var(--accent);color:var(--accent);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:rgba(245,158,11,.08)}
+.bigdie.spin{animation:spin .12s linear infinite;color:var(--faint);border-color:var(--faint)}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(60deg)}}
+.check{display:grid;grid-template-columns:58px 1fr 70px;gap:12px;align-items:center;padding:8px 10px;border:1px solid #1d2230;background:rgba(255,255,255,.015)}
+.check.pass{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.06)}
+.check.fail{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.05)}
+.banner{font:700 18px var(--mono);letter-spacing:.3em;text-transform:uppercase;text-align:center;padding:6px 0}
+.hidden{visibility:hidden}
+.opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(168,85,247,.4);background:rgba(168,85,247,.05);cursor:pointer}
+.opt:hover{background:rgba(168,85,247,.12)}
+.opt .k{font:700 10px var(--mono);color:var(--purple);width:16px}
+.seg{display:inline-flex;border:1px solid var(--line)}
+.seg span{padding:3px 10px;font:600 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.seg span.on{background:rgba(245,158,11,.15);color:var(--accent)}
+.seg.p span.on{background:rgba(168,85,247,.15);color:var(--purple)}
+.rowi{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #1d2230;background:rgba(255,255,255,.015)}
+.rowi .q2{flex:1;font-size:12.5px}
+.panel{width:330px;border:1px solid #1d2230;background:#07080b;display:flex;flex-direction:column}
+.abar{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px;border-top:1px solid #1d2230}
+.abar span{font:600 10.5px var(--mono);letter-spacing:.08em;color:var(--dim);border:1px solid #2a2f3a;padding:5px 8px}
+.toggle{display:inline-flex;align-items:center;gap:6px;font:11px var(--mono);color:var(--dim)}
+.toggle i{width:24px;height:12px;border:1px solid var(--purple);position:relative}.toggle i:after{content:'';position:absolute;right:1px;top:1px;width:8px;height:8px;background:var(--purple)}
+</style></head><body><div class="page">
+<h1>Actions and decisions · mockup</h1>
+<p class="lead">Two separate things, never mixed. <b class="acc">An action</b> is something attempted; checks and a roll pick the outcome, and nobody chooses it. <b style="color:var(--purple)">A decision</b> is a choice between options; nothing is rolled, and someone (you or an agent) picks. The words the agent gets always say which one it is, so it never has to guess whether to play out a result or ask.</p>
+
+<div class="sec"><h2>1 · Rolling an action</h2>
+<p class="what">Roll opens this over whatever you are on. The dice tumble, then land one check at a time, then the verdict and the outcome. <b>Play this out</b> starts a chat at the place with the result as your first message (it isn't there when you rolled from inside a chat: the result goes straight into that chat). When an agent rolls, the same card shows in its chat.</p>
+<div class="backdrop"><div class="modal">
+ <div class="mh"><span class="kind a">Action</span><span class="tag">any check passes</span><span class="faint mono small" style="margin-left:auto">rolled by you · Esc</span></div>
+ <div class="mb">
+  <div class="hero"><div class="port"><svg viewBox="0 0 52 52"><circle cx="26" cy="18" r="10" fill="none" stroke="#00e5ff" stroke-width="1.5"/><path d="M6 52c2-12 10-18 20-18s18 6 20 18" fill="none" stroke="#00e5ff" stroke-width="1.5"/></svg></div>
+   <div><div class="q">Convince the guard to open the gate</div><div class="mono small dim" style="margin-top:4px">V · Air genasi bard 4 · HP 22/27</div></div></div>
+  <div class="check" id="c1"><span class="bigdie spin" id="d1">?</span><span class="math" id="m1"><b>Persuasion</b> +5 · needs 12</span><span class="verdict" id="v1"></span></div>
+  <div class="check" id="c2"><span class="bigdie spin" id="d2">?</span><span class="math" id="m2"><b>Deception</b> +4 · needs 15</span><span class="verdict" id="v2"></span></div>
+  <div class="banner hidden" id="ban"></div>
+  <div class="outcome hidden" id="out"><div class="lbl">Outcome · persuasion pass</div>He grumbles, checks the seal twice, and swings the gate open.</div>
+  <div style="display:flex;gap:6px" id="acts" class="hidden"><span class="btn">Play this out</span><span class="btn ghost">Roll again</span><span class="btn ghost">Close</span></div>
+ </div></div></div>
+<div style="margin-top:8px"><span class="btn ghost" onclick="roll()">Replay the roll</span></div>
+</div>
+
+<div class="sec"><h2>2 · Making one</h2>
+<p class="what">One builder, two kinds. Pick Action or Decision at the top; the form changes. Who rolls or who decides defaults to you (your character in this world) and can be any agent.</p>
+<div class="two">
+<div class="dc"><div class="dch"><span class="seg"><span class="on">Action</span><span>Decision</span></span><span style="margin-left:auto" class="mode"><span>All pass</span><span class="on">Any passes</span></span></div>
+<div class="dcb form">
+ <div class="in">Convince the guard to open the gate</div>
+ <div class="who2">Rolled by <span class="seg"><span class="on">You</span><span>An agent</span></span><span class="pt" style="background:#0d1218"></span><span class="in" style="flex:1">V (your character here) ▾</span></div>
+ <div class="lbl">Checks</div>
+ <div class="crow"><span class="in mono">Persuasion ▾</span><span class="in mono">diff 0.55</span><span class="in mono">base 10</span><div><div class="chance">70% with +5</div><div class="bar2"><i style="width:70%"></i></div></div></div>
+ <div class="crow"><span class="in mono">Deception ▾</span><span class="in mono">diff 0.7</span><span class="in mono">base 10</span><div><div class="chance">50% with +4</div><div class="bar2"><i style="width:50%"></i></div></div></div>
+ <div class="lbl">Outcomes</div>
+ <div class="in small">Pass: He grumbles, checks the seal twice, and swings the gate open.</div>
+ <div class="in small">Fail: He calls for the watch captain.</div>
+ <div style="display:flex;gap:6px"><span class="btn">Roll</span><span class="btn ghost">Keep on this place</span></div>
+</div></div>
+<div class="dc dec"><div class="dch"><span class="seg p"><span>Action</span><span class="on">Decision</span></span></div>
+<div class="dcb form">
+ <div class="in">Where does V go next?</div>
+ <div class="who2">Decided by <span class="seg p"><span class="on">You</span><span>An agent</span></span></div>
+ <div class="lbl">Options</div>
+ <div class="in small">The coast road</div>
+ <div class="in small">Up into the mountains</div>
+ <div class="in small">Back to town</div>
+ <div class="in small faint">+ another option</div>
+ <span class="toggle"><i></i>They can answer something else</span>
+ <div style="display:flex;gap:6px"><span class="btn" style="background:var(--purple)">Decide now</span><span class="btn ghost">Keep on this place</span></div>
+</div></div>
+</div></div>
+
+<div class="sec"><h2>3 · Deciding</h2>
+<p class="what">A decision never rolls. When it's yours, you get the options; when it's an agent's, the question goes to that agent and its pick comes back.</p>
+<div class="three">
+<div><div class="lbl">You decide (from a place, or in a chat)</div>
+<div class="dc dec"><div class="dch"><span class="kind d">Decision</span><span class="faint mono small" style="margin-left:auto">yours</span></div><div class="dcb">
+ <div class="q">Where does V go next?</div>
+ <div class="opt"><span class="k">1</span>The coast road</div>
+ <div class="opt"><span class="k">2</span>Up into the mountains</div>
+ <div class="opt"><span class="k">3</span>Back to town</div>
+ <div class="in small faint">Something else…</div>
+</div></div></div>
+<div><div class="lbl">An agent decides</div>
+<div class="dc dec"><div class="dch"><span class="kind d">Decision</span><span class="faint mono small" style="margin-left:auto">the Keeper decides</span></div><div class="dcb">
+ <div class="q">Does the smuggler take the deal?</div>
+ <div class="mono small dim">Options: takes it · haggles · walks away</div>
+ <div class="outcome" style="border-color:rgba(168,85,247,.4);background:rgba(168,85,247,.06)"><div class="lbl" style="color:var(--purple)">The Keeper chose</div>Haggles, wanting the map thrown in.</div>
+</div></div></div>
+<div><div class="lbl">Kept on a place (the panel)</div>
+<div class="panel"><div class="pc" style="gap:10px">
+ <div class="lbl" style="margin:0">Actions</div>
+ <div class="rowi"><span class="kind a">A</span><span class="q2">Convince the guard</span><span class="chip">any · 2</span><span class="btn">Roll</span></div>
+ <div class="rowi"><span class="kind a">A</span><span class="q2">Pick the gate lock</span><span class="chip">1</span><span class="btn">Roll</span></div>
+ <div class="lbl" style="margin:6px 0 0">Decisions</div>
+ <div class="rowi"><span class="kind d">D</span><span class="q2">Where does V go next?</span><span class="chip">you · 3</span><span class="btn" style="background:var(--purple)">Decide</span></div>
+ <div class="rowi"><span class="kind d">D</span><span class="q2">Does the smuggler take the deal?</span><span class="chip">Keeper · 3</span><span class="btn ghost">Ask</span></div>
+</div>
+<div class="abar"><span>Continue here</span><span>New action</span><span>New decision</span><span>New place inside</span><span>Redraw shape</span><span style="color:var(--alert);border-color:rgba(239,68,68,.5)">Delete</span></div></div>
+<div class="small faint" style="margin-top:6px">Right-click a row: Roll / Decide, Edit, Delete.</div></div>
+</div></div>
+
+<div class="sec"><h2>4 · What the agent gets</h2>
+<p class="what">Different wording for each, so it knows whether to play out a result, ask you, or choose.</p>
+<div class="three">
+<div><div class="lbl">An action was rolled</div><pre class="agent">ACTION RESULT (rolled, not a choice)
+V attempted: "Convince the guard to open the gate".
+Persuasion passed (rolled 9 + 5 = 14 against 12).
+Outcome: He grumbles, checks the seal twice, and swings the gate open.
+Play out this outcome.</pre></div>
+<div><div class="lbl">A decision is yours</div><pre class="agent">DECISION FOR THE USER (not rolled)
+Ask the user with ask_user: "Where does V go next?"
+Options: The coast road · Up into the mountains · Back to town. They may answer something else.
+Carry on from their answer.</pre>
+<div class="lbl" style="margin-top:10px">…or you already picked (from the panel)</div><pre class="agent">DECISION MADE BY THE USER
+"Where does V go next?" The user chose: Up into the mountains.
+Play this out.</pre></div>
+<div><div class="lbl">A decision is the agent's</div><pre class="agent">DECISION FOR YOU (not rolled)
+"Does the smuggler take the deal?"
+Options: takes it · haggles · walks away.
+Choose one, say which, and play it out.</pre>
+<div class="lbl" style="margin-top:10px">The agent's tool</div><pre class="agent">action_check(attempt, checks, needs, pass, fail, character)
+(was decision_check; same maths)</pre></div>
+</div></div>
+
+<div class="sec"><h2>5 · As text on a place</h2>
+<p class="what">The place keeps two text fields, Actions and Decisions, readable by you and the agent. The panel shows them as the rows above.</p>
+<div class="two">
+<div><div class="lbl">Actions</div><pre class="agent">Convince the guard to open the gate (any)
+- persuasion 0.55
+- deception 0.7: fail He spots the lie at once
+pass: He grumbles, checks the seal twice, and swings the gate open.
+fail: He calls for the watch captain.</pre></div>
+<div><div class="lbl">Decisions</div><pre class="agent">Where does V go next? (you decide)
+- The coast road
+- Up into the mountains
+- Back to town
+- something else
+
+Does the smuggler take the deal? (the_keeper decides)
+- takes it
+- haggles
+- walks away</pre></div>
+</div></div>
+</div>
+<script>
+function land(n,roll,bonus,target,cb){const d=document.getElementById('d'+n),c=document.getElementById('c'+n),m=document.getElementById('m'+n),v=document.getElementById('v'+n);setTimeout(()=>{d.classList.remove('spin');d.textContent=roll;const t=roll+bonus,ok=t>=target;m.innerHTML=m.innerHTML.split(' · ')[0]+' · '+roll+' + '+bonus+' = <b>'+t+'</b> against '+target;c.classList.add(ok?'pass':'fail');v.textContent=ok?'Pass':'Fail';v.className='verdict '+(ok?'ok':'bad');cb&&cb()},n*700)}
+function roll(){for(const n of [1,2]){const d=document.getElementById('d'+n);d.classList.add('spin');d.textContent='?';document.getElementById('c'+n).className='check';document.getElementById('v'+n).textContent='';const m=document.getElementById('m'+n);m.innerHTML=m.innerHTML.split(' · ')[0]+' · '+(n==1?'+5 · needs 12':'+4 · needs 15')}
+['ban','out','acts'].forEach(i=>document.getElementById(i).classList.add('hidden'))
+land(1,9,5,12);land(2,6,4,15,()=>setTimeout(()=>{const b=document.getElementById('ban');b.textContent='Success';b.className='banner ok';['out','acts'].forEach(i=>document.getElementById(i).classList.remove('hidden'))},350))}
+roll()
+</script>
+</body></html>

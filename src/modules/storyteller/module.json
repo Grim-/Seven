@@ -1,0 +1,53 @@
+{
+  "id": "storyteller",
+  "name": "Storyteller Nexus",
+  "description": "Runs procedurally seeded, branching stories from templates: Seven keeps the structure (acts, rolled scenarios, what's true about the world), the model writes the prose. It rolls from your repos (in Data); story templates and POIs are its own kinds, and a library folder of JSON files can add more. Story runs are kept in the vault.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "permission": "custom",
+  "settings": [
+    {
+      "name": "libraryFolder",
+      "type": "folder",
+      "label": "Library folder",
+      "description": "Optional. Holds templates/, repos/ and pois/ as JSON you edit by hand (not encrypted); they're used alongside the ones in Data. Story runs found in its stories/ folder are copied into the vault once."
+    }
+  ],
+  "kinds": [
+    {
+      "type": "template",
+      "label": "Story template",
+      "plural": "Story templates",
+      "icon": "scroll-text",
+      "group": "Worlds",
+      "description": "the acts, branches and calls to action a story run follows",
+      "view": "nexus.html",
+      "actions": [
+        "add_story_template",
+        "update_story_template"
+      ]
+    },
+    {
+      "type": "poi",
+      "label": "Point of interest",
+      "plural": "POIs",
+      "icon": "map-pin",
+      "group": "Worlds",
+      "description": "a place stories can draw on",
+      "view": "nexus.html"
+    },
+    {
+      "type": "tale",
+      "label": "Branching story",
+      "plural": "Branching stories",
+      "icon": "git-branch",
+      "group": "Worlds",
+      "description": "a finished story in passages, where the reader's choices lead to other passages",
+      "view": "nexus.html",
+      "actions": [
+        "add_branching_story",
+        "update_branching_story"
+      ]
+    }
+  ]
+}

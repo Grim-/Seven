@@ -1,0 +1,9 @@
+{
+  "id": "player",
+  "name": "Media player",
+  "description": "Play audio from the library: play or queue tracks, pause, skip and see what's on. You control whether it plays and how loud.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": false,
+  "permission": "none"
+}

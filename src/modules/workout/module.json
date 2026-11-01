@@ -1,0 +1,8 @@
+{
+  "id": "workout",
+  "name": "Workout",
+  "description": "Exercises and workouts as entries, with form guides (drawings, pictures, video links, dos and don'ts) and a log of every session. The user logs sets in Workout (Data, Pages or the side panel); agents show workouts, log what the user tells them, track progress and write exercise guides.",
+  "version": "3.0.0",
+  "apiVersion": 1,
+  "permission": "none"
+}

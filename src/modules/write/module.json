@@ -1,0 +1,9 @@
+{
+  "id": "write",
+  "name": "Edit files",
+  "description": "Change and create files in the workspace. Each file is saved before it changes, so a chat can be rewound.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": true,
+  "permission": "custom"
+}

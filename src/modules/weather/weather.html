@@ -1,0 +1,64 @@
+<div id="w" style="display:flex;flex-direction:column;gap:10px;height:100%">
+  <div id="error" class="s-note" style="display:none"></div>
+  <div id="main" style="display:none;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <div id="temp" style="font-size:44px;font-weight:700;line-height:1"></div>
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <div id="text" style="font-size:15px"></div>
+        <div id="place" class="s-note"></div>
+      </div>
+    </div>
+    <div id="extra" class="s-note"></div>
+    <div id="days" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px"></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="at" class="s-note" style="flex:1"></span>
+      <button id="refresh" class="s-btn">Refresh</button>
+    </div>
+  </div>
+</div>
+<script>
+  function el(id) {
+    return document.getElementById(id)
+  }
+  el('refresh').addEventListener('click', function () {
+    window.sevenTemplate.action('refresh')
+  })
+  window.sevenTemplate.onFields(function (v) {
+    var bad = !v || v.error
+    el('error').style.display = bad ? 'block' : 'none'
+    el('main').style.display = bad ? 'none' : 'flex'
+    if (bad) {
+      el('error').textContent = (v && v.error) || 'No weather yet.'
+      return
+    }
+    var u = v.units.temp
+    el('temp').textContent = v.now.temp + u
+    el('text').textContent = v.now.text
+    el('place').textContent = v.place.name + (v.place.region ? ', ' + v.place.region : '')
+    var today = v.days[0]
+    el('extra').textContent =
+      'Feels ' + v.now.feels + u + ' · wind ' + v.now.wind + ' ' + v.units.wind + ' · humidity ' + v.now.humidity + '%' + (today ? ' · sun ' + today.sunrise + '–' + today.sunset : '')
+    var days = el('days')
+    days.innerHTML = ''
+    v.days.forEach(function (d) {
+      var box = document.createElement('div')
+      box.className = 's-panel'
+      box.style.padding = '6px 8px'
+      var label = document.createElement('div')
+      label.className = 's-note'
+      label.textContent = d.label
+      var t = document.createElement('div')
+      t.style.fontSize = '12.5px'
+      t.textContent = d.text
+      var range = document.createElement('div')
+      range.style.fontSize = '13px'
+      range.style.fontWeight = '600'
+      range.textContent = d.low + '–' + d.high + u + (d.rain !== null ? ' · ' + d.rain + '%' : '')
+      box.appendChild(label)
+      box.appendChild(t)
+      box.appendChild(range)
+      days.appendChild(box)
+    })
+    el('at').textContent = 'Updated ' + new Date(v.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · Open-Meteo'
+  })
+</script>

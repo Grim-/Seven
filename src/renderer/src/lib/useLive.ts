@@ -1,0 +1,40 @@
+import { useEffect, useState } from 'react'
+import type { EventName } from '@shared/protocol'
+import { on } from './ipc'
+import { onLibraryChange } from './library'
+
+export function useLive<T>(fetch: () => Promise<T>, event: EventName): T | null {
+  const [value, setValue] = useState<T | null>(null)
+  useEffect(() => {
+    let live = true
+    const load = () =>
+      void fetch()
+        .then((v) => live && setValue(v))
+        .catch(() => undefined)
+    load()
+    const off = on(event, load)
+    return () => {
+      live = false
+      off()
+    }
+  }, [event])
+  return value
+}
+
+export function useLibraryData<T>(fetch: () => Promise<T>, key: string): T | null {
+  const [value, setValue] = useState<T | null>(null)
+  useEffect(() => {
+    let live = true
+    const load = () =>
+      void fetch()
+        .then((v) => live && setValue(v))
+        .catch(() => undefined)
+    load()
+    const off = onLibraryChange(load)
+    return () => {
+      live = false
+      off()
+    }
+  }, [key])
+  return value
+}

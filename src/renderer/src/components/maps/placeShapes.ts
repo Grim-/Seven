@@ -1,0 +1,11 @@
+import type { Shape, ShapeForm } from '@shared/shapes'
+import type { WorldEntity } from '@shared/world'
+
+export const placeName = (places: Record<string, WorldEntity>, key: string): string => {
+  const name = places[key]?.Name
+  return typeof name === 'string' && name ? name : key
+}
+
+export function placeShapes(shapes: Record<string, ShapeForm>, places: Record<string, WorldEntity>): Shape[] {
+  return Object.entries(shapes).map(([key, form]) => ({ id: key, label: placeName(places, key), form }))
+}

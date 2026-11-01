@@ -1,0 +1,9 @@
+{
+  "id": "dashboards",
+  "name": "Dashboards",
+  "description": "Create and arrange boards, which also appear on the overlay toolbar. Things go on them with add_to_board, or as a presentation.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": false,
+  "permission": "custom"
+}

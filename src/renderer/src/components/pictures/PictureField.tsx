@@ -1,0 +1,36 @@
+import { Images, ImagePlus, X } from 'lucide-react'
+import { Button } from '../ui'
+import { AssetMedia } from './AssetMedia'
+import { pickPicture, type PictureOptions } from '../data/PicturePicker'
+import { choosePictures } from '../../lib/importFiles'
+import { cn } from '../../lib/cn'
+
+export function PictureField({ value, onChange, options = {}, large = false, clearable = true }: { value: string | null; onChange: (id: string | null) => void; options?: PictureOptions; large?: boolean; clearable?: boolean }) {
+  const fromSeven = () => void pickPicture(value, options).then((r) => r && onChange(r.id))
+  const fromDisk = async () => {
+    const [added] = await choosePictures(options.kinds ?? ['image'], false, options.what ?? 'a picture', options.mimes)
+    if (added) onChange(added.id)
+  }
+  return (
+    <div className={cn('flex gap-2', large ? 'flex-col' : 'items-center')}>
+      {(value || large) && (
+        <div className={cn('shrink-0 overflow-hidden border border-line/60 bg-black/50', large ? 'flex aspect-[4/3] w-full items-center justify-center' : 'h-10 w-10')}>
+          {value ? <AssetMedia id={value} className="h-full w-full" /> : <span className="text-[12px] text-faint">No picture yet</span>}
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="secondary" icon={<Images />} onClick={fromSeven}>
+          Use image from Seven
+        </Button>
+        <Button size="sm" variant="secondary" icon={<ImagePlus />} onClick={() => void fromDisk()}>
+          Use image from…
+        </Button>
+        {value && clearable && (
+          <Button size="sm" variant="ghost" icon={<X />} onClick={() => onChange(null)}>
+            Clear
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}

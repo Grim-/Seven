@@ -1,0 +1,32 @@
+import type { ShellViewProps } from './shellTypes'
+import { FaceCount, FaceGrid, ShellAddTile, asideOf, enterStyle, shellState } from './ShellParts'
+import { ShellFace } from './ShellFace'
+
+export function ShellDeck({ items, adds, bind, scale }: ShellViewProps) {
+  return (
+    <FaceGrid scale={scale}>
+      {items.map((item, i) => {
+        const b = bind(item)
+        return (
+          <button key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i)} className="shell-enter group relative block min-w-0 text-left">
+            {item.face ?? (
+              <ShellFace
+                title={item.title}
+                label={item.tag}
+                aside={asideOf(item)}
+                color={item.color}
+                art={item.thumb ?? item.tile}
+                type={item.subtitle}
+                body={item.excerpt}
+              />
+            )}
+            <FaceCount count={item.count} />
+          </button>
+        )
+      })}
+      {adds.map((a) => (
+        <ShellAddTile key={a.label} add={a} />
+      ))}
+    </FaceGrid>
+  )
+}

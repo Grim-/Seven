@@ -1,0 +1,9 @@
+{
+  "id": "backgrounds",
+  "name": "Backgrounds",
+  "description": "Animated backgrounds for themes: Cyberdeck, Neon cityscape and Blackwall. Pick one as a theme's effect. Adds no tools; with Ambience on, the agent can play a background's reactions with cue.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "tools": false,
+  "permission": "custom"
+}

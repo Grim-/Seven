@@ -1,0 +1,8 @@
+{
+  "id": "reminders",
+  "name": "Reminders",
+  "description": "The agent can set one-off or repeating reminders that pop up (with sound) at the time, and scheduled tasks that start a turn in a chat at the time (these always ask you first). Seven has to be running, in the tray is enough.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "permission": "custom"
+}

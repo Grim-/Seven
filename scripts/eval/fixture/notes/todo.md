@@ -1,0 +1,2 @@
+- Rename the parser module to tokenizer
+- Raise RETRY_LIMIT once the network layer is stable

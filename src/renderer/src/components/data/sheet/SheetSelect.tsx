@@ -1,0 +1,13 @@
+import { useEffect, useState } from 'react'
+import { Select } from '../../ui'
+import { engine } from '../../../lib/ipc'
+
+export function SheetSelect({ value, onChange, className }: { value: string | null; onChange: (id: string | null) => void; className?: string }) {
+  const [list, setList] = useState<{ id: string; title: string }[]>([])
+  useEffect(() => {
+    void engine('library.find', { query: '', kind: 'sheet' })
+      .then((hits) => setList(hits.map((h) => ({ id: h.id, title: h.title }))))
+      .catch(() => setList([]))
+  }, [])
+  return <Select value={value ?? ''} options={[{ value: '', label: 'None' }, ...list.map((s) => ({ value: s.id, label: s.title }))]} onChange={(v) => onChange(v || null)} className={className} />
+}

@@ -1,0 +1,71 @@
+<style>
+  .cg { display: flex; flex-direction: column; gap: 10px; color: var(--text) }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start }
+  .card { position: relative; width: 112px; height: 160px; border: 2px solid var(--c, #3a6ea5); border-radius: 8px; background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(0,0,0,.55)); display: flex; flex-direction: column; padding: 6px; box-sizing: border-box; font-size: 11px; cursor: default; transition: transform .12s }
+  .card .nm { font-weight: 700; font-size: 12px; padding-right: 22px; line-height: 1.15 }
+  .card .art { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 30px; overflow: hidden; margin: 4px 0 }
+  .card .art svg { max-width: 100%; max-height: 100% }
+  .card .tx { font-size: 10.5px; line-height: 1.25; opacity: .9; max-height: 40px; overflow: hidden }
+  .turn { font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--accent) }
+  textarea.js { width: 100%; min-height: 220px; box-sizing: border-box; background: rgba(0,0,0,.5); color: var(--text); border: 1px solid var(--line); font: 12px var(--mono); padding: 6px }
+</style>
+<div id="root" class="cg"></div>
+<script>
+  var root = document.getElementById('root')
+  var current = null
+
+  function h(tag, attrs, kids) {
+    var el = document.createElement(tag)
+    if (attrs) for (var k in attrs) {
+      if (k === 'class') el.className = attrs[k]
+      else if (k === 'text') el.textContent = attrs[k]
+      else if (k === 'onclick') el.addEventListener('click', attrs[k])
+      else if (k === 'style') el.setAttribute('style', attrs[k])
+      else el.setAttribute(k, attrs[k])
+    }
+    ;(kids || []).forEach(function (c) { if (c) el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c) })
+    return el
+  }
+
+  function cardEl(c) {
+    var el = h('div', { class: 'card', style: c.color ? '--c:' + c.color : '' })
+    el.appendChild(h('div', { class: 'nm', text: c.name }))
+    var art = h('div', { class: 'art' })
+    if (c.art && c.art.indexOf('<svg') === 0) art.innerHTML = c.art
+    else art.textContent = c.art || ''
+    el.appendChild(art)
+    var tx = c.use === 'generic' || !c.use ? c.prompt || c.text : c.text
+    if (tx) el.appendChild(h('div', { class: 'tx', text: tx }))
+    return el
+  }
+
+  function editor(json) {
+    var box = h('textarea', { class: 'js' })
+    box.value = json
+    var wrap = h('details', null, [h('summary', { class: 's-note', text: 'Edit as JSON' }), box, h('button', { class: 's-btn', text: 'Save', onclick: function () { window.sevenTemplate.action('save', { json: box.value }) } })])
+    return wrap
+  }
+
+  function renderCounts(v) {
+    root.appendChild(h('div', { class: 'turn', text: v.name + ' · ' + v.cards.reduce(function (n, c) { return n + c.count }, 0) + ' cards' }))
+    root.appendChild(h('div', { class: 'row' }, v.cards.map(function (e) { return h('div', null, [cardEl(e.card), h('div', { class: 's-chip', text: '× ' + e.count })]) })))
+    root.appendChild(editor(v.json))
+  }
+
+  function draw() {
+    root.innerHTML = ''
+    var v = current
+    if (!v) return
+    if (v.mode === 'counts') renderCounts(v)
+    else if (v.mode === 'layout') root.appendChild(h('div', { class: 's-note', text: v.text }))
+    else {
+      root.appendChild(cardEl(v.data))
+      root.appendChild(editor(v.json))
+    }
+  }
+
+  window.sevenTemplate.onFields(function (v) {
+    current = v
+    draw()
+  })
+</script>

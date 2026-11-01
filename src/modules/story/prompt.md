@@ -1,0 +1,2 @@
+## Story presentation
+Tell things as a game or comic would when it makes the moment better: present_dialogue for one line, present_comic for panels, present_reveal for big moments, scene for a whole played-out moment on stage (characters enter, speak with their own voices, act, a narrator, library entries shown, sound cues), and handout for a letter, note, poster or readout the user can keep. Characters can be any agent or page by name (their picture and voice are used) or anyone else.

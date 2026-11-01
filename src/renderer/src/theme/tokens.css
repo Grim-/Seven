@@ -1,0 +1,185 @@
+@theme {
+  --color-bg: #090a0d;
+  --color-sidebar: #0d0f14;
+  --color-card: #11141c;
+  --color-card-hover: #161a24;
+  --color-line: rgba(245, 158, 11, 0.35);
+  --color-line-strong: rgba(245, 158, 11, 0.6);
+  --color-line-hover: rgba(6, 182, 212, 0.6);
+  --color-accent: #ffc919;
+  --color-accent-soft: #e39d07;
+  --color-accent-dark: rgb(163, 112, 2);
+  --color-cyan: rgb(102, 252, 241);
+  --color-teal: rgb(0, 229, 255);
+  --color-purple: #a855f7;
+  --color-alert: #ef4444;
+  --color-ok: #34d399;
+  --color-text: #ffffff;
+  --color-dim: #a1a1aa;
+  --color-faint: #52525b;
+
+  --font-sans: 'Segoe UI', Inter, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'SFMono-Regular', Menlo, monospace;
+
+  --animate-blink: blink 1s steps(2, start) infinite;
+  --animate-sweep: sweep 1.4s cubic-bezier(0.75, 0, 0.25, 1) infinite;
+  --animate-bubble: bubble 2.6s ease-out forwards;
+
+  @keyframes bubble {
+    0% {
+      transform: translateY(4px) scale(0.4);
+      opacity: 0;
+    }
+    15% {
+      transform: translateY(0) scale(1.15);
+      opacity: 1;
+    }
+    25% {
+      transform: translateY(0) scale(1);
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-10px) scale(1);
+      opacity: 0;
+    }
+  }
+
+  @keyframes blink {
+    to {
+      visibility: hidden;
+    }
+  }
+
+  @keyframes sweep {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(400%);
+    }
+  }
+}
+
+@keyframes reveal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes reveal-flash {
+  0% { opacity: 0; filter: brightness(5); }
+  20% { opacity: 1; filter: brightness(3); }
+  100% { opacity: 1; filter: brightness(1); }
+}
+@keyframes reveal-flash-cover {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes reveal-shake {
+  0% { opacity: 0; transform: translate(0, 0); }
+  10% { opacity: 1; transform: translate(-14px, 6px) rotate(-1deg); }
+  20% { transform: translate(12px, -8px) rotate(1deg); }
+  30% { transform: translate(-10px, 4px); }
+  40% { transform: translate(8px, -4px); }
+  55% { transform: translate(-5px, 2px); }
+  70% { transform: translate(3px, -1px); }
+  100% { opacity: 1; transform: translate(0, 0); }
+}
+@keyframes reveal-iris {
+  from { clip-path: circle(0% at 50% 50%); }
+  to { clip-path: circle(150% at 50% 50%); }
+}
+@keyframes reveal-slide {
+  from { opacity: 0; transform: translateY(60px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes reveal-glitch {
+  0% { opacity: 0; clip-path: inset(40% 0 45% 0); transform: translateX(-20px); filter: hue-rotate(90deg); }
+  10% { opacity: 1; clip-path: inset(10% 0 70% 0); transform: translateX(16px); }
+  20% { clip-path: inset(60% 0 10% 0); transform: translateX(-12px); filter: hue-rotate(-60deg); }
+  30% { clip-path: inset(20% 0 50% 0); transform: translateX(8px); }
+  45% { clip-path: inset(0 0 30% 0); transform: translateX(-4px); filter: hue-rotate(30deg); }
+  60% { clip-path: inset(0 0 0 0); transform: translateX(2px); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); transform: translateX(0); filter: none; }
+}
+@keyframes reveal-zoom {
+  from { opacity: 0; transform: scale(2.4); filter: blur(10px); }
+  to { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+@keyframes comic-in {
+  from { opacity: 0; transform: scale(0.88) rotate(-2deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes seven-encrypt {
+  0% { opacity: 0; clip-path: inset(48% 0 48% 0); }
+  30% { opacity: 1; clip-path: inset(20% 0 30% 0); transform: translateX(-6px); }
+  55% { clip-path: inset(0 0 10% 0); transform: translateX(4px); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); transform: none; }
+}
+@keyframes seven-decrypt {
+  0% { opacity: 1; clip-path: inset(0 0 0 0); }
+  25% { clip-path: inset(10% 0 30% 0); transform: translateX(6px); filter: hue-rotate(60deg); }
+  50% { opacity: 0.8; clip-path: inset(40% 0 20% 0); transform: translateX(-4px); }
+  100% { opacity: 0; clip-path: inset(50% 0 50% 0); transform: none; filter: none; }
+}
+@keyframes seven-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(400%); }
+}
+@keyframes seven-trace {
+  from { stroke-dashoffset: 60; }
+  to { stroke-dashoffset: 0; }
+}
+.seven-encrypt { animation: seven-encrypt 0.45s ease-out both; }
+.seven-decrypt { animation: seven-decrypt 0.6s ease-in forwards; }
+.seven-sweep { animation: seven-sweep 1.6s ease-in-out infinite; }
+.seven-trace { stroke-dasharray: 30 30; animation: seven-trace 1.1s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .seven-encrypt, .seven-decrypt { animation-duration: 0.01s; }
+  .seven-sweep, .seven-trace { animation: none; }
+}
+@keyframes av-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(2px, -1px); }
+  60% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 1px); }
+}
+@keyframes av-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6%); }
+}
+@keyframes av-droop {
+  0%, 100% { transform: translateY(2%) rotate(-1deg); opacity: 0.85; }
+  50% { transform: translateY(6%) rotate(1deg); opacity: 0.7; }
+}
+@keyframes av-flicker {
+  0%, 100% { opacity: 1; }
+  45% { opacity: 1; }
+  50% { opacity: 0.35; }
+  55% { opacity: 1; }
+  80% { opacity: 0.6; }
+}
+@keyframes av-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+@keyframes av-scan {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(100%); }
+}
+@keyframes av-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.25); }
+}
+.av-shake { animation: av-shake 0.28s linear infinite; }
+.av-bob { animation: av-bob 1.4s ease-in-out infinite; }
+.av-droop { animation: av-droop 3.2s ease-in-out infinite; }
+.av-flicker { animation: av-flicker 1.1s steps(1, end) infinite; }
+.av-breathe { animation: av-breathe 4.5s ease-in-out infinite; }
+.av-pulse { animation: av-pulse 0.6s ease-in-out infinite; }
+.av-scan { animation: av-scan 1.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .av-shake, .av-bob, .av-droop, .av-flicker, .av-breathe, .av-pulse, .av-scan { animation: none; }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "agents",
+  "name": "Make agents",
+  "description": "Lets the agent make new agents and change any agent's name, description, instructions or roleplay style. A new agent starts with no tools; only you give it tools and permissions, in Agents. Asks before each change.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": false,
+  "permission": "ask"
+}

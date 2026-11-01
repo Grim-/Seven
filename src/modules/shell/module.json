@@ -1,0 +1,12 @@
+{
+  "id": "shell",
+  "name": "Run commands",
+  "description": "Run commands in a terminal starting in the workspace. Commands are not sandboxed: approve them with care.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": true,
+  "permission": "custom",
+  "settings": [
+    { "name": "showMedia", "type": "boolean", "label": "Show media commands make", "description": "Pictures, audio, video and PDFs a command saves in the workspace are added to your files and shown in the chat.", "default": true }
+  ]
+}

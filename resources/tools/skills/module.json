@@ -1,0 +1,10 @@
+{
+  "id": "skills",
+  "name": "Skills",
+  "description": "Saved step-by-step instructions for particular tasks, kept as folders with a SKILL.md in your Skills folder. The agent lists and reads them when a task could use one, and can save new ones (asks first).",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "entry": "index.js",
+  "permission": "none",
+  "toolPermissions": { "write_skill": "ask", "delete_skill": "ask" }
+}

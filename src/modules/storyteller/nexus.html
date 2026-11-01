@@ -1,0 +1,111 @@
+<div id="root" style="display:flex;flex-direction:column;gap:10px"></div>
+<script>
+  var root = document.getElementById('root')
+
+  function h(tag, attrs, kids) {
+    var el = document.createElement(tag)
+    if (attrs) for (var k in attrs) {
+      if (k === 'class') el.className = attrs[k]
+      else if (k === 'text') el.textContent = attrs[k]
+      else if (k === 'onclick') el.addEventListener('click', attrs[k])
+      else if (k === 'style') el.setAttribute('style', attrs[k])
+      else el.setAttribute(k, attrs[k])
+    }
+    ;(kids || []).forEach(function (c) { if (c) el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c) })
+    return el
+  }
+
+  function field(label, input, note) {
+    return h('label', { style: 'display:flex;flex-direction:column;gap:4px' }, [h('span', { class: 's-label', text: label }), input, note ? h('span', { class: 's-dim', style: 'font-size:12px', text: note }) : null])
+  }
+
+  function repo(v) {
+    var d = v.data
+    var tags = h('input', { class: 's-input' })
+    tags.value = d.tags.join(', ')
+    var scope = h('select', { class: 's-select' }, [h('option', { value: 'use', text: 'Roll every time it is used' }), h('option', { value: 'run', text: 'Roll once per story run, then keep it' })])
+    scope.value = d.scope
+    var values = h('textarea', { class: 's-textarea', style: 'min-height:260px;font-family:var(--mono);font-size:12.5px' })
+    values.value = d.values.join('\n')
+    root.appendChild(h('div', { class: 's-row' }, [h('span', { class: 's-title', text: v.title }), h('span', { class: 's-chip', text: d.values.length + ' values' }), h('span', { class: 's-dim', style: 'font-size:12px', text: 'Templates use it as {' + v.id + '}' })]))
+    root.appendChild(field('Tags', tags, 'Comma separated. Templates can ask for any repo with a tag, as {tag:name}.'))
+    root.appendChild(field('Rolling', scope))
+    root.appendChild(field('Values', values, 'One per line.'))
+    root.appendChild(h('div', null, [h('button', { class: 's-btn primary', text: 'Save', onclick: function () {
+      window.sevenTemplate.action('save', { tags: tags.value, scope: scope.value, values: values.value })
+    } })]))
+  }
+
+  function json(v, note) {
+    var box = h('textarea', { class: 's-textarea', style: 'min-height:420px;font-family:var(--mono);font-size:12.5px' })
+    box.value = v.json
+    root.appendChild(h('div', { class: 's-row' }, [h('span', { class: 's-title', text: v.title })]))
+    root.appendChild(h('div', { class: 's-note', text: note }))
+    root.appendChild(box)
+    root.appendChild(h('div', null, [h('button', { class: 's-btn primary', text: 'Save', onclick: function () { window.sevenTemplate.action('save', { json: box.value }) } })]))
+  }
+
+  function tale(v) {
+    var d = v.data
+    var byId = {}
+    d.passages.forEach(function (p) { byId[p.id] = p })
+    var trail = []
+    var editing = false
+    var endings = d.passages.filter(function (p) { return !p.choices.length }).length
+    var missing = []
+    d.passages.forEach(function (p) { p.choices.forEach(function (c) { if (!byId[c.to] && missing.indexOf(c.to) < 0) missing.push(c.to) }) })
+
+    function go(id) {
+      trail.push(id)
+      draw()
+    }
+
+    function draw() {
+      root.innerHTML = ''
+      root.appendChild(h('div', { class: 's-row' }, [
+        h('span', { class: 's-title', text: v.title }),
+        h('span', { class: 's-chip', text: d.passages.length + ' passages' }),
+        h('span', { class: 's-chip', text: endings + (endings === 1 ? ' ending' : ' endings') }),
+        h('button', { class: 's-btn', style: 'margin-left:auto', text: editing ? 'Read' : 'Edit as JSON', onclick: function () { editing = !editing; draw() } })
+      ]))
+      if (missing.length) root.appendChild(h('div', { class: 's-note', text: 'Choices lead to passages not written yet: ' + missing.join(', ') }))
+      if (editing) {
+        var box = h('textarea', { class: 's-textarea', style: 'min-height:420px;font-family:var(--mono);font-size:12.5px' })
+        box.value = v.json
+        root.appendChild(box)
+        root.appendChild(h('div', null, [h('button', { class: 's-btn primary', text: 'Save', onclick: function () { window.sevenTemplate.action('save', { json: box.value }) } })]))
+        return
+      }
+      var id = trail[trail.length - 1]
+      var p = byId[id]
+      if (!p) {
+        root.appendChild(h('div', { class: 's-note', text: id ? 'The passage ' + id + ' is not written yet.' : 'This story has no start passage yet.' }))
+      } else {
+        var body = h('div', { style: 'display:flex;flex-direction:column;gap:10px;max-width:70ch;font-size:15px;line-height:1.65' })
+        p.text.split(/\n\s*\n/).forEach(function (para) { if (para.trim()) body.appendChild(h('p', { style: 'margin:0;white-space:pre-wrap', text: para.trim() })) })
+        root.appendChild(body)
+        var choices = h('div', { style: 'display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:6px' })
+        p.choices.forEach(function (c) { choices.appendChild(h('button', { class: 's-btn', text: c.label, onclick: function () { go(c.to) } })) })
+        if (!p.choices.length) choices.appendChild(h('span', { class: 's-dim', text: 'The end.' }))
+        root.appendChild(choices)
+      }
+      root.appendChild(h('div', { class: 's-row', style: 'margin-top:8px' }, [
+        h('button', { class: 's-btn', text: 'Back', onclick: function () { if (trail.length > 1) { trail.pop(); draw() } } }),
+        h('button', { class: 's-btn', text: 'Start over', onclick: function () { trail = [d.start]; draw() } }),
+        h('span', { class: 's-dim', style: 'font-size:12px', text: (id || '') + ' · step ' + trail.length })
+      ]))
+    }
+
+    trail = [d.start]
+    draw()
+  }
+
+  window.sevenTemplate.onFields(function (v) {
+    root.innerHTML = ''
+    if (!v) return
+    if (v.mode === 'repo') repo(v)
+    else if (v.mode === 'tale') tale(v)
+    else if (v.mode === 'template') json(v, 'The template as JSON: title, tags, story_notes, callToActionOptions and acts (name, story_beat, transition_threshold, branches). {repo name} and {tag:name} in any text are rolled when a story starts.')
+    else json(v, 'The point of interest as JSON. Give it tags so stories can find it.')
+  })
+</script>
