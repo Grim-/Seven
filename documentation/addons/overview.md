@@ -3,7 +3,7 @@
 An add-on is a folder that teaches Seven something new: new tools for agents, new kinds of entry, its own screens and widgets. It's plain JavaScript and HTML; you don't need to build or compile anything.
 
 ## Where they live
-Your Tools folder, set in Settings (yours is `C:\Users\Bry\.seven\tools`). Each add-on is one folder in it, e.g. `tools\quotes\`.
+Your Tools folder, set in Settings (yours is `C:\Users\YOUR_USER\.seven\tools`). Each add-on is one folder in it, e.g. `tools\quotes\`.
 
 Seven finds the folder when it starts. It shows up in **Tools** waiting for you to approve it. If any file in the folder changes, Seven pauses it and asks you to approve it again, so nothing changes behind your back.
 
