@@ -19,7 +19,7 @@ The agent does the grunt work; you get something to act on. Agents handle the ha
 * **Characters** are formatted as sheets.
 * **Plans** render as checklists.
 
-### 🧩 Everything is a "Kind" ([Kinds](./documentation/kinds/overview.md)
+### 🧩 Everything is a "Kind" ([Kinds](./documentation/kinds/overview.md))
 Pages, files, chats, agents, themes, days, routines—everything shares a single unified concept.
 * Finding, linking, showing, and exporting work identically across all item types.
 * New features slot in naturally as new kinds.
