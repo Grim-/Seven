@@ -43,4 +43,4 @@ Software should feel good to use. Atmospheric themes, customizable backgrounds, 
 
 ## Getting Started
 
-*(Add installation, setup, or quickstart commands here)*
+
