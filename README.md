@@ -44,10 +44,6 @@ Software should feel good to use. Atmospheric themes, customizable backgrounds, 
 
 <img width="1920" height="1050" alt="seven_example_1" src="https://github.com/user-attachments/assets/72bfd885-8a20-47a2-8a2d-bb64406dd3b9" />
 <img width="1920" height="1050" alt="seven_example_2" src="https://github.com/user-attachments/assets/7c22fa95-6207-4c46-b6ce-09029822a878" />
-<img width="1920" height="1050" alt="seven_example_3" src="https://github.com/user-attachments/assets/18378c83-276b-449e-ae99-9804af37d15d" />
-<img width="1920" height="1050" alt="seven_example_4" src="https://github.com/user-attachments/assets/ea15640c-c0a0-478d-9ef1-4eb4d7045b93" />
-<img width="1920" height="1050" alt="seven_example_filexplore" src="https://github.com/user-attachments/assets/09e9743b-fdf9-4cf9-92b6-fea0d25f5804" />
-<img width="1920" height="1050" alt="seven_example_5" src="https://github.com/user-attachments/assets/f5443388-cea0-4506-9076-702c66fad7f2" />
 
 
 
