@@ -16,6 +16,7 @@ import { showInData } from '../../lib/library'
 import { referenceInChat, startChatWith } from '../../lib/conversation'
 import { useAgents } from '../../store/agents'
 import { boardMenu } from '../../components/data/boardMenu'
+import { favouriteItem } from '../../lib/favourites'
 
 
 export function openIn(kind: string, id: string, select: (s: DataSelection | null) => void): void {
@@ -43,6 +44,14 @@ function sections(): Promise<LibrarySection[]> {
   return loading
 }
 
+async function sectionOf(kind: string): Promise<LibrarySection | null> {
+  const hit = (await sections()).find((s) => s.kind === kind)
+  if (hit) return hit
+  const [found] = await engine('library.overview', { query: '', perKind: 0, kind })
+  if (found) known = [...(known ?? []), found]
+  return found ?? null
+}
+
 function at(e: React.MouseEvent) {
   e.preventDefault()
   e.stopPropagation()
@@ -59,9 +68,8 @@ function joined(...groups: MenuItem[][]): MenuItem[] {
 
 export function entryMenuAt(e: React.MouseEvent, kind: string, id: string, title: string, extra: MenuItem[] = []): void {
   const where = at(e)
-  void sections().then(
-    (list) => {
-      const section = list.find((s) => s.kind === kind)
+  void sectionOf(kind).then(
+    (section) => {
       const selected = (useWindows.getState().locations.data as DataSelection | null | undefined) ?? null
       const select = (s: DataSelection | null) => showInData(s, false)
       const open = () => {
@@ -90,9 +98,9 @@ export function clearKind(section: LibrarySection): void {
 
 export function exportMenuAt(e: React.MouseEvent, section: LibrarySection, open: { id: string; kind: string; title: string } | null = null): void {
   const where = at(e)
-  void sections()
-    .then((list) => {
-      const own = open ? list.find((s) => s.kind === open.kind && s.exportable) : undefined
+  void (open ? sectionOf(open.kind) : Promise.resolve(null))
+    .then((found) => {
+      const own = found?.exportable ? found : undefined
       const entry = own ? open : null
       openMenu(where, entry ? showName(entry.title) : section.plural, joined(entry ? exportMenu(`${entry.kind}/${entry.id}`, own?.carriable ? showName(entry.title) : null) : [], exportKindMenu(section.kind, section.plural)))
     })
@@ -133,6 +141,7 @@ export function entryActions(section: LibrarySection, hit: LibraryHit, ctx: { op
     { label: 'Show in chat panel', icon: <PanelRight />, onSelect: () => void showInPanel(entry) },
     ...(section.boardable ? [boardMenu(entry)] : []),
     { label: 'Copy link', icon: <Link />, onSelect: () => void copyText(link, 'Link copied', link) },
+    favouriteItem({ kind: section.kind, id: hit.id, label: hit.title, icon: section.icon }),
     {
       label: 'Tags…',
       icon: <Hash />,

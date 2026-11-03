@@ -57,15 +57,23 @@ export const MIDDLE = 0.5
 export const CHANCE = 'chance'
 export const NEEDS_LABEL: Record<ActionNeeds, string> = { any: 'one check, picked', all: 'every check passes' }
 
+const CHECKS: { id: string; label: string; bonus: (d: DndStats) => number | null }[] = [
+  ...DND_STATS.map((s) => ({ id: toId(DND_STAT_NAMES[s]), label: DND_STAT_NAMES[s], bonus: (d: DndStats) => mod(d.stats[s]) })),
+  ...DND_STATS.map((s) => ({ id: `${toId(DND_STAT_NAMES[s])}_save`, label: `${DND_STAT_NAMES[s]} save`, bonus: (d: DndStats) => saveBonus(d, s) })),
+  ...DND_SKILLS.map((s) => ({ id: toId(s.name), label: s.name, bonus: (d: DndStats) => skillBonus(d, s.id) })),
+  { id: 'spell_attack', label: 'Spell attack', bonus: spellAttack }
+]
+
+export function checkNames(): { id: string; label: string }[] {
+  return CHECKS.map(({ id, label }) => ({ id, label }))
+}
+
 export function checkTargets(d: DndStats | null): CheckTarget[] {
   if (!d) return []
-  const attack = spellAttack(d)
-  return [
-    ...DND_STATS.map((s) => ({ id: toId(DND_STAT_NAMES[s]), label: DND_STAT_NAMES[s], bonus: mod(d.stats[s]) })),
-    ...DND_STATS.map((s) => ({ id: `${toId(DND_STAT_NAMES[s])}_save`, label: `${DND_STAT_NAMES[s]} save`, bonus: saveBonus(d, s) })),
-    ...DND_SKILLS.map((s) => ({ id: toId(s.name), label: s.name, bonus: skillBonus(d, s.id) })),
-    ...(attack === null ? [] : [{ id: 'spell_attack', label: 'Spell attack', bonus: attack }])
-  ]
+  return CHECKS.flatMap((c) => {
+    const bonus = c.bonus(d)
+    return bonus === null ? [] : [{ id: c.id, label: c.label, bonus }]
+  })
 }
 
 export function findTarget(targets: CheckTarget[], against: string | null): CheckTarget | null {

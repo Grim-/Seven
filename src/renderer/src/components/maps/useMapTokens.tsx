@@ -24,11 +24,12 @@ interface Options {
   player: string | null
   editing: boolean
   save: (use: WorldMapUse) => void
+  onSelect?: (sheet: string) => void
 }
 
 const NONE: Standing = { at: { x: 0, y: 0 }, actions: '', decisions: '' }
 
-export function useMapTokens({ world, use, places, player, editing, save }: Options) {
+export function useMapTokens({ world, use, places, player, editing, save, onSelect }: Options) {
   const ids = Object.keys(use.stand)
   const visitors = useLibraryData(() => (ids.length ? engine('places.visitors', { sheets: ids }) : Promise.resolve([] as PlaceVisitor[])), `tokens.${ids.join(',')}`) ?? []
   const tokens: MapToken[] = visitors.map((visitor) => ({ visitor, at: use.stand[visitor.sheet].at }))
@@ -65,7 +66,7 @@ export function useMapTokens({ world, use, places, player, editing, save }: Opti
   const open = (t: MapToken, e: MouseEvent) => openMenu(e, showName(t.visitor.name), items(t))
   const handlers: TokenHandlers = {
     mine: player,
-    onPick: open,
+    onPick: onSelect ? (t) => onSelect(t.visitor.sheet) : open,
     onMenu: open,
     onMove: (sheet, at) => {
       setStanding(sheet, { ...(use.stand[sheet] ?? NONE), at })
@@ -91,5 +92,5 @@ export function useMapTokens({ world, use, places, player, editing, save }: Opti
         />
       )
   })
-  return { tokens, handlers, putHere }
+  return { tokens, handlers, putHere, holder, items }
 }

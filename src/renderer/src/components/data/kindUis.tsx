@@ -74,6 +74,7 @@ import { addToQueue, playNow } from '../../store/player'
 import { SETUP_GROUP, registerKindUi, type KindMenuContext, type KindScreenProps, type KindUi } from '../../registries/kinds'
 import { registerStoryteller } from '../storyteller/register'
 import { registerCards } from '../cards/register'
+import { registerDecisions } from '../decisions/register'
 import { AssetMedia } from '../pictures/AssetMedia'
 import { SlideshowScreen, askNewSlideshow } from '../slideshow/SlideshowScreen'
 import { SlideshowPart, SlideshowThumb } from '../slideshow/SlideshowPlayer'
@@ -145,7 +146,7 @@ const pageBase: KindUi = {
   menu: pageMenu
 }
 
-registerKindUi('page', { ...pageBase, browser: PagesBrowser, picker: FilesPicker, rail: { label: 'Files', icon: 'folder' }, start: true, present: { Screen: PageScreen, Chat: PageChat, Stage: PageStage, Widget: PAGE_WIDGET_UI } })
+registerKindUi('page', { ...pageBase, browser: PagesBrowser, picker: FilesPicker, rail: { label: 'Files', icon: 'folder' }, ownView: 'pages', present: { Screen: PageScreen, Chat: PageChat, Stage: PageStage, Widget: PAGE_WIDGET_UI } })
 
 function FolderScreen({ id, select }: KindScreenProps) {
   const pages = useData((s) => s.pages)
@@ -157,6 +158,7 @@ registerKindUi('folder', {
   present: { Screen: FolderScreen, Chat: FolderChat, Stage: FolderChat, Widget: entryWidget(FolderChat) },
   showsAs: 'page',
   railUnder: { kind: 'page', count: false },
+  ownView: 'pages',
   whole: true,
   open: (id) => showPage(id === 'all' ? null : id),
   addLabel: 'New folder',
@@ -375,3 +377,4 @@ registerKindUi('board', {
 
 registerStoryteller()
 registerCards()
+registerDecisions()

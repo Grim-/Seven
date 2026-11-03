@@ -1,10 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
-import { cleanBackdrop, cleanVoice, type AudioPrefs, type DropPrefs, type VoicePrefs, type ChatListPrefs, type ScreenPoint, type Settings, type SidePanelPrefs, type TrayPin, type ViewId } from '@shared/types'
+import { cleanBackdrop, cleanVoice, type AudioPrefs, type DropPrefs, type VoicePrefs, type ChatListPrefs, type ScreenPoint, type Settings, type SidePanelPrefs, type TrayPin } from '@shared/types'
 import { dataDir } from './paths'
 
-const VIEWS: ViewId[] = ['chat', 'dashboards', 'pages', 'data', 'composer', 'kinds', 'agents', 'tools', 'models', 'settings']
 
 export const DEFAULT_HOTKEY = 'CommandOrControl+Shift+Space'
 
@@ -15,7 +14,9 @@ const DEFAULTS: Settings = {
   pagesWidth: 288,
   chatPictureHeight: 480,
   trayKinds: [],
+  trayTabs: ['files', 'outputs', 'browser', 'commands', 'skills'],
   trayPins: [],
+  favourites: [],
   avatarSize: 'small',
   backdrop: null,
   chatBackdrop: null,
@@ -59,7 +60,7 @@ function chatList(value: unknown, fallback: ChatListPrefs = DEFAULTS.chatList): 
   }
 }
 
-function trayPins(value: unknown): TrayPin[] {
+function pins(value: unknown): TrayPin[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
   return value
@@ -73,7 +74,6 @@ function trayPins(value: unknown): TrayPin[] {
       seen.add(key)
       return [pin]
     })
-    .slice(0, 24)
 }
 
 function audio(value: unknown): AudioPrefs {
@@ -107,7 +107,9 @@ function sanitize(input: Partial<Settings>): Settings {
   return {
     chatList: chatList(input.chatList),
     dataList: chatList(input.dataList, DEFAULTS.dataList),
-    trayPins: trayPins(input.trayPins),
+    trayPins: pins(input.trayPins).slice(0, 24),
+    favourites: pins(input.favourites),
+    trayTabs: Array.isArray(input.trayTabs) ? [...new Set(input.trayTabs.filter((k): k is string => typeof k === 'string' && /^[\w:.-]{1,64}$/.test(k)))] : DEFAULTS.trayTabs,
     trayKinds: Array.isArray(input.trayKinds) ? [...new Set(input.trayKinds.filter((k): k is string => typeof k === 'string' && /^[\w:.-]{1,64}$/.test(k)))].slice(0, 30) : DEFAULTS.trayKinds,
     chatPictureHeight: typeof input.chatPictureHeight === 'number' && Number.isFinite(input.chatPictureHeight) && input.chatPictureHeight > 0 ? Math.round(input.chatPictureHeight) : DEFAULTS.chatPictureHeight,
     pagesWidth: typeof input.pagesWidth === 'number' && Number.isFinite(input.pagesWidth) ? Math.round(Math.min(640, Math.max(200, input.pagesWidth))) : DEFAULTS.pagesWidth,
@@ -122,7 +124,7 @@ function sanitize(input: Partial<Settings>): Settings {
       ? [...new Set(input.modelFolders.filter((f) => typeof f === 'string' && f.trim()))]
       : DEFAULTS.modelFolders,
     ambientBackground: typeof input.ambientBackground === 'boolean' ? input.ambientBackground : DEFAULTS.ambientBackground,
-    lastView: input.lastView && VIEWS.includes(input.lastView) ? input.lastView : DEFAULTS.lastView,
+    lastView: typeof input.lastView === 'string' && input.lastView ? input.lastView : DEFAULTS.lastView,
     overlayEnabled: typeof input.overlayEnabled === 'boolean' ? input.overlayEnabled : DEFAULTS.overlayEnabled,
     hotkey: typeof input.hotkey === 'string' ? input.hotkey.trim() : DEFAULTS.hotkey,
     overlayPosition: point(input.overlayPosition),

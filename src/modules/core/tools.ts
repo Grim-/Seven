@@ -7,7 +7,7 @@ import type { GbnfJsonSchema } from 'node-llama-cpp'
 import type { CollectionRecord, FieldChange, FieldType, Page, ViewRef } from '@shared/types'
 import { FIELD_TYPES, hitDetail, pageKindOf } from '@shared/types'
 import { data } from '../../engine/data/hub'
-import { canSee, entryId, generatedTitle, find as libraryFind, itemsView, kinds, entryView, linkView, partView, resolveEntry, rollEntry, setTags, textView, type KindContext } from '../../engine/library/kinds'
+import { canSee, entryId, generatedTitle, find as libraryFind, insideText, itemsView, kinds, entryView, linkView, partView, resolveEntry, rollEntry, setTags, textView, type KindContext } from '../../engine/library/kinds'
 import { tags as tagStore } from '../../engine/library/tags'
 import { resolveIncludes } from '../../engine/library/includes'
 import { ToolError, optStr, str, type ToolContext, type ToolDef, type ToolScope } from '../../engine/tools/types'
@@ -100,15 +100,16 @@ async function readThing(kindName: string, raw: string, ctx: ToolContext, kctx: 
   }
   const rooted = kindName ? kinds(kctx).find((k) => k.kind === kindName) : undefined
   if (rooted?.root !== undefined && !toId(raw)) return { kind: rooted.kind, id: rooted.root, text: resolveIncludes(rooted.full(rooted.root, {}, kctx), kctx), link: false }
-  const { kind, id } = resolveEntry(raw, kindName, kctx)
+  const { kind, id, trail, path } = resolveEntry(raw, kindName, kctx)
   const name = entryId(kind, id, kind.title(id), kctx)
+  const inside = insideText(kind, id, path ?? linkFor(kind.kind, id), trail ?? [], kctx)
   const full = kind.readFull ? await kind.readFull(id) : null
-  if (full !== null) return { kind: kind.kind, id: name, text: full, link: true }
+  if (full !== null) return { kind: kind.kind, id: name, text: full + inside, link: true }
   if (kind.readView) {
     const out = kind.readView(id, {}, kctx)
-    return { kind: kind.kind, id: name, text: resolveIncludes(out.text, kctx), view: out.view, link: true }
+    return { kind: kind.kind, id: name, text: resolveIncludes(out.text, kctx) + inside, view: out.view, link: true }
   }
-  return { kind: kind.kind, id: name, text: resolveIncludes(kind.full(id, {}, kctx), kctx), link: true }
+  return { kind: kind.kind, id: name, text: resolveIncludes(kind.full(id, {}, kctx), kctx) + inside, link: true }
 }
 
 function fitRead(got: ReadResult, truncate: boolean, ctx: ToolContext): string {

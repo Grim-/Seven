@@ -3,6 +3,9 @@ import type { DndStats } from './dnd'
 import type { Story } from './story'
 import type { WorldBinding } from './world'
 import type { CardSource } from './cardDecks'
+import type { PickDecisionProps } from './pickDecision'
+import type { RolledDecisionProps } from './rolledDecision'
+import type { OpposedProps } from './opposedCheck'
 export type ModelStatus = 'unloaded' | 'loading' | 'ready' | 'error'
 
 export type RemoteApi = 'openai' | 'anthropic'
@@ -741,7 +744,7 @@ export interface TerminalData {
   assetIds?: string[]
 }
 
-export type UiRequestKind = 'question' | 'confirm' | 'approval' | 'form' | 'unlock' | 'gather'
+export type UiRequestKind = 'question' | 'confirm' | 'approval' | 'form' | 'unlock' | 'gather' | 'decide' | 'rolled' | 'opposed'
 export type UiRequestStatus = 'pending' | 'answered' | 'cancelled' | 'expired'
 
 export interface CommandInfo {
@@ -849,7 +852,7 @@ export interface ApprovalAnswer {
 export interface UiRequestState {
   id: string
   kind: UiRequestKind
-  props: QuestionProps | ConfirmProps | ApprovalProps | FormProps | UnlockProps | GatherProps
+  props: QuestionProps | ConfirmProps | ApprovalProps | FormProps | UnlockProps | GatherProps | PickDecisionProps | RolledDecisionProps | OpposedProps
   status: UiRequestStatus
   answer?: unknown
 }
@@ -920,7 +923,7 @@ export interface OverlayState {
   anchor: { right: boolean; bottom: boolean }
 }
 
-export type ViewId = 'chat' | 'dashboards' | 'pages' | 'data' | 'composer' | 'kinds' | 'agents' | 'tools' | 'models' | 'settings' | 'files'
+export type ViewId = string
 
 export interface ScreenPoint {
   x: number
@@ -1088,7 +1091,9 @@ export interface Settings {
   pagesWidth: number
   chatPictureHeight: number
   trayKinds: string[]
+  trayTabs: string[]
   trayPins: TrayPin[]
+  favourites: TrayPin[]
   modelFolders: string[]
   ambientBackground: boolean
   lastView: ViewId

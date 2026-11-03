@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ComponentType } from 'react'
 import { Check, Send, ShieldAlert } from 'lucide-react'
 import type { ApprovalAnswer, ApprovalProps, ConfirmProps, FormAnswer, FormProps, QuestionAnswer, QuestionProps, UiRequestState } from '@shared/types'
 import { PatchView, TerminalOutput } from './views'
@@ -12,7 +12,7 @@ import { UnlockCard } from '../components/vault/Vault'
 import { GatherCard } from '../components/chat/Gather'
 import { focusedConversation } from '../lib/conversation'
 
-async function answer(ui: UiRequestState, value: unknown, fallbackText: string): Promise<void> {
+export async function answer(ui: UiRequestState, value: unknown, fallbackText: string): Promise<void> {
   try {
     if (ui.status === 'expired') {
       const conv = focusedConversation()
@@ -26,7 +26,7 @@ async function answer(ui: UiRequestState, value: unknown, fallbackText: string):
   }
 }
 
-function StatusLine({ ui }: { ui: UiRequestState }) {
+export function StatusLine({ ui }: { ui: UiRequestState }) {
   if (ui.status === 'pending') return <span className="animate-pulse text-accent">Waiting for your answer</span>
   if (ui.status === 'expired') return <span className="text-accent-soft">Seven restarted before you answered. Answering now sends it as a new message.</span>
   if (ui.status === 'cancelled') return <span className="text-faint">Cancelled</span>
@@ -279,7 +279,15 @@ function FormCard({ ui }: { ui: UiRequestState }) {
   )
 }
 
+const ownCards = new Map<string, ComponentType<{ ui: UiRequestState }>>()
+
+export function registerUiRequest(kind: string, card: ComponentType<{ ui: UiRequestState }>): void {
+  ownCards.set(kind, card)
+}
+
 export function UiRequestCard({ ui }: { ui: UiRequestState }) {
+  const Own = ownCards.get(ui.kind)
+  if (Own) return <Own ui={ui} />
   if (ui.kind === 'approval') return <ApprovalCard ui={ui} />
   if (ui.kind === 'form') return <FormCard ui={ui} />
   if (ui.kind === 'unlock') return <UnlockCard ui={ui} />

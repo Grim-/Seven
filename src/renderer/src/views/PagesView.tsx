@@ -180,12 +180,7 @@ export function useOpenPage(): { id: string; title: string; kind: string } | nul
 
 export function showPage(id: string | null): void {
   useTree.getState().select(id)
-  showInData({ kind: 'page', id: 'all' })
-}
-
-export function PagesView() {
-  useEffect(() => showPage(useTree.getState().selected), [])
-  return null
+  useApp.getState().setView('pages')
 }
 
 export function PagesBrowser({ section, select: selectData, onBack }: { section: LibrarySection; select: (s: DataSelection | null) => void; onBack?: () => void }) {

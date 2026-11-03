@@ -55,6 +55,7 @@ export interface KindUi {
   trail?: ComponentType<{ id: string }>
   back?: (selected: DataSelection) => void
   start?: boolean
+  ownView?: string
 }
 
 export interface KindBrowserProps {
@@ -96,6 +97,10 @@ export function noteKindFamilies(list: { kind: string; family: string | null }[]
 export function kindUi(kind: string): KindUi {
   const family = families.get(kind)
   return uis.get(kind) ?? (family ? uis.get(family) : undefined) ?? (addonKind(kind) ? (uis.get('page:addon') ?? NONE) : NONE)
+}
+
+export function ownViewKinds(): string[] {
+  return [...uis.entries()].filter(([, ui]) => ui.ownView).map(([kind]) => kind)
 }
 
 export function presentOf(kind: string): KindPresent {

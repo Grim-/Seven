@@ -35,7 +35,7 @@ import { setupCommands } from './commands/builtin'
 import { commandInfo, commandsFor, runCommand } from './commands/registry'
 import type { Ambience, AmbienceCue, Theme } from '@shared/theme'
 import { tags as tagStore } from './library/tags'
-import { setGuideSource, specialPages, USER, allKinds, clearKind, kindInfo, removeEntry, renameEntry, rollText, drawEntry, drawableEntries, previewEntry, find as libraryFind, overview as libraryOverview, resolveEntry, partView, timelineRows, describeEvent, resolveRoutineEntry } from './library/kinds'
+import { setGuideSource, specialPages, USER, allKinds, clearKind, kindInfo, removeEntry, renameEntry, rollText, drawEntry, drawableEntries, previewEntry, find as libraryFind, overview as libraryOverview, resolveEntry, partView, timelineRows, describeEvent, resolveRoutineEntry, entryInside } from './library/kinds'
 import { WRAPPER_NAMES, chatWrapperFor, checkTemplate, isModelFix, modelFixes, setModelSource, wrapperForFile } from './model/wrappers'
 import { readMeta } from './model/gguf/read'
 import { contextPrefs } from './chat/prefs'
@@ -92,6 +92,7 @@ import { carryOpen, carryPeek, carrySave } from './carry'
 import { agentFolders, liveFolder, removeFolderTree } from './agents/folders'
 import { currentActor } from './timeline/actor'
 import { compendium } from '../modules/dnd/compendium'
+import { decisions } from '../modules/decisions/store'
 import { widgetInfo } from './data/widgetSources'
 import { resolveThings } from '../modules/core/things'
 import './data/glances'
@@ -187,6 +188,7 @@ data.pages.setOnRemove((id, up) => data.assets.reparent(id, up))
 workout.onChange(() => emit('workout.changed', {}))
 board.onChange(() => emit('board.changed', {}))
 compendium.on('changed', () => emit('dnd.changed', {}))
+decisions.on('changed', () => emit('decisions.changed', {}))
 board.setNames((id) => agents.list().find((a) => a.id === id)?.name ?? 'an agent')
 scripts.onChange(() => emit('python.changed', {}))
 storyRuns.on('changed', () => emit('stories.changed', {}))
@@ -521,6 +523,8 @@ const handlers: Handlers = {
   },
   'dnd.save': ({ kind, entry, previousId }) => compendium.save(kind, entry, previousId),
   'dnd.remove': ({ kind, id }) => compendium.remove(kind, id),
+  'decisions.get': ({ id }) => decisions.get(id),
+  'decisions.save': ({ decision, previousId }) => decisions.save(decision, previousId),
   'dnd.import': ({ kind, json, apply }) => {
     let raw: unknown
     try {
@@ -561,7 +565,7 @@ const handlers: Handlers = {
     warmIndexes()
     return true
   },
-  'library.overview': ({ query, perKind }) => libraryOverview(query, perKind, USER),
+  'library.overview': ({ query, perKind, kind, skip }) => libraryOverview(query, perKind, USER, kind ?? null, skip ?? []),
   'timeline.recent': ({ limit }) => timelineRows(Math.min(50, Math.max(1, limit)), USER),
   'routines.list': () => routines.list(),
   'routines.save': (draft) => routines.save(draft),
@@ -607,6 +611,7 @@ const handlers: Handlers = {
     return resolveIncludes(kind.full(id, {}, USER))
   },
   'library.fields': ({ entry }) => entryFields(entry),
+  'library.inside': ({ entry }) => entryInside(entry),
   'library.field': ({ entry, field }) => entryField(entry, field),
   'data.pages.list': () => data.pages.list(),
   'data.pages.get': ({ id }) => data.pages.get(id),

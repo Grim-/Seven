@@ -14,7 +14,7 @@ import { askNewFolder, askNewPage } from '../data/PageView'
 import { openWorkout } from '../workout/Workout'
 import { fillComposer } from '../chat/Thread'
 import { showPage } from '../../views/PagesView'
-import { SETTINGS_TAB, VIEW_TABS } from './views'
+import { viewsIn } from '../../views/registry'
 import { failed } from '../../lib/notify'
 import { focusedConversation, openChat } from '../../lib/conversation'
 
@@ -69,7 +69,7 @@ function useActions(open: boolean): Action[] {
   }, [open, loadCommands])
 
   return useMemo(() => {
-    const out: Action[] = [...VIEW_TABS, SETTINGS_TAB]
+    const out: Action[] = [...viewsIn('tabs'), ...viewsIn('settings')]
       .filter((v) => v.id !== view)
       .map((v) => ({ id: `view:${v.id}`, group: 'Go to', label: v.label, icon: v.icon, keywords: ['open', 'go', 'view'], run: () => setView(v.id) }))
     out.push({

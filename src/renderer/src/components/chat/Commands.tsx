@@ -11,6 +11,7 @@ import { failed } from '../../lib/notify'
 import { useConversation } from '../../lib/conversation'
 import { useKindInfos } from '../../lib/kinds'
 import { toId } from '@shared/ids'
+import { useKeepInView } from '../../lib/useKeepInView'
 
 export interface Hint {
   key: string
@@ -38,7 +39,6 @@ function useCommandHints(text: string, setText: (t: string) => void): Hint[] {
   const q = text.slice(1).toLowerCase()
   return list
     .filter((c) => c.name.toLowerCase().startsWith(q))
-    .slice(0, 12)
     .map((c) => ({ key: `/${c.name}`, label: `/${c.name}`, detail: c.summary, apply: () => setText(`/${c.name} `) }))
 }
 
@@ -64,7 +64,6 @@ function useFieldHints(token: string | null, before: string, setText: (t: string
   if (!base) return null
   return fields
     .filter((f) => !query || toId(f).startsWith(query) || f.toLowerCase().startsWith(query))
-    .slice(0, 8)
     .map((f) => ({ key: `${base}#${f}`, label: `#${toId(f)}`, detail: `put the text of ${f} here`, apply: () => setText(`${before}${base}#${toId(f)} `) }))
 }
 
@@ -75,22 +74,37 @@ export function useReferenceHints(text: string, setText: (t: string) => void): H
   const colon = token ? token.indexOf(':') : -1
   const kind = token && colon > 0 ? token.slice(0, colon) : null
   const query = token && colon > 0 ? token.slice(colon + 1) : ''
+  const slash = query.lastIndexOf('/')
+  const parent = slash > 0 ? query.slice(0, slash) : null
+  const tail = slash > 0 ? query.slice(slash + 1).toLowerCase() : ''
   const kinds = useKindInfos(token !== null)
   const [hits, setHits] = useState<LibraryHit[]>([])
+  const [inside, setInside] = useState<{ segment: string; kind: string; title: string }[]>([])
 
   useEffect(() => {
-    if (!kind) return setHits([])
+    if (!kind || parent !== null) return setHits([])
     let live = true
     const timer = setTimeout(() => {
       void engine('library.find', { query, kind })
-        .then((h) => live && setHits(h.slice(0, 8)))
+        .then((h) => live && setHits(h))
         .catch(() => live && setHits([]))
     }, 150)
     return () => {
       live = false
       clearTimeout(timer)
     }
-  }, [kind, query])
+  }, [kind, query, parent])
+
+  useEffect(() => {
+    if (!kind || parent === null) return setInside([])
+    let live = true
+    void engine('library.inside', { entry: `@${kind}:${parent}` })
+      .then((c) => live && setInside(c))
+      .catch(() => live && setInside([]))
+    return () => {
+      live = false
+    }
+  }, [kind, parent])
 
   if (token === null) return []
   if (fieldHints) return fieldHints
@@ -99,12 +113,23 @@ export function useReferenceHints(text: string, setText: (t: string) => void): H
     const q = token.toLowerCase()
     return kinds
       .filter((k) => !q || k.kind.toLowerCase().startsWith(q) || k.short.toLowerCase().startsWith(q) || k.label.toLowerCase().startsWith(q))
-      .slice(0, 8)
       .map((k) => ({ key: `@${k.kind}`, label: `@${k.short}:`, detail: k.description, apply: () => setText(`${before}${k.short}:`) }))
+  }
+  const descend = (ref: string) => {
+    if (ref.startsWith('"')) return setText(`${before}${kind}:${ref} `)
+    void engine('library.inside', { entry: `@${kind}:${ref}` })
+      .then((c) => setText(`${before}${kind}:${ref}${c.length ? '/' : ' '}`))
+      .catch(() => setText(`${before}${kind}:${ref} `))
+  }
+  if (parent !== null) {
+    const label = (k: string) => kinds.find((x) => x.kind === k)?.label ?? k
+    return inside
+      .filter((c) => !tail || c.segment.startsWith(tail) || c.title.toLowerCase().startsWith(tail))
+      .map((c) => ({ key: `${kind}:${parent}/${c.segment}`, label: c.title, detail: `${label(c.kind)} · ${parent}/${c.segment}`, apply: () => descend(`${parent}/${c.segment}`) }))
   }
   const info = kinds.find((k) => k.kind === kind || k.short === kind?.toLowerCase())
   return hits.flatMap((h) => {
-    const link: Hint = { key: `${h.kind}/${h.id}`, label: h.title, detail: hitDetail(h), apply: () => setText(`${before}${kind}:${quote(h.id)} `) }
+    const link: Hint = { key: `${h.kind}/${h.id}`, label: h.title, detail: hitDetail(h), apply: () => descend(quote(h.id)) }
     const parts: Hint[] = (info?.parts ?? []).map((p) => ({ key: `${h.kind}/${h.id}#${p.name}`, label: `${h.title} · #${p.name}`, detail: p.description, apply: () => setText(`${before}${kind}:${quote(h.id)}#${p.name} `) }))
     if (!info?.rollable) return [link, ...parts]
     const roll: Hint = {
@@ -144,12 +169,14 @@ export function useComposerHints(): Hint[] {
 }
 
 export function ComposerHints({ hints, selected, onSelect, inline = false }: { hints: Hint[]; selected: number; onSelect: (index: number) => void; inline?: boolean }) {
+  const list = useKeepInView<HTMLDivElement>(selected)
   if (!hints.length) return null
   return (
-    <div className={cn('max-h-80 overflow-y-auto border border-line bg-black/95 py-1', inline ? 'shrink-0' : 'absolute bottom-full left-0 right-0 z-30 mb-px')}>
+    <div ref={list} className={cn('max-h-80 overflow-y-auto border border-line bg-black/95 py-1', inline ? 'shrink-0' : 'absolute bottom-full left-0 right-0 z-30 mb-px')}>
       {hints.map((h, i) => (
         <button
           key={h.key}
+          type="button"
           onMouseDown={(e) => e.preventDefault()}
           onMouseEnter={() => onSelect(i)}
           onClick={h.apply}

@@ -257,8 +257,12 @@ function KindTab({ kind, label }: { kind: string; label: string }) {
 }
 
 export function OutputTray() {
-  const { tabs: builtIn, ctx, sessionId, items } = useTabs()
+  const { tabs: allBuiltIn, ctx, sessionId, items } = useTabs()
   const pinned = useApp((s) => s.settings?.trayKinds) ?? []
+  const shownTabs = useApp((s) => s.settings?.trayTabs) ?? []
+  const saveTrayTabs = (next: string[]) => void useApp.getState().updateSettings({ trayTabs: next })
+  const builtIn = allBuiltIn.filter((t) => shownTabs.includes(t.id))
+  const hiddenBuiltIn = allBuiltIn.filter((t) => !shownTabs.includes(t.id))
   const kindList = useKindList()
   const kindTabs: SideTabDef[] = pinned.flatMap((k, i) => {
     const info = kindList.find((x) => x.kind === k)
@@ -270,12 +274,16 @@ export function OutputTray() {
     openMenu(
       e,
       'Add a button',
-      kindList.length
-        ? kindList
-            .filter((k) => !pinned.includes(k.kind))
-            .sort((a, b) => a.plural.localeCompare(b.plural))
-            .map((k) => ({ label: k.plural, icon: <KindIcon name={k.icon} />, onSelect: () => saveTrayKinds([...pinned, k.kind]) }))
-        : [{ label: 'Loading kinds…', disabled: true }]
+      [
+        ...hiddenBuiltIn.map((t) => ({ label: t.label, icon: t.icon, onSelect: () => saveTrayTabs([...shownTabs, t.id]) })),
+        ...(hiddenBuiltIn.length ? [{ label: '', separator: true }] : []),
+        ...(kindList.length
+          ? kindList
+              .filter((k) => !pinned.includes(k.kind))
+              .sort((a, b) => a.plural.localeCompare(b.plural))
+              .map((k) => ({ label: k.plural, icon: <KindIcon name={k.icon} />, onSelect: () => saveTrayKinds([...pinned, k.kind]) }))
+          : [{ label: 'Loading kinds…', disabled: true }])
+      ]
     )
   const seen = usePanel((s) => s.seen)
   const tab = useTray((s) => s.tab)
@@ -332,7 +340,18 @@ export function OutputTray() {
               key={t.id}
               onClick={() => setTray({ tab: active ? null : t.id })}
               onContextMenu={(e) => {
-                if (!t.id.startsWith(KIND_TAB)) return
+                if (!t.id.startsWith(KIND_TAB))
+                  return openMenu(e, t.label, [
+                    {
+                      label: 'Remove button',
+                      icon: <X />,
+                      danger: true,
+                      onSelect: () => {
+                        if (active) setTray({ tab: null })
+                        saveTrayTabs(shownTabs.filter((x) => x !== t.id))
+                      }
+                    }
+                  ])
                 const k = t.id.slice(KIND_TAB.length)
                 const at = pinned.indexOf(k)
                 const move = (to: number) => {
@@ -367,7 +386,7 @@ export function OutputTray() {
           )
         })}
         <button
-          title="Add a button that opens a kind, like Open does in Data"
+          title="Add a button"
           onClick={addMenu}
           className="flex h-6 w-6 items-center justify-center border border-dashed border-line/50 text-dim hover:border-accent/60 hover:text-accent"
         >

@@ -6,7 +6,7 @@ import { useData } from '../../store/data'
 import { Everything } from './Everything'
 import { KindHeader } from './KindHeader'
 import { KindPane } from './KindPane'
-import { kindUi } from '../../registries/kinds'
+import { kindUi, ownViewKinds } from '../../registries/kinds'
 import { KindRail } from './KindRail'
 import { rememberSections } from './entryMenu'
 import { useRememberedLocation } from '../../lib/window'
@@ -23,13 +23,14 @@ function useQuery(): [string, string, (q: string) => void] {
 }
 
 export function DataWindow() {
-  const { sections } = useLibrary('', 8)
+  const skip = ownViewKinds()
+  const { sections } = useLibrary('', 8, skip)
   const start = sections?.find((s) => kindUi(s.kind).start)
   const [selected, select] = useRememberedLocation<DataSelection | null>(start ? { kind: start.kind, id: 'all' } : null)
   const [prefs, save] = useListPrefs('dataList', { open: true, width: 248 })
   const closed = new Set(prefs.closed ?? [])
   const [query, q, setQuery] = useQuery()
-  const { sections: found } = useLibrary(q, 20)
+  const { sections: found } = useLibrary(q, 20, skip)
   useEffect(() => {
     if (sections) rememberSections(sections)
   }, [sections])

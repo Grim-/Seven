@@ -15,7 +15,7 @@ import { dropFiles } from './lib/dropFiles'
 import { WindowProvider } from './lib/window'
 import { useApp } from './store/app'
 import { useWindows } from './store/windows'
-import { VIEW_APPS, VIEW_COMPONENTS } from './views/registry'
+import { viewOf } from './views/registry'
 import { ExportHost } from './components/export/ExportModal'
 import { PlayHost } from './components/play/PlayHost'
 import { PicturePickerHost } from './components/data/PicturePicker'
@@ -25,7 +25,7 @@ import { useCinema, useCinemaKey } from './lib/cinema'
 
 export function App() {
   const view = useApp((s) => s.view)
-  const View = VIEW_COMPONENTS[view]
+  const { Component: View, app } = viewOf(view)
   const [cinemaOn] = useCinema()
   const cinema = view === 'chat' && cinemaOn
   useCinemaKey(view === 'chat', cinemaOn)
@@ -45,7 +45,7 @@ export function App() {
       <main className="relative z-10 min-h-0 flex-1" {...fileDrop.props}>
         <DropOverlay show={fileDrop.over} label="Drop files to add them to Files" className="z-[300]" />
         <motion.div key={view} className="h-full" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: 'easeOut' }} onPointerDownCapture={() => useWindows.getState().focus(view)}>
-          <WindowProvider id={view} app={VIEW_APPS[view] ?? 'view'} focused>
+          <WindowProvider id={view} app={app ?? 'view'} focused>
             <View />
           </WindowProvider>
         </motion.div>

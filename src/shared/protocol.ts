@@ -118,6 +118,7 @@ import type {
   WebLogEntry
 } from './types'
 import type { CompendiumEntry, CompendiumKind, CompendiumRef } from './compendium'
+import type { StoredDecision } from './storedDecision'
 
 type Req<P, R> = { params: P; result: R }
 
@@ -306,6 +307,8 @@ export interface EngineRequests {
   'dnd.get': Req<{ kind: CompendiumKind; id: string }, { entry: CompendiumEntry; srd: boolean; own: boolean }>
   'dnd.save': Req<{ kind: CompendiumKind; entry: CompendiumEntry; previousId: string | null }, CompendiumEntry>
   'dnd.remove': Req<{ kind: CompendiumKind; id: string }, boolean>
+  'decisions.get': Req<{ id: string }, StoredDecision>
+  'decisions.save': Req<{ decision: StoredDecision; previousId: string | null }, StoredDecision>
   'dnd.import': Req<{ kind: CompendiumKind; json: string; apply: boolean }, { added: string[]; replaced: string[] }>
   'board.add': Req<{ text: string }, BoardMessage>
   'board.update': Req<{ id: string; text: string }, BoardMessage>
@@ -332,7 +335,7 @@ export interface EngineRequests {
   'python.run': Req<{ id: string }, PythonScript>
   'library.read': Req<{ entry: string }, string>
   'library.find': Req<{ query: string; kind: string | null }, LibraryHit[]>
-  'library.overview': Req<{ query: string; perKind: number }, LibrarySection[]>
+  'library.overview': Req<{ query: string; perKind: number; kind?: string | null; skip?: string[] }, LibrarySection[]>
   'timeline.recent': Req<{ limit: number }, TimelineRow[]>
   'routines.list': Req<void, Routine[]>
   'routines.save': Req<RoutineDraft, Routine>
@@ -363,6 +366,7 @@ export interface EngineRequests {
   'library.resolve': Req<{ entry: string }, { kind: string; id: string }>
   'library.preview': Req<{ entry: string }, EntryPreview>
   'library.fields': Req<{ entry: string }, string[]>
+  'library.inside': Req<{ entry: string }, { segment: string; kind: string; title: string }[]>
   'library.field': Req<{ entry: string; field: string }, string | null>
   'library.drawable': Req<Record<string, never>, LibraryHit[]>
   'library.draw': Req<{ entry: string; count: number }, string[]>
@@ -552,6 +556,7 @@ export interface Events {
   'workout.changed': Record<string, never>
   'board.changed': Record<string, never>
   'dnd.changed': Record<string, never>
+  'decisions.changed': Record<string, never>
   'themes.changed': Theme[]
   'ambience.changed': { sessionId: string; ambience: Ambience }
   'ambience.cue': AmbienceCue

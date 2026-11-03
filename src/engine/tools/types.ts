@@ -2,12 +2,18 @@ import type { PanelAccess } from '../panel/store'
 import type { GbnfJsonObjectSchema } from 'node-llama-cpp'
 import type { AvatarState, ConfirmProps, FormProps, GatherProps, QuestionProps, ToolPermission, ViewRef, LinkedFolder } from '@shared/types'
 import type { PermissionContext } from '../permissions/gate'
+import type { PickDecisionProps } from '@shared/pickDecision'
+import type { RolledDecisionProps } from '@shared/rolledDecision'
+import type { OpposedProps } from '@shared/opposedCheck'
 
 export interface UiAccess {
   ask(kind: 'question', props: QuestionProps): Promise<unknown>
   ask(kind: 'confirm', props: ConfirmProps): Promise<unknown>
   ask(kind: 'form', props: FormProps): Promise<unknown>
   ask(kind: 'gather', props: GatherProps): Promise<unknown>
+  ask(kind: 'decide', props: PickDecisionProps): Promise<unknown>
+  ask(kind: 'rolled', props: RolledDecisionProps): Promise<unknown>
+  ask(kind: 'opposed', props: OpposedProps): Promise<unknown>
   notify(title: string, message: string): void
 }
 

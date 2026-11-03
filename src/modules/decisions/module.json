@@ -1,0 +1,9 @@
+{
+  "id": "decisions",
+  "name": "Decisions",
+  "description": "Story decisions in chat: ones you pick (each option can roll a chance or a check), ones a die picks, opposed checks between two characters, and stored decisions to use again.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "needsWorkspace": false,
+  "permission": "none"
+}

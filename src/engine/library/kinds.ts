@@ -20,7 +20,8 @@ import { themes } from '../themes/store'
 import type { Theme } from '@shared/theme'
 import { PLACE_TYPE, PLACE_TYPE_KEY, plainValue, type WorldChange, type WorldType } from '@shared/world'
 import { fieldText, resolveIncludes } from './includes'
-import { layerNames, mapObjects, placePath, placeRef, placeTree, type MapData, type PlaceNode } from '@shared/maps'
+import { layerNames, mapObjects, placePath, placeRef, placeTree, type MapData, type ObjectLayerData, type PlaceNode } from '@shared/maps'
+import { smallestAt } from '@shared/shapes'
 import { maps } from '../maps/store'
 import { mapListing, removeMap } from '../maps/usage'
 import { agentAccess } from '../agents/access'
@@ -82,6 +83,21 @@ export interface KindHandTo {
   answer?: (ctx: EntryCtx) => string
 }
 
+export interface TrailStep {
+  kind: string
+  id: string
+}
+
+export interface KindChildInput {
+  kind: string
+  id: string
+  title: string
+}
+
+export interface KindChild extends KindChildInput {
+  segment: string
+}
+
 export interface Kind {
   kind: string
   label: string
@@ -127,6 +143,8 @@ export interface Kind {
   pack?(id: string): unknown
   uses?(id: string): EntryRef[]
   unpack?(value: unknown, how: Unpack): string
+  children?(id: string, ctx: KindContext, trail: TrailStep[]): KindChildInput[]
+  pathOf?(id: string, ctx: KindContext): string | null
 }
 
 const MAX_TEXT = 12000
@@ -749,7 +767,7 @@ const worldKind: Kind = {
   },
   resolve(ref) {
     const parts = ref.split('/')
-    if (parts.length === 3 && worlds.exists(parts[0])) return ref
+    if (parts.length === 3 && worlds.exists(parts[0]) && worlds.schema(parts[0]).types[parts[1]] && worlds.entities(parts[0], parts[1], false)[parts[2]]) return ref
     const w = worlds.list().find((x) => x.id === ref || x.name.toLowerCase() === ref.toLowerCase())
     if (w) return w.id
     return worldHits(ref, 50).find((h) => h.title.toLowerCase() === ref.toLowerCase())?.id ?? null
@@ -766,6 +784,10 @@ const worldKind: Kind = {
   rename(id, name) {
     if (id.includes('/')) throw new ToolError('Rename records inside their world')
     worlds.rename(id, name)
+  },
+  children(id) {
+    if (id.includes('/')) return []
+    return worlds.mapUses(id).map((u) => ({ kind: 'map', id: u.map, title: mapTitle(u.map) }))
   }
 }
 
@@ -779,6 +801,24 @@ const usedBy = (id: string) => worlds.usingMap(id).map((w) => w.name)
 
 function worldPlaces(world: string): Record<string, Record<string, unknown>> {
   return worlds.schema(world).types[PLACE_TYPE_KEY] ? worlds.entities(world, PLACE_TYPE_KEY, false) : {}
+}
+
+const objectCenter = (o: ObjectLayerData) => ({ x: o.offset.x + (o.size.w * o.scale) / 2, y: o.offset.y + (o.size.h * o.scale) / 2 })
+
+function placeChild(world: string, key: string, places: Record<string, Record<string, unknown>>): KindChildInput {
+  return { kind: 'place', id: `${world}/${PLACE_TYPE_KEY}/${key}`, title: String(places[key]?.Name || key) }
+}
+
+function sheetChild(sheet: string): KindChildInput {
+  try {
+    return { kind: 'sheet', id: sheet, title: getSheet(sheet).title }
+  } catch {
+    return { kind: 'sheet', id: sheet, title: sheet }
+  }
+}
+
+function mapTitle(id: string): string {
+  return maps.get(id)?.name ?? id
 }
 
 const mapLine = (id: string) => {
@@ -885,6 +925,29 @@ const placeKind: Kind = {
   remove(id) {
     const { world, key } = placeRef(id)
     worlds.removePlace(world, key)
+  },
+  children(id) {
+    const { world, key } = placeRef(id)
+    const places = worldPlaces(world)
+    const out = Object.keys(places)
+      .filter((k) => places[k]?.Inside === key)
+      .map((k) => placeChild(world, k, places))
+    const seen = new Set<string>()
+    for (const use of worlds.mapUses(world)) {
+      const m = maps.get(use.map)
+      if (m) for (const o of mapObjects(m.layers)) if (smallestAt(use.shapes, objectCenter(o)) === key) out.push({ kind: 'map_object', id: `${use.map}/${o.id}`, title: o.name })
+      for (const [sheet, s] of Object.entries(use.stand))
+        if (!seen.has(sheet) && smallestAt(use.shapes, s.at) === key) {
+          seen.add(sheet)
+          out.push(sheetChild(sheet))
+        }
+    }
+    for (const v of whoIsHere(world)[key] ?? [])
+      if (!seen.has(v.sheet)) {
+        seen.add(v.sheet)
+        out.push({ kind: 'sheet', id: v.sheet, title: v.name })
+      }
+    return out
   }
 }
 
@@ -942,7 +1005,77 @@ const mapKind: Kind = {
   },
   rename(id, name) {
     maps.save({ ...mapOf(id), name })
+  },
+  children(id, _ctx, trail) {
+    const m = mapOf(id)
+    const world = [...trail].reverse().find((t) => t.kind === 'world' && !t.id.includes('/'))?.id ?? null
+    const use = world ? worlds.mapUses(world).find((u) => u.map === id) : undefined
+    const shapes = use?.shapes ?? {}
+    const out: KindChildInput[] = []
+    if (world && use) {
+      const places = worldPlaces(world)
+      for (const k of Object.keys(use.shapes)) {
+        const inside = places[k]?.Inside
+        if (places[k] && !(typeof inside === 'string' && use.shapes[inside])) out.push(placeChild(world, k, places))
+      }
+      for (const [sheet, s] of Object.entries(use.stand)) if (!smallestAt(shapes, s.at)) out.push(sheetChild(sheet))
+    }
+    for (const o of mapObjects(m.layers)) if (!smallestAt(shapes, objectCenter(o))) out.push({ kind: 'map_object', id: `${id}/${o.id}`, title: o.name })
+    return out
   }
+}
+
+function objectOf(id: string): { map: MapData; object: ObjectLayerData } {
+  const [mapId, objectId] = id.split('/')
+  const map = mapOf(mapId)
+  const object = mapObjects(map.layers).find((o) => o.id === objectId)
+  if (!object) throw new ToolError(`No object ${objectId} on map ${map.name}.`)
+  return { map, object }
+}
+
+function objectText(id: string): string {
+  const { map, object: o } = objectOf(id)
+  return [
+    `# ${o.name}`,
+    `An object on @map:${map.id}${o.entry ? `; using it opens @${o.entry}` : ''}.`,
+    o.actions.trim() ? `actions (attempts; roll one with action_check):\n${o.actions.trim()}` : '',
+    o.decisions.trim() ? `decisions (choices, never rolled; when the user decides, ask them with ask_user):\n${o.decisions.trim()}` : ''
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+const objectKind: Kind = {
+  group: 'Worlds',
+  kind: 'map_object',
+  label: 'Map object',
+  plural: 'Map objects',
+  icon: 'box',
+  description: 'objects placed on maps: a door, a rock, a scroll, with their own actions and decisions',
+  parts: [],
+  actions: [],
+  exportable: false,
+  resolveOnly: true,
+  available: () => true,
+  search: () => [],
+  resolve(ref) {
+    try {
+      return objectOf(ref.trim()) && ref.trim()
+    } catch {
+      return null
+    }
+  },
+  title(id) {
+    try {
+      return objectOf(id).object.name
+    } catch {
+      return id
+    }
+  },
+  line: (id) => `object on ${objectOf(id).map.name}`,
+  pathOf: (id, ctx) => pathVia([[mapKind, id.split('/')[0]], [objectKind, id]], ctx),
+  card: objectText,
+  full: objectText
 }
 
 function nexusKinds(taken: Set<string>, claimed: Set<string>): Kind[] {
@@ -2186,7 +2319,7 @@ function withNexus(list: Kind[]): Kind[] {
 }
 
 function everyKind(): Kind[] {
-  return withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, storyKind, scriptKind, skillKind, reminderKind, chatKind, agentKind, themeKind, memoryKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
+  return withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, storyKind, scriptKind, skillKind, reminderKind, chatKind, agentKind, themeKind, memoryKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
 }
 
 setWidgetKinds(everyKind)
@@ -2345,9 +2478,10 @@ export function setTags(entry: string, add: string[], remove: string[], ctx: Kin
   return { kind, id, tags: tagStore.change(kind.kind, id, add, remove) }
 }
 
-export function overview(query: string, perKind: number, ctx: KindContext = USER): LibrarySection[] {
+export function overview(query: string, perKind: number, ctx: KindContext = USER, only: string | null = null, skip: string[] = []): LibrarySection[] {
   const out: LibrarySection[] = []
   for (const k of kinds(ctx)) {
+    if ((only && k.kind !== only) || skip.includes(k.kind)) continue
     let all: KindHit[]
     try {
       all = searchKind(k, query, 10_000, ctx)
@@ -2403,20 +2537,93 @@ function resolveIn(k: Kind, ref: string, ctx: KindContext): string | null {
   }
 }
 
-export function resolveEntry(entry: string, kindName: string | null = null, ctx: KindContext = USER): { kind: Kind; id: string } {
+function childrenOf(kind: Kind, id: string, ctx: KindContext, trail: TrailStep[]): KindChild[] {
+  let list: KindChildInput[] = []
+  try {
+    list = kind.children?.(id, ctx, trail) ?? []
+  } catch {
+    list = []
+  }
+  const used = new Set<string>()
+  return list.map((c) => {
+    const base = toId(c.title) || toId(c.id)
+    let segment = base
+    for (let n = 2; used.has(segment); n++) segment = `${base}-${n}`
+    used.add(segment)
+    return { ...c, segment }
+  })
+}
+
+function pathVia(steps: [Kind, string][], ctx: KindContext): string | null {
+  const [[rootKind, rootId], ...rest] = steps
+  let path = `@${rootKind.kind}:${rootId}`
+  let cur: [Kind, string] = [rootKind, rootId]
+  const trail: TrailStep[] = []
+  for (const step of rest) {
+    const hit = childrenOf(cur[0], cur[1], ctx, trail).find((c) => c.id === step[1])
+    if (!hit) return null
+    path += `/${hit.segment}`
+    trail.push({ kind: cur[0].kind, id: cur[1] })
+    cur = step
+  }
+  return path
+}
+
+function walkPath(k: Kind, ref: string, ctx: KindContext): { kind: Kind; id: string; trail: TrailStep[] } | null {
+  const segs = stripRef(ref).split('/').map((s) => s.trim()).filter(Boolean)
+  for (let n = segs.length - 1; n >= 1; n--) {
+    const rootId = resolveIn(k, segs.slice(0, n).join('/'), ctx)
+    if (!rootId) continue
+    let cur = { kind: k, id: rootId }
+    const trail: TrailStep[] = []
+    let reached = true
+    for (const seg of segs.slice(n)) {
+      const want = toId(seg)
+      const hit = childrenOf(cur.kind, cur.id, ctx, trail).find((c) => c.segment === want || toId(c.title) === want || toId(c.id) === want)
+      const next = hit ? kindFor(hit.kind, ctx) : undefined
+      if (!hit || !next) {
+        reached = false
+        break
+      }
+      trail.push({ kind: cur.kind.kind, id: cur.id })
+      cur = { kind: next, id: hit.id }
+    }
+    if (reached) return { ...cur, trail }
+  }
+  return null
+}
+
+export function entryInside(entry: string, ctx: KindContext = USER): KindChild[] {
+  const { kind, id, trail } = resolveEntry(entry, null, ctx)
+  return childrenOf(kind, id, ctx, trail ?? [])
+}
+
+export function insideText(kind: Kind, id: string, base: string, trail: TrailStep[], ctx: KindContext): string {
+  const list = childrenOf(kind, id, ctx, trail)
+  if (!list.length) return ''
+  const label = (k: string) => kindFor(k, ctx)?.label.toLowerCase() ?? k
+  return `\n\nInside it (read any of these by its path):\n${list.map((c) => `- ${base}/${c.segment} — ${label(c.kind)} ${c.title}`).join('\n')}`
+}
+
+export function resolveEntry(entry: string, kindName: string | null = null, ctx: KindContext = USER): { kind: Kind; id: string; trail?: TrailStep[]; path?: string } {
   const link = splitLink(entry)
   if (link.kind && entry.trim().startsWith('@')) {
     const k = kindFor(link.kind, ctx)
     const id = k ? resolveIn(k, link.ref, ctx) : null
     if (k && id) return { kind: k, id }
+    const walked = k && link.ref.includes('/') ? walkPath(k, link.ref, ctx) : null
+    if (k && walked) return { ...walked, path: `@${k.kind}:${stripRef(link.ref)}` }
   }
   const raw = entry.trim().replace(/^seven:/, '')
   const slash = raw.indexOf('/')
   if (!kindName && slash > 0) {
     const k = kindFor(raw.slice(0, slash), ctx)
     if (k) {
-      const id = resolveIn(k, decodeURIComponent(raw.slice(slash + 1)), ctx)
+      const ref = decodeURIComponent(raw.slice(slash + 1))
+      const id = resolveIn(k, ref, ctx)
       if (id) return { kind: k, id }
+      const walked = ref.includes('/') ? walkPath(k, ref, ctx) : null
+      if (walked) return { ...walked, path: `@${k.kind}:${stripRef(ref)}` }
     }
   }
   const named = kindName ? kindFor(kindName, ctx) : undefined
@@ -2434,6 +2641,11 @@ export function resolveEntry(entry: string, kindName: string | null = null, ctx:
     const id = byName(k, raw, ctx)
     if (id) return { kind: k, id }
   }
+  if (raw.includes('/'))
+    for (const k of list) {
+      const walked = walkPath(k, raw, ctx)
+      if (walked) return { ...walked, path: `@${k.kind}:${stripRef(raw)}` }
+    }
   const asked = toId(link.kind && entry.trim().startsWith('@') ? link.ref : raw) || stripRef(raw)
   const what = named?.kind ?? (link.kind && kindFor(link.kind, ctx) ? link.kind : 'entry')
   if (named?.missing) throw new ToolError(named.missing(asked))
@@ -2455,7 +2667,8 @@ export function libraryGuide(toolNames: string[], agentId: string | null = null)
     '## Library and links',
     `Everything Seven keeps is in the library, as entries of the kinds below. Each entry has an id; read_kind(kind, id) gives it.${mine.has('find') ? ' find searches the library.' : ''}${mine.has('show') ? ' show presents an entry.' : ''}`,
     'Link to an entry with @kind:id, e.g. @page:recipes/pancakes. find and read_kind give each entry\'s link: copy it. Links work the same in replies, pages, sheets and tool arguments; never write a markdown link or a [[wiki link]] for an entry.',
-    'Pages sit in folders, and a page\'s id is its path, e.g. recipes/pancakes. read_kind(folder, recipes) lists what recipes holds; read_kind(folder, /) lists the top level.'
+    'Pages sit in folders, and a page\'s id is its path, e.g. recipes/pancakes. read_kind(folder, recipes) lists what recipes holds; read_kind(folder, /) lists the top level.',
+    'Everything that holds other things is a path the same way. Reading one lists what is inside it, each with its path: @world:my_world lists its maps, @world:my_world/the_map the places, objects and characters on that map, @world:my_world/the_map/the_village what is inside that place. Copy the paths you are given; each one goes a level deeper.'
   ]
   if (mine.has('draw')) lines.push('Draw in replies and pages with a ```svg block (one <svg> element, no scripts or outside links); draw saves one as a file. A ```mermaid block draws a flowchart, sequence diagram or timeline. ![name](seven:file/<id>) puts a library picture in a page.')
   for (const k of kinds({ agentId, user: false })) lines.push(`- @${k.kind}: ${k.label}, ${k.description}${mine.has('show') && k.parts.length > 1 ? `. Parts: ${k.parts.map((p) => `#${p}`).join(', ')}` : ''}`)

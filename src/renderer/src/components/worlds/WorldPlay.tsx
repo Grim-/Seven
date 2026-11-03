@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { MessageSquarePlus } from 'lucide-react'
 import { placePath, type MapData, type PlaceVisitor, type WorldMapUse } from '@shared/maps'
-import { ActionBar, EmptyState, Eyebrow, ShellTabs, openMenu } from '../ui'
+import { ActionBar, EmptyState, Eyebrow, ShellTabs, openMenu, type MenuItem } from '../ui'
 import { Markdown } from '../chat/Markdown'
 import { engine } from '../../lib/ipc'
 import { useLive } from '../../lib/useLive'
@@ -30,14 +30,22 @@ import { useDeckInUse } from '../cards/useDeckInUse'
 
 const agentsOf = (here: PlaceVisitor[]) => here.flatMap((v) => (v.agent ? [v.agent] : []))
 
+function PlayPanel({ children, actions }: { children: ReactNode; actions: MenuItem[] }) {
+  return (
+    <div className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-24px)] w-[340px] flex-col border border-line/70 bg-black/95 shadow-[-12px_0_24px_rgba(0,0,0,0.5)]">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">{children}</div>
+      <ActionBar items={actions} className="shrink-0 border-t border-line/40 p-2.5" />
+    </div>
+  )
+}
+
 function PlayCard({ world, placeKey, data, player }: { world: string; placeKey: string; data: PlaceData; player: string | null }) {
   const { places, here } = data
   const place = places[placeKey] ?? {}
   const now = typeof place.Now === 'string' ? place.Now : ''
   const there = here[placeKey] ?? []
   return (
-    <div className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-24px)] w-[340px] flex-col border border-line/70 bg-black/95 shadow-[-12px_0_24px_rgba(0,0,0,0.5)]">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+    <PlayPanel actions={[{ label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(sceneLink(`@place:${placeKey}`, player) ?? '', agentsOf(there)) }]}>
         <div className="font-mono text-[11px] text-dim">{placePath(places, placeKey).map((k) => placeName(places, k)).join(' › ')}</div>
         <div className="text-[15px] font-semibold uppercase tracking-[0.06em] text-white">{placeName(places, placeKey)}</div>
         {now ? <Markdown text={now} className="border border-cyan/25 bg-cyan/[0.04] px-2.5 py-1.5 text-[13px] leading-relaxed text-white/90" /> : <span className="text-[12px] text-faint">Nothing is happening here.</span>}
@@ -50,23 +58,37 @@ function PlayCard({ world, placeKey, data, player }: { world: string; placeKey: 
           </div>
         )}
         <PlayList play={placePlay(world, placeKey, place, player, agentsOf(there))} />
-      </div>
-      <ActionBar items={[{ label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(sceneLink(`@place:${placeKey}`, player) ?? '', agentsOf(there)) }]} className="shrink-0 grid-cols-1 border-t border-line/40 p-2.5" />
-    </div>
+    </PlayPanel>
   )
 }
 
 function PlayMap({ world, map, use, data, player, at }: { world: string; map: MapData; use: WorldMapUse; data: PlaceData; player: string | null; at: string | null }) {
   const [looking, setLooking] = useState<string | null>(at)
-  const people = useMapTokens({ world, use, places: data.places, player, editing: false, save: (next) => void engine('worlds.saveMapUse', { id: world, use: next }).catch(failed('Could not save it')) })
+  const [who, setWho] = useState<string | null>(null)
+  const pickPlace = (key: string | null) => {
+    setWho(null)
+    setLooking(key)
+  }
+  const pickWho = (sheet: string) => {
+    setLooking(null)
+    setWho(sheet)
+  }
+  const people = useMapTokens({ world, use, places: data.places, player, editing: false, onSelect: pickWho, save: (next) => void engine('worlds.saveMapUse', { id: world, use: next }).catch(failed('Could not save it')) })
   const shown = looking && data.places[looking] ? looking : null
+  const token = who ? (people.tokens.find((t) => t.visitor.sheet === who) ?? null) : null
   const deck = useDeckInUse(player ? { character: player } : null)
   const where = worldWhere(at ? `@place:${at}` : null, at ? agentsOf(data.here[at] ?? []) : [], world, player)
-  useEscapeLayer(shown !== null, () => setLooking(null))
+  useEscapeLayer(shown !== null || token !== null, () => pickPlace(null))
   return (
     <div className="relative min-h-0 flex-1 border border-line/40 bg-black/40">
-      <MapCanvas map={map} shapes={use.shapes} places={data.places} here={data.here} place={`play.${world}.${map.id}`} selected={shown} onPick={(s) => setLooking(s.id)} onBlank={() => setLooking(null)} onBlankMenu={(e, point) => openMenu(e, map.name, [people.putHere(point)])} objects={objectHandlers(world, map.id, player)} tokens={people.tokens} onToken={people.handlers} className="h-full" />
+      <MapCanvas map={map} shapes={use.shapes} places={data.places} here={data.here} place={`play.${world}.${map.id}`} selected={shown} onPick={(s) => pickPlace(s.id)} onBlank={() => pickPlace(null)} onBlankMenu={(e, point) => openMenu(e, map.name, [people.putHere(point)])} objects={objectHandlers(world, map.id, player)} tokens={people.tokens} onToken={people.handlers} className="h-full" />
       {shown && <PlayCard world={world} placeKey={shown} data={data} player={player} />}
+      {token && (
+        <PlayPanel actions={people.items(token)}>
+          <CharacterRow visitor={token.visitor} />
+          <PlayList play={people.holder(token.visitor)} />
+        </PlayPanel>
+      )}
       {deck && <CardHand entries={deck.entries} buttons onPlay={(card) => playCard(card, deck.ref, where)} className="!absolute inset-x-0 bottom-0" />}
     </div>
   )

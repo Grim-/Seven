@@ -2,7 +2,7 @@ import type { ModuleFactory } from '../../engine/modules/sdk'
 import type { ToolDef } from '../../engine/tools/types'
 import { roll } from './dice'
 import { presentationTool } from '../../engine/present/define'
-import { actionResultText, cleanAction } from '@shared/actions'
+import { CHANCE, actionResultText, checkNames, cleanAction } from '@shared/actions'
 import { rollFor } from '../../engine/actions'
 import { journalAction } from '../../engine/worlds/journeys'
 import { agentAccess } from '../../engine/agents/access'
@@ -42,7 +42,7 @@ const factory: ModuleFactory = (sdk) =>
 const CHECK = {
   type: 'object',
   properties: {
-    against: { type: ['string', 'null'], description: 'A stat, save or skill on the D&D sheet, e.g. charisma, dexterity save, deception; null for plain chance' },
+    against: { oneOf: [{ type: 'null' }, { enum: [CHANCE, ...checkNames().map((c) => c.id)] }], description: 'null or chance for plain chance' },
     difficulty: { type: ['number', 'null'], description: '0 easy to 1 hard; null is 0.5' },
     base: { type: ['number', 'null'], description: 'Base DC; null is 10' },
     pass: { type: ['string', 'null'], description: 'What happens if this check decides it and passes' },

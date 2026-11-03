@@ -1,5 +1,5 @@
-import { Globe, Settings as SettingsIcon } from 'lucide-react'
-import { VIEW_TABS } from './views'
+import { Globe } from 'lucide-react'
+import { viewsIn } from '../../views/registry'
 import { showBrowser } from '../side/BrowserTab'
 import { useTools } from '../../store/tools'
 import { cn } from '../../lib/cn'
@@ -11,6 +11,7 @@ import { ThemeButton } from '../themes/ThemeControl'
 import { AppSearch } from './Search'
 import { StatusControl } from './Status'
 import { NotificationButton } from './Notifications'
+import { FavouritesFlyout } from './FavouritesFlyout'
 
 function Tab({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label?: string; onClick: () => void }) {
   return (
@@ -37,8 +38,11 @@ export function Taskbar() {
 
   return (
     <nav className="relative z-40 flex h-11 shrink-0 items-stretch border-t border-line/40 bg-bg/95 px-1.5">
-      {VIEW_TABS.map((item) => (
-        <Tab key={item.id} active={view === item.id} icon={item.icon} label={item.label} onClick={() => setView(item.id)} />
+      {viewsIn('tabs').map((item) => (
+        <div key={item.id} className="group relative flex">
+          <Tab active={view === item.id} icon={item.icon} label={item.label} onClick={() => setView(item.id)} />
+          <FavouritesFlyout view={item.id} />
+        </div>
       ))}
       <AppSearch />
       <div className="ml-auto flex items-center gap-2.5 pr-2 font-mono text-[10.5px] uppercase tracking-wider">
@@ -59,7 +63,9 @@ export function Taskbar() {
       <div className="flex items-stretch pl-1">
         <NotificationButton />
         <LockButton compact />
-        <Tab active={view === 'settings'} icon={<SettingsIcon />} onClick={() => setView('settings')} />
+        {viewsIn('settings').map((item) => (
+          <Tab key={item.id} active={view === item.id} icon={item.icon} onClick={() => setView(item.id)} />
+        ))}
       </div>
     </nav>
   )

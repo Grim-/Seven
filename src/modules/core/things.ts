@@ -8,7 +8,7 @@ import { pathExists, pathLike } from '../read/tools'
 
 export function hitId(h: { kind: string; id: string; title: string }, kctx: KindContext): string {
   const k = kinds(kctx).find((x) => x.kind === h.kind)
-  return k ? entryId(k, h.id, h.title, kctx) : h.id
+  return k ? (k.pathOf?.(h.id, kctx) ?? entryId(k, h.id, h.title, kctx)) : h.id
 }
 
 export function thingsFrom(value: unknown, ctx: ToolContext): string[] {
