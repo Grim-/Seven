@@ -117,66 +117,35 @@
   }
 }
 
-.seven-md-editor .milkdown {
-  --crepe-color-background: transparent;
-  --crepe-color-on-background: var(--color-text);
-  --crepe-color-surface: var(--color-card);
-  --crepe-color-surface-low: var(--color-sidebar);
-  --crepe-color-on-surface: var(--color-text);
-  --crepe-color-on-surface-variant: var(--color-dim);
-  --crepe-color-outline: var(--color-faint);
-  --crepe-color-primary: var(--color-accent);
-  --crepe-color-secondary: color-mix(in srgb, var(--color-accent) 18%, transparent);
-  --crepe-color-on-secondary: var(--color-text);
-  --crepe-color-inline-code: var(--color-cyan);
-  --crepe-color-hover: var(--color-card-hover);
-  --crepe-color-selected: color-mix(in srgb, var(--color-accent) 16%, transparent);
-  --crepe-color-inline-area: var(--color-card);
-  --crepe-base-font-size: 14px;
-  --crepe-font-title: var(--font-sans);
-  --crepe-font-default: var(--font-sans);
-  --crepe-font-code: var(--font-mono);
-}
-
-.seven-md-compact .milkdown .ProseMirror {
+.seven-md-compact .ProseMirror {
   padding: 6px 10px;
   min-height: 2.4em;
-}
-
-.seven-md-compact .milkdown {
-  --crepe-base-font-size: 13.5px;
-}
-
-.seven-md-editor .milkdown {
-  --crepe-color-hover: color-mix(in srgb, var(--color-accent) 14%, transparent);
-  --crepe-color-selected: color-mix(in srgb, var(--color-accent) 30%, transparent);
-  --crepe-shadow-1: 0 0 18px color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 .seven-doc-bg {
   background: color-mix(in srgb, var(--color-bg) 92%, transparent);
 }
 
-.seven-md-doc .milkdown .ProseMirror {
+.seven-md-doc .ProseMirror {
   padding: 24px 40px 32px 72px;
 }
 
 .prose-doc,
-.seven-md-doc .milkdown .ProseMirror {
+.seven-md-doc .ProseMirror {
   font-size: 14.5px;
   line-height: 1.65;
   color: var(--color-text);
 }
 
 .prose-doc p,
-.seven-md-doc .milkdown .ProseMirror p {
+.seven-md-doc .ProseMirror p {
   margin: 0 0 0.6em;
   padding: 0;
   line-height: 1.65;
 }
 
 .prose-doc h1,
-.seven-md-doc .milkdown .ProseMirror h1 {
+.seven-md-doc .ProseMirror h1 {
   font-family: var(--font-sans);
   font-size: 1.8em;
   font-weight: 600;
@@ -188,7 +157,7 @@
 }
 
 .prose-doc h1::before,
-.seven-md-doc .milkdown .ProseMirror h1::before {
+.seven-md-doc .ProseMirror h1::before {
   content: '// ';
   font-family: var(--font-mono);
   font-weight: 400;
@@ -196,7 +165,7 @@
 }
 
 .prose-doc h2,
-.seven-md-doc .milkdown .ProseMirror h2 {
+.seven-md-doc .ProseMirror h2 {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -212,7 +181,7 @@
 }
 
 .prose-doc h2::after,
-.seven-md-doc .milkdown .ProseMirror h2::after {
+.seven-md-doc .ProseMirror h2::after {
   content: '';
   flex: 1;
   height: 1px;
@@ -221,8 +190,8 @@
 
 .prose-doc h3,
 .prose-doc h4,
-.seven-md-doc .milkdown .ProseMirror h3,
-.seven-md-doc .milkdown .ProseMirror h4 {
+.seven-md-doc .ProseMirror h3,
+.seven-md-doc .ProseMirror h4 {
   font-family: var(--font-mono);
   font-size: 0.95em;
   font-weight: 700;
@@ -233,17 +202,20 @@
   padding: 0;
 }
 
-.prose-doc ul {
+.prose-doc ul,
+.seven-md-editor .ProseMirror ul:not([data-type='taskList']) {
   list-style: none;
   padding-left: 0;
 }
 
-.prose-doc ul > li:not(.task-list-item) {
+.prose-doc ul > li:not(.task-list-item),
+.seven-md-editor .ProseMirror ul:not([data-type='taskList']) > li {
   position: relative;
   padding-left: 18px;
 }
 
-.prose-doc ul > li:not(.task-list-item)::before {
+.prose-doc ul > li:not(.task-list-item)::before,
+.seven-md-editor .ProseMirror ul:not([data-type='taskList']) > li::before {
   content: '';
   position: absolute;
   left: 3px;
@@ -254,14 +226,8 @@
   clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
-.seven-md-doc .milkdown .milkdown-list-item-block li .label-wrapper,
-.seven-md-doc .milkdown .milkdown-list-item-block li .label-wrapper svg {
-  color: var(--color-accent);
-  fill: var(--color-accent);
-}
-
 .prose-doc blockquote,
-.seven-md-doc .milkdown .ProseMirror blockquote {
+.seven-md-doc .ProseMirror blockquote {
   margin: 0 0 0.8em;
   padding: 6px 12px;
   border-left: 2px solid var(--color-cyan);
@@ -269,12 +235,12 @@
   color: var(--color-text);
 }
 
-.seven-md-doc .milkdown .ProseMirror blockquote::before {
+.seven-md-doc .ProseMirror blockquote::before {
   display: none;
 }
 
 .prose-doc code,
-.seven-md-doc .milkdown .ProseMirror code {
+.seven-md-doc .ProseMirror code {
   font-family: var(--font-mono);
   font-size: 0.87em;
   color: var(--color-accent-soft);
@@ -285,7 +251,7 @@
 }
 
 .prose-doc pre,
-.seven-md-doc .milkdown .ProseMirror pre {
+.seven-md-doc .ProseMirror pre {
   background: #05060a;
   border: 1px solid var(--color-line);
   border-left: 1px solid var(--color-line);
@@ -299,7 +265,7 @@
 }
 
 .prose-doc table,
-.seven-md-doc .milkdown .ProseMirror table {
+.seven-md-doc .ProseMirror table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.92em;
@@ -313,7 +279,7 @@
 }
 
 .prose-doc th,
-.seven-md-doc .milkdown .ProseMirror th {
+.seven-md-doc .ProseMirror th {
   background: none;
   font-family: var(--font-mono);
   font-size: 0.72em;
@@ -325,7 +291,7 @@
 }
 
 .prose-doc hr,
-.seven-md-doc .milkdown .ProseMirror hr {
+.seven-md-doc .ProseMirror hr {
   border: 0;
   height: 1px;
   padding: 0;
@@ -399,104 +365,122 @@
   padding: 1px 6px 1px 3px;
 }
 
-.seven-md-editor .milkdown .milkdown-toolbar {
-  border: 1px solid color-mix(in srgb, var(--color-accent) 60%, transparent);
-  border-radius: 0;
-  background: color-mix(in srgb, var(--color-bg) 92%, var(--color-accent));
-  box-shadow: 0 0 18px color-mix(in srgb, var(--color-accent) 35%, transparent);
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%);
+
+.seven-md-editor .ProseMirror {
+  outline: none;
+  min-height: 100%;
 }
 
-.seven-md-editor .milkdown .milkdown-toolbar .toolbar-item {
-  width: 28px;
-  height: 28px;
-  margin: 3px 1px;
-  padding: 4px;
-  border-radius: 0;
+.seven-md-doc .ProseMirror {
+  padding: 24px 40px 32px 40px;
 }
 
-.seven-md-editor .milkdown .milkdown-toolbar .toolbar-item svg {
-  width: 20px;
-  height: 20px;
-  color: var(--color-dim);
-  fill: var(--color-dim);
+.seven-md-compact .ProseMirror {
+  font-size: 13.5px;
+  color: var(--color-text);
 }
 
-.seven-md-editor .milkdown .milkdown-toolbar .toolbar-item.active svg {
-  color: #fff;
-  fill: #fff;
-}
-
-.seven-md-editor .milkdown .milkdown-toolbar .toolbar-item.active {
-  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
-}
-
-.seven-md-editor .milkdown .milkdown-toolbar .divider {
-  height: 20px;
-  margin: 7px 3px;
-}
-
-.seven-md-editor .milkdown .milkdown-slash-menu {
-  border: 1px solid color-mix(in srgb, var(--color-cyan) 45%, transparent);
-  border-radius: 0;
-  background: color-mix(in srgb, var(--color-bg) 95%, var(--color-cyan));
-  box-shadow: 0 0 22px color-mix(in srgb, var(--color-cyan) 18%, transparent);
-  font-family: var(--font-mono);
-}
-
-.seven-md-editor .milkdown .milkdown-slash-menu ul li {
-  border-radius: 0;
-}
-
-.seven-md-editor .milkdown .milkdown-slash-menu .tab-group ul li {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.seven-md-editor .milkdown .milkdown-slash-menu .menu-groups .menu-group h6 {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  padding: 10px 10px 6px;
+.seven-md-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
   color: var(--color-faint);
 }
 
-.seven-md-editor .milkdown .milkdown-slash-menu .menu-groups .menu-group li {
-  padding: 7px 10px;
-  gap: 12px;
-  font-size: 12px;
-  border-left: 2px solid transparent;
+.seven-md-editor .ProseMirror ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.2em;
 }
 
-.seven-md-editor .milkdown .milkdown-slash-menu .menu-groups .menu-group li.hover,
-.seven-md-editor .milkdown .milkdown-slash-menu .menu-groups .menu-group li.active {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--color-cyan) 18%, transparent), transparent);
-  border-left-color: var(--color-cyan);
-  color: #fff;
+.seven-md-editor .ProseMirror ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
 }
 
-.seven-md-editor .milkdown .milkdown-slash-menu svg {
-  fill: var(--color-cyan);
+.seven-md-editor .ProseMirror ul[data-type='taskList'] li > label {
+  margin-top: 0.3em;
 }
 
-.seven-md-editor .milkdown .milkdown-block-handle .operation-item {
-  width: 22px;
-  height: 22px;
-  padding: 2px;
-  border-radius: 0;
-  border: 1px solid var(--color-line);
-  background: #000;
+.seven-md-editor .ProseMirror ul[data-type='taskList'] input[type='checkbox'] {
+  accent-color: var(--color-accent);
 }
 
-.seven-md-editor .milkdown .milkdown-block-handle .operation-item svg {
-  width: 16px;
-  height: 16px;
-  fill: var(--color-cyan);
+.seven-md-editor .ProseMirror ul[data-type='taskList'] li > div {
+  flex: 1;
 }
 
-.seven-md-editor .milkdown .milkdown-block-handle .operation-item:hover {
-  border-color: var(--color-cyan);
-  background: color-mix(in srgb, var(--color-cyan) 12%, #000);
+.seven-md-editor .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.seven-md-editor .ProseMirror td,
+.seven-md-editor .ProseMirror th {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  padding: 6px 10px;
+  vertical-align: top;
+  position: relative;
+}
+
+.seven-md-editor .ProseMirror .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  pointer-events: none;
+}
+
+.seven-md-editor .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+}
+
+.seven-md-editor .ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid var(--color-accent);
+}
+
+.seven-md-editor .ProseMirror a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.seven-md-editor .ProseMirror ol {
+  list-style: decimal;
+  padding-left: 1.6em;
+}
+
+.seven-md-editor .ProseMirror ol > li::marker {
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+}
+
+.seven-md-editor .ProseMirror li > p {
+  margin: 0 0 0.2em;
+}
+
+.seven-screen {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent),
+    0 0 26px color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+}
+
+.seven-screen-tab {
+  align-self: flex-start;
+  margin-left: 14px;
+  padding: 5px 16px 4px 18px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+  border-bottom: 0;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);
 }

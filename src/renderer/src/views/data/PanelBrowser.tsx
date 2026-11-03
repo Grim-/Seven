@@ -103,7 +103,7 @@ function KindSection({
   )
 }
 
-export function PanelBrowser({ selected, select }: { selected: DataSelection | null; select: (s: DataSelection | null) => void }) {
+export function PanelBrowser({ selected, select, only = null }: { selected: DataSelection | null; select: (s: DataSelection | null) => void; only?: string[] | null }) {
   useEffect(() => {
     void useData.getState().refresh().catch(() => undefined)
   }, [])
@@ -115,7 +115,7 @@ export function PanelBrowser({ selected, select }: { selected: DataSelection | n
     const timer = setTimeout(() => setQ(query.trim()), 250)
     return () => clearTimeout(timer)
   }, [query])
-  const { sections } = useLibrary(q, q ? 20 : 6)
+  const { sections } = useLibrary(q, q ? 20 : 6, [], only)
   const closed = new Set(listPrefs.closed ?? [])
   const toggle = (kind: string) => void updateSettings({ dataList: { ...listPrefs, closed: closed.has(kind) ? [...closed].filter((k) => k !== kind) : [...closed, kind] } })
   const section = sections?.find((x) => x.kind === selected?.kind)

@@ -1,10 +1,12 @@
 import type { UiRequestState } from '@shared/types'
 import { pickMadeText, type PickAnswer, type PickDecisionProps } from '@shared/pickDecision'
-import { StatusLine, answer } from '../../registries/ui-requests'
+import { StatusLine, answer, type RequestPlace } from '../../registries/ui-requests'
 import { DecideView } from './DecideView'
+import { AnsweringAbove } from './AnsweringAbove'
 
-export function DecideCard({ ui }: { ui: UiRequestState }) {
+export function DecideCard({ ui, place }: { ui: UiRequestState; place: RequestPlace }) {
   const p = ui.props as PickDecisionProps
+  if (place === 'inline' && ui.status === 'pending') return <AnsweringAbove tag="Decision" question={p.question} />
   return (
     <DecideView
       p={p}

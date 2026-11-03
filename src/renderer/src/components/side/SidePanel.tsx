@@ -21,7 +21,7 @@ import { WorkoutPanel } from '../workout/Workout'
 import { useData, usePage } from '../../store/data'
 import { StatsTab } from './StatsTab'
 import { KindIcon } from '../../lib/library'
-import { presentOf } from '../../registries/kinds'
+import { presentOf, viewKinds } from '../../registries/kinds'
 import { KindBrowser } from '../data/KindBrowser'
 import './BrowserTab'
 import { useAgentIdOf, useConversation } from '../../lib/conversation'
@@ -62,7 +62,7 @@ function FilesTab() {
   const selected = useSide((s) => s.files)
   const select = useSide((s) => s.setFiles)
   if (locked) return <div className="p-2.5"><LockedState what="Pages and files" /></div>
-  return <DataBrowser mode="panel" selected={selected} select={select} />
+  return <DataBrowser mode="panel" selected={selected} select={select} only={viewKinds('pages')} />
 }
 
 export function PanelItems({ tab, empty }: { tab: string; empty: string }) {

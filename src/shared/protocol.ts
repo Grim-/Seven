@@ -119,6 +119,7 @@ import type {
 } from './types'
 import type { CompendiumEntry, CompendiumKind, CompendiumRef } from './compendium'
 import type { StoredDecision } from './storedDecision'
+import type { StoredAction } from './storedAction'
 
 type Req<P, R> = { params: P; result: R }
 
@@ -309,6 +310,10 @@ export interface EngineRequests {
   'dnd.remove': Req<{ kind: CompendiumKind; id: string }, boolean>
   'decisions.get': Req<{ id: string }, StoredDecision>
   'decisions.save': Req<{ decision: StoredDecision; previousId: string | null }, StoredDecision>
+  'storyActions.get': Req<{ id: string }, StoredAction>
+  'storyActions.list': Req<Record<string, never>, StoredAction[]>
+  'decisions.list': Req<Record<string, never>, StoredDecision[]>
+  'storyActions.save': Req<{ action: StoredAction; previousId: string | null }, StoredAction>
   'dnd.import': Req<{ kind: CompendiumKind; json: string; apply: boolean }, { added: string[]; replaced: string[] }>
   'board.add': Req<{ text: string }, BoardMessage>
   'board.update': Req<{ id: string; text: string }, BoardMessage>
@@ -335,7 +340,7 @@ export interface EngineRequests {
   'python.run': Req<{ id: string }, PythonScript>
   'library.read': Req<{ entry: string }, string>
   'library.find': Req<{ query: string; kind: string | null }, LibraryHit[]>
-  'library.overview': Req<{ query: string; perKind: number; kind?: string | null; skip?: string[] }, LibrarySection[]>
+  'library.overview': Req<{ query: string; perKind: number; kind?: string | null; kinds?: string[]; skip?: string[] }, LibrarySection[]>
   'timeline.recent': Req<{ limit: number }, TimelineRow[]>
   'routines.list': Req<void, Routine[]>
   'routines.save': Req<RoutineDraft, Routine>
@@ -557,6 +562,7 @@ export interface Events {
   'board.changed': Record<string, never>
   'dnd.changed': Record<string, never>
   'decisions.changed': Record<string, never>
+  'storyActions.changed': Record<string, never>
   'themes.changed': Theme[]
   'ambience.changed': { sessionId: string; ambience: Ambience }
   'ambience.cue': AmbienceCue

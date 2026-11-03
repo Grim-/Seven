@@ -44,12 +44,12 @@ export function onLibraryChange(fn: () => void): () => void {
   }
 }
 
-export function useLibrary(query: string, perKind: number, skip: string[] = []): { sections: LibrarySection[] | null; reload: () => void } {
+export function useLibrary(query: string, perKind: number, skip: string[] = [], only: string[] | null = null): { sections: LibrarySection[] | null; reload: () => void } {
   const [sections, setSections] = useState<LibrarySection[] | null>(null)
   const latest = useRef(0)
   const load = () => {
     const n = ++latest.current
-    void engine('library.overview', { query, perKind, skip })
+    void engine('library.overview', { query, perKind, skip, ...(only ? { kinds: only } : {}) })
       .then((s) => {
         noteKindFamilies(s)
         if (n === latest.current) setSections(s)
@@ -59,7 +59,7 @@ export function useLibrary(query: string, perKind: number, skip: string[] = []):
   useEffect(() => {
     load()
     return onLibraryChange(load)
-  }, [query, perKind, skip.join('\n')])
+  }, [query, perKind, skip.join('\n'), only?.join('\n')])
   return { sections, reload: load }
 }
 

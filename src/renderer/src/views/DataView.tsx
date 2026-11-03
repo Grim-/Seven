@@ -9,6 +9,6 @@ export function DataView() {
   return <DataWindow />
 }
 
-export function DataBrowser({ selected, select }: { mode: 'panel'; selected: DataSelection | null; select: (s: DataSelection | null) => void }) {
-  return <PanelBrowser selected={selected} select={select} />
+export function DataBrowser({ selected, select, only }: { mode: 'panel'; selected: DataSelection | null; select: (s: DataSelection | null) => void; only?: string[] }) {
+  return <PanelBrowser selected={selected} select={select} only={only} />
 }

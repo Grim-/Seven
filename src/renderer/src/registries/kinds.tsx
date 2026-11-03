@@ -99,6 +99,10 @@ export function kindUi(kind: string): KindUi {
   return uis.get(kind) ?? (family ? uis.get(family) : undefined) ?? (addonKind(kind) ? (uis.get('page:addon') ?? NONE) : NONE)
 }
 
+export function viewKinds(view: string): string[] {
+  return [...uis.entries()].filter(([, ui]) => ui.ownView === view).map(([kind]) => kind)
+}
+
 export function ownViewKinds(): string[] {
   return [...uis.entries()].filter(([, ui]) => ui.ownView).map(([kind]) => kind)
 }

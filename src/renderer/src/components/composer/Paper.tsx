@@ -12,7 +12,7 @@ import { PadBlockView } from './PadBlockView'
 import { useRollableKinds } from './useRollableKinds'
 import type { Pad } from './pad'
 
-export function Paper({ pad, head, className }: { pad: Pad; head?: ReactNode; className?: string }) {
+export function Paper({ pad, head, className, onMenu }: { pad: Pad; head?: ReactNode; className?: string; onMenu?: () => void }) {
   const rollable = useRollableKinds()
   const [wide, setWide] = useState<Record<string, boolean>>({})
   const [open, setOpen] = useState<Record<string, boolean>>({})
@@ -26,6 +26,11 @@ export function Paper({ pad, head, className }: { pad: Pad; head?: ReactNode; cl
   return (
     <div
       className={cn('pad-paper', (over || files.over) && 'pad-over', className)}
+      onContextMenu={(e) => {
+        if (!onMenu) return
+        e.preventDefault()
+        onMenu()
+      }}
       onDragOver={(e) => {
         if (!isEntryDrag(e)) return files.props.onDragOver(e)
         e.preventDefault()
@@ -52,7 +57,7 @@ export function Paper({ pad, head, className }: { pad: Pad; head?: ReactNode; cl
         <button type="button" onClick={() => pad.add([''])} className="pad-add">
           <Plus className="h-3 w-3" /> Text
         </button>
-        <span>drop anything here · type @ in text to link · right-click a block for more</span>
+        <span>{onMenu ? 'right-click the paper to add from your library · ' : ''}drop anything here · type @ in text to link · right-click a block for more</span>
       </div>
     </div>
   )

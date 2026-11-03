@@ -4,12 +4,12 @@ import { pickMadeText, type PickAnswer, type PickOption } from '@shared/pickDeci
 import { DICE, rolledMadeText, type RolledAnswer } from '@shared/rolledDecision'
 import { opposedText, type OpposedAnswer, type OpposedSide } from '@shared/opposedCheck'
 import { optionRollFrom } from '@shared/storyRolls'
-import { checkNames } from '@shared/actions'
+import { CHANCE, checkNames, cleanAction } from '@shared/actions'
 import type { DecisionMode, StoredDecision } from '@shared/storedDecision'
 import { ToolError, type ToolContext, type ToolDef } from '../../engine/tools/types'
 import { agentAccess } from '../../engine/agents/access'
 import { findSheet, getSheet } from '../../engine/library/sheets'
-import { decisions } from './store'
+import { decisions, storyActions } from './store'
 
 type Json = Record<string, unknown>
 
@@ -51,7 +51,7 @@ function stored(raw: unknown, mode: DecisionMode): StoredDecision | null {
   const ref = str(raw)
   if (!ref) return null
   const d = decisions.find(ref)
-  if (!d) throw new ToolError(`No decision "${ref}". find with kind decision lists them.`)
+  if (!d) throw new ToolError(`No story_decision "${ref}". find with kind story_decision lists them.`)
   if (d.mode !== mode) throw new ToolError(`${d.name} is ${mode === 'roll' ? 'picked by the user; use decide' : 'rolled on a die; use roll_decision'}.`)
   return d
 }
@@ -91,7 +91,7 @@ const decide: ToolDef = {
   name: 'decide',
   maxRepeats: 1,
   activity: () => 'asking for a decision',
-  description: 'The user picks one of your options; an option that can fail gets a chance or a check against a DC. from: a stored @decision.',
+  description: 'The user picks one of your options; an option that can fail gets a chance or a check against a DC. from: a stored @story_decision.',
   params: {
     type: 'object',
     properties: {
@@ -107,7 +107,7 @@ const decide: ToolDef = {
     const given = pickOptions(params.options)
     const options = given.length ? given : (from?.options ?? [])
     if (!options.length) throw new ToolError(from ? `Write ${from.count} options for ${from.name} from its prompt, in options.` : 'Give options: a list of {text}, with a chance or a check on each that can fail.')
-    const props = { question: str(params.question) ?? from?.name ?? 'What do you do?', options, own: params.own !== false, character: sheetOf(params.character, ctx), from: from ? linkFor('decision', from.id) : null }
+    const props = { question: str(params.question) ?? from?.name ?? 'What do you do?', options, own: params.own !== false, character: sheetOf(params.character, ctx), from: from ? linkFor('story_decision', from.id) : null }
     const answer = (await ctx.ui.ask('decide', props)) as PickAnswer
     return pickMadeText(props, answer, sheetName(answer.character))
   }
@@ -118,7 +118,7 @@ const rollDecision: ToolDef = {
   name: 'roll_decision',
   maxRepeats: 1,
   activity: () => 'rolling a decision',
-  description: 'A die picks one of your options; write exactly as many as the die has sides. from: a stored @decision.',
+  description: 'A die picks one of your options; write exactly as many as the die has sides. from: a stored @story_decision.',
   params: {
     type: 'object',
     properties: {
@@ -135,7 +135,7 @@ const rollDecision: ToolDef = {
     const given = (Array.isArray(params.options) ? params.options : []).map((o) => String(o).trim()).filter(Boolean)
     const options = given.length ? given : (from?.options.map((o) => o.text) ?? [])
     if (options.length !== die) throw new ToolError(`A d${die} needs exactly ${die} options; there are ${options.length}.${from && !given.length ? ` Write ${die} from the prompt of ${from.name}.` : ''}`)
-    const props = { question: str(params.question) ?? from?.name ?? 'What happens?', die, options, from: from ? linkFor('decision', from.id) : null }
+    const props = { question: str(params.question) ?? from?.name ?? 'What happens?', die, options, from: from ? linkFor('story_decision', from.id) : null }
     const answer = (await ctx.ui.ask('rolled', props)) as RolledAnswer
     return rolledMadeText(props, answer)
   }
@@ -196,10 +196,59 @@ const createDecisions: ToolDef = {
     const lines = list.map((raw) => {
       const existing = typeof raw.name === 'string' ? decisions.find(raw.name) : null
       const saved = decisions.save({ ...(existing ?? {}), ...raw, options: pickOptions(raw.options) }, existing?.id ?? null)
-      return `${existing ? 'Changed' : 'Created'} ${linkFor('decision', saved.id)}`
+      return `${existing ? 'Changed' : 'Created'} ${linkFor('story_decision', saved.id)}`
     })
     return lines.join('\n')
   }
 }
 
-export const decisionTools: ToolDef[] = [decide, rollDecision, opposedCheck, createDecisions]
+const ACTION_CHECK: GbnfJsonSchema = {
+  type: 'object',
+  properties: {
+    against: { oneOf: [{ type: 'null' }, { enum: [CHANCE, ...CHECK_IDS] }] },
+    dc: { type: ['number', 'null'] },
+    pass: { type: ['string', 'null'] },
+    fail: { type: ['string', 'null'] }
+  }
+}
+
+const createStoryActions: ToolDef = {
+  ...base,
+  name: 'create_story_actions',
+  activity: () => 'creating story actions',
+  description: 'Create stored actions, all in one call. needs any: one check is tried; all: every check must pass.',
+  params: {
+    type: 'object',
+    properties: {
+      actions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            attempt: { type: 'string' },
+            needs: { enum: ['any', 'all'] },
+            checks: { type: 'array', items: ACTION_CHECK },
+            pass: { type: 'string' },
+            fail: { type: 'string' },
+            tags: { type: 'array', items: { type: 'string' } }
+          }
+        }
+      }
+    }
+  },
+  execute: async (params) => {
+    const list = Array.isArray(params.actions) ? (params.actions as Json[]) : []
+    if (!list.length) throw new ToolError('Give actions as a list.')
+    return list
+      .map((raw) => {
+        const checks = (Array.isArray(raw.checks) ? (raw.checks as Json[]) : []).map((c) => ({ ...c, base: typeof c.dc === 'number' ? c.dc - 1 : null, difficulty: null }))
+        const existing = typeof raw.name === 'string' ? storyActions.find(raw.name) : null
+        const saved = storyActions.save({ ...(existing ?? {}), name: raw.name, tags: raw.tags, action: cleanAction({ ...raw, checks }) }, existing?.id ?? null)
+        return `${existing ? 'Changed' : 'Created'} ${linkFor('story_action', saved.id)}`
+      })
+      .join('\n')
+  }
+}
+
+export const decisionTools: ToolDef[] = [decide, rollDecision, opposedCheck, createDecisions, createStoryActions]

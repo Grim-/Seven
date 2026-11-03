@@ -1,14 +1,16 @@
 import { decisionModeLabel, storedDecisionText } from '@shared/storedDecision'
+import { storedActionText } from '@shared/storedAction'
 import { ENTRY_WIDGET, type Kind } from '../../engine/library/kinds'
-import { decisions } from './store'
+import { decisions, storyActions } from './store'
 
 const has = (text: string, q: string) => text.toLowerCase().includes(q)
+const tagLine = (tags: string[]) => (tags.length ? ` · ${tags.join(', ')}` : '')
 
 export const decisionKind: Kind = {
-  kind: 'decision',
+  kind: 'story_decision',
   presents: { chat: true, widget: ENTRY_WIDGET },
-  label: 'Decision',
-  plural: 'Decisions',
+  label: 'Story decision',
+  plural: 'Story decisions',
   icon: 'split',
   description: 'stored decisions: options, or a prompt to write them from; the user picks one or a die does',
   group: 'Worlds',
@@ -26,12 +28,12 @@ export const decisionKind: Kind = {
       .list()
       .filter((d) => !q || has(d.name, q) || has(d.prompt, q) || d.tags.some((t) => t.includes(q)))
       .slice(0, limit)
-      .map((d) => ({ kind: 'decision', id: d.id, title: d.name }))
+      .map((d) => ({ kind: 'story_decision', id: d.id, title: d.name }))
   },
   resolve: (ref) => decisions.find(ref)?.id ?? null,
   line(id) {
     const d = decisions.get(id)
-    return `${decisionModeLabel(d)}${d.tags.length ? ` · ${d.tags.join(', ')}` : ''}`
+    return `${decisionModeLabel(d)}${tagLine(d.tags)}`
   },
   card: (id) => storedDecisionText(decisions.get(id)),
   full: (id) => storedDecisionText(decisions.get(id)),
@@ -44,4 +46,46 @@ export const decisionKind: Kind = {
   },
   remove: (id) => decisions.remove(id),
   rename: (id, name) => void decisions.save({ ...decisions.get(id), name })
+}
+
+export const storyActionKind: Kind = {
+  kind: 'story_action',
+  presents: { chat: true, widget: ENTRY_WIDGET },
+  label: 'Story action',
+  plural: 'Story actions',
+  icon: 'swords',
+  description: 'stored actions: what is attempted, the checks for it and what happens on a pass or a fail',
+  group: 'Worlds',
+  parts: [],
+  actions: ['action_check'],
+  exportable: true,
+  export(id) {
+    const a = storyActions.get(id)
+    return { title: a.name, markdown: storedActionText(a), json: a }
+  },
+  available: () => true,
+  search(query, limit) {
+    const q = query.trim().toLowerCase()
+    return storyActions
+      .list()
+      .filter((a) => !q || has(a.name, q) || has(a.action.attempt, q) || a.tags.some((t) => t.includes(q)))
+      .slice(0, limit)
+      .map((a) => ({ kind: 'story_action', id: a.id, title: a.name }))
+  },
+  resolve: (ref) => storyActions.find(ref)?.id ?? null,
+  line(id) {
+    const a = storyActions.get(id)
+    return `${a.action.checks.length} check${a.action.checks.length === 1 ? '' : 's'}${tagLine(a.tags)}`
+  },
+  card: (id) => storedActionText(storyActions.get(id)),
+  full: (id) => storedActionText(storyActions.get(id)),
+  title(id) {
+    try {
+      return storyActions.get(id).name
+    } catch {
+      return id
+    }
+  },
+  remove: (id) => storyActions.remove(id),
+  rename: (id, name) => void storyActions.save({ ...storyActions.get(id), name })
 }

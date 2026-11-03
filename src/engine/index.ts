@@ -92,7 +92,7 @@ import { carryOpen, carryPeek, carrySave } from './carry'
 import { agentFolders, liveFolder, removeFolderTree } from './agents/folders'
 import { currentActor } from './timeline/actor'
 import { compendium } from '../modules/dnd/compendium'
-import { decisions } from '../modules/decisions/store'
+import { decisions, storyActions } from '../modules/decisions/store'
 import { widgetInfo } from './data/widgetSources'
 import { resolveThings } from '../modules/core/things'
 import './data/glances'
@@ -189,6 +189,7 @@ workout.onChange(() => emit('workout.changed', {}))
 board.onChange(() => emit('board.changed', {}))
 compendium.on('changed', () => emit('dnd.changed', {}))
 decisions.on('changed', () => emit('decisions.changed', {}))
+storyActions.on('changed', () => emit('storyActions.changed', {}))
 board.setNames((id) => agents.list().find((a) => a.id === id)?.name ?? 'an agent')
 scripts.onChange(() => emit('python.changed', {}))
 storyRuns.on('changed', () => emit('stories.changed', {}))
@@ -525,6 +526,10 @@ const handlers: Handlers = {
   'dnd.remove': ({ kind, id }) => compendium.remove(kind, id),
   'decisions.get': ({ id }) => decisions.get(id),
   'decisions.save': ({ decision, previousId }) => decisions.save(decision, previousId),
+  'storyActions.get': ({ id }) => storyActions.get(id),
+  'storyActions.list': () => storyActions.list(),
+  'decisions.list': () => decisions.list(),
+  'storyActions.save': ({ action, previousId }) => storyActions.save(action, previousId),
   'dnd.import': ({ kind, json, apply }) => {
     let raw: unknown
     try {
@@ -565,7 +570,7 @@ const handlers: Handlers = {
     warmIndexes()
     return true
   },
-  'library.overview': ({ query, perKind, kind, skip }) => libraryOverview(query, perKind, USER, kind ?? null, skip ?? []),
+  'library.overview': ({ query, perKind, kind, kinds, skip }) => libraryOverview(query, perKind, USER, kinds ?? (kind ? [kind] : null), skip ?? []),
   'timeline.recent': ({ limit }) => timelineRows(Math.min(50, Math.max(1, limit)), USER),
   'routines.list': () => routines.list(),
   'routines.save': (draft) => routines.save(draft),

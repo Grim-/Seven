@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { Check, Send, ShieldAlert } from 'lucide-react'
 import type { ApprovalAnswer, ApprovalProps, ConfirmProps, FormAnswer, FormProps, QuestionAnswer, QuestionProps, UiRequestState } from '@shared/types'
 import { PatchView, TerminalOutput } from './views'
@@ -10,7 +10,8 @@ import { toast } from '../store/toasts'
 import { errorText } from '../lib/format'
 import { UnlockCard } from '../components/vault/Vault'
 import { GatherCard } from '../components/chat/Gather'
-import { focusedConversation } from '../lib/conversation'
+import { focusedConversation, useConversation } from '../lib/conversation'
+import { hidePlayRequest, showPlayRequest } from '../lib/playRequests'
 
 export async function answer(ui: UiRequestState, value: unknown, fallbackText: string): Promise<void> {
   try {
@@ -279,15 +280,29 @@ function FormCard({ ui }: { ui: UiRequestState }) {
   )
 }
 
-const ownCards = new Map<string, ComponentType<{ ui: UiRequestState }>>()
+export type RequestPlace = 'inline' | 'panel'
 
-export function registerUiRequest(kind: string, card: ComponentType<{ ui: UiRequestState }>): void {
+type OwnCard = ComponentType<{ ui: UiRequestState; place: RequestPlace }>
+
+const ownCards = new Map<string, OwnCard>()
+
+export function registerUiRequest(kind: string, card: OwnCard): void {
   ownCards.set(kind, card)
 }
 
-export function UiRequestCard({ ui }: { ui: UiRequestState }) {
+function InlineOwn({ ui, Own }: { ui: UiRequestState; Own: OwnCard }) {
+  const chat = useConversation().key
+  useEffect(() => {
+    if (ui.status === 'pending') showPlayRequest(chat, ui)
+    else hidePlayRequest(chat, ui.id)
+    return () => hidePlayRequest(chat, ui.id)
+  }, [chat, ui.id, ui.status])
+  return <Own ui={ui} place="inline" />
+}
+
+export function UiRequestCard({ ui, place = 'inline' }: { ui: UiRequestState; place?: RequestPlace }) {
   const Own = ownCards.get(ui.kind)
-  if (Own) return <Own ui={ui} />
+  if (Own) return place === 'panel' ? <Own ui={ui} place="panel" /> : <InlineOwn ui={ui} Own={Own} />
   if (ui.kind === 'approval') return <ApprovalCard ui={ui} />
   if (ui.kind === 'form') return <FormCard ui={ui} />
   if (ui.kind === 'unlock') return <UnlockCard ui={ui} />

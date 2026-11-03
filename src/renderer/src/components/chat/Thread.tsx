@@ -50,10 +50,12 @@ import { THREAD_LOOKS, ThreadLookContext, useThreadLook, type ThreadLookId } fro
 import { Trace } from './Trace'
 import { LinkFaces } from '../entries/LinkFaces'
 import { DrawPanel } from '../draw/DrawPanel'
-import { PlayBuilder } from '../play/PlayBuilder'
+import { PlayPanel } from '../play/PlayPanel'
+import { usePlayRequests } from '../../lib/playRequests'
+import { UiRequestCard } from '../../registries/ui-requests'
 import { useWorldPlayer } from '../play/useWorldPlayer'
 import { ComposerTool } from './ComposerTool'
-import { ChatComposer } from '../composer/ChatComposer'
+import { ChatComposer, ChatPad } from '../composer/ChatComposer'
 import { AreaAction } from '../pictures/areaAction'
 import { errorText, formatClock } from '../../lib/format'
 
@@ -430,6 +432,7 @@ function Composer({ running, placeholder }: { running: boolean; placeholder: str
   const { sessionId: activeId } = conv
   const player = useWorldPlayer(agent?.world?.worldId ?? null)
   const append = (text: string) => aui.composer.setText(current.trim() ? `${current.trimEnd()} ${text}` : text)
+  const request = usePlayRequests((s) => s.byChat[conv.key])
   return (
     <ComposerPrimitive.Root className={cn('relative flex items-end gap-2', look.root)}>
       {hints.length ? <ComposerHints hints={hints} selected={pick} onSelect={setSelected} /> : <ActiveCommand />}
@@ -443,9 +446,13 @@ function Composer({ running, placeholder }: { running: boolean; placeholder: str
           }}
         />
       )}
-      {tool === 'play' && (
-        <div className="notch-sm absolute inset-x-2 bottom-full z-30 mb-2 max-h-[70vh] overflow-y-auto border border-accent/60 bg-black/95 p-3">
-          <PlayBuilder kind="action" character={player} where={{ link: null, agents: [], onText: append }} />
+      {request ? (
+        <div className="absolute inset-x-2 bottom-full z-30 mb-2 max-h-[75vh] overflow-y-auto border border-accent/60 bg-black/95 p-4 shadow-[0_-12px_30px_rgba(0,0,0,0.6)]">
+          <UiRequestCard ui={request} place="panel" />
+        </div>
+      ) : tool === 'play' && (
+        <div className="absolute inset-x-2 bottom-full z-30 mb-2 h-[min(760px,75vh)]">
+          <PlayPanel character={player} where={{ link: null, agents: [], onText: append }} onClose={() => setTool(null)} />
         </div>
       )}
       {look.avatar > 0 && agent && <AgentAvatar agent={agent} size={look.avatar} sessionId={activeId} className="mr-1" />}
@@ -724,6 +731,7 @@ export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody
           <DraftFiles />
           <ComposerReferences />
           {look.outputs && <OutputTray />}
+          <ChatPad conv={conv} running={running} />
           <ChatHand conv={conv} agent={agent} running={running} />
           <Composer running={running} placeholder={placeholder} />
         </ThreadPrimitive.Root>

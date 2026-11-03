@@ -2478,10 +2478,10 @@ export function setTags(entry: string, add: string[], remove: string[], ctx: Kin
   return { kind, id, tags: tagStore.change(kind.kind, id, add, remove) }
 }
 
-export function overview(query: string, perKind: number, ctx: KindContext = USER, only: string | null = null, skip: string[] = []): LibrarySection[] {
+export function overview(query: string, perKind: number, ctx: KindContext = USER, only: string[] | null = null, skip: string[] = []): LibrarySection[] {
   const out: LibrarySection[] = []
   for (const k of kinds(ctx)) {
-    if ((only && k.kind !== only) || skip.includes(k.kind)) continue
+    if ((only && !only.includes(k.kind)) || skip.includes(k.kind)) continue
     let all: KindHit[]
     try {
       all = searchKind(k, query, 10_000, ctx)

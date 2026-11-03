@@ -1,9 +1,8 @@
-import { Plugin, PluginKey } from '@milkdown/kit/prose/state'
-import { Decoration, DecorationSet } from '@milkdown/kit/prose/view'
-import type { Node } from '@milkdown/kit/prose/model'
-import { $prose } from '@milkdown/kit/utils'
+import { Extension } from '@tiptap/core'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
+import type { Node } from '@tiptap/pm/model'
 import { referenceHref, referencePattern } from '@shared/text'
-import type { EditorView } from '@milkdown/kit/prose/view'
 import { engine } from '../../lib/ipc'
 import { openSevenLink } from '../../lib/links'
 import { failed } from '../../lib/notify'
@@ -61,24 +60,28 @@ function marks(doc: Node): DecorationSet {
 
 const key = new PluginKey<DecorationSet>('seven-references')
 
-export const referenceMarks = $prose(
-  () =>
-    new Plugin<DecorationSet>({
-      key,
-      state: {
-        init: (_, state) => marks(state.doc),
-        apply: (tr, set) => (tr.docChanged ? marks(tr.doc) : set)
-      },
-      props: {
-        decorations: (state) => key.getState(state),
-        handleClick: (view, pos, event) => {
-          if (!event.shiftKey && !event.ctrlKey && !event.metaKey) return false
-          const r = referenceAt(view.state.doc, pos)
-          if (!r) return false
-          if (event.shiftKey) resolveInto(view, r)
-          else openSevenLink(referenceHref(r.kind, r.ref))
-          return true
+export const referenceMarks = Extension.create({
+  name: 'sevenReferences',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin<DecorationSet>({
+        key,
+        state: {
+          init: (_, state) => marks(state.doc),
+          apply: (tr, set) => (tr.docChanged ? marks(tr.doc) : set)
+        },
+        props: {
+          decorations: (state) => key.getState(state),
+          handleClick: (view, pos, event) => {
+            if (!event.shiftKey && !event.ctrlKey && !event.metaKey) return false
+            const r = referenceAt(view.state.doc, pos)
+            if (!r) return false
+            if (event.shiftKey) resolveInto(view, r)
+            else openSevenLink(referenceHref(r.kind, r.ref))
+            return true
+          }
         }
-      }
-    })
-)
+      })
+    ]
+  }
+})

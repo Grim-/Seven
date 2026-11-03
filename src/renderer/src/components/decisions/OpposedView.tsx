@@ -21,7 +21,7 @@ function RollLine({ side, roll, won }: { side: OpposedSide; roll: OpposedRoll; w
   )
 }
 
-export function OpposedView({ p, done, open, status, onAnswer }: { p: OpposedProps; done: OpposedAnswer | null; open: boolean; status?: ReactNode; onAnswer: (value: OpposedAnswer) => Promise<void> }) {
+export function OpposedView({ p, done, open, status, onAnswer, editable = false }: { p: OpposedProps; done: OpposedAnswer | null; open: boolean; status?: ReactNode; onAnswer: (value: OpposedAnswer) => Promise<void>; editable?: boolean }) {
   const [a, setA] = useState(p.a)
   const [b, setB] = useState(p.b)
   const [dc, setDc] = useState(p.dc)
@@ -55,7 +55,7 @@ export function OpposedView({ p, done, open, status, onAnswer }: { p: OpposedPro
   return (
     <DecisionCardFrame tag="Opposed check" question={p.question} status={status}>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-2">
-        <OpposedSideFields title="tries" side={a} targets={aTargets} onChange={setA} />
+        <OpposedSideFields title="tries" side={a} targets={aTargets} onChange={setA} editable={editable} />
         <div className="flex min-w-0 flex-col gap-2">
           <Segmented
             value={dc === null ? 'roll' : 'dc'}
@@ -66,7 +66,7 @@ export function OpposedView({ p, done, open, status, onAnswer }: { p: OpposedPro
             onChange={(v) => setDc(v === 'dc' ? (dc ?? BASE) : null)}
           />
           {dc === null ? (
-            <OpposedSideFields title="against" side={b} targets={bTargets} onChange={setB} />
+            <OpposedSideFields title="against" side={b} targets={bTargets} onChange={setB} editable={editable} />
           ) : (
             <div className="flex items-center gap-2 border border-line/60 p-2.5">
               <span className="font-mono text-[11px] text-dim">DC</span>

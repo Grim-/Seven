@@ -16,6 +16,10 @@ export interface StoredDecision {
   tags: string[]
 }
 
+export function cleanTagList(raw: unknown): string[] {
+  return [...new Set((Array.isArray(raw) ? raw : []).map((t) => String(t).trim().toLowerCase()).filter(Boolean))]
+}
+
 export function blankDecision(): StoredDecision {
   return { id: '', name: '', mode: 'pick', prompt: '', die: DICE[0], count: DICE[0], options: [], tags: [] }
 }
@@ -27,7 +31,7 @@ export function cleanStoredDecision(raw: unknown): StoredDecision | null {
   const die = DICE.includes(Number(v.die)) ? Number(v.die) : DICE[0]
   const count = Number.isInteger(v.count) && Number(v.count) > 0 ? Number(v.count) : DICE[0]
   const options = (Array.isArray(v.options) ? v.options : []).map(cleanPickOption).filter((o): o is PickOption => o !== null)
-  const tags = [...new Set((Array.isArray(v.tags) ? v.tags : []).map((t) => String(t).trim().toLowerCase()).filter(Boolean))]
+  const tags = cleanTagList(v.tags)
   const id = (typeof v.id === 'string' && toId(v.id)) || toId(name)
   return { id, name, mode: v.mode === 'roll' ? 'roll' : 'pick', prompt: typeof v.prompt === 'string' ? v.prompt.trim() : '', die, count, options, tags }
 }
@@ -46,7 +50,7 @@ export function storedDecisionText(d: StoredDecision): string {
     `Decision "${d.name}", ${decisionModeLabel(d)}${d.tags.length ? `; tags: ${d.tags.join(', ')}` : ''}.`,
     d.prompt ? `Prompt: ${d.prompt}` : '',
     kept.length ? `Options:\n${kept.join('\n')}` : `No options are kept: ${write}.`,
-    `To use it, call ${use} with from "@decision:${d.id}".`
+    `To use it, call ${use} with from "@story_decision:${d.id}".`
   ]
     .filter(Boolean)
     .join('\n')

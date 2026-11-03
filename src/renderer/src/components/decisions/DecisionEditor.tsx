@@ -3,7 +3,7 @@ import type { DecisionMode, StoredDecision } from '@shared/storedDecision'
 import { Field, Input, NumberField, Segmented, Select, TagInput, Textarea } from '../ui'
 import { PickOptionsEditor } from './PickOptionsEditor'
 
-export function DecisionEditor({ decision, onChange }: { decision: StoredDecision; onChange: (next: StoredDecision) => void }) {
+export function DecisionEditor({ value: decision, onChange }: { value: StoredDecision; onChange: (next: StoredDecision) => void }) {
   const set = (patch: Partial<StoredDecision>) => onChange({ ...decision, ...patch })
   const rolled = decision.mode === 'roll'
   const kept = decision.options.length

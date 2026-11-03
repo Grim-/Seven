@@ -14,6 +14,7 @@ import { failed } from '../../lib/notify'
 import { useBusy } from '../../lib/useBusy'
 import { showInData } from '../../lib/library'
 import { cn } from '../../lib/cn'
+import { showName } from '@shared/ids'
 
 export const PageNav = createContext<((ref: string) => void) | null>(null)
 
@@ -107,6 +108,7 @@ export function NoteBody({
           value={text}
           onValue={editor.set}
           onSave={() => void saveRef.current()}
+          title={showName(page.title)}
           autoFocus
           placeholder='Write here, or type / for blocks. @kind:Name links anything, e.g. @page:"Page title"; @kind:Name#random rolls a value from it when you press Done.'
           className="min-h-64 flex-1"

@@ -1,12 +1,12 @@
+import { useState } from 'react'
 import { showName } from '@shared/ids'
 import { Segmented } from '../ui'
 import { useViewPlace } from '../../lib/viewPlace'
-import { useDragHeight } from '../../lib/useDragHeight'
 import { useSessions } from '../../store/sessions'
 import { ComposerSendPanel } from './ComposerSendPanel'
 import { ChatPreview } from './ChatPreview'
 import { Paper } from './Paper'
-import { PadExplorer } from './PadExplorer'
+import { PadPicker } from './PadPicker'
 import { usePad } from './pad'
 import { EMPTY_DRAFT, type PadDraft } from './composerSend'
 
@@ -23,7 +23,7 @@ export function ComposerView() {
   const [mode, setMode] = useViewPlace<Mode>('composer.mode', 'paper')
   const [agent, setAgent] = useViewPlace<string | null>('composer.agent', null)
   const fallback = useSessions((s) => s.defaultAgentId)
-  const explorer = useDragHeight('composer.explorer', 340)
+  const [picking, setPicking] = useState(false)
   const pad = usePad(draft.text, (text) => setDraft({ ...draft, text }))
   const load = (next: PadDraft) => {
     setDraft(next)
@@ -38,17 +38,14 @@ export function ComposerView() {
             <span className="font-mono text-[11px] text-dim">{draft.page ? `page · ${showName(draft.title)}` : 'draft · not saved'}</span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {mode === 'paper' && <Paper pad={pad} />}
+            {mode === 'paper' && <Paper pad={pad} onMenu={() => setPicking(true)} />}
             {mode === 'text' && <pre className="pad-paper pad-raw">{pad.text || 'Nothing on the paper yet.'}</pre>}
             {mode === 'chat' && <ChatPreview text={pad.text} agentId={agent ?? fallback} />}
           </div>
         </div>
         <ComposerSendPanel draft={{ ...draft, text: pad.text }} agent={agent} onAgent={setAgent} onLoad={load} onSaved={setDraft} />
       </div>
-      <div {...explorer.handle} title="Drag to resize" className="drag-bar" />
-      <div style={{ height: explorer.height }} className="flex min-h-0 shrink-0">
-        <PadExplorer id="composer.explorer" pad={pad} />
-      </div>
+      <PadPicker id="composer.explorer" pad={pad} open={picking} onClose={() => setPicking(false)} />
     </div>
   )
 }

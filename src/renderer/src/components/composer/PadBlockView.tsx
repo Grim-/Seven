@@ -104,8 +104,8 @@ function LinkBlockView({ block, pad, rollable, drag, over, wide, onWide, open, o
   const base = `@${kind}:${refText}`
   const preview = useEntryPreview(base)
   const found = preview && !('missing' in preview) ? preview : null
-  const { Chat, Face } = presentOf(found?.kind ?? '')
-  const large = Boolean(Chat) && (wide ?? Boolean(found?.image && !Face))
+  const { Chat } = presentOf(found?.kind ?? '')
+  const large = Boolean(Chat) && wide === true
   const rolls = rollable.has(kind)
   const rollNow = () =>
     void engine('library.rollText', { text: `${base}#random` })

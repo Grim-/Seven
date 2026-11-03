@@ -92,7 +92,7 @@ export function chanceOf(bonus: number, target: number): number {
 }
 
 const d20 = () => 1 + Math.floor(Math.random() * 20)
-const BLANK_CHECK: ActionCheck = { against: null, difficulty: null, base: null, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP }
+export const BLANK_CHECK: ActionCheck = { against: null, difficulty: null, base: null, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP }
 
 export function picksCheck(action: Action): boolean {
   return action.needs === 'any' && action.checks.length > 1
