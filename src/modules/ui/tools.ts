@@ -8,7 +8,7 @@ const choices = presentationTool({
   group: 'ui',
   fixed: true,
   description:
-    'Ask the user one or more multiple-choice questions, or offer them choices (what to do next, which option they like, where a story goes). Waits for their answer. Put the question in question and only short answer labels in options; never put a question in options. The user can also type their own answer. Do not use it to ask permission for tools.',
+    'Ask the user one or more multiple-choice questions, or offer them choices (what to do next, which option they like, where a story goes). Waits for their answer. Put the question in question and only short answer labels in options; never put a question in options. Do not use it to ask permission for tools.',
   fields: {
     questions: {
       type: 'array',
@@ -30,14 +30,15 @@ const choices = presentationTool({
     if (!list.length) throw new ToolError('Give questions as a list of 1 to 4, e.g. [{"question": "Which colour?", "options": ["Red", "Blue"]}].')
     list.forEach((q, i) => {
       const n = list.length > 1 ? ` (question ${i + 1})` : ''
-      if (typeof q.question !== 'string' || !q.question.trim()) throw new ToolError(`Each item needs its question text in "question"${n}`)
+
+      if (typeof q.question !== 'string' || !q.question.trim())
+        throw new ToolError(`Each item needs its question text in "question"${n}`)
+
       const options = Array.isArray(q.options) ? q.options.filter((o): o is string => typeof o === 'string' && o.trim() !== '') : []
-      if (options.length < 2) throw new ToolError(`Give at least 2 options${n}`)
-      const bad = options.find((o) => o.trim().endsWith('?') || o.length > 80)
-      if (bad)
-        throw new ToolError(
-          `"${bad.slice(0, 60)}" looks like a question or a sentence, but options must be short answer labels${n}. Put each question in its own "question" field (up to 4 questions per call) and give only answers in "options".`
-        )
+
+      if (options.length < 2)
+        throw new ToolError(`Give at least 2 options${n}`)
+
     })
   },
   title: (f) => {
@@ -129,18 +130,18 @@ const suggest = presentationTool({
   type: 'suggest',
   group: 'ui',
   fixed: true,
-  description: 'At the end of your reply, offer the user 2 to 4 short replies they can click to send. Does not wait.',
+  description: 'These suggestions are offered to the user after you end your reply, as jumping off points to continue.',
   fields: {
     replies: { type: 'array', items: { type: 'string' }, minItems: 2, maxItems: 4, description: '2 to 4 short replies in the user\'s voice, a few words each' }
   },
   check: (f) => {
     const replies = Array.isArray(f.replies) ? f.replies.filter((r): r is string => typeof r === 'string' && r.trim() !== '') : []
-    if (replies.length < 2) throw new ToolError('Give replies: 2 to 4 short replies the user might send, e.g. ["Log it", "Show me the plan"].')
-    const long = replies.find((r) => r.length > 60)
-    if (long) throw new ToolError(`"${long.slice(0, 40)}…" is too long for a reply button. Keep each reply to a few words.`)
+    if (replies.length < 2)
+      throw new ToolError('Give replies: 2 to 4 short replies the user might send, e.g. ["Log it", "Show me the plan"].')
+
   },
-  title: () => 'Suggested replies',
-  result: () => 'The user sees the replies as buttons. Finish your reply.'
+  title: () => 'Suggestions',
+  result: () => 'The user sees the replies as buttons. Once you end your reply.'
 })
 
 export const UI_TOOLS: ToolDef[] = [choices, notify, gather, suggest]

@@ -3,7 +3,7 @@ import { SHEET_FIELDS, findSheet, getSheet, saveSheet } from '../../engine/libra
 import { linkFor } from '@shared/text'
 import { stripRef, toId } from '@shared/ids'
 import { LIMITS } from '../../engine/limits'
-import type { GbnfJsonSchema } from 'node-llama-cpp'
+import type { JsonSchema } from '../../engine/tools/schema'
 import type { CollectionRecord, FieldChange, FieldType, Page, ViewRef } from '@shared/types'
 import { FIELD_TYPES, hitDetail, pageKindOf } from '@shared/types'
 import { data } from '../../engine/data/hub'
@@ -21,8 +21,8 @@ import { SLIDESHOW_TOOLS } from './slideshowTools'
 import { CHARACTER_TOOLS } from './characterTools'
 import { hitId, resolveEntries, thingsFrom } from './things'
 
-const VALUE: GbnfJsonSchema = { oneOf: [{ type: ['string', 'number', 'boolean', 'null'] }, { type: 'array', items: { type: 'string' } }] }
-const OBJECT: GbnfJsonSchema = { type: 'object', properties: {}, additionalProperties: VALUE }
+const VALUE: JsonSchema = { oneOf: [{ type: ['string', 'number', 'boolean', 'null'] }, { type: 'array', items: { type: 'string' } }] }
+const OBJECT: JsonSchema = { type: 'object', properties: {}, additionalProperties: VALUE }
 
 
 function fieldsText(p: Pick<Page, 'fields'>): string {
@@ -86,13 +86,14 @@ interface ReadResult {
   text: string
   view?: ViewRef
   link: boolean
+  images?: string[]
 }
 
 async function readThing(kindName: string, raw: string, ctx: ToolContext, kctx: KindContext): Promise<ReadResult> {
   if (kindName === 'disk') {
     if (!canReadPaths(ctx)) throw new ToolError("You can't read files on disk. If you need to, ask the user to give you a workspace or a linked folder, and the Read files tools.")
     const got = await readDisk(ctx, raw)
-    return { kind: 'disk', id: got.id, text: got.text, view: got.view, link: false }
+    return { kind: 'disk', id: got.id, text: got.text, view: got.view, link: false, images: got.images }
   }
   if (kindName === 'result') {
     const id = stripRef(raw)
@@ -102,14 +103,16 @@ async function readThing(kindName: string, raw: string, ctx: ToolContext, kctx: 
   if (rooted?.root !== undefined && !toId(raw)) return { kind: rooted.kind, id: rooted.root, text: resolveIncludes(rooted.full(rooted.root, {}, kctx), kctx), link: false }
   const { kind, id, trail, path } = resolveEntry(raw, kindName, kctx)
   const name = entryId(kind, id, kind.title(id), kctx)
+  const asset = kind.asset?.(id) ?? null
+  const images = asset?.kind === 'image' ? [asset.id] : undefined
   const inside = insideText(kind, id, path ?? linkFor(kind.kind, id), trail ?? [], kctx)
   const full = kind.readFull ? await kind.readFull(id) : null
-  if (full !== null) return { kind: kind.kind, id: name, text: full + inside, link: true }
+  if (full !== null) return { kind: kind.kind, id: name, text: full + inside, link: true, images }
   if (kind.readView) {
     const out = kind.readView(id, {}, kctx)
-    return { kind: kind.kind, id: name, text: resolveIncludes(out.text, kctx) + inside, view: out.view, link: true }
+    return { kind: kind.kind, id: name, text: resolveIncludes(out.text, kctx) + inside, view: out.view, link: true, images }
   }
-  return { kind: kind.kind, id: name, text: resolveIncludes(kind.full(id, {}, kctx), kctx) + inside, link: true }
+  return { kind: kind.kind, id: name, text: resolveIncludes(kind.full(id, {}, kctx), kctx) + inside, link: true, images }
 }
 
 function fitRead(got: ReadResult, truncate: boolean, ctx: ToolContext): string {
@@ -159,7 +162,7 @@ const read: ToolDef = {
     const kindName = str(params, 'kind').trim().toLowerCase()
     const raw = typeof params.id === 'string' ? params.id : ''
     const got = await readThing(kindName, raw, ctx, kctx)
-    return { text: fitRead(got, params.truncate !== false, ctx), view: got.view }
+    return { text: fitRead(got, params.truncate !== false, ctx), view: got.view, images: got.images }
   }
 }
 

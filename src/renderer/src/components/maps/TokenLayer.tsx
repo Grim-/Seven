@@ -1,4 +1,4 @@
-import type { MouseEvent } from 'react'
+import type { MenuEvent } from '../ui/ContextMenu'
 import type { PlaceVisitor } from '@shared/maps'
 import type { Point } from '@shared/shapes'
 import { showName } from '@shared/ids'
@@ -15,8 +15,8 @@ export interface MapToken {
 
 export interface TokenHandlers {
   mine?: string | null
-  onPick?: (token: MapToken, e: MouseEvent) => void
-  onMenu?: (token: MapToken, e: MouseEvent) => void
+  onPick?: (token: MapToken, e: MenuEvent) => void
+  onMenu?: (token: MapToken, e: MenuEvent) => void
   onMove?: (sheet: string, at: Point) => void
 }
 

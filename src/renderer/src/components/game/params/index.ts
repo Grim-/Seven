@@ -1,0 +1,11 @@
+import './NumberParam'
+import './TextParam'
+import './ChoiceParam'
+import './FlagParam'
+import './FormulaParam'
+import './TemplateParam'
+import './ValuesParam'
+import './ListParam'
+import './ComponentsParam'
+
+export { paramEditor, paramWide, registerParamEditor, type ParamEditor, type ParamEditorProps } from './registry'

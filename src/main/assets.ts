@@ -40,23 +40,46 @@ function serveSealed(file: string, mime: string, rangeHeader: string | null): Re
   return new Response(new Uint8Array(body), { status: 206, headers: { ...base, 'Content-Length': String(body.length), 'Content-Range': `bytes ${start}-${start + body.length - 1}/${size}` } })
 }
 
+interface StoredAsset {
+  name: string
+  file: string
+  mime: string
+}
+
+function assetRoot(): string {
+  return path.join(dataDir, 'data', 'assets')
+}
+
+function storedAsset(id: string): StoredAsset | null {
+  if (!isAssetId(id)) return null
+  const root = assetRoot()
+  const meta = JSON.parse(mainSecure.readText(path.join(root, id, 'meta.json'))) as { file: string; mime: string; stored?: string }
+  const file = path.join(root, id, meta.stored ?? meta.file)
+  const rel = path.relative(root, file)
+  if (rel.startsWith('..') || path.isAbsolute(rel) || !fs.existsSync(file)) return null
+  return { name: meta.file, file, mime: meta.mime || 'application/octet-stream' }
+}
+
+export function readImage(id: string): { bytes: Uint8Array<ArrayBuffer>; mime: string } | null {
+  const found = storedAsset(id)
+  if (!found || !found.mime.startsWith('image/')) return null
+  const bytes = sealedFile(found.file) ? mainSecure.readBytes(found.file) : fs.readFileSync(found.file)
+  return { bytes: Uint8Array.from(bytes), mime: found.mime }
+}
+
 export function handleAssets(): void {
-  const root = path.join(dataDir, 'data', 'assets')
   protocol.handle(ASSET_SCHEME, (request) => {
     const url = new URL(request.url)
     const id = url.hostname
     const name = decodeURIComponent(url.pathname.replace(/^\/+/, ''))
-    if (!isAssetId(id) || !name || name.includes('/') || name.includes('\\') || name === '..' || name === '.') {
+    if (!name || name.includes('/') || name.includes('\\') || name === '..' || name === '.') {
       return new Response('Not found', { status: 404 })
     }
     try {
-      const meta = JSON.parse(mainSecure.readText(path.join(root, id, 'meta.json'))) as { file: string; mime: string; stored?: string }
-      if (meta.file !== name) return new Response('Not found', { status: 404 })
-      const file = path.join(root, id, meta.stored ?? meta.file)
-      const rel = path.relative(root, file)
-      if (rel.startsWith('..') || path.isAbsolute(rel) || !fs.existsSync(file)) return new Response('Not found', { status: 404 })
-      if (!sealedFile(file)) return net.fetch(pathToFileURL(file).toString(), { headers: request.headers })
-      return serveSealed(file, meta.mime || 'application/octet-stream', request.headers.get('range'))
+      const found = storedAsset(id)
+      if (!found || found.name !== name) return new Response('Not found', { status: 404 })
+      if (!sealedFile(found.file)) return net.fetch(pathToFileURL(found.file).toString(), { headers: request.headers })
+      return serveSealed(found.file, found.mime, request.headers.get('range'))
     } catch (err) {
       if (isVaultLocked(err)) return new Response('Locked', { status: 423 })
       return new Response('Not found', { status: 404 })

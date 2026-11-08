@@ -29,8 +29,9 @@ export function checkOf(roll: OptionRoll, targets: CheckTarget[]): Pick<CheckRol
   if (roll.type === 'none') return null
   if (roll.type === 'chance') return { label: 'Chance', bonus: 0, target: 101 - roll.chance, chance: roll.chance / 100 }
   const found = findTarget(targets, roll.against)
-  const bonus = found?.bonus ?? 0
-  return { label: found?.label ?? roll.against, bonus, target: roll.dc, chance: chanceOf(bonus, roll.dc) }
+  if (!found) return null
+  const bonus = found.bonus
+  return { label: found.label, bonus, target: roll.dc, chance: chanceOf(bonus, roll.dc) }
 }
 
 export function rollCheck(roll: OptionRoll, targets: CheckTarget[], force: boolean | null): RolledCheck | null {

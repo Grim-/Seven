@@ -4,6 +4,7 @@ import { SuggestList, useSuggest } from './Suggest'
 
 export function InlineEdit({
   value,
+  shown,
   onSave,
   placeholder = '—',
   suggestions,
@@ -14,6 +15,7 @@ export function InlineEdit({
   className
 }: {
   value: string
+  shown?: string
   onSave: (next: string) => void
   placeholder?: string
   suggestions?: string[]
@@ -43,7 +45,7 @@ export function InlineEdit({
   if (!editing)
     return (
       <button onClick={start} title={title} className={cn('group inline-flex min-w-0 max-w-full items-baseline gap-1.5 border-b border-dashed border-transparent text-left hover:border-faint', className)}>
-        <span className={cn('truncate', !value && 'text-faint')}>{value || placeholder}</span>
+        <span className={cn('truncate', !value && 'text-faint')}>{shown ?? (value || placeholder)}</span>
         {trailing}
       </button>
     )

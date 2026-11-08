@@ -59,6 +59,7 @@ function toDraft(agent: AgentProfile): AgentDraft {
     thinking: agent.thinking ?? null,
     mindAuto: agent.mindAuto,
     remindEvery: agent.remindEvery,
+    maxToolRounds: agent.maxToolRounds,
     sheet: agent.sheet ?? null,
     player: agent.player ?? null,
     cards: agent.cards ?? null,
@@ -355,6 +356,9 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
         <EditorSection id="tools" title="Tools" summary={`${(draft.toolsets ?? []).length} toolsets, ${draft.modules.length} modules`} isNew={!draft.id}>
         <div className="grid grid-cols-2 gap-x-5 gap-y-4">
         <ToolsetPicker draft={draft} onChange={change} />
+        <Field label="Most tool rounds per reply" className="col-span-2" hint="How many times in a row the agent can call tools before Seven stops the reply. 0 means no limit. Applies to remote models and models run in llama-server.">
+          <NumberField value={draft.maxToolRounds ?? 0} min={0} step={1} onChange={(v) => change({ ...draft, maxToolRounds: v ?? 0 })} className="w-28" />
+        </Field>
         <Field label="Workspace" className="col-span-2" hint="The folder this agent's file tools work in. Paths outside it are refused.">
           <div className="flex gap-2">
             <Input readOnly value={draft.workspace ?? ''} placeholder="No workspace: file tools are off" className="font-mono text-[12.5px]" />

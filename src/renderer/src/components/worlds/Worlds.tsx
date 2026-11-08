@@ -4,7 +4,7 @@ import { inspectSchema, type WorldBinding, type WorldMeta, type WorldSchema } fr
 import { engine, on } from '../../lib/ipc'
 import { toast } from '../../store/toasts'
 import { errorText, formatRelative } from '../../lib/format'
-import { Button, EmptyState, Field, Input, LoadingScreen, Panel, SaveState, Select, askText, useAutosavedState, confirmDelete } from '../ui'
+import { Button, EmptyState, Field, Input, LoadingScreen, Panel, SaveState, Select, TagInput, askText, useAutosavedState, confirmDelete } from '../ui'
 import { entryMenuAt } from '../../views/data/entryMenu'
 import { cn } from '../../lib/cn'
 import { WorldRecords } from './Records'
@@ -13,9 +13,11 @@ import { SchemaEditor } from './SchemaEditor'
 import { WorldMaps } from '../maps/WorldMaps'
 import { WorldPlay } from './WorldPlay'
 import { setWhere } from '../maps/placeActions'
+import { bringHere } from '../play/bringHere'
 import { SheetSelect } from '../data/sheet/SheetSelect'
 import { ShellTabs } from '../ui'
 import { failed } from '../../lib/notify'
+import { useResolvedRuleSet, useRuleSets } from '../game/ruleSet'
 
 export function useWorlds(): WorldMeta[] {
   const [list, setList] = useState<WorldMeta[]>([])
@@ -77,6 +79,17 @@ function SchemaJson({ world }: { world: WorldMeta }) {
   )
 }
 
+function RulesPick({ world }: { world: WorldMeta }) {
+  const sets = useRuleSets() ?? []
+  const current = useResolvedRuleSet(world.rules) ?? ''
+  return (
+    <span className="flex items-center gap-1.5" title="The rule set everything played in this world uses">
+      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Rules</span>
+      <Select value={current} options={sets.map((s) => ({ value: s.id, label: s.name }))} onChange={(rules) => void engine('worlds.setRules', { id: world.id, rules }).catch(failed('Could not set the rules'))} className="h-7 w-36 text-[12px]" />
+    </span>
+  )
+}
+
 export function WorldsPanel({ initial = null }: { initial?: string | null }) {
   const list = useWorlds()
   const [first, firstType, firstKey] = (initial ?? '').split('/')
@@ -104,7 +117,12 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
       }
     })
   const remove = (w: WorldMeta) =>
-    confirmDelete(`Delete ${w.name}?`, 'Every record and the board go with it. Agents linked to it lose their place.', () => engine('worlds.delete', { id: w.id }))
+    void engine('saves.list', { world: w.id })
+      .then((list) => {
+        const n = list.saves.length
+        confirmDelete(`Delete ${w.name}?`, `Every record goes with it${n ? `, and its ${n === 1 ? 'save' : `${n} saves`}: their characters leave first, taking their state onto their sheets` : ''}. Agents linked to it lose their place.`, () => engine('worlds.delete', { id: w.id }))
+      })
+      .catch(failed('Could not read its saves'))
   return (
     <Panel
       className="min-w-0 flex-1"
@@ -136,6 +154,7 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
                 <div className="text-[13px] text-white">{w.name}</div>
                 <div className="font-mono text-[10px] text-faint">
                   {w.types.map((t) => `${t.count} ${t.plural}`).join(' · ')} · {w.posts} posts
+                  {w.tags.length > 0 && ` · ${w.tags.map((t) => `#${t}`).join(' ')}`}
                 </div>
               </button>
             ))}
@@ -155,7 +174,12 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
                   ]}
                 />
                 <span className="font-mono text-[10px] text-faint">{world.updatedAt ? `changed ${formatRelative(world.updatedAt)}` : ''}</span>
-                <span className="ml-auto flex items-center gap-1.5" title="Rolls you make in this world are for this character unless you pick another">
+                <span className="ml-auto" />
+                <span className="w-56" title="Tags for this world, such as fantasy or story-world">
+                  <TagInput value={world.tags} suggestions={[...new Set(list.flatMap((w) => w.tags))]} onChange={(tags) => void engine('worlds.setTags', { id: world.id, tags }).catch(failed('Could not save the tags'))} />
+                </span>
+                <RulesPick world={world} />
+                <span className="flex items-center gap-1.5" title="Rolls you make in this world are for this character unless you pick another">
                   <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Your character</span>
                   <SheetSelect value={world.player} onChange={(sheet) => void engine('worlds.setPlayer', { id: world.id, sheet }).catch(failed('Could not set your character'))} className="h-7 w-40 text-[12px]" />
                 </span>
@@ -171,8 +195,11 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
                   key={world.id}
                   worldId={world.id}
                   onStart={(place) => {
-                    if (!world.player) return
-                    void setWhere(world.player, place).then(() => setTab('play'), failed('Could not start there'))
+                    const player = world.player
+                    if (!player) return
+                    void bringHere(world.id, player)
+                      .then((ok) => (ok ? setWhere(player, place).then(() => setTab('play')) : undefined))
+                      .catch(failed('Could not start there'))
                   }}
                 />
               )}

@@ -4,11 +4,13 @@ import { DICE } from './rolledDecision'
 import { optionRollLabel } from './storyRolls'
 
 export type DecisionMode = 'pick' | 'roll'
+export type RollerChoice = 'agent' | 'player'
 
 export interface StoredDecision {
   id: string
   name: string
   mode: DecisionMode
+  roller: RollerChoice
   prompt: string
   die: number
   count: number
@@ -21,7 +23,7 @@ export function cleanTagList(raw: unknown): string[] {
 }
 
 export function blankDecision(): StoredDecision {
-  return { id: '', name: '', mode: 'pick', prompt: '', die: DICE[0], count: DICE[0], options: [], tags: [] }
+  return { id: '', name: '', mode: 'pick', roller: 'agent', prompt: '', die: DICE[0], count: DICE[0], options: [], tags: [] }
 }
 
 export function cleanStoredDecision(raw: unknown): StoredDecision | null {
@@ -30,16 +32,18 @@ export function cleanStoredDecision(raw: unknown): StoredDecision | null {
   if (!name) return null
   const die = DICE.includes(Number(v.die)) ? Number(v.die) : DICE[0]
   const count = Number.isInteger(v.count) && Number(v.count) > 0 ? Number(v.count) : DICE[0]
+  const roller: RollerChoice = v.roller === 'player' ? 'player' : 'agent'
   const options = (Array.isArray(v.options) ? v.options : []).map(cleanPickOption).filter((o): o is PickOption => o !== null)
   const tags = cleanTagList(v.tags)
   const id = (typeof v.id === 'string' && toId(v.id)) || toId(name)
-  return { id, name, mode: v.mode === 'roll' ? 'roll' : 'pick', prompt: typeof v.prompt === 'string' ? v.prompt.trim() : '', die, count, options, tags }
+  return { id, name, mode: v.mode === 'roll' ? 'roll' : 'pick', roller, prompt: typeof v.prompt === 'string' ? v.prompt.trim() : '', die, count, options, tags }
 }
 
 export const decisionSize = (d: StoredDecision): number => (d.mode === 'roll' ? d.die : d.count)
 
 export function decisionModeLabel(d: StoredDecision): string {
-  return d.mode === 'roll' ? `rolled on a d${d.die}` : 'the user picks'
+  const who = d.roller === 'player' ? 'player chooses who rolls' : 'agent chooses who rolls'
+  return d.mode === 'roll' ? `rolled on a d${d.die}` : `the user picks (${who})`
 }
 
 export function storedDecisionText(d: StoredDecision): string {

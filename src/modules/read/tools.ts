@@ -6,6 +6,7 @@ import { stripRef } from '@shared/ids'
 import { DISK_ROOT, displayPath, isHidden, resolvePlace, resolveInWorkspace } from '../../engine/tools/workspace'
 import { runRg } from '../../engine/tools/rg'
 import { documentKind, documentText, unreadableFormat } from '../../engine/util/documents'
+import { classify } from '../../engine/data/assets'
 
 const MAX_LIST = 500
 const MAX_MATCHES = 300
@@ -22,7 +23,7 @@ function parentId(id: string): string {
   return parts.join('/') || '/'
 }
 
-export async function readDisk(ctx: ToolContext, id: string): Promise<{ id: string; text: string; view?: ToolOutput['view'] }> {
+export async function readDisk(ctx: ToolContext, id: string): Promise<{ id: string; text: string; view?: ToolOutput['view']; images?: string[] }> {
   if (!stripRef(id).replace(/[/\\.\s]/g, '')) {
     const roots = [...(ctx.workspace ? [DISK_ROOT] : []), ...ctx.folders.map((f) => f.name)]
     return { id: '/', text: roots.map((r) => `disk ${r}/`).join('\n') || '(no folders)' }
@@ -50,6 +51,7 @@ export async function readDisk(ctx: ToolContext, id: string): Promise<{ id: stri
     const lines = entries.map((e, i) => `disk ${diskId(ctx, path.join(target, e.name))}${e.isDirectory() ? '/' : ` (${items[i].size} bytes)`}`)
     return { id: canonical, text: lines.join('\n') || '(empty)', view: { kind: 'files', title: canonical, data: items } }
   }
+  if (classify(target).kind === 'image') return { id: canonical, text: `disk ${canonical} is a picture (${fs.statSync(target).size} bytes).`, images: [target] }
   const buffer = fs.readFileSync(target)
   const kind = documentKind(target)
   const old = unreadableFormat(target)

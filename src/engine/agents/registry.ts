@@ -49,6 +49,10 @@ function cleanRemindEvery(input: unknown): number {
   return typeof input === 'number' && Number.isFinite(input) ? Math.max(0, Math.min(100, Math.round(input))) : DEFAULT_REMIND_EVERY
 }
 
+function cleanMaxToolRounds(input: unknown): number {
+  return typeof input === 'number' && Number.isFinite(input) ? Math.max(0, Math.round(input)) : 0
+}
+
 function cleanTools(input: unknown): string[] {
   return Array.isArray(input) ? [...new Set(input.filter((n): n is string => typeof n === 'string' && /^[A-Za-z][\w]{0,63}$/.test(n)))] : []
 }
@@ -290,6 +294,7 @@ export class AgentRegistry extends EventEmitter {
       cards: cleanCardSource(draft.cards === undefined ? existing?.cards : draft.cards),
       mindAuto: cleanMindAuto(draft.mindAuto === undefined ? existing?.mindAuto : draft.mindAuto),
       remindEvery: cleanRemindEvery(draft.remindEvery === undefined ? existing?.remindEvery : draft.remindEvery),
+      maxToolRounds: cleanMaxToolRounds(draft.maxToolRounds === undefined ? existing?.maxToolRounds : draft.maxToolRounds),
       folder: existing ? existing.folder : undefined,
       incognito: (draft.incognito ?? existing?.incognito) === true,
       createdBy: existing ? (existing.createdBy ?? null) : typeof draft.createdBy === 'string' ? draft.createdBy : null,

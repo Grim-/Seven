@@ -10,12 +10,8 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!scripts/**'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-  - '!**/node_modules/node-llama-cpp/llama/xpack/**'
 asarUnpack:
   - resources/**
-  - '**/node_modules/node-llama-cpp/bins/**/*'
-  - '**/node_modules/node-llama-cpp/llama/localBuilds/**/*'
-  - '**/node_modules/@node-llama-cpp/**/*'
   - '**/node_modules/@vscode/ripgrep/bin/**/*'
 win:
   executableName: seven

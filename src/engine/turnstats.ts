@@ -1,13 +1,17 @@
 import path from 'node:path'
 import type { ModelStats, StatRecord, StatsSummary } from '@shared/types'
 import { dataRoot } from './util/paths'
-import { appendLine, readLines } from './util/fs'
+import { appendLine, readLines, removePath } from './util/fs'
 
 const FILE = path.join(dataRoot, 'stats.jsonl')
 const MIN_EVAL_TOKENS = 64
 
 export function recordTurn(record: StatRecord): void {
   appendLine(FILE, record)
+}
+
+export function clearStats(): void {
+  removePath(FILE)
 }
 
 const rate = (tokens: number, ms: number) => (ms > 200 && tokens > 0 ? Math.round((tokens / (ms / 1000)) * 10) / 10 : null)

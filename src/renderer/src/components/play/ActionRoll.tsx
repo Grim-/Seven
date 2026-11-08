@@ -6,24 +6,12 @@ import { SheetPortrait } from '../data/SheetPortrait'
 import { cn } from '../../lib/cn'
 import { showName } from '@shared/ids'
 import { ActionOutcome } from './ActionResultCard'
+import { Die } from './Die'
+import { RollVerdict } from './roll/RollVerdict'
 import { closePlay, type PlayWhere } from './playStore'
 import { playOutItem } from './playOut'
 
 const STEP_MS = 700
-
-function Die({ value, rolling }: { value: number; rolling: boolean }) {
-  const [shown, setShown] = useState(value)
-  useEffect(() => {
-    if (!rolling) return setShown(value)
-    const t = window.setInterval(() => setShown(1 + Math.floor(Math.random() * 20)), 70)
-    return () => window.clearInterval(t)
-  }, [rolling, value])
-  return (
-    <span className="play-die" data-rolling={rolling || undefined}>
-      {shown}
-    </span>
-  )
-}
 
 export function ActionRoll({ result, where, onAgain }: { result: ActionResult; where: PlayWhere; onAgain: () => void }) {
   const [landed, setLanded] = useState(0)
@@ -60,7 +48,7 @@ export function ActionRoll({ result, where, onAgain }: { result: ActionResult; w
       })}
       {done && (
         <>
-          <div className={cn('play-verdict text-center font-mono text-[18px] font-bold uppercase tracking-[0.3em]', result.passed ? 'text-ok' : 'text-alert')}>{result.passed ? 'Success' : 'Failure'}</div>
+          <RollVerdict passed={result.passed} />
           <ActionOutcome result={result} />
           <ActionBar items={actions} className="grid-cols-3" />
         </>

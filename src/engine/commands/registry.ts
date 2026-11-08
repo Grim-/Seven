@@ -1,5 +1,5 @@
 import { paramType } from '../tools/signature'
-import type { GbnfJsonSchema } from 'node-llama-cpp'
+import type { JsonSchema } from '../tools/schema'
 import type { CommandInfo, CommandResult } from '@shared/types'
 import type { ToolDef } from '../tools/types'
 
@@ -63,7 +63,7 @@ export function firstSentence(text: string): string {
 }
 
 export function toolUsage(tool: ToolDef): string {
-  const props = ((tool.params as { properties?: Record<string, GbnfJsonSchema> }).properties ?? {}) as Record<string, GbnfJsonSchema>
+  const props = ((tool.params as { properties?: Record<string, JsonSchema> }).properties ?? {}) as Record<string, JsonSchema>
   const lines = Object.entries(props).map(([k, v]) => {
     const d = (v as { description?: string }).description
     return `- \`${k}\` ${paramType(v)}${d ? ` — ${d}` : ''}`

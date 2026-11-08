@@ -139,7 +139,18 @@ export function NumberField({ value, onChange, min, max, step, placeholder, allo
       max={max}
       step={step}
       placeholder={placeholder}
-      onChange={(e) => setText(e.target.value)}
+      onChange={(e) => {
+        const raw = e.target.value
+        setText(raw)
+        if (raw.trim() === '') {
+          if (allowEmpty) onChange(undefined)
+          return
+        }
+        const n = Number(raw)
+        if (Number.isFinite(n)) {
+          onChange(n)
+        }
+      }}
       onBlur={(e) => commit(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') commit((e.target as HTMLInputElement).value)

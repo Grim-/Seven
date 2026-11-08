@@ -1,11 +1,12 @@
-import type { GbnfJsonSchema } from 'node-llama-cpp'
+import type { JsonSchema } from '../../engine/tools/schema'
 import { linkFor } from '@shared/text'
 import { pickMadeText, type PickAnswer, type PickOption } from '@shared/pickDecision'
 import { DICE, rolledMadeText, type RolledAnswer } from '@shared/rolledDecision'
 import { opposedText, type OpposedAnswer, type OpposedSide } from '@shared/opposedCheck'
 import { optionRollFrom } from '@shared/storyRolls'
+import { isLater, laterDecisionText } from '@shared/uiLater'
 import { CHANCE, checkNames, cleanAction } from '@shared/actions'
-import type { DecisionMode, StoredDecision } from '@shared/storedDecision'
+import type { DecisionMode, RollerChoice, StoredDecision } from '@shared/storedDecision'
 import { ToolError, type ToolContext, type ToolDef } from '../../engine/tools/types'
 import { agentAccess } from '../../engine/agents/access'
 import { findSheet, getSheet } from '../../engine/library/sheets'
@@ -15,7 +16,7 @@ type Json = Record<string, unknown>
 
 const CHECK_IDS = checkNames().map((c) => c.id)
 
-const OPTION: GbnfJsonSchema = {
+const OPTION: JsonSchema = {
   type: 'object',
   properties: {
     text: { type: 'string' },
@@ -25,7 +26,7 @@ const OPTION: GbnfJsonSchema = {
   }
 }
 
-const SIDE: GbnfJsonSchema = {
+const SIDE: JsonSchema = {
   type: 'object',
   properties: {
     name: { type: 'string' },
@@ -98,6 +99,7 @@ const decide: ToolDef = {
       question: { type: ['string', 'null'] },
       options: { type: 'array', items: OPTION },
       character: { type: ['string', 'null'] },
+      roller: { enum: ['agent', 'player'] },
       own: { type: ['boolean', 'null'], description: 'allow their own answer' },
       from: { type: ['string', 'null'] }
     }
@@ -107,9 +109,14 @@ const decide: ToolDef = {
     const given = pickOptions(params.options)
     const options = given.length ? given : (from?.options ?? [])
     if (!options.length) throw new ToolError(from ? `Write ${from.count} options for ${from.name} from its prompt, in options.` : 'Give options: a list of {text}, with a chance or a check on each that can fail.')
-    const props = { question: str(params.question) ?? from?.name ?? 'What do you do?', options, own: params.own !== false, character: sheetOf(params.character, ctx), from: from ? linkFor('story_decision', from.id) : null }
+    const roller = ((params.roller === 'player' || params.roller === 'agent') ? params.roller : (from?.roller ?? 'agent')) as RollerChoice
+    const character = sheetOf(params.character, ctx)
+    const props = { question: str(params.question) ?? from?.name ?? 'What do you do?', options, own: params.own !== false, character, roller, from: from ? linkFor('story_decision', from.id) : null }
     const answer = (await ctx.ui.ask('decide', props)) as PickAnswer
-    return pickMadeText(props, answer, sheetName(answer.character))
+    if (isLater(answer)) {
+      return laterDecisionText('decide', props.question, from ? linkFor('story_decision', from.id) : null)
+    }
+    return pickMadeText(props, answer, sheetName(answer.character), sheetName(character))
   }
 }
 
@@ -137,6 +144,9 @@ const rollDecision: ToolDef = {
     if (options.length !== die) throw new ToolError(`A d${die} needs exactly ${die} options; there are ${options.length}.${from && !given.length ? ` Write ${die} from the prompt of ${from.name}.` : ''}`)
     const props = { question: str(params.question) ?? from?.name ?? 'What happens?', die, options, from: from ? linkFor('story_decision', from.id) : null }
     const answer = (await ctx.ui.ask('rolled', props)) as RolledAnswer
+    if (isLater(answer)) {
+      return laterDecisionText('roll_decision', props.question, from ? linkFor('story_decision', from.id) : null)
+    }
     return rolledMadeText(props, answer)
   }
 }
@@ -161,6 +171,9 @@ const opposedCheck: ToolDef = {
     if (!question) throw new ToolError('Give the question, e.g. "Does the guard spot the lie?"')
     const props = { question, a: side(params.a, 'a'), b: side(params.b, 'b'), dc: typeof params.dc === 'number' ? Math.round(params.dc) : null }
     const answer = (await ctx.ui.ask('opposed', props)) as OpposedAnswer
+    if (isLater(answer)) {
+      return laterDecisionText('opposed_check', question, null)
+    }
     return opposedText(answer)
   }
 }
@@ -180,6 +193,7 @@ const createDecisions: ToolDef = {
           properties: {
             name: { type: 'string' },
             mode: { enum: ['pick', 'roll'] },
+            roller: { enum: ['agent', 'player'] },
             prompt: { type: 'string' },
             die: { oneOf: [{ type: 'null' }, { enum: DICE }] },
             count: { type: ['integer', 'null'], description: 'options to write, for pick' },
@@ -202,7 +216,7 @@ const createDecisions: ToolDef = {
   }
 }
 
-const ACTION_CHECK: GbnfJsonSchema = {
+const ACTION_CHECK: JsonSchema = {
   type: 'object',
   properties: {
     against: { oneOf: [{ type: 'null' }, { enum: [CHANCE, ...CHECK_IDS] }] },

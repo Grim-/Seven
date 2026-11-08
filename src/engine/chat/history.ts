@@ -1,4 +1,4 @@
-import type { ChatHistoryItem, ChatModelFunctionCall, ChatModelResponse } from 'node-llama-cpp'
+import type { ChatHistoryItem, FunctionCallItem as ChatModelFunctionCall, ModelItem as ChatModelResponse } from './items'
 import type { ChatMessage, ContextSummary, ToolPart } from '@shared/types'
 
 export interface TurnGroup {
@@ -32,8 +32,21 @@ export function modelResultOf(part: ToolPart): string {
 
 export type FitResult = (part: ToolPart, text: string) => string
 
-function synthesize(turn: TurnGroup, fit?: FitResult): ChatHistoryItem[] {
-  const response: ChatModelResponse['response'] = []
+export type ImagesOf = (user: ChatMessage) => string[]
+
+export function imageItem(images: string[]): ChatHistoryItem {
+  return { type: 'user', text: '', images } as ChatHistoryItem
+}
+
+export function imagesIn(item: ChatHistoryItem): string[] {
+  const images = (item as { images?: unknown }).images
+  return Array.isArray(images) ? images.filter((i): i is string => typeof i === 'string') : []
+}
+
+function synthesize(turn: TurnGroup, fit?: FitResult, imagesOf?: ImagesOf): ChatHistoryItem[] {
+  const images = imagesOf?.(turn.user) ?? []
+  const items: ChatHistoryItem[] = [{ type: 'user', text: userText(turn.user), ...(images.length ? { images } : {}) } as ChatHistoryItem]
+  let response: ChatModelResponse['response'] = []
   for (const reply of turn.replies) {
     for (const part of reply.parts) {
       if (part.type === 'thought') response.push({ type: 'segment', segmentType: 'thought', text: part.text, ended: true })
@@ -41,13 +54,15 @@ function synthesize(turn: TurnGroup, fit?: FitResult): ChatHistoryItem[] {
       else if (part.status !== 'running') {
         const result = modelResultOf(part)
         response.push({ type: 'functionCall', name: part.name, params: part.args, result: fit && part.status === 'done' ? fit(part, result) : result })
+        if (part.images?.length && imagesOf) {
+          items.push({ type: 'model', response }, imageItem(part.images))
+          response = []
+        }
       }
     }
   }
-  return [
-    { type: 'user', text: userText(turn.user) },
-    { type: 'model', response }
-  ]
+  items.push({ type: 'model', response })
+  return items
 }
 
 function clone<T>(value: T): T {
@@ -93,14 +108,15 @@ export interface RebuildInput {
   slices: Map<string, ChatHistoryItem[]>
   summary: ContextSummary | null
   fit?: FitResult
+  imagesOf?: ImagesOf
 }
 
-export function turnItems(turn: TurnGroup, slices: Map<string, ChatHistoryItem[]>, fit?: FitResult): ChatHistoryItem[] {
+export function turnItems(turn: TurnGroup, slices: Map<string, ChatHistoryItem[]>, fit?: FitResult, imagesOf?: ImagesOf): ChatHistoryItem[] {
   const slice = turn.replies.length === 1 && !turn.replies[0].edited ? slices.get(turn.replies[0].id) : undefined
-  return slice && slice[0]?.type === 'user' ? clone(slice) : synthesize(turn, fit)
+  return slice && slice[0]?.type === 'user' ? clone(slice) : synthesize(turn, fit, imagesOf)
 }
 
-export function rebuildHistory({ systemPrompt, messages, slices, summary, fit }: RebuildInput): ChatHistoryItem[] {
+export function rebuildHistory({ systemPrompt, messages, slices, summary, fit, imagesOf }: RebuildInput): ChatHistoryItem[] {
   let turns = groupTurns(messages)
   if (summary) {
     const start = summary.upTo === NEXT_TURN ? turns.length : turns.findIndex((t) => t.user.id === summary.upTo)
@@ -108,7 +124,7 @@ export function rebuildHistory({ systemPrompt, messages, slices, summary, fit }:
   }
   const history: ChatHistoryItem[] = systemPrompt ? [{ type: 'system', text: systemPrompt }] : []
   turns.forEach((turn, index) => {
-    const items = turnItems(turn, slices, fit)
+    const items = turnItems(turn, slices, fit, imagesOf)
     for (const [call, part] of pairCalls(items, toolParts(turn))) {
       if (part.trimmed) call.result = trimStub(part)
       else if (part.edited) call.result = part.result ?? ''

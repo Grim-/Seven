@@ -1,18 +1,51 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
-import { createModelDownloader, type ModelDownloader } from 'node-llama-cpp'
+import { Readable, Transform } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import type { DownloadItem } from '@shared/types'
 import { isVaultLocked } from '@shared/sealed'
 import { dataRoot } from '../util/paths'
 import { newId, readJson, writeJson } from '../util/fs'
 import { hubTokens } from './hub'
+import { hubUrl } from './gguf/read'
 
 const FILE = path.join(dataRoot, 'downloads.json')
 const ACTIVE: DownloadItem['state'][] = ['queued', 'downloading']
+const PART = /-(\d{5})-of-(\d{5})\.gguf$/i
+
+function partFiles(file: string): string[] {
+  const m = file.match(PART)
+  if (!m) return [file]
+  const parts = Number(m[2])
+  return Array.from({ length: parts }, (_, i) => file.replace(PART, `-${String(i + 1).padStart(5, '0')}-of-${m[2]}.gguf`))
+}
+
+function auth(): Record<string, string> {
+  const token = hubTokens().huggingFace
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function remoteSize(url: string, signal: AbortSignal): Promise<number> {
+  const res = await fetch(url, { method: 'HEAD', headers: auth(), signal })
+  if (res.status === 401 || res.status === 403) throw new Error('Hugging Face refused the download. The model may need you to accept its terms on its page, or a Hugging Face token in Models.')
+  if (!res.ok) throw new Error(`Hugging Face answered ${res.status} for ${path.posix.basename(new URL(url).pathname)}.`)
+  const size = Number(res.headers.get('x-linked-size') ?? res.headers.get('content-length'))
+  if (!Number.isFinite(size) || size <= 0) throw new Error(`Hugging Face did not say how big ${path.posix.basename(new URL(url).pathname)} is, so it can't be resumed safely.`)
+  return size
+}
+
+function sizeOn(file: string): number {
+  try {
+    return fs.statSync(file).size
+  } catch {
+    return 0
+  }
+}
 
 class Downloads extends EventEmitter {
   private items: DownloadItem[] | null = null
-  private running = new Map<string, ModelDownloader>()
+  private running = new Map<string, AbortController>()
   private stopping = new Set<string>()
   private lastEmit = 0
 
@@ -64,20 +97,51 @@ class Downloads extends EventEmitter {
     if (next) void this.run(next)
   }
 
-  private downloader(d: DownloadItem, onProgress?: (s: { totalSize: number; downloadedSize: number; averageSpeed: number }) => void): Promise<ModelDownloader> {
-    return createModelDownloader({ modelUri: `hf:${d.repo}/${d.file}`, dirPath: d.folder, tokens: hubTokens(), deleteTempFileOnCancel: false, skipExisting: true, ...(onProgress ? { onProgress } : {}) })
+  private targets(d: DownloadItem): { url: string; target: string }[] {
+    return partFiles(d.file).map((file) => ({ url: hubUrl(d.repo, file), target: path.join(d.folder, path.posix.basename(file)) }))
   }
 
   private async run(d: DownloadItem): Promise<void> {
+    const controller = new AbortController()
+    this.running.set(d.id, controller)
     this.patch(d.id, { state: 'downloading', error: null })
     try {
-      const downloader = await this.downloader(d, (s) => {
-        const left = s.averageSpeed > 0 ? Math.round((s.totalSize - s.downloadedSize) / s.averageSpeed) : null
-        this.patch(d.id, { received: s.downloadedSize, total: s.totalSize, speed: s.averageSpeed, secondsLeft: left }, false)
-      })
-      this.running.set(d.id, downloader)
-      const file = await downloader.download()
-      this.patch(d.id, { state: 'done', path: file, received: downloader.totalSize, total: downloader.totalSize, speed: 0, secondsLeft: 0 })
+      const files = this.targets(d)
+      const sizes = await Promise.all(files.map((f) => remoteSize(f.url, controller.signal)))
+      const total = sizes.reduce((n, s) => n + s, 0)
+      let received = files.reduce((n, f, i) => n + (sizeOn(f.target) === sizes[i] ? sizes[i] : Math.min(sizeOn(`${f.target}.part`), sizes[i])), 0)
+      const began = Date.now()
+      const startedWith = received
+      const report = () => {
+        const seconds = (Date.now() - began) / 1000
+        const speed = seconds > 0 ? (received - startedWith) / seconds : 0
+        this.patch(d.id, { received, total, speed, secondsLeft: speed > 0 ? Math.round((total - received) / speed) : null }, false)
+      }
+      for (const [i, f] of files.entries()) {
+        if (sizeOn(f.target) === sizes[i]) continue
+        const part = `${f.target}.part`
+        let from = Math.min(sizeOn(part), sizes[i])
+        if (from < sizes[i]) {
+          const res = await fetch(f.url, { headers: { ...auth(), ...(from > 0 ? { Range: `bytes=${from}-` } : {}) }, signal: controller.signal })
+          if (!res.ok || !res.body) throw new Error(`Downloading ${path.basename(f.target)} failed: Hugging Face answered ${res.status}.`)
+          if (from > 0 && res.status !== 206) {
+            received -= from
+            from = 0
+          }
+          fs.mkdirSync(path.dirname(part), { recursive: true })
+          const count = new Transform({
+            transform(chunk: Buffer, _enc, done) {
+              received += chunk.length
+              report()
+              done(null, chunk)
+            }
+          })
+          await pipeline(Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]), count, fs.createWriteStream(part, { flags: from > 0 ? 'a' : 'w' }), { signal: controller.signal })
+        }
+        if (sizeOn(part) !== sizes[i]) throw new Error(`${path.basename(f.target)} came out the wrong size. Resume the download to try again.`)
+        fs.renameSync(part, f.target)
+      }
+      this.patch(d.id, { state: 'done', path: files[0].target, received: total, total, speed: 0, secondsLeft: 0 })
     } catch (err) {
       if (!this.stopping.has(d.id)) this.patch(d.id, { state: 'failed', speed: 0, secondsLeft: null, error: err instanceof Error ? err.message : String(err) })
     } finally {
@@ -87,13 +151,17 @@ class Downloads extends EventEmitter {
     }
   }
 
+  private async stop(id: string): Promise<void> {
+    const controller = this.running.get(id)
+    if (!controller) return
+    this.stopping.add(id)
+    controller.abort()
+    while (this.running.has(id)) await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+
   async pause(id: string): Promise<DownloadItem[]> {
-    const running = this.running.get(id)
     this.patch(id, { state: 'paused', speed: 0, secondsLeft: null })
-    if (running) {
-      this.stopping.add(id)
-      await running.cancel({ deleteTempFile: false })
-    }
+    await this.stop(id)
     return this.list()
   }
 
@@ -106,19 +174,12 @@ class Downloads extends EventEmitter {
   async cancel(id: string): Promise<DownloadItem[]> {
     const item = this.all().find((d) => d.id === id)
     if (!item) throw new Error('That download is no longer listed.')
-    const running = this.running.get(id)
-    if (running) {
-      this.stopping.add(id)
-      await running.cancel({ deleteTempFile: true })
-      this.items = this.all().filter((d) => d.id !== id)
-      this.save()
-      return this.list()
-    }
+    await this.stop(id)
     this.items = this.all().filter((d) => d.id !== id)
     this.save()
     if (item.state !== 'done') {
       try {
-        await (await this.downloader(item)).cancel({ deleteTempFile: true })
+        for (const f of this.targets(item)) fs.rmSync(`${f.target}.part`, { force: true })
       } catch (err) {
         throw new Error(`Removed ${item.name} from downloads, but its partial file in ${item.folder} could not be cleaned up: ${err instanceof Error ? err.message : String(err)}`)
       }

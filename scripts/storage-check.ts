@@ -9,7 +9,9 @@ const ALLOWED = new Set([
   'src/engine/vision.ts',
   'src/engine/tts.ts',
   'src/engine/python/scripts.ts',
-  'src/engine/model/cuda.ts',
+  'src/engine/model/zip.ts',
+  'src/engine/model/server/install.ts',
+  'src/engine/model/downloads.ts',
   'src/engine/modules/mcp.ts',
   'src/engine/modules/registry.ts',
   'src/engine/skills.ts'

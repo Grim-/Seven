@@ -385,7 +385,7 @@ export function WorldRecords({ worldId, schema, initialType, initialKey }: { wor
   const [query, setQuery] = useState('')
   useEffect(() => {
     const load = () =>
-      void Promise.all(types.map((t) => Promise.all([engine('worlds.records', { id: worldId, type: t }), engine('worlds.changes', { id: worldId, type: t })]).then(([r, c]) => [t, r, c] as const)))
+      void Promise.all(types.map((t) => Promise.all([engine('worlds.records', { id: worldId, type: t, layer: 'template' }), engine('worlds.changes', { id: worldId, type: t, layer: 'template' })]).then(([r, c]) => [t, r, c] as const)))
         .then((rows) => {
           setAll(Object.fromEntries(rows.map(([t, r]) => [t, r])))
           setChanges(Object.fromEntries(rows.map(([t, , c]) => [t, c])))

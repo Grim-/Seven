@@ -2,10 +2,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { MODEL_KINDS, type ChatTemplate, type GpuBackend, type ModelConfig, type ModelConfigResult, type ModelEntry, type ModelInfo, type ModelKind, type RemoteApi } from '@shared/types'
+import { MODEL_KINDS, type ChatTemplate, type ModelConfig, type ModelConfigResult, type ModelEntry, type ModelInfo, type ModelKind, type RemoteApi } from '@shared/types'
 import { paths } from '../util/paths'
 import { remoteKeys } from './keys'
-import type { RemoteTarget } from './remote'
+import type { ApiTarget } from './apiChat'
 import { readJson, writeJson } from '../util/fs'
 import { normalize, reloadRequired } from './params'
 import { readHeader } from './gguf/read'
@@ -18,11 +18,9 @@ interface ModelsFile {
   info?: Record<string, { size: number; info: ModelInfo | null; v?: number }>
   kinds?: Record<string, ModelKind>
   templates?: Record<string, ChatTemplate>
-  fixes?: Record<string, Record<string, boolean>>
-  gpu?: GpuBackend
+  projectors?: Record<string, string | null>
 }
 
-const GPUS: GpuBackend[] = ['auto', 'cuda', 'vulkan', 'cpu']
 const INFO_VERSION = 5
 function readInfo(filePath: string): Promise<ModelInfo | null> {
   return readHeader(filePath, { size: true }).catch(() => null)
@@ -136,18 +134,46 @@ export class ModelRegistry extends EventEmitter {
     return this.list()
   }
 
-  get gpu(): GpuBackend {
-    return GPUS.includes(this.data.gpu as GpuBackend) ? (this.data.gpu as GpuBackend) : 'auto'
+  mtpLayers(id: string): number | null {
+    return this.list().find((m) => m.id === id)?.info?.mtpLayers ?? null
   }
 
-  setGpu(choice: GpuBackend): void {
-    if (!GPUS.includes(choice)) throw new Error(`Unknown GPU backend "${choice}". Pick one of: ${GPUS.join(', ')}.`)
-    this.data.gpu = choice
+  projectors(): { id: string; name: string; path: string }[] {
+    const info = this.data.info ?? {}
+    return this.data.models.filter((m) => !m.remote && this.infoOf(m, info[m.id])?.kind === 'projector').map((m) => ({ id: m.id, name: m.name, path: m.path }))
+  }
+
+  projectorFor(id: string): { choice: string | null; auto: boolean } {
+    const all = this.projectors()
+    const set = this.data.projectors?.[id]
+    if (set !== undefined) return { choice: set && all.some((p) => p.id === set) ? set : null, auto: false }
+    const m = this.data.models.find((x) => x.id === id)
+    if (!m || m.remote) return { choice: null, auto: true }
+    const dir = path.dirname(m.path).toLowerCase()
+    return { choice: all.find((p) => path.dirname(p.path).toLowerCase() === dir)?.id ?? null, auto: true }
+  }
+
+  setProjector(id: string, projector: string | null): { choice: string | null; auto: boolean } {
+    this.get(id)
+    if (projector && !this.projectors().some((p) => p.id === projector)) throw new Error('That vision adapter is no longer in Models. Pick another, or none.')
+    this.data.projectors = { ...this.data.projectors, [id]: projector }
     this.save()
+    return this.projectorFor(id)
+  }
+
+  projectorPath(id: string): string | null {
+    const choice = this.projectorFor(id).choice
+    return choice ? (this.projectors().find((p) => p.id === choice)?.path ?? null) : null
   }
 
   getTemplate(id: string): ChatTemplate {
-    return this.data.templates?.[id] ?? { type: 'auto' }
+    const saved = this.data.templates?.[id]
+    return saved?.type === 'jinja' && saved.template.trim() ? saved : { type: 'auto' }
+  }
+
+  templateText(id: string): string | null {
+    const choice = this.getTemplate(id)
+    return choice.type === 'jinja' ? choice.template : null
   }
 
   setTemplate(id: string, choice: ChatTemplate): ChatTemplate {
@@ -158,23 +184,6 @@ export class ModelRegistry extends EventEmitter {
     this.data.templates = map
     this.save()
     return this.getTemplate(id)
-  }
-
-  getFixes(id: string): Record<string, boolean> {
-    return { ...(this.data.fixes?.[id] ?? {}) }
-  }
-
-  setFix(id: string, fix: string, on: boolean): Record<string, boolean> {
-    this.get(id)
-    const mine = { ...(this.data.fixes?.[id] ?? {}) }
-    if (on) delete mine[fix]
-    else mine[fix] = false
-    const map = { ...(this.data.fixes ?? {}) }
-    if (Object.keys(mine).length) map[id] = mine
-    else delete map[id]
-    this.data.fixes = map
-    this.save()
-    return this.getFixes(id)
   }
 
   touch(id: string): void {
@@ -268,7 +277,7 @@ export class ModelRegistry extends EventEmitter {
     return this.list().find((m) => m.id === id)!
   }
 
-  remoteTarget(id: string): RemoteTarget {
+  remoteTarget(id: string): ApiTarget {
     const m = this.get(id)
     if (!m.remote) throw new Error(`${m.name} is not a remote model`)
     const size = Number(this.getConfig(id).contextSize) || 32768
@@ -281,7 +290,7 @@ export class ModelRegistry extends EventEmitter {
     this.data.models = this.data.models.filter((m) => m.id !== id)
     delete this.data.configs[id]
     if (this.data.templates) delete this.data.templates[id]
-    if (this.data.fixes) delete this.data.fixes[id]
+    if (this.data.projectors) delete this.data.projectors[id]
     if (this.data.models.length === before) return false
     this.changed()
     return true

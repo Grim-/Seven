@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { app, utilityProcess, type UtilityProcess } from 'electron'
 import enginePath from '../engine/index?modulePath'
@@ -16,6 +17,15 @@ import { dataDir } from './paths'
 const REQUEST_TIMEOUT_MS = 30000
 const MAX_BACKOFF_MS = 5000
 
+function endServers(pids: number[]): void {
+  if (process.platform !== 'win32') return
+  for (const pid of pids) {
+    execFile('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], { windowsHide: true }, (err, stdout) => {
+      if (!err && stdout.toLowerCase().includes('"llama-server.exe"')) execFile('taskkill', ['/PID', String(pid), '/F'], { windowsHide: true }, () => undefined)
+    })
+  }
+}
+
 interface Pending {
   resolve: (value: unknown) => void
   reject: (error: Error) => void
@@ -29,6 +39,7 @@ export class EngineSupervisor extends EventEmitter {
   private restarts = 0
   private stopping = false
   private state: EngineState = 'starting'
+  private servers: number[] = []
 
   status(): EngineStatus {
     return { state: this.state, restarts: this.restarts }
@@ -47,7 +58,7 @@ export class EngineSupervisor extends EventEmitter {
     const child = utilityProcess.fork(enginePath, [], {
       serviceName: 'seven-engine',
       stdio: 'inherit',
-      env: { ...process.env, SEVEN_HOME: dataDir, SEVEN_DEV: app.isPackaged ? '0' : '1', SEVEN_RESOURCES: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'resources') : path.join(app.getAppPath(), 'resources') }
+      env: { ...process.env, SEVEN_HOME: dataDir, SEVEN_DEV: app.isPackaged ? '0' : '1', SEVEN_RESOURCES: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'resources') : path.join(app.getAppPath(), 'resources'), SEVEN_APP: app.isPackaged ? path.dirname(process.execPath) : app.getAppPath() }
     })
     this.child = child
 
@@ -67,10 +78,16 @@ export class EngineSupervisor extends EventEmitter {
         void this.restart()
         return
       }
+      if (message.event === 'engine.children') {
+        this.servers = (message.payload as { pids: number[] }).pids
+        return
+      }
       this.emit('event', message)
     })
 
     child.on('exit', (code) => {
+      endServers(this.servers)
+      this.servers = []
       if (this.child !== child) return
       this.child = null
       this.rejectAll(new Error(`Engine exited with code ${code}`))
@@ -126,6 +143,7 @@ export class EngineSupervisor extends EventEmitter {
 
   stop(): void {
     this.stopping = true
+    endServers(this.servers)
     this.rejectAll(new Error('Engine stopped'))
     this.child?.kill()
     this.child = null

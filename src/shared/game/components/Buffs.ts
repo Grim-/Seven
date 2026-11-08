@@ -1,0 +1,137 @@
+import { Component, createComponent, registerComponent, type ComponentDef, type GameEntity, type TooltipRow } from '../core'
+
+export class Buff extends Component {
+  static readonly type: string = 'buff'
+  static readonly DESCRIPTION: string = 'A buff or debuff: lasts its duration and holds the pieces that do its work. The same buff from the same source adds stacks.'
+  static readonly PARAMS = {
+    id: { kind: 'text' as const, default: '', description: 'Which buff this is; with the source, decides when two applications stack.' },
+    duration: { kind: 'number' as const, default: 0, min: 0, description: 'Seconds it lasts. 0 lasts until removed.' },
+    potency: { kind: 'number' as const, default: 1, min: 0, description: 'Strength per stack, read by its pieces.' },
+    maxStacks: { kind: 'number' as const, default: 1, min: 1, description: 'Most stacks it can reach.' }
+  }
+  source: string | null = null
+  key: string | null = null
+  stacks = 1
+  elapsed = 0
+  remaining = Infinity
+
+  canApply(host: Component | GameEntity): true | string {
+    return host instanceof Buffs ? true : 'a buff belongs in buffs'
+  }
+
+  get id(): string {
+    return String(this.params.id)
+  }
+
+  get strength(): number {
+    return Number(this.params.potency) * this.stacks
+  }
+
+  identity(): string {
+    return `${this.id}/${this.key ?? this.source ?? ''}`
+  }
+
+  onApplied(): void {
+    super.onApplied()
+    if (this.remaining === Infinity && Number(this.params.duration) > 0) this.remaining = Number(this.params.duration)
+  }
+
+  advance(seconds: number): void {
+    this.elapsed += seconds
+    if (this.remaining !== Infinity) this.remaining -= seconds
+  }
+
+  done(): boolean {
+    const pieces = this.comps.filter((c): c is BuffPiece => c instanceof BuffPiece && c.finite)
+    return this.remaining <= 1e-6 || (pieces.length > 0 && pieces.every((p) => p.isDone()))
+  }
+
+  end(): void {
+    for (const c of this.comps) if (c instanceof BuffPiece) c.onEnd()
+  }
+
+  protected saveState(): Record<string, unknown> {
+    return { source: this.source, key: this.key, stacks: this.stacks, elapsed: this.elapsed, remaining: this.remaining === Infinity ? null : this.remaining }
+  }
+
+  protected loadState(state: Record<string, unknown>): void {
+    this.source = typeof state.source === 'string' ? state.source : null
+    this.key = typeof state.key === 'string' ? state.key : null
+    this.stacks = Number(state.stacks) || 1
+    this.elapsed = Number(state.elapsed) || 0
+    this.remaining = typeof state.remaining === 'number' ? state.remaining : Infinity
+  }
+}
+
+export abstract class BuffPiece extends Component {
+  readonly finite: boolean = false
+
+  canApply(host: Component | GameEntity): true | string {
+    return host instanceof Buff ? true : 'a buff piece belongs inside a buff'
+  }
+
+  get buff(): Buff | null {
+    return this.parent instanceof Buff ? this.parent : null
+  }
+
+  get strength(): number {
+    return this.buff?.strength ?? 1
+  }
+
+  isDone(): boolean {
+    return false
+  }
+
+  onEnd(): void {}
+}
+
+export class Buffs extends Component {
+  static readonly type: string = 'buffs'
+  static readonly DESCRIPTION: string = 'The buffs and debuffs on an entity. Ticks them, stacks repeats, and removes them when they end.'
+  static readonly PARAMS = {}
+
+  canApply(host: Component | GameEntity): true | string {
+    return 'catalog' in host ? true : 'buffs belong on an entity'
+  }
+
+  get held(): Buff[] {
+    return this.comps.filter((c): c is Buff => c instanceof Buff)
+  }
+
+  apply(def: ComponentDef, source: GameEntity | null, key: string | null = null): Buff | null {
+    const made = createComponent({ ...def, type: 'buff' })
+    if (!(made instanceof Buff)) return null
+    made.source = source?.uid ?? null
+    made.key = key
+    const same = this.held.find((b) => b.identity() === made.identity())
+    if (same) {
+      same.stacks = Math.min(Number(same.params.maxStacks), same.stacks + 1)
+      if (Number(same.params.duration) > 0) same.remaining = Number(same.params.duration)
+      this.entity?.emit('OnBuffStacked', { buff: same.id, stacks: same.stacks })
+      return same
+    }
+    if (!this.add(made)) return null
+    this.entity?.emit('OnBuffApplied', { buff: made.id, source: made.source })
+    return made
+  }
+
+  removeBuff(buff: Buff): void {
+    buff.end()
+    if (this.remove(buff)) this.entity?.emit('OnBuffRemoved', { buff: buff.id })
+  }
+
+  tickSim(seconds: number): void {
+    for (const b of this.held) {
+      b.tickSim(seconds)
+      b.advance(seconds)
+      if (b.done()) this.removeBuff(b)
+    }
+  }
+
+  tooltipRows(): TooltipRow[] {
+    return this.held.map((b) => ({ label: b.stacks > 1 ? `${b.id} ×${b.stacks}` : b.id, value: b.remaining === Infinity ? 'until removed' : `${Math.ceil(b.remaining)} s` }))
+  }
+}
+
+registerComponent(Buff)
+registerComponent(Buffs)

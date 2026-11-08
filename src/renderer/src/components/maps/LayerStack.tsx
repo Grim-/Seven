@@ -13,7 +13,7 @@ export function LayerStack({ map, layers = map.layers }: { map: MapData; layers?
           const type = layerTypeOf(l)
           return (
             type && (
-              <div key={l.id} className="pointer-events-none absolute left-0 top-0" style={{ transform: `translate(${l.offset.x}px, ${l.offset.y}px)`, opacity: l.opacity }}>
+              <div key={l.id} className="pointer-events-none absolute left-0 top-0" style={{ transform: `translate(${l.offset.x}px, ${l.offset.y}px)`, opacity: typeof l.opacity === 'number' && l.opacity > 0 ? l.opacity : 1 }}>
                 <type.Layer layer={l} map={map} />
               </div>
             )

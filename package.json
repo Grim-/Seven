@@ -8,7 +8,6 @@
     "lint": "eslint --cache .",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
-    "update:llama": "npx --no node-llama-cpp source download --release latest --gpu cuda",
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
@@ -21,8 +20,7 @@
     "check:storage": "tsx scripts/storage-check.ts",
     "srd:import": "tsx --tsconfig tsconfig.node.json scripts/srd-import.ts",
     "eval": "tsx --tsconfig tsconfig.node.json scripts/eval-tools.ts",
-    "check:restrictions": "tsx --tsconfig tsconfig.node.json scripts/restrictions-check.ts",
-    "bench:context": "tsx --tsconfig tsconfig.node.json scripts/bench-context.ts"
+    "check:restrictions": "tsx --tsconfig tsconfig.node.json scripts/restrictions-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -30,6 +28,9 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@git-diff-view/react": "^0.1.7",
+    "@huggingface/gguf": "^0.4.6",
+    "node-forge": "^1.3.1",
+    "pixi.js": "^8.22.0",
     "@milkdown/crepe": "^7.22.2",
     "@modelcontextprotocol/sdk": "^1.31.0",
     "@mozilla/readability": "^0.6.0",
@@ -64,7 +65,6 @@
     "mermaid": "^12.1.0",
     "minisearch": "^7.2.0",
     "motion": "^14.0.0",
-    "node-llama-cpp": "^3.22.2",
     "openai": "^7.28.0",
     "react-grid-layout": "^2.2.4",
     "react-is": "^19.3.0",
@@ -78,7 +78,8 @@
     "tailwind-merge": "^3.7.0",
     "unpdf": "1.8.1",
     "zod": "^4.6.5",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.15",
+    "agent_map_gen": "file:./agent_map_gen"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config": "^2.1.0",
@@ -86,6 +87,7 @@
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.4",
+    "@types/node-forge": "^1.3.11",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.1.1",

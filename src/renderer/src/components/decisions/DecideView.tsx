@@ -1,36 +1,78 @@
-import { useState } from 'react'
-import { Check, Dices, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { PickAnswer, PickDecisionProps } from '@shared/pickDecision'
 import { NO_ROLL, checkOf, optionRollLabel, rollCheck, type OptionRoll } from '@shared/storyRolls'
-import { Button, Input } from '../ui'
+import { ActionBar, Button, Input } from '../ui'
 import { useCheckTargets } from '../play/useCheckTargets'
 import { RollRow } from '../play/RollRow'
-import { SheetSelect } from '../data/sheet/SheetSelect'
+import { WhoRolls } from '../play/roll/WhoRolls'
+import { useRollers } from '../play/roll/useRollers'
+import { ROLL_TOOLTIP_NO_CHAR, rollItems } from '../play/roll/rollItems'
 import { DecisionCardFrame } from './DecisionCardFrame'
 import { OptionRow } from './OptionRow'
 import { OptionRollFields } from './OptionRollFields'
 
 const OWN = -1
 
-export function DecideView({ p, done, open, status, onAnswer }: { p: PickDecisionProps; done: PickAnswer | null; open: boolean; status?: ReactNode; onAnswer: (value: PickAnswer) => Promise<void> }) {
+export function DecideView({
+  p,
+  done,
+  open,
+  status,
+  onAnswer,
+  onClose
+}: {
+  p: PickDecisionProps
+  done: PickAnswer | null
+  open: boolean
+  status?: ReactNode
+  onAnswer: (value: PickAnswer) => Promise<void>
+  onClose?: () => void
+}) {
   const [picked, setPicked] = useState<number | null>(null)
   const [own, setOwn] = useState('')
-  const [sheet, setSheet] = useState(p.character)
+  const [sheet, setSheet] = useState<string | null>(p.roller === 'player' ? null : p.character)
   const [roll, setRoll] = useState<OptionRoll>(NO_ROLL)
   const [sending, setSending] = useState(false)
+
   const targets = useCheckTargets(sheet)
+  const against = roll.type === 'check' ? roll.against : null
+  const { rollers, eligible } = useRollers(against, { preferred: p.character })
+
+  // Auto-select preferred character if available and eligible when not set
+  useEffect(() => {
+    if (roll.type === 'check' && !sheet) {
+      if (p.character && eligible.some((r) => r.sheet === p.character)) {
+        setSheet(p.character)
+      } else if (p.roller !== 'player' && eligible[0]) {
+        setSheet(eligible[0].sheet)
+      }
+    }
+  }, [roll.type, sheet, p.character, p.roller, eligible])
 
   const pick = (index: number) => {
     setPicked(index)
-    setRoll(index === OWN ? NO_ROLL : p.options[index].roll)
+    const nextRoll = index === OWN ? NO_ROLL : p.options[index].roll
+    setRoll(nextRoll)
   }
+
+  const checkDetail = roll.type === 'check' ? checkOf(roll, targets) : null
+  const ready = roll.type !== 'check' || (sheet !== null && checkDetail !== null)
+  const overridden = Boolean(roll.type === 'check' && p.character && sheet && sheet !== p.character)
 
   const send = async (force: boolean | null) => {
     if (picked === null || sending) return
     setSending(true)
     const option = picked === OWN ? own.trim() : p.options[picked].text
-    const value: PickAnswer = { option, own: picked === OWN, character: roll.type === 'check' ? sheet : null, roll, check: rollCheck(roll, targets, force) }
+    const value: PickAnswer = {
+      option,
+      own: picked === OWN,
+      character: roll.type === 'check' ? sheet : null,
+      overridden,
+      roll,
+      check: rollCheck(roll, targets, force)
+    }
     await onAnswer(value)
     setSending(false)
   }
@@ -44,12 +86,13 @@ export function DecideView({ p, done, open, status, onAnswer }: { p: PickDecisio
     return (
       <DecisionCardFrame tag="Decision" note="you picked" question={p.question} status={status}>
         <OptionRow mark={<Check className="h-3.5 w-3.5" />} text={done.option} picked aside={<span className="font-mono text-[11px] text-dim">{optionRollLabel(done.roll)}</span>} />
+        {done.overridden && <span className="font-mono text-[11px] text-accent">You chose the rolling character</span>}
         {done.check && (done.check.forced ? <span className="font-mono text-[12px] text-dim">You made it {done.check.passed ? 'pass' : 'fail'}.</span> : <RollRow roll={done.check} />)}
       </DecisionCardFrame>
     )
 
   return (
-    <DecisionCardFrame tag="Decision" note="you pick" question={p.question} status={status}>
+    <DecisionCardFrame tag="Decision" note="you pick" question={p.question} status={status} onClose={open ? onClose : undefined}>
       {p.options.map((o, i) => (
         <OptionRow
           key={i}
@@ -74,32 +117,46 @@ export function DecideView({ p, done, open, status, onAnswer }: { p: PickDecisio
         </div>
       )}
       {open && picked !== null && (
-        <div className="flex flex-col gap-2 border-t border-line/60 pt-2.5">
+        <div className="flex flex-col gap-3 border-t border-line/60 pt-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <OptionRollFields roll={roll} targets={targets} onChange={setRoll} />
-            {roll.type === 'check' && <SheetSelect value={sheet} onChange={setSheet} className="w-44" />}
             <span className="flex-1" />
             {roll.type !== 'none' && <span className="font-mono text-[18px] font-bold text-accent">{chance(roll)}</span>}
           </div>
-          <div className="flex flex-wrap justify-end gap-1.5">
-            {roll.type === 'none' ? (
-              <Button size="sm" variant="primary" icon={<Check />} disabled={sending} onClick={() => void send(null)}>
-                Choose
-              </Button>
-            ) : (
-              <>
-                <Button size="sm" variant="primary" icon={<Dices />} disabled={sending} onClick={() => void send(null)}>
-                  Roll
-                </Button>
-                <Button size="sm" icon={<ThumbsUp />} disabled={sending} onClick={() => void send(true)}>
-                  Pass
-                </Button>
-                <Button size="sm" icon={<ThumbsDown />} disabled={sending} onClick={() => void send(false)}>
-                  Fail
-                </Button>
-              </>
-            )}
-          </div>
+          {roll.type === 'check' && (
+            <WhoRolls
+              label="Who makes this check"
+              people={rollers}
+              value={sheet}
+              onPick={(s) => setSheet(s)}
+              empty="No characters available."
+            />
+          )}
+          {roll.type === 'none' ? (
+            <div className="flex justify-end gap-1.5">
+              <ActionBar
+                items={[
+                  { label: 'Choose', disabled: sending, onSelect: () => void send(null) },
+                  ...(onClose ? [{ label: 'Close', disabled: sending, onSelect: onClose }] : [])
+                ]}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <ActionBar
+                items={rollItems({
+                  ready,
+                  sending,
+                  onRoll: () => void send(null),
+                  onPass: () => void send(true),
+                  onFail: () => void send(false),
+                  onClose
+                })}
+                className="grid-cols-4"
+              />
+              {!ready && <span className="text-[12px] text-dim">{ROLL_TOOLTIP_NO_CHAR}</span>}
+            </div>
+          )}
         </div>
       )}
     </DecisionCardFrame>

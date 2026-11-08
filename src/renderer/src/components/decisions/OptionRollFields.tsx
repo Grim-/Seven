@@ -1,4 +1,4 @@
-import { BASE, MIDDLE, type CheckTarget } from '@shared/actions'
+import { BASE, MIDDLE, checkNames, type CheckTarget } from '@shared/actions'
 import { NO_ROLL, type OptionRoll } from '@shared/storyRolls'
 import { NumberField, Select } from '../ui'
 import { SkillSelect } from './SkillSelect'
@@ -9,8 +9,10 @@ const TYPES = [
   { value: 'check', label: 'Check' }
 ]
 
-export function OptionRollFields({ roll, targets, onChange }: { roll: OptionRoll; targets: CheckTarget[]; onChange: (next: OptionRoll) => void }) {
-  const setType = (type: string) => onChange(type === 'chance' ? { type: 'chance', chance: MIDDLE * 100 } : type === 'check' ? { type: 'check', against: targets[0]?.id ?? '', dc: BASE } : NO_ROLL)
+const DEFAULT_CHECK = checkNames()[0]?.id ?? 'strength'
+
+export function OptionRollFields({ roll, targets = [], onChange }: { roll: OptionRoll; targets?: CheckTarget[]; onChange: (next: OptionRoll) => void }) {
+  const setType = (type: string) => onChange(type === 'chance' ? { type: 'chance', chance: MIDDLE * 100 } : type === 'check' ? { type: 'check', against: targets[0]?.id ?? DEFAULT_CHECK, dc: BASE } : NO_ROLL)
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Select value={roll.type} options={TYPES} onChange={setType} className="w-28" />

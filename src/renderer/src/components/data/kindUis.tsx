@@ -54,7 +54,7 @@ import { deletePlaceItem } from '../maps/placeActions'
 import { PlaceChat, PlaceStage, PlaceWidget } from '../maps/PlaceSurfaces'
 import { SkillsPanel } from '../skills/Skills'
 import { AgentAvatar } from '../agents/look'
-import { PageHost, ToolPage, askNewFolder, askNewPage, usePageTypes } from './PageView'
+import { PageHost, ToolPage, askNewFolder, askNewPage, askRenamePage, usePageTypes } from './PageView'
 import { PageExplorer } from './PageExplorer'
 import { FilesPicker } from './FilesPicker'
 import { WorkoutHome } from '../workout/WorkoutHome'
@@ -119,21 +119,13 @@ function PageScreen({ id, select }: KindScreenProps) {
   if (id.startsWith('all:')) return <GeneratedPage key={id} id={id} />
   const page = pages.find((p) => p.id === id)
   if (page?.type && types.some((t) => t.id === page.type && t.single)) return <ToolPage key={id} id={id} />
-  return (
-    <div className="flex min-h-0 flex-1 flex-col border border-line/60 bg-black/70">
-      <PageHost id={id} onChange={(next) => select({ kind: 'page', id: next })} />
-    </div>
-  )
+  return <PageHost id={id} onChange={(next) => select({ kind: 'page', id: next })} />
 }
 
 function pageMenu(ctx: KindMenuContext): MenuItem[] {
   if (ctx.id.startsWith('all:')) return []
-  const rename = () =>
-    askText('Rename page', 'Title', ctx.title, async (title) => {
-      await engine('data.pages.write', { id: ctx.id, title, body: null }).catch(failed('Could not rename'))
-    })
   return [
-    { label: 'Rename', icon: <Pencil />, onSelect: rename },
+    { label: 'Rename', icon: <Pencil />, onSelect: () => askRenamePage(ctx.id, ctx.title) },
     deleteItem(ctx, 'Its text and items are removed. Boards and chats showing it will say it is missing.', () => engine('data.pages.delete', { id: ctx.id }))
   ]
 }

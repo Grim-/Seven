@@ -1,6 +1,7 @@
 import { showName, toId } from './ids'
 import { NO_SWAP, cleanSwap, hasSwap, parseSwap, swapSentence, swapText, type CardSwap } from './cardDecks'
 import { DND_SKILLS, DND_STATS, DND_STAT_NAMES, mod, saveBonus, skillBonus, spellAttack, type DndStats } from './dnd'
+import type { RollerChoice } from './storedDecision'
 
 export type ActionNeeds = 'any' | 'all'
 
@@ -18,6 +19,7 @@ export interface Action {
   attempt: string
   needs: ActionNeeds
   by: string | null
+  roller?: RollerChoice
   checks: ActionCheck[]
   pass: string
   fail: string
@@ -231,5 +233,6 @@ export function cleanAction(raw: unknown): Action {
   const text = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim() : null)
   const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null)
   const checks = Array.isArray(v.checks) ? (v.checks as Record<string, unknown>[]).map((c) => ({ against: text(c?.against), difficulty: num(c?.difficulty), base: num(c?.base), pass: text(c?.pass), fail: text(c?.fail), passCards: cleanSwap(c?.passCards), failCards: cleanSwap(c?.failCards) })) : []
-  return { attempt: text(v.attempt) ?? 'Does it work?', needs: v.needs === 'all' ? 'all' : 'any', by: text(v.by), checks, pass: text(v.pass) ?? '', fail: text(v.fail) ?? '', passCards: cleanSwap(v.passCards), failCards: cleanSwap(v.failCards) }
+  const roller: RollerChoice = v.roller === 'agent' ? 'agent' : 'player'
+  return { attempt: text(v.attempt) ?? 'Does it work?', needs: v.needs === 'all' ? 'all' : 'any', by: text(v.by), roller, checks, pass: text(v.pass) ?? '', fail: text(v.fail) ?? '', passCards: cleanSwap(v.passCards), failCards: cleanSwap(v.failCards) }
 }

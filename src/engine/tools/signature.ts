@@ -1,4 +1,4 @@
-import type { GbnfJsonSchema } from 'node-llama-cpp'
+import type { JsonSchema } from './schema'
 import type { ToolDef } from './types'
 
 type Schema = Record<string, unknown>
@@ -12,13 +12,13 @@ function nullable(s: Schema): boolean {
   return false
 }
 
-export function paramType(schema: GbnfJsonSchema | undefined): string {
+export function paramType(schema: JsonSchema | undefined): string {
   if (!schema || typeof schema !== 'object') return 'value'
   const s = schema as Schema
   if (Array.isArray(s.enum)) return s.enum.filter((x) => x !== null).map((x) => JSON.stringify(x)).join(' | ')
-  if (Array.isArray(s.oneOf)) return (s.oneOf as GbnfJsonSchema[]).map(paramType).filter((x) => x !== NULL).join(' | ')
+  if (Array.isArray(s.oneOf)) return (s.oneOf as JsonSchema[]).map(paramType).filter((x) => x !== NULL).join(' | ')
   const type = Array.isArray(s.type) ? (s.type as string[]).filter((t) => t !== NULL).join(' | ') : String(s.type ?? 'value')
-  if (type === 'array') return `[${paramType(s.items as GbnfJsonSchema)}, …]`
+  if (type === 'array') return `[${paramType(s.items as JsonSchema)}, …]`
   if (type === 'object') {
     const keys = Object.keys((s.properties as Schema | undefined) ?? {})
     return keys.length ? `{${keys.join(', ')}}` : '{field: value}'
@@ -43,7 +43,7 @@ function inner(s: Schema): [string, Schema][] {
 function paramLines(entries: [string, Schema][], indent: string): string[] {
   return entries.flatMap(([k, v]) => {
     const d = typeof v.description === 'string' ? v.description : ''
-    const line = `${indent}- ${k}: ${paramType(v as GbnfJsonSchema)}${nullable(v) ? ', or null' : ''}${d ? `. ${d}` : ''}`
+    const line = `${indent}- ${k}: ${paramType(v as JsonSchema)}${nullable(v) ? ', or null' : ''}${d ? `. ${d}` : ''}`
     const sub = inner(v).filter(([, s]) => typeof s.description === 'string' || Array.isArray(s.enum) || Array.isArray(s.oneOf))
     return [line, ...paramLines(sub, `${indent}  `)]
   })

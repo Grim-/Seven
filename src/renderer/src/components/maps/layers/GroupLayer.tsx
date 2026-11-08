@@ -6,4 +6,4 @@ export function GroupLayer({ layer, map }: { layer: GroupLayerData; map: MapData
   return <LayerStack map={map} layers={layer.layers} />
 }
 
-registerLayerType('group', { tag: 'Group', Layer: GroupLayer })
+registerLayerType('group', { tag: 'Group', Layer: GroupLayer, paint: (layer, ctx) => ctx.paint(layer.layers) })

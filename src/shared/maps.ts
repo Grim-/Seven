@@ -1,6 +1,8 @@
 import type { Point, ShapeForm, Size } from './shapes'
 import { PLACE_TYPE_KEY, recordKey } from './world'
 import type { DndStats } from './dnd'
+import type { EntityRecord } from './game/core/GameEntity'
+import { cleanTrigger, type TriggerDef } from './game/triggers'
 import { refsIn } from './story'
 
 export interface LayerBase {
@@ -140,6 +142,7 @@ export interface WorldMapUse {
   map: string
   shapes: Record<string, ShapeForm>
   stand: Record<string, Standing>
+  triggers?: TriggerDef[]
 }
 
 export type JourneyKind = 'moved' | 'action' | 'decision'
@@ -156,6 +159,8 @@ export interface PlaceVisitor {
   image: string | null
   line: string
   dnd: Pick<DndStats, 'hp' | 'ac' | 'stats' | 'conditions'> | null
+  game?: EntityRecord | null
+  gameRules?: string
   agent: string | null
 }
 
@@ -184,7 +189,9 @@ function cleanZoom(raw: unknown): ZoomRange {
 
 function cleanLayer(raw: unknown): MapLayer | null {
   const v = obj(raw)
-  const base: LayerBase = { id: str(v.id) || crypto.randomUUID(), name: str(v.name, 'Layer'), visible: v.visible !== false, opacity: Math.min(1, Math.max(0, num(v.opacity, 1))), offset: point(v.offset), zoom: cleanZoom(v.zoom) }
+  const rawOpacity = typeof v.opacity === 'number' && Number.isFinite(v.opacity) && v.opacity > 0 ? v.opacity : 1
+  const opacity = Math.min(1, Math.max(0.05, rawOpacity))
+  const base: LayerBase = { id: str(v.id) || crypto.randomUUID(), name: str(v.name, 'Layer'), visible: v.visible !== false, opacity, offset: point(v.offset), zoom: cleanZoom(v.zoom) }
   if (v.kind === 'tiles') {
     const columns = Math.max(1, Math.round(num(v.columns, 1)))
     const rows = Math.max(1, Math.round(num(v.rows, 1)))
@@ -224,13 +231,17 @@ export function cleanShapes(raw: unknown): Record<string, ShapeForm> {
   return shapes
 }
 
-function cleanStand(raw: unknown): Record<string, Standing> {
+export function cleanStand(raw: unknown): Record<string, Standing> {
   return Object.fromEntries(Object.entries(obj(raw)).map(([sheet, v]) => [sheet, { at: point(obj(v).at), actions: str(obj(v).actions), decisions: str(obj(v).decisions) }]))
+}
+
+function cleanTriggers(raw: unknown): TriggerDef[] {
+  return Array.isArray(raw) ? raw.map((t) => cleanTrigger(t, cleanForm(obj(t).shape))).filter((t): t is TriggerDef => t !== null) : []
 }
 
 export function cleanMapUses(raw: unknown): WorldMapUse[] {
   const list = Array.isArray(obj(raw).maps) ? (obj(raw).maps as unknown[]) : []
-  return list.map(obj).filter((u) => typeof u.map === 'string' && u.map).map((u) => ({ map: String(u.map), shapes: cleanShapes(u.shapes), stand: cleanStand(u.stand) }))
+  return list.map(obj).filter((u) => typeof u.map === 'string' && u.map).map((u) => ({ map: String(u.map), shapes: cleanShapes(u.shapes), stand: cleanStand(u.stand), triggers: cleanTriggers(u.triggers) }))
 }
 
 export function cleanMap(raw: unknown, id: string): MapData {

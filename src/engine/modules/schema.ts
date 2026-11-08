@@ -1,11 +1,11 @@
-import type { GbnfJsonObjectSchema, GbnfJsonSchema } from 'node-llama-cpp'
+import type { JsonObjectSchema, JsonSchema } from '../tools/schema'
 
 type Json = Record<string, unknown>
 
-const ANY: GbnfJsonSchema = { oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }] }
+const ANY: JsonSchema = { oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }] }
 const PRIMITIVES = new Set(['string', 'number', 'integer', 'boolean', 'null'])
 
-function described<T extends GbnfJsonSchema>(schema: T, source: Json): T {
+function described<T extends JsonSchema>(schema: T, source: Json): T {
   return typeof source.description === 'string' && source.description.trim() ? ({ ...schema, description: source.description.trim().slice(0, 400) } as T) : schema
 }
 
@@ -22,11 +22,11 @@ function resolve(node: Json, root: Json): Json {
   return current
 }
 
-function nullable(schema: GbnfJsonSchema): GbnfJsonSchema {
+function nullable(schema: JsonSchema): JsonSchema {
   return { oneOf: [schema, { type: 'null' }] }
 }
 
-function convert(input: unknown, root: Json, depth: number): GbnfJsonSchema {
+function convert(input: unknown, root: Json, depth: number): JsonSchema {
   if (!input || typeof input !== 'object' || depth > 8) return ANY
   const node = resolve(input as Json, root)
   if (Array.isArray(node.enum)) {
@@ -48,7 +48,7 @@ function convert(input: unknown, root: Json, depth: number): GbnfJsonSchema {
   let type = node.type
   if (Array.isArray(type)) {
     const list = type.filter((t): t is string => typeof t === 'string')
-    if (list.every((t) => PRIMITIVES.has(t))) return described({ type: list.map((t) => (t === 'integer' ? 'integer' : t)) } as GbnfJsonSchema, node)
+    if (list.every((t) => PRIMITIVES.has(t))) return described({ type: list.map((t) => (t === 'integer' ? 'integer' : t)) } as JsonSchema, node)
     const others = list.filter((t) => t !== 'null')
     const inner = convert({ ...node, type: others[0] }, root, depth + 1)
     return list.includes('null') ? nullable(inner) : inner
@@ -60,12 +60,12 @@ function convert(input: unknown, root: Json, depth: number): GbnfJsonSchema {
     case 'integer':
     case 'boolean':
     case 'null':
-      return described({ type } as GbnfJsonSchema, node)
+      return described({ type } as JsonSchema, node)
     case 'array': {
       const out: Json = { type: 'array', items: node.items && !Array.isArray(node.items) ? convert(node.items, root, depth + 1) : ANY }
       if (typeof node.minItems === 'number') out.minItems = node.minItems
       if (typeof node.maxItems === 'number') out.maxItems = node.maxItems
-      return described(out as GbnfJsonSchema, node)
+      return described(out as JsonSchema, node)
     }
     case 'object':
       return objectOf(node, root, depth)
@@ -74,21 +74,21 @@ function convert(input: unknown, root: Json, depth: number): GbnfJsonSchema {
   }
 }
 
-function objectOf(node: Json, root: Json, depth: number): GbnfJsonObjectSchema {
+function objectOf(node: Json, root: Json, depth: number): JsonObjectSchema {
   const props = (node.properties && typeof node.properties === 'object' ? node.properties : {}) as Json
   const required = new Set(Array.isArray(node.required) ? node.required.map(String) : [])
-  const properties: Record<string, GbnfJsonSchema> = {}
+  const properties: Record<string, JsonSchema> = {}
   for (const [key, value] of Object.entries(props)) {
     const converted = convert(value, root, depth + 1)
     properties[key] = required.has(key) ? converted : nullable(converted)
   }
   if (!Object.keys(properties).length && node.additionalProperties && typeof node.additionalProperties === 'object') {
-    return described({ type: 'object', properties: {}, additionalProperties: convert(node.additionalProperties, root, depth + 1) } as GbnfJsonObjectSchema, node)
+    return described({ type: 'object', properties: {}, additionalProperties: convert(node.additionalProperties, root, depth + 1) } as JsonObjectSchema, node)
   }
-  return described({ type: 'object', properties } as GbnfJsonObjectSchema, node)
+  return described({ type: 'object', properties } as JsonObjectSchema, node)
 }
 
-export function toGrammarSchema(input: unknown): GbnfJsonObjectSchema {
+export function toGrammarSchema(input: unknown): JsonObjectSchema {
   const root = (input && typeof input === 'object' ? input : {}) as Json
   return objectOf({ ...root, type: 'object' }, root, 0)
 }

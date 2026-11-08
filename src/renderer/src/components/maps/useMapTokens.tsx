@@ -1,12 +1,11 @@
-import type { MouseEvent } from 'react'
-import { LogOut, MessageSquarePlus, UserPlus } from 'lucide-react'
+import { LogOut, MessageSquarePlus, UserCheck, UserPlus } from 'lucide-react'
 import { parseActions } from '@shared/actions'
 import { parseDecisions } from '@shared/decisions'
 import type { PlaceVisitor, Standing, WorldMapUse } from '@shared/maps'
 import { smallestAt, type Point } from '@shared/shapes'
 import type { WorldEntity } from '@shared/world'
 import { showName } from '@shared/ids'
-import { openMenu, type MenuItem } from '../ui'
+import { openMenu, type MenuEvent, type MenuItem } from '../ui'
 import { EntryPicker } from '../library/EntryPicker'
 import { engine } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
@@ -15,6 +14,7 @@ import { startChatItems } from '../../views/data/entryMenu'
 import { closePlay, showPlay, worldWhere } from '../play/playStore'
 import { actionItems, decisionItems, newPlayItems, type PlayHolder } from '../play/playHolder'
 import { characterItems, setWhere } from './placeActions'
+import { bringHere } from '../play/bringHere'
 import type { MapToken, TokenHandlers } from './TokenLayer'
 
 interface Options {
@@ -55,6 +55,15 @@ export function useMapTokens({ world, use, places, player, editing, save, onSele
     const play = holder(t.visitor)
     const standing = use.stand[t.visitor.sheet] ?? NONE
     return [
+      ...(t.visitor.sheet !== player
+        ? [
+            {
+              label: 'Take Control (Set as Player)',
+              icon: <UserCheck />,
+              onSelect: () => void engine('worlds.setPlayer', { id: world, sheet: t.visitor.sheet }).catch(failed('Could not set player'))
+            }
+          ]
+        : []),
       { label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(`@sheet:${t.visitor.sheet}`, t.visitor.agent ? [t.visitor.agent] : []) },
       ...parseActions(standing.actions).map((a, i) => ({ ...actionItems(play, a, i)[0], label: a.attempt })),
       ...parseDecisions(standing.decisions).map((d, i) => ({ ...decisionItems(play, d, i, null)[0], label: d.question })),
@@ -63,7 +72,7 @@ export function useMapTokens({ world, use, places, player, editing, save, onSele
       { label: 'Take off this map', icon: <LogOut />, danger: true, onSelect: () => setStanding(t.visitor.sheet, null) }
     ]
   }
-  const open = (t: MapToken, e: MouseEvent) => openMenu(e, showName(t.visitor.name), items(t))
+  const open = (t: MapToken, e: MenuEvent) => openMenu(e, showName(t.visitor.name), items(t))
   const handlers: TokenHandlers = {
     mine: player,
     onPick: onSelect ? (t) => onSelect(t.visitor.sheet) : open,
@@ -85,9 +94,14 @@ export function useMapTokens({ world, use, places, player, editing, save, onSele
           inline
           onClose={closePlay}
           onPick={(hit) => {
-            setStanding(hit.id, { ...(use.stand[hit.id] ?? NONE), at })
-            settle(hit.id, at)
             closePlay()
+            void bringHere(world, hit.id)
+              .then((ok) => {
+                if (!ok) return
+                setStanding(hit.id, { ...(use.stand[hit.id] ?? NONE), at })
+                settle(hit.id, at)
+              })
+              .catch(failed('Could not put them here'))
           }}
         />
       )

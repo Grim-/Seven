@@ -11,7 +11,13 @@ import { customCommands } from './commands/custom'
 import type { EngineRequestName, EngineRequests, EngineWireRequest, Events } from '@shared/protocol'
 import { ModelRegistry } from './model/registry'
 import { ModelHost } from './model/host'
+import { serverRelease } from './model/server/install'
 import { PARAMS } from './model/params'
+import { modelTraitSet } from '@shared/modelParams'
+import { Gateway } from './model/server/gateway'
+import { suggestPassword } from './model/server/password'
+import { LOG_LINES } from './model/server/process'
+import { memoryServer } from './mind/embedder'
 import { AgentRegistry } from './agents/registry'
 import { SessionStore } from './sessions/store'
 import { ChatRunner } from './chat/runner'
@@ -36,8 +42,6 @@ import { commandInfo, commandsFor, runCommand } from './commands/registry'
 import type { Ambience, AmbienceCue, Theme } from '@shared/theme'
 import { tags as tagStore } from './library/tags'
 import { setGuideSource, specialPages, USER, allKinds, clearKind, kindInfo, removeEntry, renameEntry, rollText, drawEntry, drawableEntries, previewEntry, find as libraryFind, overview as libraryOverview, resolveEntry, partView, timelineRows, describeEvent, resolveRoutineEntry, entryInside } from './library/kinds'
-import { WRAPPER_NAMES, chatWrapperFor, checkTemplate, isModelFix, modelFixes, setModelSource, wrapperForFile } from './model/wrappers'
-import { readMeta } from './model/gguf/read'
 import { contextPrefs } from './chat/prefs'
 import { modules } from './modules/registry'
 import { setAgentAccess } from './agents/access'
@@ -46,6 +50,7 @@ import { setPrivateKey, vaultEvents } from './util/secure'
 import { clearIndexes } from './util/dirIndex'
 import { checkFiles, migrate, vaultStatus } from './vault'
 import { minds } from './mind/store'
+import { endLeftovers, reportChildren } from './model/server/children'
 import { styles } from './mind/styles'
 import { setupReasoner } from './mind/reason'
 import { setupProbe } from './probe/probe'
@@ -55,7 +60,7 @@ import { ChatSearch } from './search'
 import { linkedFolders } from './folders/store'
 import { reminders } from './reminders/store'
 import { exportToFolder } from './library/folderExport'
-import { remoteTest } from './model/remote'
+import { apiTest } from './model/apiChat'
 import { timeline } from './timeline/store'
 import { routines } from './routines/store'
 import { observeData } from './timeline/record'
@@ -65,7 +70,7 @@ import type { WebLogEntry } from '@shared/types'
 import type { Backdrop, ChatBackdrops, PanelItem, TodoList, Toolset } from '@shared/types'
 import { panel } from './panel/store'
 import { backdrops } from './backdrops'
-import { summarize } from './turnstats'
+import { clearStats, summarize } from './turnstats'
 import { worlds } from './worlds/store'
 import { importMap } from './maps/importMap'
 import { maps } from './maps/store'
@@ -92,6 +97,12 @@ import { carryOpen, carryPeek, carrySave } from './carry'
 import { agentFolders, liveFolder, removeFolderTree } from './agents/folders'
 import { currentActor } from './timeline/actor'
 import { compendium } from '../modules/dnd/compendium'
+import { gameDefs } from '../modules/game/store'
+import { characterMisfits, giveItem, joinCharacter, leaveCharacter, saveCharacter, tickCharacters, useAbility } from '../modules/game/characters'
+import { removeRuleSet } from '../modules/game/worldRules'
+import { saves } from './worlds/saves'
+import './worlds/playLayer'
+import { adoptOldPlay, bring, removeSave, removeWorldSaves, takeOut, travel } from './worlds/party'
 import { decisions, storyActions } from '../modules/decisions/store'
 import { widgetInfo } from './data/widgetSources'
 import { resolveThings } from '../modules/core/things'
@@ -133,8 +144,13 @@ void modules.start()
 setToolsFolderCheck((abs) => modules.isProtected(abs))
 
 const models = new ModelRegistry()
-const host = new ModelHost(models.gpu)
-setModelSource((model) => (host.isLoaded && host.loadedId && host.model === model ? { template: models.getTemplate(host.loadedId), fixes: models.getFixes(host.loadedId) } : { template: { type: 'auto' }, fixes: {} }))
+const host = new ModelHost((entry) => {
+  const info = models.list().find((m) => m.id === entry.id)?.info ?? null
+  const mmproj = models.projectorPath(entry.id)
+  return { mtpLayers: models.mtpLayers(entry.id), mmproj, architecture: info?.architecture ?? null, template: models.templateText(entry.id), traits: modelTraitSet(info, mmproj !== null) }
+})
+reportChildren((pids) => emit('engine.children', { pids }))
+void endLeftovers().then((n) => n && console.warn(`[llama-server] ended ${n} left over from an earlier run`)).catch(() => undefined)
 const agents = new AgentRegistry()
 agents.useFolders(agentFolders)
 const agentFolder = (): string | null => {
@@ -150,6 +166,9 @@ requests.on('changed', () => emit('ui.pending', requests.list()))
 const permissions = new PermissionStore()
 const checkpoints = new CheckpointStore((id) => sessions.files(id))
 const runner = new ChatRunner(host, models, agents, sessions, requests, permissions, checkpoints, emit)
+const gateway = new Gateway(host, models, { busy: () => runner.busy })
+gateway.on('changed', (status) => emit('network.changed', status))
+gateway.start()
 setGuideSource({
   guides: () => guideModules(),
   guide: (moduleId, agentId) => guideText(moduleId, agentId ? (agents.list().find((a) => a.id === agentId) ?? null) : null),
@@ -188,6 +207,8 @@ data.pages.setOnRemove((id, up) => data.assets.reparent(id, up))
 workout.onChange(() => emit('workout.changed', {}))
 board.onChange(() => emit('board.changed', {}))
 compendium.on('changed', () => emit('dnd.changed', {}))
+gameDefs.on('changed', () => emit('game.changed', {}))
+saves.on('changed', (world: string) => emit('saves.changed', { world }))
 decisions.on('changed', () => emit('decisions.changed', {}))
 storyActions.on('changed', () => emit('storyActions.changed', {}))
 board.setNames((id) => agents.list().find((a) => a.id === id)?.name ?? 'an agent')
@@ -265,12 +286,6 @@ type Handlers = {
   ) => EngineRequests[K]['result'] | Promise<EngineRequests[K]['result']>
 }
 
-async function fixWrapper(id: string) {
-  const model = models.get(id)
-  if (model.remote) return null
-  return wrapperForFile(await readMeta(model.path), model.path, models.getTemplate(id))
-}
-
 function warmIndexes(): void {
   try {
     data.pages.list()
@@ -297,7 +312,7 @@ const handlers: Handlers = {
   },
   'models.state': () => host.getState(),
   'models.remote.save': (input) => models.saveRemote(input),
-  'models.remote.test': ({ id }) => remoteTest(models.remoteTarget(id)),
+  'models.remote.test': ({ id }) => apiTest(models.remoteTarget(id)),
   'models.load': ({ id }) => {
     if (models.isRemote(id)) throw new Error('Remote models are not loaded here. Give an agent this model in Agents and it is used when that agent replies.')
     models.assertRunnable(id)
@@ -336,26 +351,15 @@ const handlers: Handlers = {
   'models.config.set': ({ id, patch }) =>
     models.setConfig(id, patch, host.loadedId === id ? host.loadedConfig : null),
   'models.config.reset': ({ id }) => models.resetConfig(id, host.loadedId === id ? host.loadedConfig : null),
-  'models.gpu.get': () => host.gpuInfo(),
-  'models.gpu.set': async ({ choice }) => {
-    models.setGpu(choice)
-    await host.setGpu(choice)
-    return host.gpuInfo()
-  },
-  'models.cuda.install': async () => {
-    await host.installCuda((p) => emit('cuda.install', p))
-    setTimeout(() => emit('engine.restart', null), 200)
-    return host.gpuInfo()
-  },
-  'models.template.get': ({ id }) => ({ choice: models.getTemplate(id), wrappers: WRAPPER_NAMES }),
+  'models.server.get': () => host.serverInfo(),
+  'models.server.release': () => serverRelease(),
+  'models.projector.get': ({ id }) => ({ ...models.projectorFor(id), options: models.projectors().map(({ id: pid, name }) => ({ id: pid, name })) }),
+  'models.projector.set': ({ id, projector }) => ({ ...models.setProjector(id, projector), options: models.projectors().map(({ id: pid, name }) => ({ id: pid, name })) }),
+  'models.server.install': () => host.installServer((p) => emit('server.install', p)),
+  'models.template.get': ({ id }) => models.getTemplate(id),
   'models.template.set': ({ id, choice }) => {
-    checkTemplate(choice)
-    return { choice: models.setTemplate(id, choice), wrappers: WRAPPER_NAMES }
-  },
-  'models.fixes.get': async ({ id }) => modelFixes(models.getFixes(id), await fixWrapper(id)),
-  'models.fixes.set': async ({ id, fix, on }) => {
-    if (!isModelFix(fix)) throw new Error(`There is no model fix "${fix}"`)
-    return modelFixes(models.setFix(id, fix, on), await fixWrapper(id))
+    if (choice.type === 'jinja' && !choice.template.trim()) throw new Error('The Jinja template is empty. Paste a chat template, or set Chat template back to the one in the file.')
+    return models.setTemplate(id, choice)
   },
   'agents.list': () => agents.list(),
   'agents.get': ({ id }) => agents.get(id),
@@ -392,6 +396,8 @@ const handlers: Handlers = {
   'worlds.create': ({ name, schema }) => worlds.create(name, schema ?? undefined),
   'worlds.rename': ({ id, name }) => worlds.rename(id, name),
   'worlds.setPlayer': ({ id, sheet }) => worlds.setPlayer(id, sheet),
+  'worlds.setRules': ({ id, rules }) => worlds.setRules(id, gameDefs.ruleSet(rules).id),
+  'worlds.setTags': ({ id, tags }) => worlds.setTags(id, tags),
   'actions.roll': ({ action, character, pick, world, deck }) => {
     const result = rollFor(cleanAction(action), character, pick ?? null)
     journalAction(world ?? null, result)
@@ -407,11 +413,14 @@ const handlers: Handlers = {
   'worlds.journey': ({ id, sheet }) => worlds.journeys(id)[sheet] ?? [],
   'worlds.addJourney': ({ id, sheet, kind, text }) => worlds.addJourney(id, sheet, kind, text),
   'places.visitors': ({ sheets }) => visitorsOf(sheets),
-  'worlds.delete': ({ id }) => worlds.delete(id),
+  'worlds.delete': ({ id }) => {
+    removeWorldSaves(id)
+    return worlds.delete(id)
+  },
   'worlds.schema': ({ id }) => worlds.schema(id),
   'worlds.saveSchema': ({ id, schema }) => worlds.saveSchema(id, schema),
-  'worlds.records': ({ id, type }) => worlds.entities(id, type),
-  'worlds.changes': ({ id, type }) => worlds.changes(id, type),
+  'worlds.records': ({ id, type, layer }) => worlds.entities(id, type, true, layer ?? 'play'),
+  'worlds.changes': ({ id, type, layer }) => worlds.changes(id, type, layer ?? 'play'),
   'maps.list': () => mapListing(),
   'maps.get': ({ id }) => maps.get(id),
   'maps.withPlace': ({ world, place }) => mapWithPlace(world, place),
@@ -429,6 +438,21 @@ const handlers: Handlers = {
   'worlds.board': ({ id }) => worlds.board(id),
   'worlds.post': ({ id, author, to, message }) => worlds.post(id, author, to, message),
   'worlds.editPost': ({ id, index, message }) => worlds.editPost(id, index, message),
+  'stats.clear': () => clearStats(),
+  'server.status': async () => ({ installed: host.serverInfo().installed, logLines: LOG_LINES, chat: await host.chatServer(), memory: memoryServer(), network: gateway.status(), vram: await host.vram() }),
+  'server.stop': () => host.unload(),
+  'server.restart': async () => {
+    const id = host.loadedId
+    if (!id) return host.getState()
+    await host.unload()
+    return host.load(models.get(id), models.getConfig(id))
+  },
+  'network.set': ({ on, settings }) => gateway.set(on, settings),
+  'network.password.suggest': () => suggestPassword(),
+  'network.password.set': ({ password }) => gateway.setPassword(password),
+  'network.certificate.get': () => gateway.certificate(),
+  'network.certificate.renew': () => gateway.renewCertificate(),
+  'network.unlock': ({ address }) => gateway.unlock(address),
   'stats.summary': () => {
     const id = host.loadedId
     let modelName: string | null = null
@@ -441,8 +465,8 @@ const handlers: Handlers = {
     return summarize({
       modelId: id,
       modelName,
-      contextSize: id ? host.sequence.context.contextSize : null,
-      gpuLayers: id ? (host.model.gpuLayers ?? null) : null,
+      contextSize: id ? host.contextSize : null,
+      gpuLayers: id ? host.gpuLayers : null,
       totalLayers
     })
   },
@@ -515,7 +539,7 @@ const handlers: Handlers = {
   'permissions.set': (rules) => permissions.set(rules),
   'permissions.defaults': () => DEFAULT_RULES,
   'shell.info': () => detectShell(),
-  'models.facts': () => (host.isLoaded ? host.facts(chatWrapperFor(host.model).wrapperName) : null),
+  'models.facts': () => host.facts(),
   'board.list': () => board.list(),
   'dnd.list': ({ kind }) => compendium.all(kind).map(({ text: _text, ...ref }) => ref),
   'dnd.get': ({ kind, id }) => {
@@ -524,6 +548,36 @@ const handlers: Handlers = {
   },
   'dnd.save': ({ kind, entry, previousId }) => compendium.save(kind, entry, previousId),
   'dnd.remove': ({ kind, id }) => compendium.remove(kind, id),
+  'game.ruleSets': () => gameDefs.ruleSets(),
+  'game.saveRuleSet': ({ id, name, notes, copy }) => gameDefs.saveRuleSet(id, name, notes, copy),
+  'game.removeRuleSet': ({ id }) => removeRuleSet(id),
+  'game.list': ({ ruleSet, type }) => gameDefs.list(ruleSet, type),
+  'game.get': ({ ruleSet, type, id }) => gameDefs.get(ruleSet, type, id),
+  'game.save': ({ ruleSet, type, def, previousId }) => gameDefs.save(ruleSet, type, def, previousId),
+  'game.remove': ({ ruleSet, type, id }) => gameDefs.remove(ruleSet, type, id),
+  'game.catalog': ({ ruleSet }) => gameDefs.catalog(ruleSet),
+  'game.joinCharacter': ({ sheet, ruleSet, template }) => joinCharacter(sheet, ruleSet, template),
+  'game.saveCharacter': ({ sheet, record }) => saveCharacter(sheet, record),
+  'game.leaveCharacter': ({ sheet }) => leaveCharacter(sheet),
+  'game.tickCharacters': ({ sheets, seconds }) => tickCharacters(sheets, seconds),
+  'saves.list': ({ world }) => saves.worldSaves(world),
+  'saves.all': () => saves.list(),
+  'saves.get': ({ id }) => saves.get(id),
+  'saves.current': ({ world }) => saves.current(world),
+  'saves.create': ({ world, name, copy }) => saves.create(world, name, copy),
+  'saves.select': ({ world, id }) => saves.select(world, id),
+  'saves.rename': ({ id, name }) => saves.rename(id, name),
+  'saves.remove': ({ id }) => removeSave(id),
+  'saves.bring': ({ id, sheet }) => bring(id, sheet),
+  'saves.takeOut': ({ sheet }) => takeOut(sheet),
+  'saves.adopt': ({ world }) => adoptOldPlay(world),
+  'saves.travel': ({ sheet, id, map, place }) => travel(sheet, id, map, place),
+  'game.misfits': ({ sheet }) => characterMisfits(sheet),
+  'game.giveItem': ({ sheet, item, count, gold }) => giveItem(sheet, item, count, gold),
+  'game.useAbility': ({ sheet, ability, target, at, distance }) => useAbility(sheet, ability, target, at, distance),
+  'saves.markUsed': ({ id, trigger, flag }) => saves.markUsed(id, trigger, flag),
+  'saves.setFlag': ({ id, flag }) => saves.setFlag(id, flag),
+  'saves.writeClock': ({ id, clockId, clock }) => saves.writeClock(id, clockId, clock),
   'decisions.get': ({ id }) => decisions.get(id),
   'decisions.save': ({ decision, previousId }) => decisions.save(decision, previousId),
   'storyActions.get': ({ id }) => storyActions.get(id),
@@ -729,7 +783,9 @@ const shutdown = async (): Promise<void> => {
     console.warn('[timeline] could not save on exit', err)
   }
   await modules.dispose().catch(() => undefined)
+  await gateway.close().catch(() => undefined)
   await host.dispose().catch(() => undefined)
+  await minds.embedder.unload().catch(() => undefined)
   process.exit(0)
 }
 

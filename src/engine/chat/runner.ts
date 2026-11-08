@@ -1,21 +1,19 @@
 import { EventEmitter } from 'node:events'
 import crypto from 'node:crypto'
-import fs from 'node:fs'
-import { LlamaChatSession, defineChatSessionFunction, type ChatHistoryItem } from 'node-llama-cpp'
+import type { ChatHistoryItem } from './items'
 import path from 'node:path'
 import type { AgentDraft, AgentProfile, ModelConfig, ThinkingLevel, ChatMessage, ChatPart, ContextSummary, ContextUsage, PermissionMode, PromptCost, PromptView, TurnPhaseKind, RewindPreview, SessionMeta, ToolPart } from '@shared/types'
 import type { Events } from '@shared/protocol'
 import type { ModelHost } from '../model/host'
-import { checkFits, readableError } from './fit'
+import { checkFits } from './fit'
 import { buildInstructions, withState } from './context'
-import { TurnMeter, countRendered, fixedTokens, renderTokens, usageOf } from './stats'
+import { TurnMeter, usageOf } from './stats'
 import { NEXT_TURN, activeSummary, rebuildHistory, summaryBlock, type FitResult } from './history'
-import { SHIFT_NOTICE, TOOLS_OFF, applyTrim, handoffRequest, planSummary, planTrim, summaryRequest } from './compact'
+import { TOOLS_OFF, applyTrim, handoffRequest, planSummary, planTrim, summaryRequest } from './compact'
 import { data } from '../data/hub'
 import { contextPrefs } from './prefs'
-import { chatWrapperFor, handlesThinking } from '../model/wrappers'
 import { ChatBusy } from './busy'
-import { RemoteChat } from '../model/remote'
+import { ApiChat } from '../model/apiChat'
 import type { ModelRegistry } from '../model/registry'
 import type { AgentRegistry } from '../agents/registry'
 import type { SessionStore } from '../sessions/store'
@@ -25,9 +23,9 @@ import type { PermissionStore } from '../permissions/rules'
 import type { CheckpointStore } from '../checkpoints/store'
 import { newGrants, type SessionGrants } from '../permissions/gate'
 import { detectShell } from '../tools/shell'
-import { promptOptions, thinkingLevel, withThinking } from '../model/params'
+import { promptOptions, serverSampling, thinkingLevel, withThinking } from '../model/params'
 import { findTool, toolsFor } from '../tools/registry'
-import { referenceText } from '../library/kinds'
+import { USER, referenceText, resolveEntry } from '../library/kinds'
 import { referencePattern } from '@shared/text'
 
 const ACTIVITY_KEYS = ['command', 'path', 'pattern', 'query', 'url', 'title', 'collection', 'name', 'board']
@@ -45,7 +43,7 @@ function activityOf(name: string, args: Record<string, unknown>): string | null 
   return typeof value === 'string' ? (value.length > 80 ? `${value.slice(0, 77)}...` : value) : null
 }
 import { buildFunctions, runTool, type WrapHooks } from '../tools/wrap'
-import { newId, writeText } from '../util/fs'
+import { newId, readText, writeText } from '../util/fs'
 import { secure } from '../util/secure'
 import { minds } from '../mind/store'
 import { mindAuto, recallBlock } from '../mind/auto'
@@ -68,7 +66,7 @@ interface ActiveChat {
   sessionId: string
   modelId: string
   systemPrompt: string
-  chat: LlamaChatSession
+  chat: ApiChat
 }
 
 interface Turn {
@@ -89,6 +87,8 @@ interface Turn {
   meter?: TurnMeter
   usageBase?: { fixed: number; before: number; size: number }
   historyIndex?: number
+  images?: string[]
+  pendingImages?: string[]
 }
 
 const MAX_BLOCKS_PER_TURN = 3
@@ -127,6 +127,26 @@ function interrupt(message: ChatMessage): ChatMessage {
   }
 }
 
+function linkImages(prompt: string): string[] {
+  const out: string[] = []
+  for (const m of prompt.matchAll(referencePattern())) {
+    try {
+      const hit = resolveEntry(m[3].replace(/^"|"$/g, ''), m[2], USER)
+      const asset = hit.kind.asset?.(hit.id) ?? null
+      if (asset?.kind === 'image' && !out.includes(asset.id)) out.push(asset.id)
+    } catch {
+      continue
+    }
+  }
+  return out
+}
+
+function userImages(message: ChatMessage): string[] {
+  const text = message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')
+  const attached = (message.attachments ?? []).filter((id) => data.assets.metaFor(id)?.kind === 'image')
+  return [...new Set([...attached, ...linkImages(text)])]
+}
+
 function referenceBlock(prompt: string): string {
   const seen = new Set<string>()
   const parts: string[] = []
@@ -155,6 +175,10 @@ export class ChatRunner extends EventEmitter {
   private turn: Turn | null = null
   private compacting: { sessionId: string; controller: AbortController } | null = null
   private preparing = false
+
+  get busy(): boolean {
+    return this.preparing || this.turn !== null || this.compacting !== null
+  }
   private grants = new Map<string, SessionGrants>()
 
   constructor(
@@ -256,7 +280,8 @@ export class ChatRunner extends EventEmitter {
       messages,
       slices: this.sessions.turnModels(sessionId),
       summary: activeSummary(this.sessions.loadContext(sessionId).summaries, messages),
-      fit: this.fitFor(sessionId)
+      fit: this.fitFor(sessionId),
+      imagesOf: userImages
     })
   }
 
@@ -266,7 +291,7 @@ export class ChatRunner extends EventEmitter {
   }
 
   private count(text: string): number {
-    return this.host.countTokens(text) ?? estimateTokens(text)
+    return estimateTokens(text)
   }
 
   private remoteModel(agent: AgentProfile): boolean {
@@ -275,11 +300,7 @@ export class ChatRunner extends EventEmitter {
 
   private sizeFor(agent: AgentProfile): number | null {
     if (agent.modelId && this.models.isRemote(agent.modelId)) return this.models.remoteTarget(agent.modelId).contextSize
-    return this.host.isLoaded ? this.host.sequence.context.contextSize : null
-  }
-
-  private isRemoteChat(chat: LlamaChatSession): boolean {
-    return (chat as unknown) instanceof RemoteChat
+    return this.host.contextSize
   }
 
   snapshot(sessionId: string): ChatMessage[] {
@@ -295,7 +316,7 @@ export class ChatRunner extends EventEmitter {
   closeActive(): void {
     if (!this.active) return
     if (!this.preparing) this.turn?.controller.abort()
-    this.active.chat.dispose({ disposeSequence: false })
+    this.active.chat.dispose()
     this.active = null
   }
 
@@ -304,14 +325,14 @@ export class ChatRunner extends EventEmitter {
     this.turn?.controller.abort()
     this.closeActive()
     this.grants.clear()
-    if (this.host.loadedId) void this.host.sequence.clearHistory().catch(() => undefined)
+    if (this.host.loadedId) void this.host.clearContext().catch(() => undefined)
   }
 
   forget(sessionId: string): void {
     if (this.active?.sessionId === sessionId) this.closeActive()
   }
 
-  private async ensureModel(agent: AgentProfile): Promise<string> {
+  private async ensureModel(agent: AgentProfile, sessionId: string | null = null): Promise<string> {
     if (agent.modelId && this.models.isRemote(agent.modelId)) {
       this.models.remoteTarget(agent.modelId)
       return agent.modelId
@@ -319,10 +340,12 @@ export class ChatRunner extends EventEmitter {
     const wanted = agent.modelId
     if (wanted && this.host.loadedId !== wanted) {
       if (!this.models.has(wanted)) throw new Error(`${agent.name} is set to a model that is no longer in Models. Pick another model for ${agent.name} in Agents, or add the model back in Models.`)
-      await this.host.load(this.models.get(wanted), this.models.getConfig(wanted))
+      await this.host.load(this.models.get(wanted), this.configFor(wanted, agent, sessionId))
     }
     const loaded = this.host.loadedId
     if (!loaded) throw new Error('No model is loaded. Load one in Models, or give this agent a model.')
+    const config = this.configFor(loaded, agent, sessionId)
+    if (this.host.needsRestart(config)) await this.host.load(this.models.get(loaded), config)
     return loaded
   }
 
@@ -335,11 +358,11 @@ export class ChatRunner extends EventEmitter {
   }
 
   private async saveState(active: ActiveChat): Promise<void> {
-    if (!contextPrefs.get().saveChatState || secure.enabled || active.chat.disposed || this.isRemoteChat(active.chat)) return
+    if (!contextPrefs.get().saveChatState || active.chat.disposed || this.models.isRemote(active.modelId) || this.host.loadedId !== active.modelId) return
     const file = this.sessions.stateFile(active.sessionId)
     if (!file) return
     try {
-      await this.host.sequence.saveStateToFile(file)
+      await this.host.saveState(file)
       writeText(`${file}.json`, JSON.stringify({ key: this.stateKey(active.modelId), history: this.hashHistory(active.chat.getChatHistory()), savedAt: Date.now() }))
       this.sessions.pruneStates(3)
     } catch (err) {
@@ -348,15 +371,15 @@ export class ChatRunner extends EventEmitter {
   }
 
   private async loadState(sessionId: string, modelId: string, history: ChatHistoryItem[] | null): Promise<void> {
-    if (!contextPrefs.get().saveChatState || secure.enabled || !history) return
+    if (!contextPrefs.get().saveChatState || !history) return
     const file = this.sessions.stateFile(sessionId)
     if (!file) return
     try {
-      const meta = JSON.parse(fs.readFileSync(`${file}.json`, 'utf8')) as { key: string; history: string }
+      const meta = JSON.parse(readText(`${file}.json`)) as { key: string; history: string }
       if (meta.key !== this.stateKey(modelId) || meta.history !== this.hashHistory(history)) return
-      await this.host.sequence.loadStateFromFile(file, { acceptRisk: true })
+      await this.host.loadState(file)
     } catch {
-      await this.host.sequence.clearHistory().catch(() => undefined)
+      await this.host.clearContext().catch(() => undefined)
     }
   }
 
@@ -372,34 +395,16 @@ export class ChatRunner extends EventEmitter {
     return withThinking(this.models.getConfig(modelId), chosen ?? agent.thinking)
   }
 
-  private thinkingFor(modelId: string, agent: AgentProfile, sessionId: string | null = null): ThinkingLevel {
-    return thinkingLevel(this.configFor(modelId, agent, sessionId))
-  }
-
-  private async ensureChat(sessionId: string, modelId: string, systemPrompt: string, thinking: ThinkingLevel): Promise<LlamaChatSession> {
+  private async ensureChat(sessionId: string, modelId: string, systemPrompt: string): Promise<ApiChat> {
     const a = this.active
-    const remoteModel = this.models.isRemote(modelId)
-    const wrapper = remoteModel ? null : chatWrapperFor(this.host.sequence.model, thinking)
-    if (a && a.sessionId === sessionId && a.modelId === modelId && a.systemPrompt === systemPrompt && (remoteModel || a.chat.chatWrapper === wrapper)) return a.chat
+    if (a && a.sessionId === sessionId && a.modelId === modelId && a.systemPrompt === systemPrompt && !a.chat.disposed) return a.chat
     if (a && a.sessionId !== sessionId) await this.saveState(a)
     this.closeActive()
-    if (remoteModel || !wrapper) {
-      const remote = new RemoteChat(this.models.remoteTarget(modelId), systemPrompt) as unknown as LlamaChatSession
-      const saved = this.sessions.loadHistory(sessionId)
-      const history = saved ?? (this.sessions.messages(sessionId).length ? this.rebuildFor(sessionId, systemPrompt) : null)
-      if (history?.length) remote.setChatHistory(withSystemPrompt(history, systemPrompt))
-      this.active = { sessionId, modelId, systemPrompt, chat: remote }
-      return remote
-    }
-    const chat = new LlamaChatSession({
-      contextSequence: this.host.sequence,
-      chatWrapper: wrapper,
-      systemPrompt: systemPrompt || undefined,
-      autoDisposeSequence: false
-    })
+    const remoteModel = this.models.isRemote(modelId)
+    const chat = new ApiChat(remoteModel ? this.models.remoteTarget(modelId) : this.host.serverTarget(), systemPrompt)
     const saved = this.sessions.loadHistory(sessionId)
     const history = saved ?? (this.sessions.messages(sessionId).length ? this.rebuildFor(sessionId, systemPrompt) : null)
-    if (a?.sessionId !== sessionId) await this.loadState(sessionId, modelId, saved)
+    if (!remoteModel && a?.sessionId !== sessionId) await this.loadState(sessionId, modelId, saved)
     if (history?.length) chat.setChatHistory(withSystemPrompt(history, systemPrompt))
     this.active = { sessionId, modelId, systemPrompt, chat }
     return chat
@@ -453,25 +458,12 @@ export class ChatRunner extends EventEmitter {
   }
 
   private measure(systemPrompt: string, tools: ToolDef[], history: ChatHistoryItem[], agent: AgentProfile | null = null): ContextUsage | null {
-    if (agent && this.remoteModel(agent)) {
-      const size = this.sizeFor(agent) ?? 32768
-      const functions = tools.length ? Object.fromEntries(tools.map((t) => [t.name, { description: t.description, params: t.params }])) : {}
-      const fixed = estimateTokens(systemPrompt + JSON.stringify(functions))
-      const total = fixed + (history.length ? estimateTokens(JSON.stringify(history.filter((h) => h.type !== 'system'))) : 0)
-      return usageOf(total, fixed, total, size)
-    }
-    if (!this.host.isLoaded) return null
-    try {
-      const model = this.host.model
-      const wrapper = chatWrapperFor(model, agent && this.host.loadedId ? this.thinkingFor(this.host.loadedId, agent) : 'max')
-      const functions = tools.length ? Object.fromEntries(tools.map((t) => [t.name, { description: t.description, params: t.params }])) : undefined
-      const system: ChatHistoryItem[] = systemPrompt ? [{ type: 'system', text: systemPrompt }] : []
-      const fixed = countRendered(wrapper, model, system, functions)
-      const total = history.length ? countRendered(wrapper, model, withSystemPrompt(history, systemPrompt), functions) : fixed
-      return usageOf(total, fixed, total, this.host.sequence.context.contextSize)
-    } catch {
-      return null
-    }
+    const size = agent ? this.sizeFor(agent) : this.host.contextSize
+    if (!size) return null
+    const functions = tools.length ? Object.fromEntries(tools.map((t) => [t.name, { description: t.description, params: t.params }])) : {}
+    const fixed = estimateTokens(systemPrompt + JSON.stringify(functions))
+    const total = fixed + (history.length ? estimateTokens(JSON.stringify(history.filter((h) => h.type !== 'system'))) : 0)
+    return usageOf(total, fixed, total, size)
   }
 
   usageFor(sessionId: string): ContextUsage | null {
@@ -495,20 +487,8 @@ export class ChatRunner extends EventEmitter {
     const fresh = sessionId && !frozen ? 'This chat has not sent its first message yet, so these are the instructions it will start with. ' : ''
     const functions = Object.fromEntries(tools.map((t) => [t.name, { description: t.description, params: t.params }]))
     const plain = () => `${systemPrompt}${tools.length ? `\n\n----- Tools (${tools.length}) -----\n${JSON.stringify(functions, null, 2)}` : ''}`
-    if (this.remoteModel(agent)) {
-      const text = plain()
-      return { text, tokens: estimateTokens(text), format: 'API', note: `${fresh}The system message as sent to the model's API; the tools go alongside it as JSON schemas. The token count is an estimate.` }
-    }
-    if (!this.host.isLoaded) {
-      const text = plain()
-      return { text, tokens: null, format: 'none', note: `${fresh}No model is loaded, so this is the text before a chat format wraps it. Load a model to see it exactly as the model reads it.` }
-    }
-    const model = this.host.model
-    const wrapper = chatWrapperFor(model, this.host.loadedId ? this.thinkingFor(this.host.loadedId, agent) : 'max')
-    const system: ChatHistoryItem[] = systemPrompt ? [{ type: 'system', text: systemPrompt }] : []
-    const { contextText } = wrapper.generateContextState({ chatHistory: system, availableFunctions: tools.length ? functions : undefined })
-    const tokens = contextText.tokenize(model.tokenizer)
-    return { text: model.detokenize(tokens, true), tokens: tokens.length, format: wrapper.wrapperName, note: `${fresh}Exactly what the model reads before the first message, in its chat format, special tokens included.` }
+    const text = plain()
+    return { text, tokens: estimateTokens(text), format: 'API', note: `${fresh}The system message as sent to the model; the tools go alongside it as JSON schemas, and the model's chat template formats both. The token count is an estimate.` }
   }
 
   draftUsage(agentId: string): ContextUsage | null {
@@ -524,20 +504,9 @@ export class ChatRunner extends EventEmitter {
     const defText = (list: ToolDef[]) => list.map((t) => JSON.stringify({ name: t.name, description: t.description, params: t.params })).join('\n')
     const perModule: Record<string, number> = {}
     for (const group of new Set(modules.tools().map((t) => t.group))) perModule[group] = this.count(defText(modules.tools().filter((t) => t.group === group)))
-    if (this.host.isLoaded) {
-      try {
-        const model = this.host.model
-        const wrapper = chatWrapperFor(model, this.host.loadedId ? this.thinkingFor(this.host.loadedId, agent) : 'max')
-        const functions = tools.length ? Object.fromEntries(tools.map((t) => [t.name, { description: t.description, params: t.params }])) : undefined
-        const system: ChatHistoryItem[] = systemPrompt ? [{ type: 'system', text: systemPrompt }] : []
-        const total = countRendered(wrapper, model, system, functions)
-        const withoutTools = functions ? countRendered(wrapper, model, system, undefined) : total
-        return { exact: true, system: withoutTools, tools: total - withoutTools, total, contextSize: this.host.sequence.context.contextSize, modules: perModule }
-      } catch {}
-    }
     const sys = estimateTokens(systemPrompt)
     const defs = tools.length ? estimateTokens(defText(tools)) : 0
-    return { exact: false, system: sys, tools: defs, total: sys + defs, contextSize: null, modules: perModule }
+    return { exact: false, system: sys, tools: defs, total: sys + defs, contextSize: this.host.contextSize, modules: perModule }
   }
 
   private memoryFor(agent: AgentProfile): string {
@@ -611,13 +580,13 @@ export class ChatRunner extends EventEmitter {
     const size = this.sizeFor(agent) ?? this.host.getState().contextSize ?? 8192
     return {
       maxTokens: Math.max(256, Math.floor(size * agent.context.outputShare)),
-      count: (text) => this.host.countTokens(text) ?? estimateTokens(text),
+      count: estimateTokens,
       dir: this.sessions.outputsDir(sessionId),
       room: () => {
         const active = this.active
         if (!active || active.sessionId !== sessionId || active.chat.disposed) return null
-        if (this.isRemoteChat(active.chat)) return Math.floor(size * LIMITS.remoteRoomShare)
-        return Math.max(0, size - active.chat.sequence.nextTokenIndex - LIMITS.replyReserveTokens)
+        if (this.models.isRemote(active.modelId)) return Math.floor(size * LIMITS.remoteRoomShare)
+        return Math.max(0, size - active.chat.used - LIMITS.replyReserveTokens)
       }
     }
   }
@@ -669,9 +638,10 @@ export class ChatRunner extends EventEmitter {
         if (part.ui?.status === 'pending') this.phase(turn, 'waiting', part.name)
         else if (part.status !== 'running') this.phase(turn, 'reading', part.name)
         else this.phase(turn, 'tool', part.name, activityOf(part.name, part.args))
-        if (part.status !== 'running' && turn.usageBase && this.host.isLoaded && !this.remoteModel(turn.agent)) {
+        const used = this.active?.sessionId === sessionId ? this.active.chat.used : 0
+        if (part.status !== 'running' && turn.usageBase && used) {
           const { fixed, before, size } = turn.usageBase
-          this.emitEvent('context.usage', { sessionId, usage: usageOf(this.host.sequence.nextTokenIndex, fixed, before, size, true) })
+          this.emitEvent('context.usage', { sessionId, usage: usageOf(used, fixed, before, size, true) })
         }
       },
       output: (part, chunk) => this.emitEvent('tool.output', { sessionId, messageId: message.id, partId: part.id, chunk }),
@@ -699,7 +669,10 @@ export class ChatRunner extends EventEmitter {
       notify: (title, text) => this.emitEvent('ui.notify', { sessionId, title, message: text }),
       budget: this.budgetFor(sessionId, turn.agent),
       agentId: turn.agent.id,
-      react: (state, reaction, seconds) => this.emitEvent('agent.reaction', { sessionId, state, reaction, seconds })
+      react: (state, reaction, seconds) => this.emitEvent('agent.reaction', { sessionId, state, reaction, seconds }),
+      images: (ids) => {
+        turn.pendingImages = [...(turn.pendingImages ?? []), ...ids]
+      }
     }
   }
 
@@ -746,7 +719,7 @@ export class ChatRunner extends EventEmitter {
       turn.message.status = 'aborted'
     } else {
       turn.message.status = 'error'
-      turn.message.error = readableError(err, this.host.getState().contextSize)
+      turn.message.error = err instanceof Error ? err.message : String(err)
       this.emitEvent('engine.error', { sessionId: turn.sessionId, message: turn.message.error })
     }
   }
@@ -794,7 +767,7 @@ export class ChatRunner extends EventEmitter {
       lastCall: null
     }
     this.turn = placeholder
-    let chat: LlamaChatSession
+    let chat: ApiChat
     let modelId: string
     let checkIn: string | null = null
     this.preparing = true
@@ -806,12 +779,12 @@ export class ChatRunner extends EventEmitter {
           placeholder.modelPrompt = modelPrompt
         }
       }
-      modelId = await this.ensureModel(agent)
-      chat = await this.ensureChat(sessionId, modelId, systemPrompt, this.thinkingFor(modelId, agent, sessionId))
+      modelId = await this.ensureModel(agent, sessionId)
+      chat = await this.ensureChat(sessionId, modelId, systemPrompt)
       const messages = this.sessions.messages(sessionId)
       checkIn = probe ? null : checkInText(messages, tools, agent.remindEvery ?? DEFAULT_REMIND_EVERY, activeSummary(ctx.summaries, messages))
       if (checkIn && !addCheckIn(chat, checkIn)) checkIn = null
-      checkFits(chat, systemPrompt, modelPrompt, tools)
+      checkFits(chat.contextSize, systemPrompt, modelPrompt, tools)
     } catch (err) {
       this.turn = null
       throw err
@@ -824,6 +797,7 @@ export class ChatRunner extends EventEmitter {
     if (pending) this.sessions.saveContext(sessionId, { summaries: ctx.summaries.map((s) => (s.id === pending.id ? { ...s, upTo: turn.userMessageId } : s)) })
     turn.modelPrompt = modelPrompt
     turn.systemPrompt = systemPrompt
+    turn.images = [...new Set([...files.filter((f) => f.kind === 'image').map((f) => f.id), ...linkImages(prompt)])]
     if (checkIn) {
       const part: ToolPart = { type: 'tool', id: newId('t'), name: CHECK_IN, args: {}, status: 'done', startedAt: Date.now(), durationMs: 0, result: checkIn }
       turn.message.parts.push(part)
@@ -838,26 +812,42 @@ export class ChatRunner extends EventEmitter {
     return { userMessageId: turn.userMessageId, assistantMessageId: turn.message.id }
   }
 
-  private async generate(turn: Turn, modelId: string, chat: LlamaChatSession, tools: ToolDef[]): Promise<void> {
+  private async generate(turn: Turn, modelId: string, chat: ApiChat, tools: ToolDef[]): Promise<void> {
     const { sessionId, message, controller } = turn
-    const sampling = promptOptions(this.configFor(modelId, turn.agent, sessionId), turn.agent.sampling, handlesThinking(chat.chatWrapper))
+    const config = this.configFor(modelId, turn.agent, sessionId)
+    const sampling = promptOptions(config, turn.agent.sampling)
     const functions = tools.length ? buildFunctions(tools, this.hooks(turn)) : undefined
+    const local = chat.local
+    const every = turn.agent.remindEvery ?? DEFAULT_REMIND_EVERY
+    if (local && functions && every > 0)
+      functions[CHECK_IN] = {
+        description: 'Seven checks in every few turns.',
+        params: { type: 'object', properties: {} },
+        handler: () => {
+          const messages = this.sessions.messages(sessionId)
+          return checkInText(messages, tools, 1, activeSummary(this.sessions.loadContext(sessionId).summaries, messages)) ?? ''
+        }
+      }
+    const takeImages = () => {
+      const out = turn.pendingImages ?? []
+      turn.pendingImages = []
+      return out
+    }
     const meter = new TurnMeter(chat)
     turn.meter = meter
-    try {
-      const size = chat.sequence.context.contextSize
-      const fixed = fixedTokens(chat, turn.systemPrompt ?? '', functions)
-      turn.usageBase = { fixed, before: renderTokens(chat, chat.getChatHistory(), functions), size }
-    } catch {
-      turn.usageBase = undefined
-    }
+    const definitions = functions ? Object.fromEntries(Object.entries(functions).map(([name, f]) => [name, { description: f.description, params: f.params }])) : {}
+    const fixed = estimateTokens((turn.systemPrompt ?? '') + JSON.stringify(definitions))
+    turn.usageBase = { fixed, before: chat.used || fixed + estimateTokens(JSON.stringify(chat.getChatHistory().filter((h) => h.type !== 'system'))), size: chat.contextSize }
     this.phase(turn, 'reading')
     try {
       await chat.prompt(turn.modelPrompt, {
         ...sampling,
+        maxRounds: turn.agent.maxToolRounds || undefined,
+        images: turn.images,
+        takeImages,
+        ...(local ? { extra: serverSampling(sampling, thinkingLevel(config)) } : {}),
         ...(functions ? { functions } : {}),
         signal: controller.signal,
-        stopOnAbortSignal: true,
         onFunctionCallParamsChunk: (chunk) => {
           meter.mark()
           this.phase(turn, 'calling', chunk.functionName)
@@ -878,43 +868,47 @@ export class ChatRunner extends EventEmitter {
           this.emitEvent('text.delta', { sessionId, messageId: message.id, text: chunk.text })
         }
       })
-      if (controller.signal.aborted) this.fail(turn, new Error('Stopped'))
+      if (chat.capped) {
+        turn.stopReason = `Stopped: ${turn.agent.name} reached its limit of ${turn.agent.maxToolRounds} tool rounds in one reply. Raise or turn off "Most tool rounds per reply" for ${turn.agent.name} in Agents.`
+        this.fail(turn, new Error(turn.stopReason))
+      } else if (controller.signal.aborted) this.fail(turn, new Error('Stopped'))
       else message.status = 'complete'
     } catch (err) {
       this.fail(turn, err)
     }
     const history = this.active?.chat === chat && !chat.disposed ? chat.getChatHistory() : null
-    try {
-      const window = history ? chat.getLastEvaluationContextWindow() : null
-      if (history && window && window.length < history.length) message.notice = SHIFT_NOTICE
-    } catch {
-      message.notice = undefined
-    }
     if (!chat.disposed) {
       try {
         message.stats = meter.finish()
         const st = message.stats
-        if (!this.isRemoteChat(chat)) try {
-          recordTurn({
-            at: Date.now(),
-            modelId,
-            modelName: this.models.get(modelId).name,
-            contextSize: st.contextSize,
-            gpuLayers: this.host.model.gpuLayers ?? null,
-            sessionId,
-            evalTokens: st.evalTokens ?? 0,
-            evalMs: st.evalMs ?? 0,
-            genTokens: st.genTokens ?? st.outputTokens,
-            genMs: st.genPureMs ?? st.genMs,
-            toolMs: st.toolMs ?? 0,
-            ttftMs: st.ttftMs,
-            contextUsed: st.contextUsed
-          })
-        } catch (err) {
-          console.warn('Could not record turn stats:', err instanceof Error ? err.message : err)
+        const timings = local ? chat.timings : null
+        if (timings) {
+          if (timings.genTps !== null) st.tokensPerSecond = Math.round(timings.genTps * 10) / 10
+          if (timings.promptTps !== null) st.promptPerSecond = Math.round(timings.promptTps * 10) / 10
+          if (timings.drafted) st.predictions = { used: timings.accepted ?? 0, checked: timings.drafted }
         }
+        if (local)
+          try {
+            recordTurn({
+              at: Date.now(),
+              modelId,
+              modelName: this.models.get(modelId).name,
+              contextSize: st.contextSize,
+              gpuLayers: this.host.gpuLayers,
+              sessionId,
+              evalTokens: st.evalTokens ?? 0,
+              evalMs: st.evalMs ?? 0,
+              genTokens: st.genTokens ?? st.outputTokens,
+              genMs: st.genPureMs ?? st.genMs,
+              toolMs: st.toolMs ?? 0,
+              ttftMs: st.ttftMs,
+              contextUsed: st.contextUsed
+            })
+          } catch (err) {
+            console.warn('Could not record turn stats:', err instanceof Error ? err.message : err)
+          }
         if (history && turn.usageBase) {
-          const usage = usageOf(renderTokens(chat, history, functions), turn.usageBase.fixed, turn.usageBase.before, turn.usageBase.size)
+          const usage = usageOf(chat.used || turn.usageBase.before, turn.usageBase.fixed, turn.usageBase.before, turn.usageBase.size)
           this.sessions.saveContext(sessionId, { usage })
           this.emitEvent('context.usage', { sessionId, usage })
         }
@@ -979,8 +973,8 @@ export class ChatRunner extends EventEmitter {
     return { turns: plan.turns }
   }
 
-  private async summarise(chat: LlamaChatSession, modelId: string, agent: AgentProfile, tools: ToolDef[], withTools: boolean, signal: AbortSignal, request: (maxWords: number) => string = summaryRequest) {
-    const maxTokens = Math.max(256, Math.min(2048, Math.floor(chat.sequence.context.contextSize * 0.12)))
+  private async summarise(chat: ApiChat, modelId: string, agent: AgentProfile, tools: ToolDef[], withTools: boolean, signal: AbortSignal, request: (maxWords: number) => string = summaryRequest) {
+    const maxTokens = Math.max(256, Math.min(2048, Math.floor(chat.contextSize * 0.12)))
     const local = new AbortController()
     const stop = () => local.abort()
     signal.addEventListener('abort', stop)
@@ -990,7 +984,7 @@ export class ChatRunner extends EventEmitter {
         ? Object.fromEntries(
             tools.map((t) => [
               t.name,
-              defineChatSessionFunction({
+              {
                 description: t.description,
                 params: t.params,
                 handler: () => {
@@ -998,17 +992,19 @@ export class ChatRunner extends EventEmitter {
                   if (calls > 1) local.abort()
                   return TOOLS_OFF
                 }
-              })
+              }
             ])
           )
         : undefined
+    const config = this.configFor(modelId, agent)
+    const sampling = promptOptions(config, agent.sampling)
     try {
       const text = await chat.prompt(request(Math.floor(maxTokens * 0.6)), {
-        ...promptOptions(this.configFor(modelId, agent), agent.sampling, handlesThinking(chat.chatWrapper)),
+        ...sampling,
+        ...(chat.local ? { extra: serverSampling(sampling, thinkingLevel(config)) } : {}),
         ...(functions ? { functions } : {}),
         maxTokens,
-        signal: local.signal,
-        stopOnAbortSignal: true
+        signal: local.signal
       })
       return { text: text.trim(), toolLoop: calls > 1 }
     } finally {
@@ -1025,12 +1021,12 @@ export class ChatRunner extends EventEmitter {
     current: ContextSummary | null,
     controller: AbortController
   ): Promise<void> {
-    let chat: LlamaChatSession | null = null
+    let chat: ApiChat | null = null
     let full: ChatHistoryItem[] | null = null
     let done = false
     try {
-      const modelId = await this.ensureModel(agent)
-      chat = await this.ensureChat(sessionId, modelId, systemPrompt, this.thinkingFor(modelId, agent, sessionId))
+      const modelId = await this.ensureModel(agent, sessionId)
+      chat = await this.ensureChat(sessionId, modelId, systemPrompt)
       full = chat.getChatHistory()
       const before = rebuildHistory({ systemPrompt, messages: plan.before, slices: this.sessions.turnModels(sessionId), summary: current, fit: this.fitFor(sessionId) })
       chat.setChatHistory(before)
@@ -1088,11 +1084,11 @@ export class ChatRunner extends EventEmitter {
     const controller = new AbortController()
     this.compacting = { sessionId, controller }
     this.emitEvent('context.compacting', { sessionId, active: true })
-    let chat: LlamaChatSession | null = null
+    let chat: ApiChat | null = null
     let full: ChatHistoryItem[] | null = null
     try {
-      const modelId = await this.ensureModel(agent)
-      chat = await this.ensureChat(sessionId, modelId, systemPrompt, this.thinkingFor(modelId, agent, sessionId))
+      const modelId = await this.ensureModel(agent, sessionId)
+      chat = await this.ensureChat(sessionId, modelId, systemPrompt)
       full = chat.getChatHistory()
       let result = await this.summarise(chat, modelId, agent, tools, true, controller.signal, handoffRequest)
       if (result.toolLoop && !controller.signal.aborted) {
@@ -1230,7 +1226,7 @@ export class ChatRunner extends EventEmitter {
   }
 }
 
-function addCheckIn(chat: LlamaChatSession, text: string): boolean {
+function addCheckIn(chat: ApiChat, text: string): boolean {
   const history = chat.getChatHistory()
   const last = history[history.length - 1]
   if (last?.type !== 'model') return false

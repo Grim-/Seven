@@ -1,6 +1,6 @@
+import type { JsonObjectSchema } from './schema'
 import { panel } from '../panel/store'
 import { modules } from '../modules/registry'
-import { defineChatSessionFunction, type ChatSessionModelFunctions } from 'node-llama-cpp'
 import type { AvatarState, FormProps, ApprovalAnswer, ApprovalProps, ConfirmProps, QuestionAnswer, QuestionProps, ToolPart, UiRequestKind, UnlockProps, GatherProps, LinkedFolder } from '@shared/types'
 import { isVaultLocked } from '@shared/sealed'
 import { secure } from '../util/secure'
@@ -61,6 +61,7 @@ export interface WrapHooks {
   agentId?: string | null
   react?: (state: AvatarState | null, reaction: string | null, seconds: number) => void
   notify: (title: string, message: string) => void
+  images?: (ids: string[]) => void
 }
 
 function clip(text: string, max: number): string {
@@ -133,13 +134,16 @@ export async function runTool(tool: ToolDef, args: Record<string, unknown>, hook
     }
     const count = hooks.repeats?.(`${tool.name}:${stable(args)}`) ?? 1
     const limit = tool.maxRepeats ?? DEFAULT_MAX_REPEATS
-    if (count > limit) {
-      throw new ToolBlocked(
-        `You already made this exact ${tool.name} call ${limit === 1 ? 'just before this' : `${count - 1} times in a row`} and got its result. Do not repeat it. Use the result you have, do something different, or reply to the user.`,
-        `repeated the same ${tool.name} call`
-      )
-    }
-    if (tool.permission === 'ask' || tool.permission === 'always') await gateTool(permissions, tool, args)
+    // if (count > limit) {
+    //   throw new ToolBlocked(
+    //     `You already made this exact ${tool.name} call ${limit === 1 ? 'just before this' : `${count - 1} times in a row`} and got its result. Do not repeat it. Use the result you have, do something different, or reply to the user.`,
+    //     `repeated the same ${tool.name} call`
+    //   )
+    // }
+
+    if (tool.permission === 'ask' || tool.permission === 'always')
+      await gateTool(permissions, tool, args)
+
     const run = () =>
       asActor({ agentId: hooks.agentId ?? null, sessionId: hooks.sessionId }, () => tool.execute(args, {
         sessionId: hooks.sessionId,
@@ -174,7 +178,8 @@ export async function runTool(tool: ToolDef, args: Record<string, unknown>, hook
         if (!isVaultLocked(err)) throw err
         if (!secure.unlocked) {
           const answer = await ask('unlock', { reason: `${tool.name} needs data from the vault.` } satisfies UnlockProps)
-          if (answer !== true || !secure.unlocked) throw new ToolError('The vault is locked and the user did not unlock it. Carry on without that data, or tell the user what you needed.')
+          if (answer !== true || !secure.unlocked)
+            throw new ToolError('The vault is locked and the user did not unlock it. Carry on without that data, or tell the user what you needed.')
         }
         raw = await stoppable(run())
       }
@@ -194,6 +199,10 @@ export async function runTool(tool: ToolDef, args: Record<string, unknown>, hook
     part.status = 'done'
     part.result = clip(out.text, MAX_DISPLAY_CHARS)
     part.view = out.view
+    if (out.images?.length) {
+      part.images = out.images
+      hooks.images?.(out.images)
+    }
     part.durationMs = Date.now() - part.startedAt
     hooks.updatePart(part)
     return modelText
@@ -214,14 +223,22 @@ export async function runTool(tool: ToolDef, args: Record<string, unknown>, hook
   }
 }
 
-export function buildFunctions(tools: ToolDef[], hooks: WrapHooks): ChatSessionModelFunctions {
-  const functions: Record<string, ChatSessionModelFunctions[string]> = {}
+export interface ToolFunction {
+  description: string
+  params: JsonObjectSchema
+  handler: (params: unknown) => unknown
+}
+
+export type ToolFunctions = Record<string, ToolFunction>
+
+export function buildFunctions(tools: ToolDef[], hooks: WrapHooks): ToolFunctions {
+  const functions: ToolFunctions = {}
   for (const tool of tools) {
-    functions[tool.name] = defineChatSessionFunction({
+    functions[tool.name] = {
       description: tool.description,
       params: tool.params,
       handler: (params) => runTool(tool, (params ?? {}) as Record<string, unknown>, hooks)
-    })
+    }
   }
   return functions
 }

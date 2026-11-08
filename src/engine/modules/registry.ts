@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { EventEmitter } from 'node:events'
-import type { GbnfJsonObjectSchema } from 'node-llama-cpp'
+import type { JsonObjectSchema } from '../tools/schema'
 import type { ModuleInfo, ModuleSource, ModuleState, PageTypeInfo, ToolsPrefs } from '@shared/types'
 import { data } from '../data/hub'
 import type { SinglePage } from '../data/pages'
@@ -326,7 +326,7 @@ export class ModuleRegistry extends EventEmitter {
     if (typeof tool.name !== 'string' || !TOOL_NAME.test(tool.name)) throw new Error(`Tool name "${String(tool.name)}" must be letters, numbers and _, starting with a letter`)
     if (typeof tool.execute !== 'function') throw new Error(`Tool "${tool.name}" has no execute function. Add one, e.g. async execute(args, ctx) { return 'done' }.`)
     const m = entry.manifest
-    const params = entry.source === 'builtin' && !entry.builtin?.js ? (tool.params as GbnfJsonObjectSchema) : toGrammarSchema(tool.params)
+    const params = entry.source === 'builtin' && !entry.builtin?.js ? (tool.params as JsonObjectSchema) : toGrammarSchema(tool.params)
     return {
       name: tool.name,
       group: m.id,

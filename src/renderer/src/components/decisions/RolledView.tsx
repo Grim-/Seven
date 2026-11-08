@@ -7,7 +7,7 @@ import { Button } from '../ui'
 import { DecisionCardFrame } from './DecisionCardFrame'
 import { OptionRow } from './OptionRow'
 
-export function RolledView({ p, done, open, status, onAnswer }: { p: RolledDecisionProps; done: RolledAnswer | null; open: boolean; status?: ReactNode; onAnswer: (value: RolledAnswer) => Promise<void> }) {
+export function RolledView({ p, done, open, status, onAnswer, onClose }: { p: RolledDecisionProps; done: RolledAnswer | null; open: boolean; status?: ReactNode; onAnswer: (value: RolledAnswer) => Promise<void>; onClose?: () => void }) {
   const [sending, setSending] = useState(false)
 
   const roll = async () => {
@@ -20,7 +20,7 @@ export function RolledView({ p, done, open, status, onAnswer }: { p: RolledDecis
   }
 
   return (
-    <DecisionCardFrame tag="Rolled decision" note={`d${p.die} picks`} question={p.question} status={status}>
+    <DecisionCardFrame tag="Rolled decision" note={`d${p.die} picks`} question={p.question} status={status} onClose={open ? onClose : undefined}>
       {p.options.map((o, i) => (
         <OptionRow key={i} mark={i + 1} text={o} picked={done?.roll === i + 1} />
       ))}

@@ -1,6 +1,7 @@
 import { DICE } from '@shared/rolledDecision'
 import type { DecisionMode, StoredDecision } from '@shared/storedDecision'
 import { Field, Input, NumberField, Segmented, Select, TagInput, Textarea } from '../ui'
+import { RollerField } from '../play/roll/RollerField'
 import { PickOptionsEditor } from './PickOptionsEditor'
 
 export function DecisionEditor({ value: decision, onChange }: { value: StoredDecision; onChange: (next: StoredDecision) => void }) {
@@ -33,6 +34,7 @@ export function DecisionEditor({ value: decision, onChange }: { value: StoredDec
           </Field>
         )}
       </div>
+      {!rolled && <RollerField value={decision.roller ?? 'agent'} onChange={(roller) => set({ roller })} />}
       <Field label="Prompt">
         <Textarea value={decision.prompt} onChange={(e) => set({ prompt: e.target.value })} placeholder="What the options are about, for the agent to write them from" rows={3} />
       </Field>

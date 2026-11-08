@@ -102,11 +102,11 @@ export function CommandButtons({ editor, commands }: { editor: Editor; commands:
 
 const HEADINGS = BLOCKS.slice(0, 4)
 
-export function EditorCommandBar({ editor }: { editor: Editor | null }) {
+export function EditorCommandBar({ editor, bare = false }: { editor: Editor | null; bare?: boolean }) {
   const state = useEditorState({ editor, selector: (ctx) => ({ step: ctx.transactionNumber, table: ctx.editor?.isActive('table') ?? false, block: HEADINGS.find((h) => ctx.editor && h.on?.(ctx.editor))?.id ?? 'text' }) })
   if (!editor || !state) return null
   return (
-    <div className="flex flex-wrap items-center divide-x divide-line/40 border-b border-line/50 bg-black/60 py-1">
+    <div className={cn('flex flex-wrap items-center divide-x divide-line/40', bare ? 'border border-line/40' : 'border-b border-line/50 bg-black/60 py-1')}>
       <div className="px-1.5">
         <Select value={state.block} options={HEADINGS.map((h) => ({ value: h.id, label: h.title }))} onChange={(id) => HEADINGS.find((h) => h.id === id)?.run(editor)} className="h-8 w-32 text-[12.5px]" />
       </div>

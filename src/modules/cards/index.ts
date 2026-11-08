@@ -1,4 +1,4 @@
-import type { GbnfJsonSchema } from 'node-llama-cpp'
+import type { JsonSchema } from '../../engine/tools/schema'
 import type { ModuleFactory, ModulePage, ModuleViewResult } from '../../engine/modules/sdk'
 import type { ToolContext, ToolDef } from '../../engine/tools/types'
 import { cleanSvg } from '@shared/svg'
@@ -19,9 +19,9 @@ import { drawn } from '@shared/random'
 type Json = Record<string, unknown>
 
 const MOVED = 'setsMoved'
-const CHECK: GbnfJsonSchema = { type: 'object', properties: { against: { oneOf: [{ type: 'null' }, { enum: [CHANCE, ...checkNames().map((c) => c.id)] }] }, difficulty: { type: ['number', 'null'] }, base: { type: ['number', 'null'] }, pass: { type: ['string', 'null'] }, fail: { type: ['string', 'null'] } } }
-const ACTION: GbnfJsonSchema = { type: 'object', properties: { attempt: { type: 'string' }, needs: { enum: ['any', 'all'] }, checks: { type: 'array', items: CHECK }, pass: { type: 'string' }, fail: { type: 'string' } } }
-const DECISION: GbnfJsonSchema = { type: 'object', properties: { question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, own: { type: 'boolean' }, decider: { type: ['string', 'null'] } } }
+const CHECK: JsonSchema = { type: 'object', properties: { against: { oneOf: [{ type: 'null' }, { enum: [CHANCE, ...checkNames().map((c) => c.id)] }] }, difficulty: { type: ['number', 'null'] }, base: { type: ['number', 'null'] }, pass: { type: ['string', 'null'] }, fail: { type: ['string', 'null'] } } }
+const ACTION: JsonSchema = { type: 'object', properties: { attempt: { type: 'string' }, needs: { enum: ['any', 'all'] }, checks: { type: 'array', items: CHECK }, pass: { type: 'string' }, fail: { type: 'string' } } }
+const DECISION: JsonSchema = { type: 'object', properties: { question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, own: { type: 'boolean' }, decider: { type: ['string', 'null'] } } }
 const LINK = /^@[\w.:-]+?:"?(.+?)"?$/
 
 const factory: ModuleFactory = (sdk) =>

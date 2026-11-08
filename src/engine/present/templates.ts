@@ -1,20 +1,20 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { GbnfJsonSchema } from 'node-llama-cpp'
+import type { JsonSchema } from '../tools/schema'
 import type { TemplateField, TemplateSpec } from '../modules/manifest'
 import { ToolError, type ToolDef } from '../tools/types'
 import { presentationTool } from './define'
 
 const MAX_TEMPLATE = 200 * 1024
 
-function schemaOf(field: TemplateField): GbnfJsonSchema {
+function schemaOf(field: TemplateField): JsonSchema {
   const description = field.description || undefined
   if (field.type === 'list') {
     const list = { type: 'array' as const, items: { type: 'string' as const } }
     return field.optional ? { oneOf: [{ type: 'null' }, list], description } : { ...list, description }
   }
   const type = field.type === 'number' ? 'number' : field.type === 'boolean' ? 'boolean' : 'string'
-  return { type: field.optional ? [type, 'null'] : type, description } as GbnfJsonSchema
+  return { type: field.optional ? [type, 'null'] : type, description } as JsonSchema
 }
 
 export function templateTool(moduleId: string, dir: string, spec: TemplateSpec): ToolDef {

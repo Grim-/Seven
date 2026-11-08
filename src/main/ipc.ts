@@ -8,6 +8,7 @@ import type { Vault } from './vault'
 import { settings } from './settings'
 import { dataDir, missingVault } from './paths'
 import { hostPage } from './widgets'
+import { readImage } from './assets'
 import { clearAll, readHeader, writeBackup } from './backup'
 import { addVault, chooseVault, createVault, listVaults, removeVault, renameVault, restoreVault } from './vaults'
 import { errorCode } from '@shared/errors'
@@ -67,6 +68,7 @@ export function registerIpc(ctx: IpcContext): void {
     'window.isMaximized': (win) => win?.isMaximized() ?? false,
     'dialog.openFolder': (win) => pick(win, { properties: ['openDirectory'] }),
     'dialog.openFile': (win, { filters }) => pick(win, { properties: ['openFile'], filters }),
+    'assets.readImage': (_win, { id }) => readImage(id),
     'dialog.openModelFile': (win) =>
       pick(win, { properties: ['openFile'], filters: [{ name: 'GGUF models', extensions: ['gguf'] }] }),
     'dialog.openFiles': async (win) => {

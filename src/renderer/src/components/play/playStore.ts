@@ -24,10 +24,16 @@ export function playText(where: PlayWhere, text: string): string {
   return where.lead ? `${where.lead}\n${text}` : text
 }
 
-export const usePlay = create<{ view: { title: string; node: ReactNode } | null }>(() => ({ view: null }))
+export interface PlayView {
+  title: string
+  node: ReactNode
+  wide?: boolean
+}
 
-export function showPlay(title: string, node: ReactNode): void {
-  usePlay.setState({ view: { title, node } })
+export const usePlay = create<{ view: PlayView | null }>(() => ({ view: null }))
+
+export function showPlay(title: string, node: ReactNode, options: { wide?: boolean } = {}): void {
+  usePlay.setState({ view: { title, node, wide: options.wide } })
 }
 
 export function closePlay(): void {

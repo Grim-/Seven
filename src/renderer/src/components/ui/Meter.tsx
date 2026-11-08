@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { cn } from '../../lib/cn'
 
 export type MeterTone = 'cool' | 'warm' | 'hot'
@@ -8,12 +9,12 @@ export function meterTone(value: number | null): MeterTone {
   return value !== null && value >= 0.9 ? 'hot' : value !== null && value >= 0.75 ? 'warm' : 'cool'
 }
 
-export function SegmentBar({ value, tone, segments = 24, thin = false, className }: { value: number; tone?: MeterTone; segments?: number; thin?: boolean; className?: string }) {
-  const filled = Math.round(Math.max(0, Math.min(1, value)) * segments)
+export function SegmentBar({ value, tone, segments = 24, thin = false, className }: { value: number | null; tone?: MeterTone; segments?: number; thin?: boolean; className?: string }) {
+  const filled = value === null ? 0 : Math.round(Math.max(0, Math.min(1, value)) * segments)
   return (
-    <div className={cn('segment-bar', className)} data-tone={tone} data-thin={thin}>
+    <div className={cn('segment-bar', className)} data-tone={tone} data-thin={thin} data-loop={value === null}>
       {Array.from({ length: segments }, (_, i) => (
-        <i key={i} data-on={i < filled} />
+        <i key={i} data-on={i < filled} style={value === null ? ({ '--i': i, '--n': segments } as CSSProperties) : undefined} />
       ))}
     </div>
   )

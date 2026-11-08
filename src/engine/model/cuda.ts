@@ -2,11 +2,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import zlib from 'node:zlib'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { spawn } from 'node:child_process'
 import type { CudaInstallProgress } from '@shared/types'
+import { extractZip } from './zip'
 
 const NEEDED = ['cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll']
 const TEST_TIMEOUT_MS = 60_000
@@ -103,60 +103,6 @@ async function download(wheel: Wheel, file: string, signal: AbortSignal, onBytes
   if (hash.digest('hex') !== wheel.sha256) throw new Error(`${path.basename(new URL(wheel.url).pathname)} did not match NVIDIA's published checksum, so it was not used. Try again; if it keeps happening, the download is being changed on the way.`)
 }
 
-async function extract(zip: string, files: Record<string, string>, dir: string): Promise<void> {
-  const fd = await fs.promises.open(zip, 'r')
-  try {
-    const { size } = await fd.stat()
-    const tailLength = Math.min(size, 65557)
-    const tail = Buffer.alloc(tailLength)
-    await fd.read(tail, 0, tailLength, size - tailLength)
-    let end = -1
-    for (let i = tailLength - 22; i >= 0; i--) {
-      if (tail.readUInt32LE(i) === 0x06054b50) {
-        end = i
-        break
-      }
-    }
-    if (end < 0) throw new Error(`${path.basename(zip)} is not a valid archive. Try the download again.`)
-    const count = tail.readUInt16LE(end + 10)
-    const dirSize = tail.readUInt32LE(end + 12)
-    const dirOffset = tail.readUInt32LE(end + 16)
-    const central = Buffer.alloc(dirSize)
-    await fd.read(central, 0, dirSize, dirOffset)
-    const left = new Map(Object.entries(files))
-    let at = 0
-    for (let n = 0; n < count && left.size; n++) {
-      if (central.readUInt32LE(at) !== 0x02014b50) break
-      const method = central.readUInt16LE(at + 10)
-      const packed = central.readUInt32LE(at + 20)
-      const unpacked = central.readUInt32LE(at + 24)
-      const nameLength = central.readUInt16LE(at + 28)
-      const extraLength = central.readUInt16LE(at + 30)
-      const commentLength = central.readUInt16LE(at + 32)
-      const local = central.readUInt32LE(at + 42)
-      const name = central.toString('utf8', at + 46, at + 46 + nameLength)
-      at += 46 + nameLength + extraLength + commentLength
-      const target = left.get(name)
-      if (!target) continue
-      const header = Buffer.alloc(30)
-      await fd.read(header, 0, 30, local)
-      const start = local + 30 + header.readUInt16LE(26) + header.readUInt16LE(28)
-      const out = path.join(dir, target)
-      const part = `${out}.part`
-      const source = fs.createReadStream(zip, { start, end: start + packed - 1 })
-      if (method === 8) await pipeline(source, zlib.createInflateRaw(), fs.createWriteStream(part))
-      else if (method === 0) await pipeline(source, fs.createWriteStream(part))
-      else throw new Error(`${name} uses an unsupported compression method (${method}).`)
-      if (fs.statSync(part).size !== unpacked) throw new Error(`${target} came out the wrong size. Try the download again.`)
-      fs.renameSync(part, out)
-      left.delete(name)
-    }
-    if (left.size) throw new Error(`${[...left.values()].join(', ')} was not in the download. Try again.`)
-  } finally {
-    await fd.close()
-  }
-}
-
 export async function installCudaRuntime(signal: AbortSignal, onProgress: (p: CudaInstallProgress) => void): Promise<CudaSetup> {
   if (process.platform !== 'win32') throw new Error('The CUDA libraries download is only for Windows.')
   fs.mkdirSync(CUDA_RUNTIME_DIR, { recursive: true })
@@ -175,7 +121,9 @@ export async function installCudaRuntime(signal: AbortSignal, onProgress: (p: Cu
         }
       })
       report('extract')
-      await extract(file, wheel.files, CUDA_RUNTIME_DIR)
+      const got = await extractZip(file, (name) => wheel.files[name] ?? null, CUDA_RUNTIME_DIR)
+      const missing = Object.entries(wheel.files).filter(([name]) => !got.has(name)).map(([, target]) => target)
+      if (missing.length) throw new Error(`${missing.join(', ')} was not in the download. Try again.`)
       fs.rmSync(file, { force: true })
     }
   } finally {

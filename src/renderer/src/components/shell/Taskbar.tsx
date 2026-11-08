@@ -41,7 +41,7 @@ export function Taskbar() {
       {viewsIn('tabs').map((item) => (
         <div key={item.id} className="group relative flex">
           <Tab active={view === item.id} icon={item.icon} label={item.label} onClick={() => setView(item.id)} />
-          <FavouritesFlyout view={item.id} />
+          <FavouritesFlyout view={item.id} links={item.menu} />
         </div>
       ))}
       <AppSearch />

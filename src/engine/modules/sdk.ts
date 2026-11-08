@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { GbnfJsonObjectSchema } from 'node-llama-cpp'
+import type { JsonObjectSchema } from '../tools/schema'
 import type { ToolPermission } from '@shared/types'
 import { ToolBlocked, ToolError, optBool, optInt, optStr, str, type ToolContext, type ToolOutput } from '../tools/types'
 import { data } from '../data/hub'
@@ -15,7 +15,7 @@ export const API_VERSION = 1
 export interface ModuleTool {
   name: string
   description: string
-  params: GbnfJsonObjectSchema | Record<string, unknown>
+  params: JsonObjectSchema | Record<string, unknown>
   execute(args: Record<string, unknown>, ctx: ToolContext): Promise<string | ToolOutput> | string | ToolOutput
   permission?: ToolPermission
   needsWorkspace?: boolean

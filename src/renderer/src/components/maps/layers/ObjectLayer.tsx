@@ -1,6 +1,7 @@
 import { useContext } from 'react'
 import type { ObjectLayerData } from '@shared/maps'
 import { registerLayerType } from '../layerTypes'
+import { paintPicture } from '../../../game/map/paintPicture'
 import { MapObjects } from '../mapObjects'
 import { PictureBox } from './PictureBox'
 
@@ -21,4 +22,12 @@ export function ObjectLayer({ layer }: { layer: ObjectLayerData }) {
   )
 }
 
-registerLayerType('object', { tag: 'Object', Layer: ObjectLayer })
+registerLayerType('object', {
+  tag: 'Object',
+  Layer: ObjectLayer,
+  paint: (layer, ctx) => {
+    const view = paintPicture(layer, ctx)
+    ctx.object(view, layer)
+    return view
+  }
+})

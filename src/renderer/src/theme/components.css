@@ -974,6 +974,24 @@
     height: 2px;
   }
 
+  .segment-bar[data-loop='true'] > i {
+    animation: seven-segment-sweep 1.6s linear infinite;
+    animation-delay: calc(var(--i) / var(--n) * 1.6s - 1.6s);
+  }
+
+  @keyframes seven-segment-sweep {
+    0%,
+    18% {
+      background: var(--color-accent);
+      box-shadow: 0 0 6px color-mix(in srgb, var(--color-accent) 50%, transparent);
+    }
+    40%,
+    100% {
+      background: rgba(255, 255, 255, 0.06);
+      box-shadow: none;
+    }
+  }
+
   .segment-mask {
     mask-image: repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 8px);
   }

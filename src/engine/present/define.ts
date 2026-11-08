@@ -1,5 +1,5 @@
 import { PRESENT_PREFIX, presentationToolName } from '@shared/toolnames'
-import type { GbnfJsonObjectSchema, GbnfJsonSchema } from 'node-llama-cpp'
+import type { JsonObjectSchema, JsonSchema } from '../tools/schema'
 import type { PresentData, PresentWhere } from '@shared/types'
 import { ToolError, type ToolContext, type ToolDef } from '../tools/types'
 import { data as store } from '../data/hub'
@@ -13,7 +13,7 @@ export interface PresentationSpec {
   type: string
   group: string
   description: string
-  fields: Record<string, GbnfJsonSchema>
+  fields: Record<string, JsonSchema>
   check?: (fields: Record<string, unknown>) => void
   title?: (fields: Record<string, unknown>) => string | undefined
   result?: (fields: Record<string, unknown>, where: PresentWhere) => string
@@ -33,7 +33,7 @@ function stable(value: unknown): string {
 }
 
 export function presentationTool(spec: PresentationSpec): ToolDef {
-  const params: GbnfJsonObjectSchema = {
+  const params: JsonObjectSchema = {
     type: 'object',
     properties: spec.fixed
       ? spec.fields
@@ -42,7 +42,7 @@ export function presentationTool(spec: PresentationSpec): ToolDef {
       where: WHERE_FIELD,
       key: KEY_FIELD
         }
-  } as GbnfJsonObjectSchema
+  } as JsonObjectSchema
   return {
     name: presentationToolName(spec.type),
     group: spec.group,

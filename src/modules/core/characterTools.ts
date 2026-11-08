@@ -82,7 +82,7 @@ const setStoryWhere: ToolDef = {
   name: 'set_story_where',
   group: 'core',
   needsWorkspace: false,
-  description: "Set where a character is in their story.",
+  description: "Set where a character is in a specific story world.",
   params: { type: 'object', properties: { sheet: { type: 'string', description: 'The character' }, where: { type: 'string', description: 'Where they are now, e.g. Rooftops above the Lantern Market' } } },
   async execute(params) {
     const s = sheetOf(str(params, 'sheet'))

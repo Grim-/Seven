@@ -2,8 +2,7 @@ import { ExternalLink, MessageSquarePlus, Pencil, Trash2 } from 'lucide-react'
 import { parseActions } from '@shared/actions'
 import { parseDecisions } from '@shared/decisions'
 import type { ObjectLayerData } from '@shared/maps'
-import type { MouseEvent } from 'react'
-import { confirmDelete, openMenu, type MenuItem } from '../ui'
+import { confirmDelete, openMenu, type MenuEvent, type MenuItem } from '../ui'
 import type { MapObjectHandlers } from './mapObjects'
 import { openEntry } from '../../lib/library'
 import { startChatItems } from '../../views/data/entryMenu'
@@ -27,7 +26,7 @@ export function objectPlay(object: ObjectLayerData, mapId: string, character: st
 }
 
 export function objectHandlers(world: string, mapId: string, character: string | null): MapObjectHandlers {
-  const open = (object: ObjectLayerData, e: MouseEvent) => openMenu(e, object.name, objectItems(object, objectPlay(object, mapId, character, [], null, world), null))
+  const open = (object: ObjectLayerData, e: MenuEvent) => openMenu(e, object.name, objectItems(object, objectPlay(object, mapId, character, [], null, world), null))
   return { onPick: open, onMenu: open }
 }
 

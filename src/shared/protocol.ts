@@ -55,7 +55,13 @@ import type {
   Dashboard,
   ContextUsage,
   PromptView,
-  CudaInstallProgress,
+  ServerInfo,
+  ServerStatus,
+  NetworkSettings,
+  NetworkStatus,
+  ServerInstallProgress,
+  ServerRelease,
+  ProjectorChoice,
   ModelFacts,
   OverlayMode,
   OverlayPanel,
@@ -76,11 +82,7 @@ import type {
   CustomCommand,
   CharacterSheet,
   RepoEntry,
-  GpuBackend,
-  GpuInfo,
   ChatTemplate,
-  ChatTemplateInfo,
-  ModelFixInfo,
   ModelEntry,
   ModelKind,
   HubModel,
@@ -118,6 +120,11 @@ import type {
   WebLogEntry
 } from './types'
 import type { CompendiumEntry, CompendiumKind, CompendiumRef } from './compendium'
+import type { CatalogData, GameDef } from './game/defs/defs'
+import type { RuleSet } from './game/defs/ruleSets'
+import type { EntityRecord } from './game/core/GameEntity'
+import type { ClockState } from './game/core/clock'
+import type { GameSave, SaveMeta, WorldSaves } from './game/save'
 import type { StoredDecision } from './storedDecision'
 import type { StoredAction } from './storedAction'
 
@@ -155,13 +162,13 @@ export interface EngineRequests {
   'models.config.get': Req<{ id: string }, ModelConfig>
   'models.config.set': Req<{ id: string; patch: ModelConfig }, ModelConfigResult>
   'models.config.reset': Req<{ id: string }, ModelConfigResult>
-  'models.gpu.get': Req<void, GpuInfo>
-  'models.gpu.set': Req<{ choice: GpuBackend }, GpuInfo>
-  'models.cuda.install': Req<void, GpuInfo>
-  'models.template.get': Req<{ id: string }, ChatTemplateInfo>
-  'models.template.set': Req<{ id: string; choice: ChatTemplate }, ChatTemplateInfo>
-  'models.fixes.get': Req<{ id: string }, ModelFixInfo[]>
-  'models.fixes.set': Req<{ id: string; fix: string; on: boolean }, ModelFixInfo[]>
+  'models.server.get': Req<void, ServerInfo>
+  'models.server.release': Req<void, ServerRelease>
+  'models.server.install': Req<void, ServerInfo>
+  'models.projector.get': Req<{ id: string }, ProjectorChoice>
+  'models.projector.set': Req<{ id: string; projector: string | null }, ProjectorChoice>
+  'models.template.get': Req<{ id: string }, ChatTemplate>
+  'models.template.set': Req<{ id: string; choice: ChatTemplate }, ChatTemplate>
   'agents.list': Req<void, AgentProfile[]>
   'agents.get': Req<{ id: string }, AgentProfile>
   'agents.save': Req<AgentDraft, AgentProfile>
@@ -217,10 +224,12 @@ export interface EngineRequests {
   'worlds.delete': Req<{ id: string }, boolean>
   'worlds.schema': Req<{ id: string }, WorldSchema>
   'worlds.saveSchema': Req<{ id: string; schema: WorldSchema }, WorldMeta>
-  'worlds.records': Req<{ id: string; type: string }, Record<string, WorldEntity>>
-  'worlds.changes': Req<{ id: string; type: string }, Record<string, WorldChanges>>
+  'worlds.records': Req<{ id: string; type: string; layer?: 'template' | 'play' }, Record<string, WorldEntity>>
+  'worlds.changes': Req<{ id: string; type: string; layer?: 'template' | 'play' }, Record<string, WorldChanges>>
   'maps.list': Req<void, MapListing[]>
   'worlds.setPlayer': Req<{ id: string; sheet: string | null }, WorldMeta>
+  'worlds.setRules': Req<{ id: string; rules: string }, WorldMeta>
+  'worlds.setTags': Req<{ id: string; tags: string[] }, WorldMeta>
   'actions.roll': Req<{ action: Action; character: string | null; pick?: number | null; world?: string | null; deck?: DeckRef | null }, ActionResult>
   'decisions.roll': Req<{ decision: Decision }, Decision>
   'decks.find': Req<{ ref: DeckRef; make?: boolean }, { deck: string | null; set: string | null }>
@@ -248,6 +257,16 @@ export interface EngineRequests {
   'worlds.post': Req<{ id: string; author: string; to: string; message: string }, WorldPost>
   'worlds.editPost': Req<{ id: string; index: number; message: string | null }, WorldPost[]>
   'stats.summary': Req<void, StatsSummary>
+  'stats.clear': Req<void, void>
+  'server.status': Req<void, ServerStatus>
+  'server.stop': Req<void, ModelHostState>
+  'server.restart': Req<void, ModelHostState>
+  'network.set': Req<{ on?: boolean; settings?: Partial<NetworkSettings> }, NetworkStatus>
+  'network.password.suggest': Req<void, string>
+  'network.password.set': Req<{ password: string }, NetworkStatus>
+  'network.certificate.get': Req<void, string | null>
+  'network.certificate.renew': Req<void, NetworkStatus>
+  'network.unlock': Req<{ address: string }, NetworkStatus>
   'backdrop.get': Req<{ sessionId: string }, ChatBackdrops>
   'themes.list': Req<void, Theme[]>
   'themes.save': Req<Omit<Partial<Theme>, 'id'> & { id: string | null }, Theme>
@@ -308,6 +327,36 @@ export interface EngineRequests {
   'dnd.get': Req<{ kind: CompendiumKind; id: string }, { entry: CompendiumEntry; srd: boolean; own: boolean }>
   'dnd.save': Req<{ kind: CompendiumKind; entry: CompendiumEntry; previousId: string | null }, CompendiumEntry>
   'dnd.remove': Req<{ kind: CompendiumKind; id: string }, boolean>
+  'game.ruleSets': Req<void, RuleSet[]>
+  'game.saveRuleSet': Req<{ id: string | null; name: string; notes: string; copy: string | null }, RuleSet>
+  'game.removeRuleSet': Req<{ id: string }, boolean>
+  'game.list': Req<{ ruleSet: string; type: string }, GameDef[]>
+  'game.get': Req<{ ruleSet: string; type: string; id: string }, GameDef>
+  'game.save': Req<{ ruleSet: string; type: string; def: GameDef; previousId: string | null }, GameDef>
+  'game.remove': Req<{ ruleSet: string; type: string; id: string }, boolean>
+  'game.catalog': Req<{ ruleSet: string }, CatalogData>
+  'game.joinCharacter': Req<{ sheet: string; ruleSet: string; template: string }, EntityRecord>
+  'game.saveCharacter': Req<{ sheet: string; record: EntityRecord }, EntityRecord>
+  'game.leaveCharacter': Req<{ sheet: string }, boolean>
+  'game.tickCharacters': Req<{ sheets: string[]; seconds: number }, number>
+  'saves.list': Req<{ world: string }, WorldSaves>
+  'saves.all': Req<void, SaveMeta[]>
+  'saves.get': Req<{ id: string }, GameSave>
+  'saves.current': Req<{ world: string }, GameSave>
+  'saves.create': Req<{ world: string; name: string; copy: boolean }, GameSave>
+  'saves.select': Req<{ world: string; id: string }, GameSave>
+  'saves.rename': Req<{ id: string; name: string }, GameSave>
+  'saves.remove': Req<{ id: string }, boolean>
+  'saves.bring': Req<{ id: string; sheet: string }, GameSave>
+  'saves.takeOut': Req<{ sheet: string }, GameSave | null>
+  'saves.adopt': Req<{ world: string }, GameSave>
+  'saves.travel': Req<{ sheet: string; id: string; map: string; place: string }, GameSave>
+  'game.misfits': Req<{ sheet: string }, string[]>
+  'game.giveItem': Req<{ sheet: string; item: string; count: number; gold: number }, { given: number; gold: number }>
+  'game.useAbility': Req<{ sheet: string; ability: string; target: string | null; at: { x: number; y: number } | null; distance: number }, string>
+  'saves.markUsed': Req<{ id: string; trigger: string; flag: string }, GameSave>
+  'saves.setFlag': Req<{ id: string; flag: string }, GameSave>
+  'saves.writeClock': Req<{ id: string; clockId: string; clock: ClockState }, GameSave>
   'decisions.get': Req<{ id: string }, StoredDecision>
   'decisions.save': Req<{ decision: StoredDecision; previousId: string | null }, StoredDecision>
   'storyActions.get': Req<{ id: string }, StoredAction>
@@ -435,8 +484,8 @@ export type CodedErrorWire = { [ERROR_MARKER]: { code: string; message: string }
 export const LONG_REQUESTS: ReadonlySet<EngineRequestName> = new Set<EngineRequestName>([
   'models.load',
   'models.remote.test',
-  'models.gpu.set',
-  'models.cuda.install',
+  'models.server.release',
+  'models.server.install',
   'models.fillInfo',
   'vault.migrate',
   'mind.search',
@@ -468,6 +517,7 @@ export interface MainRequests {
   'dialog.openModelFile': Req<void, string | null>
   'dialog.openFiles': Req<void, string[]>
   'dialog.openFile': Req<{ filters: { name: string; extensions: string[] }[] }, string | null>
+  'assets.readImage': Req<{ id: string }, { bytes: Uint8Array<ArrayBuffer>; mime: string } | null>
   'asset.open': Req<{ id: string; reveal: boolean }, void>
   'clipboard.write': Req<{ text: string }, void>
   'asset.saveAs': Req<{ id: string; name: string }, string | null>
@@ -534,7 +584,9 @@ export interface Events {
   'browser.open': { url: string | null }
   'browser.status': { text: string }
   'model.state': ModelHostState
-  'cuda.install': CudaInstallProgress
+  'server.install': ServerInstallProgress
+  'network.changed': NetworkStatus
+  'engine.children': { pids: number[] }
   'engine.restart': null
   'models.changed': ModelEntry[]
   'downloads.changed': DownloadItem[]
@@ -561,6 +613,8 @@ export interface Events {
   'workout.changed': Record<string, never>
   'board.changed': Record<string, never>
   'dnd.changed': Record<string, never>
+  'game.changed': Record<string, never>
+  'saves.changed': { world: string }
   'decisions.changed': Record<string, never>
   'storyActions.changed': Record<string, never>
   'themes.changed': Theme[]

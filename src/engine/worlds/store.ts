@@ -4,12 +4,25 @@ import { EventEmitter } from 'node:events'
 import { CHANGES_KEY, PLACE_TYPE, PLACE_TYPE_KEY, STARTER_SCHEMA, inspectSchema, normalEntity, withPlaces, worldId, type WorldChanges, type WorldEntity, type WorldMeta, type WorldPost, type WorldSchema, type WorldType } from '@shared/world'
 import { dataRoot } from '../util/paths'
 import { readJson, removePath, writeJson } from '../util/fs'
-import { cleanMap, cleanMapUses, cleanShapes, type JourneyEntry, type JourneyKind, type WorldMapUse } from '@shared/maps'
+import { cleanMap, cleanMapUses, cleanShapes, type JourneyEntry, type JourneyKind, type Standing, type WorldMapUse } from '@shared/maps'
 import { maps } from '../maps/store'
 import { currentActor } from '../timeline/actor'
 import { timeline } from '../timeline/store'
 
 export class WorldError extends Error {}
+
+export type WorldLayer = 'template' | 'play'
+
+export interface PlayLayer {
+  records(world: string, type: string): Record<string, Record<string, unknown> | null>
+  setRecord(world: string, type: string, key: string, value: Record<string, unknown> | null): void
+  stand(world: string, map: string): Record<string, Standing>
+  setStand(world: string, map: string, stand: Record<string, Standing>): void
+  journeys(world: string): Record<string, JourneyEntry[]>
+  addJourney(world: string, sheet: string, entry: JourneyEntry): void
+  board(world: string): WorldPost[]
+  setBoard(world: string, list: WorldPost[]): void
+}
 
 const ROOT = path.join(dataRoot, 'worlds')
 
@@ -32,7 +45,7 @@ class WorldStore extends EventEmitter {
     return path.join(ROOT, id)
   }
 
-  private manifest(id: string): { name: string; updatedAt: number; player?: string | null } {
+  private manifest(id: string): { name: string; updatedAt: number; player?: string | null; rules?: string; tags?: unknown } {
     return readJson(path.join(this.dir(id), 'manifest.json'), { name: id, updatedAt: 0 })
   }
 
@@ -43,10 +56,30 @@ class WorldStore extends EventEmitter {
     return this.meta(id)
   }
 
+  setRules(id: string, rules: string): WorldMeta {
+    const m = this.manifest(id)
+    writeJson(path.join(this.dir(id), 'manifest.json'), { ...m, rules, updatedAt: Date.now() })
+    this.emit('changed', id)
+    return this.meta(id)
+  }
+
+  setTags(id: string, tags: string[]): WorldMeta {
+    const m = this.manifest(id)
+    const clean = [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))]
+    writeJson(path.join(this.dir(id), 'manifest.json'), { ...m, tags: clean, updatedAt: Date.now() })
+    this.emit('changed', id)
+    return this.meta(id)
+  }
+
   private touch(id: string): void {
     const m = this.manifest(id)
     writeJson(path.join(this.dir(id), 'manifest.json'), { ...m, updatedAt: Date.now() })
     this.emit('changed', id)
+  }
+
+  folder(id: string): string {
+    if (!this.exists(id)) throw new WorldError(`There is no world "${id}"`)
+    return this.dir(id)
   }
 
   exists(id: string): boolean {
@@ -75,6 +108,8 @@ class WorldStore extends EventEmitter {
       types: Object.entries(schema.types).map(([key, t]) => ({ key, plural: t.plural, count: Object.keys(this.rawType(id, key)).length })),
       posts: this.board(id).length,
       player: m.player ?? null,
+      rules: typeof m.rules === 'string' ? m.rules : '',
+      tags: Array.isArray(m.tags) ? m.tags.filter((t): t is string => typeof t === 'string') : [],
       updatedAt: m.updatedAt
     }
   }
@@ -115,7 +150,7 @@ class WorldStore extends EventEmitter {
   }
 
   private splitPlaceActions(id: string, schema: WorldSchema, place: WorldType): WorldSchema {
-    const places = this.rawType(id, PLACE_TYPE_KEY)
+    const places = this.templateType(id, PLACE_TYPE_KEY)
     let moved = false
     for (const v of Object.values(places)) {
       const p = v as Record<string, unknown>
@@ -151,25 +186,35 @@ class WorldStore extends EventEmitter {
     return path.join(this.dir(id), `${typeKey}.json`)
   }
 
-  rawType(id: string, typeKey: string): Record<string, unknown> {
+  private templateType(id: string, typeKey: string): Record<string, unknown> {
     return readJson<Record<string, unknown>>(this.typeFile(id, typeKey), {})
   }
 
-  entities(id: string, typeKey: string, includeHidden = true): Record<string, WorldEntity> {
+  rawType(id: string, typeKey: string, layer: WorldLayer = 'play'): Record<string, unknown> {
+    const raw = this.templateType(id, typeKey)
+    if (layer === 'template' || !this.play) return raw
+    for (const [key, v] of Object.entries(this.play.records(id, typeKey))) {
+      if (v === null) delete raw[key]
+      else raw[key] = v
+    }
+    return raw
+  }
+
+  entities(id: string, typeKey: string, includeHidden = true, layer: WorldLayer = 'play'): Record<string, WorldEntity> {
     const t = this.type(id, typeKey)
-    const raw = this.rawType(id, typeKey)
+    const raw = this.rawType(id, typeKey, layer)
     return Object.fromEntries(Object.entries(raw).map(([key, v]) => [key, normalEntity(t, v, includeHidden)]))
   }
 
-  get(id: string, typeKey: string, key: string, includeHidden = true): WorldEntity | null {
+  get(id: string, typeKey: string, key: string, includeHidden = true, layer: WorldLayer = 'play'): WorldEntity | null {
     const t = this.type(id, typeKey)
-    const raw = this.rawType(id, typeKey)[worldId(key)]
+    const raw = this.rawType(id, typeKey, layer)[worldId(key)]
     return raw === undefined ? null : normalEntity(t, raw, includeHidden)
   }
 
-  put(id: string, typeKey: string, key: string, entity: WorldEntity): void {
+  put(id: string, typeKey: string, key: string, entity: WorldEntity, layer: WorldLayer = 'template'): void {
     const t = this.type(id, typeKey)
-    const raw = this.rawType(id, typeKey)
+    const raw = this.rawType(id, typeKey, layer)
     const k = worldId(key)
     const made = !(k in raw)
     const previous = (raw[k] && typeof raw[k] === 'object' ? raw[k] : {}) as Record<string, unknown>
@@ -179,28 +224,36 @@ class WorldStore extends EventEmitter {
     const at = nowStamp()
     const changes: WorldChanges = { ...((previous[CHANGES_KEY] ?? {}) as WorldChanges) }
     for (const name of Object.keys(entity)) if (name in t.fields && JSON.stringify(before[name]) !== JSON.stringify(after[name])) changes[name] = { by, at }
-    raw[k] = { ...previous, ...entity, [CHANGES_KEY]: changes }
-    writeJson(this.typeFile(id, typeKey), raw)
+    const value = { ...previous, ...entity, [CHANGES_KEY]: changes }
+    if (layer === 'play') this.playLayer().setRecord(id, typeKey, k, value)
+    else {
+      const template = this.templateType(id, typeKey)
+      template[k] = value
+      writeJson(this.typeFile(id, typeKey), template)
+    }
     this.touch(id)
     timeline.record({ kind: 'world', entry: `${id}/${typeKey}/${k}`, action: made ? 'made' : 'changed', by })
   }
 
-  changes(id: string, typeKey: string): Record<string, WorldChanges> {
-    return Object.fromEntries(Object.entries(this.rawType(id, typeKey)).map(([key, v]) => [key, ((v as Record<string, unknown>)?.[CHANGES_KEY] ?? {}) as WorldChanges]))
+  changes(id: string, typeKey: string, layer: WorldLayer = 'play'): Record<string, WorldChanges> {
+    return Object.fromEntries(Object.entries(this.rawType(id, typeKey, layer)).map(([key, v]) => [key, ((v as Record<string, unknown>)?.[CHANGES_KEY] ?? {}) as WorldChanges]))
   }
 
-  remove(id: string, typeKey: string, key: string): boolean {
-    const raw = this.rawType(id, typeKey)
+  remove(id: string, typeKey: string, key: string, layer: WorldLayer = 'template'): boolean {
     const k = worldId(key)
-    if (!(k in raw)) return false
-    delete raw[k]
-    writeJson(this.typeFile(id, typeKey), raw)
+    if (!(k in this.rawType(id, typeKey, layer))) return false
+    if (layer === 'play') this.playLayer().setRecord(id, typeKey, k, null)
+    else {
+      const template = this.templateType(id, typeKey)
+      delete template[k]
+      writeJson(this.typeFile(id, typeKey), template)
+    }
     this.touch(id)
     return true
   }
 
   removePlace(id: string, key: string): boolean {
-    const places = this.rawType(id, PLACE_TYPE_KEY)
+    const places = this.rawType(id, PLACE_TYPE_KEY, 'template')
     const k = worldId(key)
     const place = places[k] as Record<string, unknown> | undefined
     if (!place) return false
@@ -215,15 +268,27 @@ class WorldStore extends EventEmitter {
     return path.join(this.dir(id), 'maps.json')
   }
 
-  mapUses(id: string): WorldMapUse[] {
+  private templateUses(id: string): WorldMapUse[] {
     this.moveOldMaps(id)
     return cleanMapUses(readJson(this.usesFile(id), {})).filter((u) => maps.get(u.map) !== null)
   }
 
+  oldStand(id: string): Record<string, Record<string, Standing>> {
+    return Object.fromEntries(this.templateUses(id).map((u) => [u.map, u.stand]))
+  }
+
+  mapUses(id: string): WorldMapUse[] {
+    const play = this.play
+    return this.templateUses(id).map((u) => ({ ...u, stand: play ? play.stand(id, u.map) : {} }))
+  }
+
   saveMapUses(id: string, uses: WorldMapUse[]): WorldMapUse[] {
-    writeJson(this.usesFile(id), { maps: uses })
+    const kept = new Map(cleanMapUses(readJson(this.usesFile(id), {})).map((u) => [u.map, u.stand]))
+    writeJson(this.usesFile(id), { maps: uses.map((u) => ({ ...u, stand: kept.get(u.map) ?? {} })) })
+    const play = this.play
+    if (play) for (const u of uses) if (JSON.stringify(u.stand) !== JSON.stringify(play.stand(id, u.map))) play.setStand(id, u.map, u.stand)
     this.touch(id)
-    return uses
+    return this.mapUses(id)
   }
 
   saveMapUse(id: string, use: WorldMapUse): WorldMapUse {
@@ -244,21 +309,24 @@ class WorldStore extends EventEmitter {
     return this.saveMapUses(id, this.mapUses(id).filter((u) => u.map !== mapId))
   }
 
-  journeys(id: string): Record<string, JourneyEntry[]> {
+  oldJourneys(id: string): Record<string, JourneyEntry[]> {
     const raw = readJson<Record<string, JourneyEntry[]>>(path.join(this.dir(id), 'journeys.json'), {})
     return raw && typeof raw === 'object' ? raw : {}
   }
 
+  journeys(id: string): Record<string, JourneyEntry[]> {
+    return this.play ? this.play.journeys(id) : {}
+  }
+
   addJourney(id: string, sheet: string, kind: JourneyKind, text: string): JourneyEntry {
     const entry: JourneyEntry = { at: nowStamp(), kind, text }
-    const all = this.journeys(id)
-    writeJson(path.join(this.dir(id), 'journeys.json'), { ...all, [sheet]: [...(all[sheet] ?? []), entry] })
+    this.playLayer().addJourney(id, sheet, entry)
     this.touch(id)
     return entry
   }
 
   usingMap(mapId: string): WorldMeta[] {
-    return this.list().filter((w) => this.mapUses(w.id).some((u) => u.map === mapId))
+    return this.list().filter((w) => this.templateUses(w.id).some((u) => u.map === mapId))
   }
 
   private moveOldMaps(id: string): void {
@@ -276,28 +344,41 @@ class WorldStore extends EventEmitter {
     removePath(dir)
   }
 
-  board(id: string): WorldPost[] {
+  oldBoard(id: string): WorldPost[] {
     const list = readJson<WorldPost[]>(path.join(this.dir(id), 'board.json'), [])
     return Array.isArray(list) ? list : []
   }
 
+  board(id: string): WorldPost[] {
+    return this.play ? this.play.board(id) : []
+  }
+
   post(id: string, author: string, to: string, message: string): WorldPost {
-    const list = this.board(id)
     const entry: WorldPost = { at: nowStamp(), author, to: to || 'ALL', message }
-    list.push(entry)
-    writeJson(path.join(this.dir(id), 'board.json'), list)
+    this.playLayer().setBoard(id, [...this.board(id), entry])
     this.touch(id)
     return entry
   }
 
   editPost(id: string, index: number, message: string | null): WorldPost[] {
-    const list = this.board(id)
+    const list = [...this.board(id)]
     if (index < 0 || index >= list.length) throw new WorldError('There is no such post')
     if (message === null) list.splice(index, 1)
     else list[index] = { ...list[index], message, edited: true }
-    writeJson(path.join(this.dir(id), 'board.json'), list)
+    this.playLayer().setBoard(id, list)
     this.touch(id)
     return list
+  }
+
+  private play: PlayLayer | null = null
+
+  setPlayLayer(layer: PlayLayer): void {
+    this.play = layer
+  }
+
+  private playLayer(): PlayLayer {
+    if (!this.play) throw new WorldError('Saves are not ready yet.')
+    return this.play
   }
 }
 

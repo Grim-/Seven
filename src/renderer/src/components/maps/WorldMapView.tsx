@@ -12,7 +12,7 @@ import { MapCanvas } from './MapCanvas'
 import { PlaceTree } from './PlaceTree'
 import { PlaceCard } from './PlaceCard'
 import { placeName } from './placeShapes'
-import { usePlaceData, type PlaceData } from './usePlaceRecords'
+import { usePlaceData, type PlaceData, type WorldLayer } from './usePlaceRecords'
 import { useMapPictures } from './useMapPictures'
 import { characterItems, placeItems } from './placeActions'
 import { objectHandlers } from './objectActions'
@@ -163,10 +163,10 @@ function PlacesOnMap({ world, map, source, data, onStart }: { world: string; map
   )
 }
 
-export function WorldMapLoad({ world, mapId, children }: { world: string; mapId: string; children: (map: MapData, use: WorldMapUse, data: PlaceData) => ReactNode }) {
+export function WorldMapLoad({ world, mapId, layer = 'play', children }: { world: string; mapId: string; layer?: WorldLayer; children: (map: MapData, use: WorldMapUse, data: PlaceData) => ReactNode }) {
   const map = useMap(mapId)
   const use = useWorldMaps(world)?.find((u) => u.map === mapId)
-  const data = usePlaceData(world)
+  const data = usePlaceData(world, layer)
   const pictures = useMapPictures(map)
   if (map === false) return <EmptyState title="Gone">This map no longer exists.</EmptyState>
   if (!map || !use || !data || pictures.done < pictures.total)
@@ -185,7 +185,7 @@ export function WorldMapLoad({ world, mapId, children }: { world: string; mapId:
 
 export function WorldMapView({ world, mapId, onStart }: { world: string; mapId: string; onStart: (place: string) => void }) {
   return (
-    <WorldMapLoad world={world} mapId={mapId}>
+    <WorldMapLoad world={world} mapId={mapId} layer="template">
       {(map, use, data) => <PlacesOnMap key={`${world}/${mapId}`} world={world} map={map} source={use} data={data} onStart={onStart} />}
     </WorldMapLoad>
   )

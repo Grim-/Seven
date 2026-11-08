@@ -5,6 +5,8 @@ import { cn } from '../../lib/cn'
 import { useApp } from '../../store/app'
 import { gigabytes, useSystemStats } from '../../lib/systemStats'
 import { modelName, useModels } from '../../store/models'
+import { engine as ask } from '../../lib/ipc'
+import type { ModelFacts } from '@shared/types'
 
 const DOT: Record<Tone, string> = {
   ok: 'bg-ok shadow-[0_0_6px_var(--color-ok)]',
@@ -19,6 +21,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="flex flex-col gap-2 border-t border-line/40 px-3 py-2.5 first:border-t-0">
       <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-soft">{title}</div>
       {children}
+    </div>
+  )
+}
+
+function Row({ label, value, tone }: { label: string; value: string; tone?: 'warn' }) {
+  return (
+    <div className="flex items-baseline gap-3 text-[12px]">
+      <span className="w-20 shrink-0 font-mono text-[10.5px] uppercase tracking-wider text-faint">{label}</span>
+      <span className={cn('min-w-0 break-words', tone === 'warn' ? 'text-accent' : 'text-white/85')}>{value}</span>
     </div>
   )
 }
@@ -55,8 +66,24 @@ export function StatusControl() {
   const cpu = stats?.cpu === null || stats?.cpu === undefined ? null : stats.cpu / 100
   const tones = [meterTone(ram), meterTone(vram), meterTone(cpu)]
   const worst = tones.includes('hot') ? 'hot' : tones.includes('warm') ? 'warm' : null
-  const label = host.status === 'loading' ? `Loading ${Math.round(host.progress * 100)}%` : host.status === 'error' ? 'Model error' : host.status === 'ready' ? 'Ready' : 'No model'
+  const label = host.status === 'loading' ? 'Loading…' : host.status === 'error' ? 'Model error' : host.status === 'ready' ? 'Ready' : 'No model'
   const open = pinned || hover
+  const [facts, setFacts] = useState<ModelFacts | null>(null)
+  useEffect(() => {
+    if (!open || host.status !== 'ready') {
+      setFacts(null)
+      return
+    }
+    const read = () => void ask('models.facts').then(setFacts).catch(() => setFacts(null))
+    read()
+    const timer = setInterval(read, 2000)
+    return () => clearInterval(timer)
+  }, [open, host.status, host.modelId])
+  const info = list.find((m) => m.id === host.modelId)?.info ?? null
+  const shape = info ? (info.experts ? `MoE, ${info.experts.used ?? '?'} of ${info.experts.count} experts active` : 'Dense') : null
+  const server = facts?.server ?? null
+  const last = server?.last ?? null
+  const acceptance = last?.drafted ? Math.round(((last.accepted ?? 0) / last.drafted) * 100) : null
 
   return (
     <div
@@ -101,8 +128,22 @@ export function StatusControl() {
                 Models
               </button>
             </div>
-            {host.status === 'loading' && <SegmentBar value={host.progress} />}
+            {host.status === 'loading' && <SegmentBar value={null} />}
+            {host.status === 'ready' && shape && <Row label="Type" value={shape} />}
           </Section>
+          {server && (
+            <Section title={`llama-server ${server.tag ?? ''}`}>
+              <Row label="Device" value={server.device ?? 'Not reported'} />
+              <Row label="GPU layers" value={server.offload ? `${server.offload.gpu} of ${server.offload.total} on GPU` : 'Not reported'} tone={server.offload && server.offload.gpu < server.offload.total ? 'warn' : undefined} />
+              <Row
+                label="MTP"
+                value={server.mtp ? (acceptance === null ? 'On, no drafts yet' : `On, ${acceptance}% of drafts accepted`) : info?.mtpLayers ? 'Off in this model\'s settings' : 'Off: this model has no MTP heads'}
+                tone={server.mtp && acceptance === null && last ? 'warn' : undefined}
+              />
+              <Row label="Vision" value={server.vision ? 'On' : 'Off: no vision adapter picked for this model'} />
+              <Row label="Last reply" value={last ? `${last.genTps?.toFixed(1) ?? '?'} tok/s writing, ${last.promptTps?.toFixed(0) ?? '?'} tok/s reading` : 'No reply yet'} />
+            </Section>
+          )}
           <Section title="Engine">
             <div className="flex items-center gap-2 text-[12.5px]">
               <span className={cn('h-1.5 w-1.5 shrink-0', DOT[engineTone])} />

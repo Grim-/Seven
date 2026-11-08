@@ -2,15 +2,15 @@ import { actionResultText, type ActionResult } from '@shared/actions'
 import { placePath, placesIn } from '@shared/maps'
 import { PLACE_TYPE_KEY } from '@shared/world'
 import { onWhereChange } from '../library/sheets'
+import { saves } from './saves'
 import { worlds } from './store'
 
 export function watchJourneys(): void {
   onWhereChange((sheet, where) => {
-    for (const w of worlds.list()) {
-      if (!worlds.schema(w.id).types[PLACE_TYPE_KEY]) continue
-      const places = worlds.entities(w.id, PLACE_TYPE_KEY, false)
-      for (const key of placesIn(where, w.id, places)) worlds.addJourney(w.id, sheet, 'moved', `Went to ${placePath(places, key).map((k) => String(places[k]?.Name || k)).join(' › ')}`)
-    }
+    const save = saves.holding(sheet)
+    if (!save || saves.currentId(save.world) !== save.id || !worlds.exists(save.world) || !worlds.schema(save.world).types[PLACE_TYPE_KEY]) return
+    const places = worlds.entities(save.world, PLACE_TYPE_KEY, false)
+    for (const key of placesIn(where, save.world, places)) worlds.addJourney(save.world, sheet, 'moved', `Went to ${placePath(places, key).map((k) => String(places[k]?.Name || k)).join(' › ')}`)
   })
 }
 

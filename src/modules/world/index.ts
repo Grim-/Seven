@@ -1,12 +1,12 @@
-import type { GbnfJsonSchema } from 'node-llama-cpp'
+import type { JsonSchema } from '../../engine/tools/schema'
 import type { ModuleFactory } from '../../engine/modules/sdk'
 import { ToolError, optInt, optStr, str, type ToolDef } from '../../engine/tools/types'
 import { WorldError } from '../../engine/worlds/store'
 import { bindingFor, postBoard, readBoard, recall, remember, search } from '../../engine/worlds/ops'
 import { resolveIncludes } from '../../engine/library/includes'
 
-export const SCALARS = { type: ['string', 'number', 'boolean', 'null'] } as const satisfies GbnfJsonSchema
-export const NUMBERS = { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { type: ['string', 'number', 'null'] } }] } as const satisfies GbnfJsonSchema
+export const SCALARS = { type: ['string', 'number', 'boolean', 'null'] } as const satisfies JsonSchema
+export const NUMBERS = { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { type: ['string', 'number', 'null'] } }] } as const satisfies JsonSchema
 
 export function guard<T>(fn: () => T): T {
   try {

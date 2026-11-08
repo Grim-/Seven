@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import type { ChatHistoryItem } from 'node-llama-cpp'
+import type { ChatHistoryItem } from './items'
 import type { ChatMessage, ContextSummary, ToolPart } from '@shared/types'
 import { NEXT_TURN, groupTurns, pairCalls, toolParts, turnItems, type FitResult, type TurnGroup } from './history'
 import { outputFile } from '../tools/budget'
@@ -95,5 +95,3 @@ export function handoffRequest(maxWords: number): string {
 
 export const TOOLS_OFF = 'Tools are not available while writing the summary. Write the summary now, as plain text.'
 
-export const SHIFT_NOTICE =
-  "This chat no longer fit in the model's context, so the oldest messages were dropped for this reply. Use Compact to keep them as a summary instead."

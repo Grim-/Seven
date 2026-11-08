@@ -5,7 +5,7 @@ import { DICE } from '@shared/rolledDecision'
 import { Button, Field, Input, NumberField } from '../ui'
 import { engine } from '../../lib/ipc'
 import { useCheckTargets } from '../play/useCheckTargets'
-import { playText, showPlay, type PlayWhere } from '../play/playStore'
+import { closePlay, playText, showPlay, type PlayWhere } from '../play/playStore'
 import { SheetSelect } from '../data/sheet/SheetSelect'
 import { PickOptionsEditor } from './PickOptionsEditor'
 import { PlayedCard } from './PlayedCard'
@@ -30,7 +30,7 @@ export function PickDecisionForm({ character, where }: { character: string | nul
   const ask = () => where.onText?.(playText(where, `Use decide for this, writing ${count} options: ${question.trim()}`))
   const show = () => {
     const p: PickDecisionProps = { question: question.trim(), options: filled, own: true, character: sheet, from: null }
-    showPlay('Decision', <PlayedCard view={(done, onAnswer) => <DecideView p={p} done={done} open={!done} onAnswer={onAnswer} />} text={async (a) => pickMadeText(p, a, await sheetTitle(a.character))} where={where} />)
+    showPlay('Decision', <PlayedCard view={(done, onAnswer) => <DecideView p={p} done={done} open={!done} onAnswer={onAnswer} onClose={closePlay} />} text={async (a) => pickMadeText(p, a, await sheetTitle(a.character))} where={where} />)
   }
   return (
     <div className="flex flex-col gap-3">

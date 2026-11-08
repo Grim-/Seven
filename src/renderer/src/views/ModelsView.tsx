@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowDownAZ, ArrowDownWideNarrow, ArrowUpNarrowWide, Clock, Cloud, Copy, Cpu, Download, FilePlus, FolderOpen, Folders, Layers, PlugZap, Power, RotateCcw, Search, Star, Trash2 } from 'lucide-react'
-import type { ChatTemplate, CudaInstallProgress, GpuBackend, GpuInfo, ModelConfig, ModelEntry, ModelFixInfo, ModelKind, ParamDef, ParamSection, RemoteApi, ThinkingLevel } from '@shared/types'
+import type { ChatTemplate, ServerInfo, ServerInstallProgress, ModelConfig, ModelEntry, ModelKind, ModelTraitSet, ParamDef, ParamSection, RemoteApi, ThinkingLevel } from '@shared/types'
+import { fileList, fileListText, modelTraitSet, paramBlock } from '@shared/modelParams'
+import { useProjector } from '../components/models/useProjector'
 import { MODEL_KINDS, type HubModel } from '@shared/types'
 import { DownloadsCard } from '../components/models/DownloadsCard'
 import { HubSearch } from '../components/models/HubSearch'
@@ -11,7 +13,7 @@ import { applyFacets, useFacetValues } from '../lib/facets'
 import { useViewPlace } from '../lib/viewPlace'
 import { applyModelArgs, modelArgsText } from '@shared/modelArgs'
 import { thinkingLabel } from '../lib/thinking'
-import { BackBar, Button, Eyebrow, FacetBar, InfoTip, Input, KindShell, Modal, NumberField, Panel, SegmentBar, SaveState, Select, SettingRow, SliderNumber, StatusBadge, ShellTabs, Textarea, Toggle, ViewHeader, openMenu, useAutosavedState, type ShellItem, type ShellSort } from '../components/ui'
+import { BackBar, Button, Eyebrow, Fact, FactGrid, FacetBar, FileField, FileListField, Input, KindShell, Modal, NumberField, Panel, SegmentBar, SaveState, Select, SettingRow, SliderNumber, StatusBadge, ShellTabs, Textarea, Toggle, ViewHeader, openMenu, useAutosavedState, type ShellItem, type ShellSort } from '../components/ui'
 import { isRunnable, modelBytes, useModels } from '../store/models'
 import { engine, main, on } from '../lib/ipc'
 import { errorText, formatBytes } from '../lib/format'
@@ -35,6 +37,8 @@ const SECTIONS: { id: ParamSection; label: string; open: boolean }[] = [
   { id: 'thinking', label: 'Thinking', open: true },
   { id: 'sampling', label: 'Sampling', open: true },
   { id: 'repetition', label: 'Repetition', open: false },
+  { id: 'vision', label: 'Vision', open: true },
+  { id: 'files', label: 'Add-on files', open: false },
   { id: 'advanced', label: 'Advanced', open: false }
 ]
 
@@ -47,6 +51,9 @@ function optionLabel(def: ParamDef, o: string): string {
 function ParamInput({ def, value, onChange }: { def: ParamDef; value: number | boolean | string; onChange: (v: number | boolean | string) => void }) {
   if (def.type === 'bool') return <Toggle checked={value === true} onChange={onChange} label={value ? 'On' : 'Off'} />
   if (def.type === 'select') return <Select value={String(value)} options={(def.options ?? []).map((o) => ({ value: o, label: optionLabel(def, o) }))} onChange={onChange} className="h-7 w-36 text-[12px]" />
+  if (def.type === 'text') return <Input value={String(value)} onChange={(e) => onChange(e.target.value)} className="h-7 w-72 font-mono text-[12px]" />
+  if (def.type === 'file') return <FileField value={String(value)} onChange={onChange} filters={def.files ? [def.files] : []} />
+  if (def.type === 'files') return <FileListField items={fileList(value)} onChange={(items) => onChange(fileListText(items))} filters={def.files ? [def.files] : []} />
   const min = def.min ?? 0
   const max = def.max ?? 100
   const step = def.step ?? 1
@@ -87,8 +94,9 @@ function ArgsBox({ config, params, onChange }: { config: ModelConfig; params: Pa
   )
 }
 
-function ParamsSection({ modelId, remote = false }: { modelId: string; remote?: boolean }) {
+function ParamsSection({ modelId, remote = false, traits = {} }: { modelId: string; remote?: boolean; traits?: ModelTraitSet }) {
   const { params, getConfig, setConfig, resetConfig, host, load } = useModels()
+  const byKey = useMemo(() => new Map(params.map((p) => [p.key, p])), [params])
   const [reloadRequired, setReloadRequired] = useState(false)
   const autosave = useAutosavedState<ModelConfig | null>(
     null,
@@ -158,24 +166,24 @@ function ParamsSection({ modelId, remote = false }: { modelId: string; remote?: 
           if (!defs.length) return null
           return (
             <Panel key={section.id} title={section.label} collapsible defaultOpen={section.open} bodyClassName="flex flex-col px-3 py-1">
-              {defs.map((def) => (
-                <SettingRow key={def.key} label={def.label} hint={hint(def)}>
-                  <ParamInput def={def} value={config[def.key] ?? def.default} onChange={(v) => autosave.set((c) => ({ ...c!, [def.key]: v }))} />
-                </SettingRow>
-              ))}
+              {defs.map((def) => {
+                const reason = remote ? null : paramBlock(def, config, traits, byKey)
+                const wide = def.type === 'files'
+                return (
+                  <SettingRow key={def.key} label={def.label} hint={hint(def)} wide={wide}>
+                    <div className={cn('flex flex-col gap-0.5', wide ? 'w-full' : 'items-end')}>
+                      <div aria-disabled={reason ? true : undefined} className={cn(wide && 'w-full', reason && 'pointer-events-none opacity-40')}>
+                        <ParamInput def={def} value={config[def.key] ?? def.default} onChange={(v) => autosave.set((c) => ({ ...c!, [def.key]: v }))} />
+                      </div>
+                      {reason && <span className="text-right text-[11px] text-faint">{reason}</span>}
+                    </div>
+                  </SettingRow>
+                )
+              })}
             </Panel>
           )
         })}
       </div>
-    </div>
-  )
-}
-
-function Fact({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
-  return (
-    <div className={cn('flex flex-col gap-0.5', wide && 'col-span-full')}>
-      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-teal/70">{label}</span>
-      <span className="break-all text-[13px] text-white">{children}</span>
     </div>
   )
 }
@@ -201,170 +209,104 @@ function useActions() {
   return { toggle, useForSearch, showFolder, copyPath, drop, star }
 }
 
-const GPU_OPTIONS: { value: GpuBackend; label: string }[] = [
-  { value: 'auto', label: 'GPU: Auto' },
-  { value: 'cuda', label: 'GPU: CUDA' },
-  { value: 'vulkan', label: 'GPU: Vulkan' },
-  { value: 'cpu', label: 'GPU: None (CPU)' }
-]
-
-const ACTIVE_LABEL: Record<string, string> = { cuda: 'CUDA', vulkan: 'Vulkan', metal: 'Metal', cpu: 'CPU' }
-
-function GpuPicker() {
+function ServerControl() {
   const status = useModels((s) => s.host.status)
-  const [info, setInfo] = useState<GpuInfo | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [why, setWhy] = useState(false)
-  const [getting, setGetting] = useState<CudaInstallProgress | null>(null)
-  useEffect(() => on('cuda.install', setGetting), [])
-  const getCuda = async () => {
-    setGetting({ stage: 'download', received: 0, total: info?.cudaDownload ?? 0 })
+  const [info, setInfo] = useState<ServerInfo | null>(null)
+  const [latest, setLatest] = useState<string | null>(null)
+  const [getting, setGetting] = useState<ServerInstallProgress | null>(null)
+  useEffect(() => on('server.install', setGetting), [])
+  useEffect(() => {
+    void engine('models.server.get')
+      .then(setInfo)
+      .catch(() => undefined)
+  }, [status])
+  useEffect(() => {
+    void engine('models.server.release')
+      .then((r) => setLatest(r.latest))
+      .catch(() => setLatest(null))
+  }, [info?.installed])
+  if (!info) return null
+  const install = async () => {
+    setGetting({ stage: 'download', received: 0, total: 0, tag: latest ?? '' })
     try {
-      await engine('models.cuda.install')
-      toast.success('CUDA libraries installed', 'The engine is restarting so it can use CUDA. Load your model again.')
-      setWhy(false)
-      window.setTimeout(() => void engine('models.gpu.get').then(setInfo).catch(() => undefined), 4000)
+      setInfo(await engine('models.server.install'))
+      toast.success('llama-server installed', 'Load your model again.')
     } catch (err) {
-      toast.error('Could not get the CUDA libraries', errorText(err))
+      toast.error('Could not install llama-server', errorText(err))
     } finally {
       setGetting(null)
     }
   }
-  useEffect(() => {
-    void engine('models.gpu.get')
-      .then(setInfo)
-      .catch(() => undefined)
-  }, [status])
-  if (!info) return null
-  const change = async (v: string) => {
-    setBusy(true)
-    try {
-      setInfo(await engine('models.gpu.set', { choice: v as GpuBackend }))
-      await useModels.getState().refresh()
-    } catch (err) {
-      toast.error('Could not change the GPU backend', errorText(err))
-    } finally {
-      setBusy(false)
-    }
-  }
+  if (getting)
+    return (
+      <span className="flex w-40 flex-col gap-1">
+        <SegmentBar value={getting.total ? getting.received / getting.total : null} />
+        <span className="font-mono text-[11px] text-dim">{getting.stage === 'extract' ? 'Unpacking…' : getting.stage === 'done' ? 'Done' : getting.total ? `Downloading ${Math.round(getting.received / 1e6)} of ${Math.round(getting.total / 1e6)} MB` : 'Finding the build…'}</span>
+      </span>
+    )
+  if (!info.installed)
+    return (
+      <Button variant="primary" disabled={status === 'loading'} onClick={() => void install()}>
+        Install llama-server
+      </Button>
+    )
+  if (latest && latest !== info.installed)
+    return (
+      <Button variant="secondary" disabled={status === 'loading'} onClick={() => void install()}>
+        Update llama-server to {latest}
+      </Button>
+    )
+  return <span className="font-mono text-[11px] text-dim">llama-server {info.installed}</span>
+}
+
+function ProjectorField({ projector }: { projector: ReturnType<typeof useProjector> }) {
+  const { state } = projector
+  if (!state) return null
+  const options = [{ value: '', label: 'None' }, ...state.options.map((p) => ({ value: p.id, label: p.name }))]
+  const pick = (v: string) => projector.pick(v || null)
   return (
-    <span className="flex items-center gap-2" title="Which llama.cpp build runs models. Changing it unloads the current model. Auto tries CUDA, then Vulkan, then CPU.">
-      <Select value={info.choice} options={GPU_OPTIONS} disabled={busy || status === 'loading'} onChange={(v) => void change(v)} className="w-44" />
-      {info.note || info.cudaDownload ? (
-        <button onClick={() => setWhy(true)} className="font-mono text-[11px] text-accent underline decoration-accent/40 underline-offset-2 hover:text-white">
-          {info.active ? `Running on ${ACTIVE_LABEL[info.active] ?? info.active}` : 'Not started'}: why not CUDA?
-        </button>
-      ) : (
-        <span className="font-mono text-[11px] text-dim">{info.active ? `Running on ${ACTIVE_LABEL[info.active] ?? info.active}` : 'Not started'}</span>
-      )}
-      <Modal open={why} title="Why not CUDA" onClose={() => setWhy(false)}>
-        <div className="flex flex-col gap-3">
-          {info.note && <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] text-white/90">{info.note}</pre>}
-          {info.cudaDownload !== null && (
-            <div className="flex flex-col gap-2 border-t border-line/40 pt-3">
-              <span className="text-[12.5px] text-dim">
-                Seven can download the CUDA 13 libraries it needs (cuBLAS and the CUDA runtime) from NVIDIA's packages on PyPI, about {Math.round(info.cudaDownload / 1e6)} MB, and keep them in its own folder. The engine restarts afterwards; then load your model again.
-              </span>
-              {getting ? (
-                <div className="flex flex-col gap-1">
-                  <SegmentBar value={getting.total ? getting.received / getting.total : 0} />
-                  <span className="font-mono text-[11px] text-dim">
-                    {getting.stage === 'extract' ? 'Unpacking…' : getting.stage === 'done' ? 'Done' : `Downloading ${Math.round(getting.received / 1e6)} of ${Math.round(getting.total / 1e6)} MB`}
-                  </span>
-                </div>
-              ) : (
-                <Button variant="primary" onClick={() => void getCuda()}>
-                  Get CUDA libraries
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      </Modal>
-    </span>
+    <SettingRow label="Vision adapter" hint={`The mmproj file that lets this model see images. llama-server only; it reloads the model on the next message.${state.auto ? ' Picked from the same folder as the model.' : ''}`}>
+      <Select value={state.choice ?? ''} options={options} onChange={pick} className="h-7 w-72 text-[12px]" />
+    </SettingRow>
   )
 }
 
-function TemplateField({ model, onSaved }: { model: ModelEntry; onSaved: () => void }) {
+function TemplateField({ model }: { model: ModelEntry }) {
   const [choice, setChoice] = useState<ChatTemplate | null>(null)
-  const [wrappers, setWrappers] = useState<string[]>([])
+  const template = useAutosavedState('', (t) => engine('models.template.set', { id: model.id, choice: { type: 'jinja', template: t } }).then(setChoice), { when: (t) => Boolean(t.trim()) })
+  const setText = template.reset
   useEffect(() => {
     void engine('models.template.get', { id: model.id })
       .then((r) => {
-        setChoice(r.choice)
-        setWrappers(r.wrappers)
-        setText(r.choice.type === 'jinja' ? r.choice.template : '')
+        setChoice(r)
+        setText(r.type === 'jinja' ? r.template : '')
       })
       .catch(() => undefined)
   }, [model.id])
-  const save = (next: ChatTemplate) =>
-    engine('models.template.set', { id: model.id, choice: next })
-      .then((r) => {
-        setChoice(r.choice)
-        onSaved()
-      })
-      .catch(failed('Could not use that template'))
-  const template = useAutosavedState('', (t) => engine('models.template.set', { id: model.id, choice: { type: 'jinja', template: t } }).then(onSaved), { when: (t) => Boolean(t.trim()) })
-  const text = template.value
-  const setText = template.reset
   if (!choice) return null
-  const value = choice.type === 'auto' ? 'auto' : choice.type === 'jinja' ? 'jinja' : choice.name
-  const options = [{ value: 'auto', label: 'Automatic (from the file)' }, ...wrappers.map((w) => ({ value: w, label: `Built-in: ${w}` })), { value: 'jinja', label: 'Custom Jinja template' }]
+  const options = [
+    { value: 'auto', label: 'From the model file' },
+    { value: 'jinja', label: 'Custom Jinja template' }
+  ]
   const pick = (v: string) => {
-    if (v === 'jinja') setChoice({ type: 'jinja', template: text })
-    else void save(v === 'auto' ? { type: 'auto' } : { type: 'wrapper', name: v })
+    if (v === 'jinja') setChoice({ type: 'jinja', template: template.value })
+    else
+      void engine('models.template.set', { id: model.id, choice: { type: 'auto' } })
+        .then(setChoice)
+        .catch(failed('Could not change the template'))
   }
   return (
     <>
-      <SettingRow label="Chat template" hint="How chats are formatted for this model. Pick a built-in when the template baked into the file is broken. Applies from the next message.">
-        <Select value={value} options={options} onChange={pick} className="h-7 w-72 text-[12px]" />
+      <SettingRow label="Chat template" hint="How chats are formatted for this model. Paste your own when the template in the file is broken. Reloads the model on the next message.">
+        <Select value={choice.type} options={options} onChange={pick} className="h-7 w-72 text-[12px]" />
       </SettingRow>
       {choice.type === 'jinja' && (
         <div className="flex flex-col gap-2">
-          <Textarea
-            mono
-            rows={10}
-            value={text}
-            onChange={(e) => template.set(e.target.value)}
-            placeholder="Paste a Jinja chat template"
-          />
+          <Textarea mono rows={10} value={template.value} onChange={(e) => template.set(e.target.value)} placeholder="Paste a Jinja chat template" />
           <SaveState status={template.status} error={template.error} />
         </div>
       )}
     </>
-  )
-}
-
-function ModelFixes({ model, templateRev }: { model: ModelEntry; templateRev: number }) {
-  const [fixes, setFixes] = useState<ModelFixInfo[] | null>(null)
-  useEffect(() => {
-    void engine('models.fixes.get', { id: model.id })
-      .then(setFixes)
-      .catch(failed('Could not check which model fixes apply'))
-  }, [model.id, templateRev])
-  if (!fixes?.length) return null
-  const set = (fix: string, on: boolean) =>
-    void engine('models.fixes.set', { id: model.id, fix, on })
-      .then(setFixes)
-      .catch(failed('Could not change the fix'))
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="flex items-center gap-1.5">
-        <Eyebrow>Model fixes</Eyebrow>
-        <InfoTip title="Model fixes" text="Changes Seven makes to how chats are formatted, to work around known problems in node-llama-cpp or a model's template. Only the fixes this model needs show here, worked out from its file and chat template, and they're on unless you turn one off. Changes apply from the next message." />
-      </span>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-1.5">
-        {fixes.map((f) => (
-          <div key={f.id} className="flex items-center gap-2 border border-line/40 bg-black/40 px-2.5 py-1.5">
-            <Toggle checked={f.on} onChange={(v) => set(f.id, v)} />
-            <span className="min-w-0 flex-1 truncate text-[12.5px] text-white" title={f.label}>
-              {f.label}
-            </span>
-            <InfoTip title={f.label} text={`For ${f.models}. ${f.description}`} />
-          </div>
-        ))}
-      </div>
-    </div>
   )
 }
 
@@ -502,7 +444,6 @@ function RemoteDetail({ model }: { model: ModelEntry }) {
 }
 
 function ModelDetail({ model }: { model: ModelEntry }) {
-  const [templateRev, setTemplateRev] = useState(0)
   const host = useModels((s) => s.host)
   const actions = useActions()
   const [searchModel, setSearchModel] = useState<string | null>(null)
@@ -512,6 +453,7 @@ function ModelDetail({ model }: { model: ModelEntry }) {
       .catch(() => undefined)
   }, [model.id])
   const info = model.info
+  const projector = useProjector(model.id)
   const isLoaded = host.modelId === model.id && host.status === 'ready'
   const isLoading = host.modelId === model.id && host.status === 'loading'
   const embedding = info?.kind === 'embedding'
@@ -543,7 +485,7 @@ function ModelDetail({ model }: { model: ModelEntry }) {
         {isLoading && (
           <>
             <StatusBadge tone="busy">Loading</StatusBadge>
-            <SegmentBar value={host.progress} className="w-40" />
+            <SegmentBar value={null} className="w-40" />
           </>
         )}
         <Button variant="ghost" icon={<FolderOpen />} onClick={() => actions.showFolder(model)}>
@@ -555,7 +497,7 @@ function ModelDetail({ model }: { model: ModelEntry }) {
           </Button>
         )}
       </div>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-5 gap-y-3 border border-line/50 bg-black/40 p-3.5">
+      <FactGrid>
         <Fact label="Type">
           {info ? (
             <Select
@@ -594,17 +536,17 @@ function ModelDetail({ model }: { model: ModelEntry }) {
         <Fact label="Path" wide>
           {model.path}
         </Fact>
-      </div>
+      </FactGrid>
       {!embedding && info?.kind !== 'projector' && (
         <Panel title="Chat format" bodyClassName="flex flex-col px-3 py-1">
-          <TemplateField model={model} onSaved={() => setTemplateRev((n) => n + 1)} />
+          <TemplateField model={model} />
+          <ProjectorField projector={projector} />
         </Panel>
       )}
-      {!embedding && info?.kind !== 'projector' && !model.remote && <ModelFixes model={model} templateRev={templateRev} />}
       {embedding ? (
         <div className="text-[12.5px] text-dim">Embedding models aren't chatted with. Seven loads this one on the CPU when agents search their memory.</div>
       ) : (
-        <ParamsSection modelId={model.id} />
+        <ParamsSection modelId={model.id} traits={modelTraitSet(info, projector.state ? projector.state.choice !== null : null)} />
       )}
     </Panel>
   )
@@ -664,20 +606,20 @@ export function ModelsView() {
         .map((m) => {
           const loaded = host.modelId === m.id && host.status === 'ready'
           const loading = host.modelId === m.id && host.status === 'loading'
-          const what = m.remote ? `${m.remote.api === 'anthropic' ? 'Anthropic' : 'OpenAI-compatible'} · ${m.remote.model}` : [m.info ? MODEL_KINDS[m.info.kind].label : null, m.info?.architecture, m.info?.sizeLabel ? `${m.info.sizeLabel} params` : null].filter(Boolean).join(' · ')
+          const what = m.remote ? `${m.remote.api === 'anthropic' ? 'Anthropic' : 'OpenAI-compatible'} · ${m.remote.model}` : [m.info ? MODEL_KINDS[m.info.kind].label : null, m.info?.architecture].filter(Boolean).join(' · ')
           return {
             key: m.id,
             title: m.name,
             subtitle: `${m.favourite ? '★ ' : ''}${what}`,
             excerpt: m.remote ? undefined : m.path,
             icon: m.remote ? <Cloud className="h-4 w-4" /> : <Cpu className="h-4 w-4" />,
-            tag: loaded ? 'LOADED' : loading ? `${Math.round(host.progress * 100)}%` : m.remote ? 'REMOTE' : (m.info ? MODEL_KINDS[m.info.kind].label : 'GGUF').toUpperCase(),
-            traits: m.remote ? [] : modelTraits(m.info),
-            aside: m.remote ? 'remote' : formatBytes(modelBytes(m)),
+            tag: loaded ? 'LOADED' : loading ? 'LOADING' : m.remote ? 'REMOTE' : (m.info ? MODEL_KINDS[m.info.kind].label : 'GGUF').toUpperCase(),
+            traits: m.remote ? [] : modelTraits(m.info, modelBytes(m)),
+            aside: m.remote ? 'remote' : undefined,
             updatedAt: m.lastUsedAt
           }
         }),
-    [faceted, host.modelId, host.status, host.progress]
+    [faceted, host.modelId, host.status]
   )
 
   useEffect(() => {
@@ -731,7 +673,7 @@ export function ModelsView() {
         subtitle="GGUF models Seven can run on this machine."
         actions={
           <>
-            <GpuPicker />
+            <ServerControl />
             <Button variant={folders ? 'secondary' : 'ghost'} icon={<Folders />} onClick={() => setFolders(!folders)}>
               Folders
             </Button>

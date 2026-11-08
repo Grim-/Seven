@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, ChevronDown, FilePlus, FileText, FolderPlus, Upload, Image as ImageIcon, MoreHorizontal, Pencil, Search, Trash2, Volume2 } from 'lucide-react'
+import { ChevronDown, FilePlus, FileText, FolderPlus, Upload, Image as ImageIcon, MoreHorizontal, Pencil, Search, Trash2, Volume2 } from 'lucide-react'
 import { pageKindOf, type CollectionViewKind } from '@shared/types'
-import { EmptyState, ShellTabs, askText, openMenu, confirmDelete, type MenuItem } from '../ui'
+import { AddressLead, AddressPane, AddressTools, Button, EmptyState, NavArrows, ShellTabs, askText, openMenu, confirmDelete, useAddressPane, type MenuItem } from '../ui'
 import { engine } from '../../lib/ipc'
 import { errorText, formatRelative } from '../../lib/format'
 import { toast } from '../../store/toasts'
@@ -39,6 +39,14 @@ export function askNewPage(onCreated: (id: string) => void, type: { id: string; 
     const id = await createPage(title, type?.id ?? null, parent)
     if (id) onCreated(id)
   })
+}
+
+export async function renamePage(id: string, title: string): Promise<void> {
+  await engine('data.pages.write', { id, title, body: null }).catch(failed('Could not rename'))
+}
+
+export function askRenamePage(id: string, title: string): void {
+  askText('Rename page', 'Title', title, (next) => renamePage(id, next))
 }
 
 export function askNewFolder(onCreated: (id: string) => void, parent: string | null = null): void {
@@ -120,13 +128,9 @@ export function PageDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const hasItems = !page.type && page.records.length > 0
   const view: CollectionViewKind = page.view ?? (checkField(page) ? 'checklist' : 'table')
   const changePicture = () => void pickPicture(page.image).then((r) => r && engine('data.pages.image', { id: page.id, image: r.id }).catch(failed('Could not set the picture')))
-  const rename = () =>
-    askText('Rename page', 'Title', page.title, async (title) => {
-      await engine('data.pages.write', { id: page.id, title, body: null }).catch(failed('Could not rename'))
-    })
   const menu = (e: React.MouseEvent) =>
     entryMenuAt(e, pageKindOf(page.type), page.id, page.title, [
-      { label: 'Rename', icon: <Pencil />, onSelect: rename },
+      { label: 'Rename', icon: <Pencil />, onSelect: () => askRenamePage(page.id, page.title) },
       { label: page.image ? 'Change picture' : 'Add a picture', icon: <ImageIcon />, onSelect: changePicture },
       { label: page.voice ? 'Change voice' : 'Give it a voice', icon: <Volume2 />, onSelect: () => setVoicing(true) },
       {
@@ -140,25 +144,16 @@ export function PageDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-      <div className="flex items-center gap-2">
-        {page.image && picture && (
-          <button title="Change picture" onClick={changePicture} className="h-14 w-14 shrink-0 overflow-hidden border border-line/60 hover:border-accent">
-            <img src={assetUrl(picture)} alt="" className="h-full w-full object-cover" />
-          </button>
-        )}
-        {Screen ? (
-          <span className="flex-1" />
-        ) : (
-          <h2 onDoubleClick={rename} className="min-w-0 flex-1 truncate text-[17px] font-semibold text-white">
-            {page.title}
-          </h2>
-        )}
+      <AddressTools order={2}>
         {page.type && <span className="shrink-0 border border-line/60 px-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-accent-soft">{typeLabel ?? 'Tool off'}</span>}
         <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{formatRelative(page.updatedAt)}</span>
-        <button title="More" onClick={menu} className="flex h-7 w-7 shrink-0 items-center justify-center text-dim hover:text-white">
-          <MoreHorizontal className="h-4 w-4" />
+        <Button size="sm" variant="ghost" icon={<MoreHorizontal />} title="More" onClick={menu} />
+      </AddressTools>
+      {page.image && picture && (
+        <button title="Change picture" onClick={changePicture} className="h-14 w-14 shrink-0 overflow-hidden border border-line/60 hover:border-accent">
+          <img src={assetUrl(picture)} alt="" className="h-full w-full object-cover" />
         </button>
-      </div>
+      )}
       {page.type ? (
         typeLabel && Screen ? (
           <Screen kind={pageKindOf(page.type)} id={page.id} select={(s) => s && showInData(s)} />
@@ -177,11 +172,11 @@ export function PageDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
         <details open={Boolean(page.body.trim())} className="group">
           <summary className="cursor-pointer font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Notes</summary>
           <div className="pt-2">
-            <NoteBody page={page} heading={false} maxHeight="" contents className="seven-doc-bg p-3" />
+            <NoteBody page={page} heading={false} maxHeight="" contents bar />
           </div>
         </details>
       ) : (
-        <NoteBody key={page.id} page={page} heading={false} maxHeight="" startEditing={!page.body && !hasItems} contents className="seven-doc-bg p-3" />
+        <NoteBody key={page.id} page={page} heading={false} maxHeight="" startEditing={!page.body && !hasItems} contents bar className="flex-1" />
       )}
       {hasItems && <CollectionBody page={page} view={view} recordIds={null} />}
       <Backlinks id={page.id} />
@@ -277,6 +272,7 @@ function Jump({ current, onPick }: { current: string; onPick: (ref: string, crea
 }
 
 export function PageHost({ id, onChange, onClose }: { id: string; onChange?: (id: string) => void; onClose?: () => void }) {
+  const inPane = useAddressPane()
   const [nav, setNav] = useState<{ history: string[]; index: number }>({ history: [id], index: 0 })
   const current = nav.history[nav.index]
 
@@ -303,25 +299,31 @@ export function PageHost({ id, onChange, onClose }: { id: string; onChange?: (id
     onChange?.(nav.history[index])
   }
 
+  const body = (
+    <>
+      <AddressLead>
+        <NavArrows back={nav.index > 0 ? () => step(-1) : null} forward={nav.index < nav.history.length - 1 ? () => step(1) : null} />
+      </AddressLead>
+      <PageDetail key={current} id={current} onDeleted={() => (nav.index > 0 ? step(-1) : onClose?.())} />
+    </>
+  )
+
   return (
     <PageNav.Provider value={(ref) => void go(ref)}>
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-center gap-1 border-b border-line/40 px-2 py-1.5">
-          <button title="Back" disabled={nav.index === 0} onClick={() => step(-1)} className="flex h-7 w-7 items-center justify-center text-dim hover:text-white disabled:opacity-30">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <button title="Forward" disabled={nav.index >= nav.history.length - 1} onClick={() => step(1)} className="flex h-7 w-7 items-center justify-center text-dim hover:text-white disabled:opacity-30">
-            <ArrowRight className="h-4 w-4" />
-          </button>
-          <Jump current={current} onPick={(ref, create) => void go(ref, create)} />
-          {onClose && (
-            <button onClick={onClose} className="ml-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-dim hover:text-white">
-              Close
-            </button>
-          )}
-        </div>
-        <PageDetail key={current} id={current} onDeleted={() => (nav.index > 0 ? step(-1) : onClose?.())} />
-      </div>
+      {inPane ? body : (
+        <AddressPane
+          path={<Jump current={current} onPick={(ref, create) => void go(ref, create)} />}
+          tools={
+            onClose && (
+              <Button size="sm" variant="ghost" onClick={onClose}>
+                Close
+              </Button>
+            )
+          }
+        >
+          {body}
+        </AddressPane>
+      )}
     </PageNav.Provider>
   )
 }

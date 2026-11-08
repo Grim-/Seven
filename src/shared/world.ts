@@ -98,6 +98,8 @@ export interface WorldMeta {
   types: { key: string; plural: string; count: number }[]
   posts: number
   player: string | null
+  rules: string
+  tags: string[]
   updatedAt: number
 }
 

@@ -1,4 +1,5 @@
 import type { ModelConfig, ParamDef } from './types'
+import { fileList, fileListFlag, fileListFromFlag, fileListText } from './modelParams'
 
 function split(text: string): string[] {
   const out: string[] = []
@@ -53,6 +54,14 @@ export function parseModelArgs(text: string, params: ParamDef[]): { values: Mode
       continue
     }
     takeNext()
+    if (def.type === 'text' || def.type === 'file') {
+      values[def.key] = next
+      continue
+    }
+    if (def.type === 'files') {
+      values[def.key] = fileListText([...fileList(values[def.key]), ...fileListFromFlag(next)])
+      continue
+    }
     if (def.type === 'select') {
       const match = def.options?.find((o) => o.toLowerCase() === next.toLowerCase())
       if (match) values[def.key] = match
@@ -73,6 +82,9 @@ export function modelArgsText(config: ModelConfig, params: ParamDef[]): string {
       const flag = p.flag!.find((f) => f.startsWith('--')) ?? p.flag![0]
       const v = config[p.key]
       if (p.type === 'bool') return v ? flag : `--no-${flag.slice(2)}`
+      const quoted = (t: string) => (/\s/.test(t) ? `"${t}"` : t)
+      if (p.type === 'files') return `${flag} ${quoted(fileListFlag(fileList(v)))}`
+      if (p.type === 'text' || p.type === 'file') return `${flag} ${quoted(String(v))}`
       return `${flag} ${p.type === 'select' ? String(v).toLowerCase() : String(v)}`
     })
     .join(' ')

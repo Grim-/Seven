@@ -1,5 +1,5 @@
 import { normalEntity, normalValue, worldId, type WorldBinding, type WorldEntity, type WorldEntry, type WorldField, type WorldLock, type WorldMapValue, type WorldType } from '@shared/world'
-import { WorldError, nowStamp, worlds } from './store'
+import { WorldError, nowStamp, worlds, type WorldLayer } from './store'
 import { Decision } from "@shared/decisions"
 import { Action } from "@shared/actions"
 
@@ -147,10 +147,10 @@ export interface WriteArgs {
   actions?: Action[] | null
 }
 
-export function writeField(worldIdv: string, typeKey: string, key: string, fieldName: string, args: WriteArgs, creatingLabel: string | null): string {
+export function writeField(worldIdv: string, typeKey: string, key: string, fieldName: string, args: WriteArgs, creatingLabel: string | null, layer: WorldLayer = 'template'): string {
   const t = worlds.type(worldIdv, typeKey)
   const [name, f] = fieldOf(t, fieldName)
-  const existing = worlds.get(worldIdv, typeKey, key)
+  const existing = worlds.get(worldIdv, typeKey, key, true, layer)
   const creating = existing === null
   const entity: WorldEntity = existing ?? normalEntity(t, { [t.label]: creatingLabel ?? key })
   const mode: Mode = creating ? 'create' : f.kind === 'list' || f.kind === 'log' ? 'append' : 'update'
@@ -197,12 +197,12 @@ export function writeField(worldIdv: string, typeKey: string, key: string, field
     const ids = f.kind === 'ref' && entity[name] ? [String(entity[name])] : f.kind === 'refs' ? (entity[name] as string[]) : []
     reply = `${name} is now ${Array.isArray(entity[name]) ? (entity[name] as string[]).join(', ') : String(entity[name])}.${ids.length ? refWarning(worldIdv, f.to, ids) : ''}`
   }
-  worlds.put(worldIdv, typeKey, key, entity)
+  worlds.put(worldIdv, typeKey, key, entity, layer)
   return creating ? `Created the ${t.noun} "${key}". ${reply}` : reply
 }
 
 export function remember(b: WorldBinding, field: string, args: WriteArgs): string {
-  return writeField(b.worldId, b.type, b.id, field, args, null)
+  return writeField(b.worldId, b.type, b.id, field, args, null, 'play')
 }
 
 export function search(b: WorldBinding, query: string, typeKey: string | null, limit: number | null): string {
@@ -251,7 +251,7 @@ export function createRecord(worldIdv: string, typeKey: string, id: string, valu
   const t = worlds.type(worldIdv, typeKey)
   const key = worldId(id)
   if (!key) throw new WorldError(`Set id to the new ${t.noun}'s name, e.g. old_mill.`)
-  if (worlds.get(worldIdv, typeKey, key)) throw new WorldError(`A ${t.noun} "${key}" already exists. Change it with world_set or world_entries.`)
+  if (worlds.get(worldIdv, typeKey, key, true, 'template')) throw new WorldError(`A ${t.noun} "${key}" already exists. Change it with world_set or world_entries.`)
   const raw: Record<string, unknown> = { [t.label]: id.trim() }
   for (const [name, v] of Object.entries(values)) {
     const [fname, f] = fieldOf(t, name)
@@ -265,7 +265,7 @@ export function createRecord(worldIdv: string, typeKey: string, id: string, valu
 export function editEntries(worldIdv: string, typeKey: string, id: string, field: string, args: { add: string[] | null; edit: { index: number; text: string } | null; remove: number[] | null; clear: boolean }): string {
   const t = worlds.type(worldIdv, typeKey)
   const key = worldId(id)
-  const e = worlds.get(worldIdv, typeKey, key)
+  const e = worlds.get(worldIdv, typeKey, key, true, 'template')
   if (!e) throw new WorldError(`No ${t.noun} with id "${key}". Use world_search to find the right id.`)
   const [name, f] = fieldOf(t, field)
   if (f.kind !== 'list' && f.kind !== 'log') throw new WorldError(`${name} is not a list or log, so world_entries can't change it. Use world_set instead.`)

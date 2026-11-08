@@ -5,8 +5,8 @@ import { create } from 'zustand'
 import MiniSearch from 'minisearch'
 import { ArrowUpToLine, BookOpen, ChevronDown, ChevronRight, Download, Folder, FolderInput, FolderOpen, FolderPlus, Hash, Plus, X } from 'lucide-react'
 import { pageKindOf, type LibrarySection, type PageMeta } from '@shared/types'
-import { Button, EmptyState, Gutter, MainPane, PaneHeader, ReadingPane, SidePane, Split, VirtualList, openMenu, type MenuItem } from '../components/ui'
-import { askNewFolder, folderNewItems, newPageMenu, usePageTypes } from '../components/data/PageView'
+import { AddressPane, Button, EmptyState, Gutter, MainPane, PaneHeader, ReadingPane, SidePane, Split, VirtualList, openMenu, type MenuItem } from '../components/ui'
+import { askNewFolder, folderNewItems, newPageMenu, renamePage, usePageTypes } from '../components/data/PageView'
 import { ancestorsOf, findPage, useData, type DataSelection } from '../store/data'
 import { FolderPath } from '../components/data/FolderPath'
 import { useApp } from '../store/app'
@@ -496,48 +496,35 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
       <MainPane id="page">
       <section className="flex h-full min-w-0 flex-1 flex-col gap-2">
         {current && current.type === FOLDER_TYPE ? (
-          <>
-            <FolderPath trail={path} current={showName(current.title)} onPick={select}>
-              <CopyLinkButton kind={pageKindOf(current.type)} id={current.id} />
-            </FolderPath>
+          <AddressPane path={<FolderPath trail={path} current={showName(current.title)} rename={{ value: current.title, onSave: (title) => void renamePage(current.id, title) }} onPick={select} />} tools={<CopyLinkButton kind={pageKindOf(current.type)} id={current.id} />}>
             <PageExplorer key={current.id} folder={current.id} onOpen={(id) => select(id)} onMenu={menu} />
-          </>
+          </AddressPane>
         ) : current ? (
-          <>
-            <FolderPath trail={path} current={showName(current.title)} onPick={select}>
-              <CopyLinkButton kind={pageKindOf(current.type)} id={current.id} />
-            </FolderPath>
-            <ReadingPane>{Screen ? <Screen key={current.id} kind={kind!} id={current.id} select={screenSelect} /> : <EmptyState title="No view">This kind has no screen of its own.</EmptyState>}</ReadingPane>
-          </>
+          <ReadingPane className="p-0">
+            <AddressPane path={<FolderPath trail={path} current={showName(current.title)} rename={{ value: current.title, onSave: (title) => void renamePage(current.id, title) }} onPick={select} />} tools={<CopyLinkButton kind={pageKindOf(current.type)} id={current.id} />}>
+              {Screen ? <Screen key={kind} kind={kind!} id={current.id} select={screenSelect} /> : <EmptyState title="No view">This kind has no screen of its own.</EmptyState>}
+            </AddressPane>
+          </ReadingPane>
         ) : special ? (
-          <>
-            <nav className="flex min-w-0 items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em]">
-              <button onClick={() => select(INDEX_ID)} className="shrink-0 text-accent-soft hover:text-white">
-                {INDEX_TITLE}
-              </button>
-              <ChevronRight className="h-3 w-3 shrink-0 text-faint" />
-              <span className="text-accent-soft">Seven</span>
-              <ChevronRight className="h-3 w-3 shrink-0 text-faint" />
-              <span className="truncate text-white">{special.title}</span>
-              <span className="ml-2 normal-case tracking-normal text-faint">generated, read only</span>
-            </nav>
-            <div className="flex min-h-0 flex-1 flex-col">
-              <GeneratedPage key={special.id} id={special.id} onEntry={openLink} />
-            </div>
-          </>
+          <AddressPane
+            path={
+              <FolderPath trail={[{ id: INDEX_ID, title: INDEX_TITLE }, { id: null, title: 'Seven' }]} current={special.title} onPick={select}>
+                <span className="ml-2 text-faint">generated, read only</span>
+              </FolderPath>
+            }
+          >
+            <GeneratedPage key={special.id} id={special.id} onEntry={openLink} />
+          </AddressPane>
         ) : selected === INDEX_ID ? (
-          <>
-            <nav className="flex min-w-0 items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em]">
-              <button title="Top level" onClick={() => select(null)} className="shrink-0 text-accent-soft hover:text-white">
-                /
-              </button>
-              <span className="text-white">{INDEX_TITLE}</span>
-              <span className="ml-2 normal-case tracking-normal text-faint">every folder and page</span>
-            </nav>
-            <div className="flex min-h-0 flex-1 flex-col">
-              <GeneratedPage id={INDEX_ID} onEntry={openLink} />
-            </div>
-          </>
+          <AddressPane
+            path={
+              <FolderPath trail={[]} current={INDEX_TITLE} onPick={select}>
+                <span className="ml-2 text-faint">every folder and page</span>
+              </FolderPath>
+            }
+          >
+            <GeneratedPage id={INDEX_ID} onEntry={openLink} />
+          </AddressPane>
         ) : (
           <PageExplorer
             folder={null}

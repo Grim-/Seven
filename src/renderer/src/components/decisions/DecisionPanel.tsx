@@ -6,7 +6,7 @@ import { Button, Input, NumberField, Toggle, askText } from '../ui'
 import { engine } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
 import { useCheckTargets } from '../play/useCheckTargets'
-import { playText, showPlay, type PlayWhere } from '../play/playStore'
+import { closePlay, playText, showPlay, type PlayWhere } from '../play/playStore'
 import { PanelBody, PanelLabel } from '../play/PanelBody'
 import { SheetSelect } from '../data/sheet/SheetSelect'
 import { PickOptionsEditor } from './PickOptionsEditor'
@@ -43,7 +43,7 @@ export function DecisionPanel({ start, character, where, onSaved }: { start: Sto
   const ask = () => where.onText?.(playText(where, start ? `Use decide with from @story_decision:${start.id}` : `Use decide for this, writing ${count} options: ${question.trim()}`))
   const show = () => {
     const p: PickDecisionProps = { question: question.trim(), options: filled, own, character: sheet, from: start ? `@story_decision:${start.id}` : null }
-    showPlay('Decision', <PlayedCard view={(done, onAnswer) => <DecideView p={p} done={done} open={!done} onAnswer={onAnswer} />} text={async (a) => pickMadeText(p, a, await sheetTitle(a.character))} where={where} />)
+    showPlay('Decision', <PlayedCard view={(done, onAnswer) => <DecideView p={p} done={done} open={!done} onAnswer={onAnswer} onClose={closePlay} />} text={async (a) => pickMadeText(p, a, await sheetTitle(a.character))} where={where} />)
   }
   return (
     <PanelBody

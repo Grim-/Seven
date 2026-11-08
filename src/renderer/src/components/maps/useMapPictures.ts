@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { mapPictureIds, type MapData } from '@shared/maps'
-import { engine } from '../../lib/ipc'
 import { useImageLoad } from '../../lib/useLoadedImages'
-import { assetUrl, useData } from '../../store/data'
+import { assetUrlOf } from '../../lib/assetSource'
 
 export function useMapPictures(map: MapData | null | false): { done: number; total: number } {
   const ids = map ? mapPictureIds(map) : []
@@ -11,17 +10,7 @@ export function useMapPictures(map: MapData | null | false): { done: number; tot
   useEffect(() => {
     let live = true
     setFound(null)
-    void Promise.all(
-      ids.map((id) =>
-        engine('data.assets.get', { id }).then(
-          (a) => {
-            useData.getState().onAsset(a.id, a)
-            return assetUrl(a)
-          },
-          () => null
-        )
-      )
-    ).then(
+    void Promise.all(ids.map(assetUrlOf)).then(
       (list) =>
         live &&
         setFound({

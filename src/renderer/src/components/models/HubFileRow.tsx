@@ -25,7 +25,7 @@ export function HubFileRow({ repo, file, folder, stats }: { repo: string; file: 
   const start = () => void engine('downloads.start', { repo, file: file.file, name: file.name, folder: folder ?? '', total: bytes }).catch(failed('Could not start the download'))
   const traits = [
     ...(fit ? [{ key: 'fit', label: fit.label, tone: fit.tone, hint: fit.hint }] : []),
-    ...modelTraits(info).filter((t) => t.key !== 'quant'),
+    ...modelTraits(info, bytes).filter((t) => t.key !== 'quant'),
     ...(!header ? [{ key: 'reading', label: 'Reading header', tone: 'busy' as const }] : []),
     ...(header?.error ? [{ key: 'error', label: 'Header unreadable', tone: 'error' as const, hint: header.error }] : [])
   ]

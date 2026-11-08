@@ -4,7 +4,7 @@ import { ActionBar } from '../ui'
 import { closePlay, playText, type PlayWhere } from '../play/playStore'
 import { playOutItem } from '../play/playOut'
 
-export function PlayedCard<A>({ view, text, where }: { view: (done: A | null, onAnswer: (value: A) => Promise<void>) => ReactNode; text: (value: A) => Promise<string>; where: PlayWhere }) {
+export function PlayedCard<A = any>({ view, text, where }: { view: (done: any, onAnswer: (value: any) => Promise<void>) => ReactNode; text: (value: any) => Promise<string>; where: PlayWhere }) {
   const [done, setDone] = useState<A | null>(null)
   const [said, setSaid] = useState<string | null>(null)
   const onAnswer = async (value: A) => {

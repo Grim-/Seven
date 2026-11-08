@@ -12,6 +12,7 @@ import { UnlockCard } from '../components/vault/Vault'
 import { GatherCard } from '../components/chat/Gather'
 import { focusedConversation, useConversation } from '../lib/conversation'
 import { hidePlayRequest, showPlayRequest } from '../lib/playRequests'
+import { isLater, LATER } from '@shared/uiLater'
 
 export async function answer(ui: UiRequestState, value: unknown, fallbackText: string): Promise<void> {
   try {
@@ -27,10 +28,15 @@ export async function answer(ui: UiRequestState, value: unknown, fallbackText: s
   }
 }
 
+export async function later(ui: UiRequestState, fallbackText: string): Promise<void> {
+  return answer(ui, LATER, fallbackText)
+}
+
 export function StatusLine({ ui }: { ui: UiRequestState }) {
   if (ui.status === 'pending') return <span className="animate-pulse text-accent">Waiting for your answer</span>
   if (ui.status === 'expired') return <span className="text-accent-soft">Seven restarted before you answered. Answering now sends it as a new message.</span>
   if (ui.status === 'cancelled') return <span className="text-faint">Cancelled</span>
+  if (isLater(ui.answer)) return <span className="text-dim">Saved for later</span>
   return <span className="text-ok">Answered</span>
 }
 

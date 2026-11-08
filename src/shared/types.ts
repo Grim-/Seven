@@ -1,3 +1,4 @@
+import type { EntityRecord } from './game/core/GameEntity'
 import { isAssetId } from './ids'
 import type { DndStats } from './dnd'
 import type { Story } from './story'
@@ -32,18 +33,19 @@ export interface ModelEntry {
 }
 
 export const MODEL_KINDS = {
-  chat: { label: 'Chat', plural: 'Chat', runnable: true, always: true, listed: true, note: null },
-  embedding: { label: 'Embedding', plural: 'Embedding', runnable: true, always: true, listed: true, note: null },
-  projector: { label: 'Vision adapter', plural: 'Vision adapters', runnable: false, always: false, listed: false, note: 'A vision adapter goes with a model; it is not a model of its own.' },
+  chat: { label: 'Chat', plural: 'Chat', runnable: true, chats: true, always: true, listed: true, note: null },
+  embedding: { label: 'Embedding', plural: 'Embedding', runnable: true, chats: false, always: true, listed: true, note: null },
+  projector: { label: 'Vision adapter', plural: 'Vision adapters', runnable: false, chats: false, always: false, listed: false, note: 'A vision adapter goes with a model; it is not a model of its own.' },
   imatrix: {
     label: 'Importance matrix',
     plural: 'Importance matrices',
     runnable: false,
+    chats: false,
     always: false,
     listed: false,
     note: 'An importance matrix is only used when a model is quantized. It is not a model, and running a model never reads it: a model made with one has it built in.'
   },
-  other: { label: 'Other', plural: 'Other', runnable: true, always: false, listed: true, note: null }
+  other: { label: 'Other', plural: 'Other', runnable: true, chats: true, always: false, listed: true, note: null }
 } as const
 
 export type ModelKind = keyof typeof MODEL_KINDS
@@ -64,6 +66,7 @@ export interface ModelInfo {
   imatrix: { dataset: string | null; chunks: number | null } | null
   experts: { count: number; used: number | null } | null
   mtpLayers: number | null
+  slidingWindow: number | null
   quant: string | null
   split: { part: number; parts: number } | null
   sizeBytes: number | null
@@ -104,12 +107,80 @@ export interface DownloadItem {
   startedAt: number
 }
 
+export interface ChatServerStatus {
+  modelId: string
+  modelName: string
+  pid: number | null
+  startedAt: number
+  args: string[]
+  contextSize: number
+  device: string | null
+  offload: { gpu: number; total: number } | null
+  mtp: boolean
+  vision: boolean
+  last: ServerTimings | null
+  writing: boolean
+  log: string[]
+}
+
+export interface MemoryServerStatus {
+  modelId: string | null
+  running: boolean
+  pid: number | null
+  error: string | null
+  log: string[]
+}
+
+export interface NetworkSettings {
+  port: number
+  privateOnly: boolean
+  maxFailures: number
+  lockMinutes: number
+  maxRequestMb: number
+}
+
+export interface NetworkClient {
+  address: string
+  lastAt: number
+  requests: number
+  failures: number
+  lockedUntil: number
+  model: string | null
+}
+
+export interface NetworkStatus {
+  on: boolean
+  listening: boolean
+  error: string | null
+  addresses: string[]
+  hasPassword: boolean
+  passwordMin: number
+  fingerprint: string | null
+  settings: NetworkSettings
+  clients: NetworkClient[]
+}
+
+export interface ServerStatus {
+  installed: string | null
+  logLines: number
+  chat: ChatServerStatus | null
+  memory: MemoryServerStatus
+  network: NetworkStatus
+  vram: { used: number; total: number } | null
+}
+
 export type ParamGroup = 'load' | 'sampling'
-export type ParamSection = 'memory' | 'context' | 'speed' | 'thinking' | 'sampling' | 'repetition' | 'advanced'
+export type ParamSection = 'memory' | 'context' | 'speed' | 'thinking' | 'sampling' | 'repetition' | 'vision' | 'files' | 'advanced'
 export const THINKING_LEVELS = ['off', 'low', 'medium', 'high', 'max'] as const
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number]
 export type ParamTarget = 'load' | 'context' | 'prompt'
-export type ParamType = 'int' | 'float' | 'bool' | 'select'
+export type ParamType = 'int' | 'float' | 'bool' | 'select' | 'text' | 'file' | 'files'
+export type ModelTrait = 'moe' | 'dense' | 'mtp' | 'swa' | 'vision'
+export type ModelTraitSet = Partial<Record<ModelTrait, boolean>>
+export interface ParamWhen {
+  key: string
+  values?: (number | boolean | string)[]
+}
 
 export interface ParamDef {
   key: string
@@ -127,6 +198,11 @@ export interface ParamDef {
   max?: number
   step?: number
   hint?: string
+  needs?: { trait: ModelTrait; reason: string }
+  when?: { any: ParamWhen[]; reason: string }
+  emit?: 'on' | 'off' | 'both' | 'value'
+  skip?: (number | boolean | string)[]
+  files?: { name: string; extensions: string[] }
 }
 
 export type ParamValue = number | boolean | string
@@ -140,35 +216,29 @@ export interface ModelHostState {
   error: string | null
 }
 
-export type GpuBackend = 'auto' | 'cuda' | 'vulkan' | 'cpu'
-
-export interface GpuInfo {
-  choice: GpuBackend
-  active: string | null
-  note: string | null
-  cudaDownload: number | null
+export interface ProjectorChoice {
+  choice: string | null
+  auto: boolean
+  options: { id: string; name: string }[]
 }
 
-export interface CudaInstallProgress {
+export interface ServerRelease {
+  installed: string | null
+  latest: string | null
+}
+
+export interface ServerInfo {
+  installed: string | null
+}
+
+export interface ServerInstallProgress {
   stage: 'download' | 'extract' | 'done'
   received: number
   total: number
+  tag: string
 }
 
-export type ChatTemplate = { type: 'auto' } | { type: 'wrapper'; name: string } | { type: 'jinja'; template: string }
-
-export interface ModelFixInfo {
-  id: string
-  label: string
-  models: string
-  description: string
-  on: boolean
-}
-
-export interface ChatTemplateInfo {
-  choice: ChatTemplate
-  wrappers: string[]
-}
+export type ChatTemplate = { type: 'auto' } | { type: 'jinja'; template: string }
 
 export interface ModelConfigResult {
   config: ModelConfig
@@ -278,6 +348,7 @@ export interface AgentProfile {
   thinking?: ThinkingLevel | null
   mindAuto?: { recall: boolean }
   remindEvery?: number
+  maxToolRounds?: number
   sheet?: string | null
   player?: string | null
   cards?: CardSource | null
@@ -443,7 +514,24 @@ export interface ContextUsage {
   at: number
 }
 
+export interface ServerTimings {
+  promptTps: number | null
+  genTps: number | null
+  drafted: number | null
+  accepted: number | null
+}
+
+export interface ServerFacts {
+  tag: string | null
+  mtp: boolean
+  vision: boolean
+  device: string | null
+  offload: { gpu: number; total: number } | null
+  last: ServerTimings | null
+}
+
 export interface ModelFacts {
+  server?: ServerFacts
   wrapper: string
   contextSize: number
   trainContextSize: number
@@ -874,6 +962,7 @@ export interface ToolPart {
   cut?: boolean
   trimmed?: number
   edited?: boolean
+  images?: string[]
 }
 
 export type TextPart = { type: 'text'; text: string }
@@ -1213,6 +1302,9 @@ export interface CharacterSheet {
   fields: string[]
   values: Record<string, string>
   dnd: DndStats | null
+  game?: EntityRecord | null
+  gameRules?: string
+  save?: string
   story: Story
   image: string | null
   updatedAt: number

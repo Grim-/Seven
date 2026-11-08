@@ -1,9 +1,13 @@
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ChatHistoryItem, ChatModelFunctionCall, ChatModelResponse, ChatModelSegment } from 'node-llama-cpp'
-import type { RemoteSpec } from '@shared/types'
+import type { RemoteSpec, ServerTimings } from '@shared/types'
+import fs from 'node:fs'
+import path from 'node:path'
+import { data } from '../data/hub'
+import { classify } from '../data/assets'
+import { imageItem, imagesIn } from '../chat/history'
 
-const MAX_ROUNDS = 30
 const DEFAULT_MAX_TOKENS = 4096
 const CHARS_PER_TOKEN = 3.6
 
@@ -12,6 +16,10 @@ export interface RemoteTarget {
   spec: RemoteSpec
   key: string | null
   contextSize: number
+  local?: boolean
+  vision?: boolean
+  keepThinking?: boolean
+  onTimings?: (timings: ServerTimings) => void
 }
 
 export interface RemoteSampling {
@@ -26,6 +34,10 @@ type Handler = { description?: string; params?: unknown; handler: (params: unkno
 
 export interface RemotePromptOptions extends RemoteSampling {
   functions?: Record<string, Handler>
+  extra?: Record<string, unknown>
+  maxRounds?: number
+  images?: string[]
+  takeImages?: () => string[]
   signal?: AbortSignal
   onResponseChunk?: (chunk: { type?: 'segment'; segmentType?: 'thought'; text: string }) => void
   onFunctionCallParamsChunk?: (chunk: { callIndex: number; functionName: string; paramsChunk: string; done: boolean }) => void
@@ -43,6 +55,11 @@ interface Round {
   calls: Call[]
   input: number
   output: number
+  timings?: ServerTimings
+}
+
+function num(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 function estimate(value: unknown): number {
@@ -59,7 +76,7 @@ function schemaOf(params: unknown): Record<string, unknown> {
 
 function friendly(err: unknown, target: RemoteTarget): Error {
   const status = (err as { status?: number })?.status
-  const where = target.spec.baseUrl ?? (target.spec.api === 'anthropic' ? 'Anthropic' : 'OpenAI')
+  const where = target.local ? 'llama-server' : (target.spec.baseUrl ?? (target.spec.api === 'anthropic' ? 'Anthropic' : 'OpenAI'))
   const raw = err instanceof Error ? err.message : String(err)
   if (status === 401 || status === 403) return new Error(`${where} refused the key for ${target.spec.model}. Check it in Models.`)
   if (status === 404) return new Error(`${where} has no model called "${target.spec.model}". Check the model name in Models.`)
@@ -103,7 +120,15 @@ class ThinkSplitter {
   }
 }
 
-function openaiMessages(items: ChatHistoryItem[], known: Set<string>): OpenAI.Chat.ChatCompletionMessageParam[] {
+function imagePart(ref: string): OpenAI.Chat.ChatCompletionContentPartImage | null {
+  const meta = data.assets.metaFor(ref)
+  if (meta) return meta.kind === 'image' ? { type: 'image_url', image_url: { url: `data:${meta.mime};base64,${data.assets.readBytes(meta).toString('base64')}` } } : null
+  if (!path.isAbsolute(ref) || !fs.existsSync(ref)) return null
+  const { mime, kind } = classify(ref)
+  return kind === 'image' ? { type: 'image_url', image_url: { url: `data:${mime};base64,${fs.readFileSync(ref).toString('base64')}` } } : null
+}
+
+function openaiMessages(items: ChatHistoryItem[], known: Set<string>, vision: boolean, thinking: boolean): OpenAI.Chat.ChatCompletionMessageParam[] {
   const out: OpenAI.Chat.ChatCompletionMessageParam[] = []
   let n = 0
   for (const item of items) {
@@ -112,22 +137,29 @@ function openaiMessages(items: ChatHistoryItem[], known: Set<string>): OpenAI.Ch
       continue
     }
     if (item.type === 'user') {
-      out.push({ role: 'user', content: item.text })
+      const images = vision ? imagesIn(item).map(imagePart).filter((p): p is OpenAI.Chat.ChatCompletionContentPartImage => p !== null) : []
+      if (images.length) out.push({ role: 'user', content: [...(item.text ? [{ type: 'text' as const, text: item.text }] : []), ...images] })
+      else if (item.text) out.push({ role: 'user', content: item.text })
       continue
     }
     let text = ''
+    let thought = ''
     let calls: { id: string; call: ChatModelFunctionCall }[] = []
     const flush = () => {
       if (!text && !calls.length) return
-      out.push({ role: 'assistant', content: text || null, ...(calls.length ? { tool_calls: calls.map((c) => ({ id: c.id, type: 'function' as const, function: { name: c.call.name, arguments: JSON.stringify(c.call.params ?? {}) } })) } : {}) })
+      out.push({ role: 'assistant', content: text || null, ...(thinking && thought ? { reasoning_content: thought } : {}), ...(calls.length ? { tool_calls: calls.map((c) => ({ id: c.id, type: 'function' as const, function: { name: c.call.name, arguments: JSON.stringify(c.call.params ?? {}) } })) } : {}) } as OpenAI.Chat.ChatCompletionMessageParam)
       for (const c of calls) out.push({ role: 'tool', tool_call_id: c.id, content: resultText(c.call.result) })
       text = ''
+      thought = ''
       calls = []
     }
     for (const r of item.response) {
       if (typeof r === 'string') {
         if (calls.length) flush()
         text += r
+      } else if (r.type === 'segment') {
+        if (calls.length) flush()
+        if (r.segmentType === 'thought') thought += r.text
       } else if (r.type === 'functionCall') {
         if (known.has(r.name)) calls.push({ id: `call_${n++}`, call: r })
         else {
@@ -206,18 +238,21 @@ async function openaiRound(target: RemoteTarget, items: ChatHistoryItem[], o: Re
   const stream = await client.chat.completions.create(
     {
       model: target.spec.model,
-      messages: openaiMessages(items, new Set(Object.keys(fns))),
+      messages: openaiMessages(items, new Set(Object.keys(fns)), target.vision === true, target.keepThinking === true),
       stream: true,
       stream_options: { include_usage: true },
       ...(tools.length ? { tools } : {}),
       ...(o.temperature !== undefined ? { temperature: o.temperature } : {}),
       ...(o.topP !== undefined ? { top_p: o.topP } : {}),
       ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
-      ...(o.effort ? { reasoning_effort: o.effort } : {})
+      ...(o.effort && !target.local ? { reasoning_effort: o.effort } : {}),
+      ...(o.extra ?? {})
     },
     { signal: o.signal }
   )
   for await (const chunk of stream) {
+    const t = (chunk as { timings?: Record<string, unknown> }).timings
+    if (t) round.timings = { promptTps: num(t.prompt_per_second), genTps: num(t.predicted_per_second), drafted: num(t.draft_n), accepted: num(t.draft_n_accepted) }
     if (chunk.usage) {
       round.input = chunk.usage.prompt_tokens ?? round.input
       round.output = chunk.usage.completion_tokens ?? round.output
@@ -288,6 +323,8 @@ async function anthropicRound(target: RemoteTarget, items: ChatHistoryItem[], o:
 
 export class RemoteChat {
   disposed = false
+  capped = false
+  timings: ServerTimings | null = null
   private items: ChatHistoryItem[]
   readonly sequence: { context: { contextSize: number }; tokenMeter: { usedInputTokens: number; usedOutputTokens: number }; nextTokenIndex: number; model: null }
   readonly chatWrapper = {
@@ -332,6 +369,10 @@ export class RemoteChat {
       meter.usedInputTokens += input
       meter.usedOutputTokens += output
       this.sequence.nextTokenIndex = input + output
+      if (r.timings) {
+        this.timings = r.timings
+        this.target.onTimings?.(r.timings)
+      }
       return r
     } catch (err) {
       if (o.signal?.aborted) return { text: '', thought: '', calls: [], input: 0, output: 0 }
@@ -340,12 +381,18 @@ export class RemoteChat {
   }
 
   async prompt(text: string, o: RemotePromptOptions = {}): Promise<string> {
-    this.items.push({ type: 'user', text })
-    const reply: ChatModelResponse = { type: 'model', response: [] }
+    this.items.push({ type: 'user', text, ...(o.images?.length ? { images: o.images } : {}) } as ChatHistoryItem)
+    let reply: ChatModelResponse = { type: 'model', response: [] }
     this.items.push(reply)
     const fns = o.functions ?? {}
     let finalText = ''
-    for (let i = 0; i < MAX_ROUNDS && !o.signal?.aborted; i++) {
+    this.capped = false
+    this.timings = null
+    for (let i = 0; !o.signal?.aborted; i++) {
+      if (o.maxRounds && i >= o.maxRounds) {
+        this.capped = true
+        break
+      }
       const r = await this.round(o)
       if (r.thought) reply.response.push({ type: 'segment', segmentType: 'thought', text: r.thought, ended: true } satisfies ChatModelSegment)
       if (r.text) {
@@ -375,6 +422,12 @@ export class RemoteChat {
         }
         reply.response.push({ type: 'functionCall', name: call.name, description: fn?.description, params, result } satisfies ChatModelFunctionCall)
         if (o.signal?.aborted) break
+      }
+      const shown = o.takeImages?.() ?? []
+      if (shown.length) {
+        this.items.push(imageItem(shown))
+        reply = { type: 'model', response: [] }
+        this.items.push(reply)
       }
     }
     return finalText

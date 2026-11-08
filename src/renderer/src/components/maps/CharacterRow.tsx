@@ -7,10 +7,14 @@ import { openSevenLink } from '../../lib/links'
 import { SheetPortrait } from '../data/SheetPortrait'
 import { RowAction } from '../ui'
 import { HpBar } from './HpBar'
+import { RecordBars } from '../game/ResourceBars'
+import { useGameCatalog } from '../game/useGameCatalog'
+import { useResolvedRuleSet } from '../game/ruleSet'
 
 export function CharacterRow({ visitor, onRemove, onMenu }: { visitor: PlaceVisitor; onRemove?: () => void; onMenu?: (e: MouseEvent) => void }) {
   const agent = useAgents((s) => (visitor.agent ? s.list.find((a) => a.id === visitor.agent) : undefined))
   const d = visitor.dnd
+  const catalog = useGameCatalog(useResolvedRuleSet(visitor.gameRules))
   return (
     <div onContextMenu={onMenu} className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5 border border-line/40 bg-white/[0.015] p-2">
       <button type="button" title={`Open ${visitor.name}`} onClick={() => openSevenLink(`seven:sheet/${encodeURIComponent(visitor.sheet)}`)}>
@@ -27,9 +31,10 @@ export function CharacterRow({ visitor, onRemove, onMenu }: { visitor: PlaceVisi
           )}
         </div>
         <div className="truncate font-mono text-[10.5px] text-dim">{visitor.line}</div>
+        {visitor.game && catalog && <RecordBars record={visitor.game} catalog={catalog} />}
         {d && (
           <>
-            <HpBar hp={d.hp} />
+            {!visitor.game && <HpBar hp={d.hp} />}
             <div className="grid grid-cols-6 border border-line/40 text-center font-mono text-[11px]">
               {DND_STATS.map((s) => (
                 <div key={s} className="border-r border-line/40 py-0.5 last:border-r-0">

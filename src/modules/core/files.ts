@@ -4,7 +4,9 @@ import { writeUserFile } from '../../engine/util/fs'
 import { displayPath, isToolsFolder, resolveForWrite } from '../../engine/tools/workspace'
 import { gateWrite } from '../../engine/permissions/gate'
 import { ToolError, optStr, str, type ToolDef } from '../../engine/tools/types'
-import type { AssetMeta } from '@shared/types'
+import type { AssetMeta, PictureArea } from '@shared/types'
+import { resolveFile } from '../../engine/library/files'
+import { newId } from '../../engine/util/fs'
 import { data } from '../../engine/data/hub'
 import { documentKind, documentText, unreadableFormat } from '../../engine/util/documents'
 
@@ -59,4 +61,53 @@ const fileExport: ToolDef = {
   }
 }
 
-export const FILE_TOOLS: ToolDef[] = [fileExport]
+function areasOf(value: unknown): PictureArea[] {
+  if (!Array.isArray(value)) throw new ToolError('areas must be a list, e.g. [{"name": "door", "note": "", "x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4}], or null to keep them.')
+  return value.map((a, i) => {
+    const area = (a ?? {}) as Record<string, unknown>
+    const name = typeof area.name === 'string' ? area.name.trim() : ''
+    if (!name) throw new ToolError(`Area ${i + 1} has no name. Give each area a name.`)
+    const n = (key: string) => (typeof area[key] === 'number' ? (area[key] as number) : Number.NaN)
+    if ([n('x'), n('y'), n('w'), n('h')].some((v) => !Number.isFinite(v))) throw new ToolError(`Area "${name}" needs x, y, w and h as numbers from 0 to 1 (fractions of the picture's width and height).`)
+    return { id: newId('area'), name, note: typeof area.note === 'string' ? area.note : '', x: n('x'), y: n('y'), w: n('w'), h: n('h') }
+  })
+}
+
+const updateFile: ToolDef = {
+  name: 'update_file',
+  group: 'core',
+  needsWorkspace: false,
+  permission: 'ask',
+  description: "Set a library file's description, and for pictures its named areas. Agents that can't see pictures read these instead.",
+  params: {
+    type: 'object',
+    properties: {
+      id: { type: 'string', description: 'The file id or name' },
+      description: { type: ['string', 'null'], description: 'What the file is or shows. null keeps the current one' },
+      areas: {
+        type: ['array', 'null'],
+        description: 'Pictures only: named parts of the picture. Positions are fractions of the width and height, 0 to 1, from the top left. [] removes them; null keeps the current ones',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            note: { type: 'string' },
+            x: { type: 'number' },
+            y: { type: 'number' },
+            w: { type: 'number' },
+            h: { type: 'number' }
+          }
+        }
+      }
+    }
+  },
+  async execute(params) {
+    const meta = resolveFile(str(params, 'id'), null, 'a file')
+    const description = typeof params.description === 'string' ? params.description : (meta.description ?? '')
+    const areas = params.areas === null || params.areas === undefined ? (meta.areas ?? []) : areasOf(params.areas)
+    const next = data.assets.describe(meta.id, description, areas)
+    return `Updated ${next.name}: ${next.description ? `description ${next.description.length} characters` : 'no description'}, ${next.areas?.length ?? 0} areas.`
+  }
+}
+
+export const FILE_TOOLS: ToolDef[] = [fileExport, updateFile]

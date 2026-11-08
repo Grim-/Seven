@@ -11,6 +11,7 @@ import { failed } from '../../lib/notify'
 export interface MenuItem {
   label: string
   icon?: ReactNode
+  hint?: string
   onSelect?: () => void
   danger?: boolean
   disabled?: boolean
@@ -58,7 +59,9 @@ export const useMenu = create<MenuState>((set) => ({
 
 let menus = 0
 
-export function openMenu(event: { preventDefault(): void; stopPropagation(): void; clientX: number; clientY: number }, title: string, items: MenuItem[]): void {
+export type MenuEvent = { preventDefault(): void; stopPropagation(): void; clientX: number; clientY: number }
+
+export function openMenu(event: MenuEvent, title: string, items: MenuItem[]): void {
   event.preventDefault()
   event.stopPropagation()
   const visible = items.filter((i) => i.separator || i.label)

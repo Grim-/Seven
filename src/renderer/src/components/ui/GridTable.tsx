@@ -5,6 +5,8 @@ export interface GridColumn {
   label: string
   width: string
   right?: boolean
+  sorted?: 'asc' | 'desc' | null
+  onSort?: () => void
 }
 
 const Template = createContext('')
@@ -15,11 +17,18 @@ export function GridTable({ columns, empty, children }: { columns: GridColumn[];
     <Template.Provider value={template}>
       <div className="flex min-w-0 flex-col overflow-x-auto">
         <div style={{ gridTemplateColumns: template }} className="grid w-full gap-x-3 border-b border-line/30 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-          {columns.map((c) => (
-            <span key={c.label} className={cn('leading-tight', c.right && 'text-right')}>
-              {c.label}
-            </span>
-          ))}
+          {columns.map((c) =>
+            c.onSort ? (
+              <button key={c.label} type="button" onClick={c.onSort} className={cn('leading-tight uppercase hover:text-white', c.right && 'text-right', c.sorted && 'text-accent')}>
+                {c.label}
+                {c.sorted === 'desc' ? ' ▼' : c.sorted === 'asc' ? ' ▲' : ''}
+              </button>
+            ) : (
+              <span key={c.label} className={cn('leading-tight', c.right && 'text-right')}>
+                {c.label}
+              </span>
+            )
+          )}
         </div>
         {children}
         {empty && <div className="px-3.5 py-3 text-[12.5px] text-faint">{empty}</div>}

@@ -1,6 +1,6 @@
-import type { GgufFileInfo } from 'node-llama-cpp'
-
 type Section = Record<string, unknown>
+
+export type GgufMeta = Record<string, unknown>
 
 export interface GgufView {
   general: Section
@@ -21,8 +21,7 @@ export function count(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null
 }
 
-export function viewOf(file: GgufFileInfo): GgufView {
-  const meta = file.metadata as unknown as Record<string, unknown>
+export function viewOf(meta: GgufMeta): GgufView {
   const general = section(meta.general)
   const architecture = text(general.architecture)
   return { general, architecture, arch: section(architecture ? meta[architecture] : null), tokenizer: section(meta.tokenizer), quantize: section(meta.quantize), split: section(meta.split) }

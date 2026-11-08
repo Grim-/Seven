@@ -4,7 +4,7 @@ import { data } from '../data/hub'
 import { USER, resolveEntry } from './kinds'
 
 
-export function resolveFile(ref: string, kinds: AssetMeta['kind'][], what: string): AssetMeta {
+export function resolveFile(ref: string, kinds: AssetMeta['kind'][] | null, what: string): AssetMeta {
   const r = ref.trim()
   let found: AssetMeta | null | undefined = data.assets.exists(r) ? data.assets.get(r) : undefined
   if (!found) {
@@ -16,6 +16,6 @@ export function resolveFile(ref: string, kinds: AssetMeta['kind'][], what: strin
     }
   }
   if (!found) throw new ToolError(`There is no file "${r}" in the library. find with kind file lists them.`)
-  if (!kinds.includes(found.kind)) throw new ToolError(`"${found.name}" is not ${what}. Give ${what} instead; find with kind file lists the files.`)
+  if (kinds && !kinds.includes(found.kind)) throw new ToolError(`"${found.name}" is not ${what}. Give ${what} instead; find with kind file lists the files.`)
   return found
 }

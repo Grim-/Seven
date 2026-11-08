@@ -1,5 +1,5 @@
 import type { PanelAccess } from '../panel/store'
-import type { GbnfJsonObjectSchema } from 'node-llama-cpp'
+import type { JsonObjectSchema } from './schema'
 import type { AvatarState, ConfirmProps, FormProps, GatherProps, QuestionProps, ToolPermission, ViewRef, LinkedFolder } from '@shared/types'
 import type { PermissionContext } from '../permissions/gate'
 import type { PickDecisionProps } from '@shared/pickDecision'
@@ -46,13 +46,14 @@ export interface ToolOutput {
   text: string
   view?: ViewRef
   empty?: boolean
+  images?: string[]
 }
 
 export interface ToolDef {
   name: string
   group: string
   description: string
-  params: GbnfJsonObjectSchema
+  params: JsonObjectSchema
   needsWorkspace: boolean
   maxRepeats?: number
   activity?: (params: Record<string, unknown>) => string

@@ -21,7 +21,7 @@ function RollLine({ side, roll, won }: { side: OpposedSide; roll: OpposedRoll; w
   )
 }
 
-export function OpposedView({ p, done, open, status, onAnswer, editable = false }: { p: OpposedProps; done: OpposedAnswer | null; open: boolean; status?: ReactNode; onAnswer: (value: OpposedAnswer) => Promise<void>; editable?: boolean }) {
+export function OpposedView({ p, done, open, status, onAnswer, onClose, editable = false }: { p: OpposedProps; done: OpposedAnswer | null; open: boolean; status?: ReactNode; onAnswer: (value: OpposedAnswer) => Promise<void>; onClose?: () => void; editable?: boolean }) {
   const [a, setA] = useState(p.a)
   const [b, setB] = useState(p.b)
   const [dc, setDc] = useState(p.dc)
@@ -53,7 +53,7 @@ export function OpposedView({ p, done, open, status, onAnswer, editable = false 
   }
 
   return (
-    <DecisionCardFrame tag="Opposed check" question={p.question} status={status}>
+    <DecisionCardFrame tag="Opposed check" question={p.question} status={status} onClose={open ? onClose : undefined}>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-2">
         <OpposedSideFields title="tries" side={a} targets={aTargets} onChange={setA} editable={editable} />
         <div className="flex min-w-0 flex-col gap-2">

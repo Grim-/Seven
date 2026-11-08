@@ -2,7 +2,7 @@ import { IN_APP } from '../../lib/mode'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { CheckCheck, Pencil } from 'lucide-react'
 import type { Page } from '@shared/types'
-import { Button, EmptyState, DoneEditing, useAutosavedState } from '../ui'
+import { AddressTools, Button, EmptyState, DoneEditing, useAutosavedState } from '../ui'
 import { Markdown, countDone, removeDone, type LineEdit } from '../chat/Markdown'
 import { rollAll } from './useRolls'
 import { MarkdownEditor } from './MarkdownEditor'
@@ -40,6 +40,7 @@ export function NoteBody({
   readOnly = false,
   heading = true,
   contents = false,
+  bar = false,
   className
 }: {
   page: Page
@@ -48,6 +49,7 @@ export function NoteBody({
   readOnly?: boolean
   heading?: boolean
   contents?: boolean
+  bar?: boolean
   className?: string
 }) {
   const nav = usePageNav()
@@ -80,35 +82,42 @@ export function NoteBody({
   const saveRef = useRef(save)
   saveRef.current = save
 
+  const actions = (
+    <div className={readOnly ? 'hidden' : 'ml-auto flex items-center gap-1.5'}>
+      {editing ? (
+        <DoneEditing saver={editor} onDone={() => void save()} disabled={busy} />
+      ) : (
+        <>
+          {done > 0 && (
+            <Button size="sm" variant="ghost" icon={<CheckCheck />} onClick={() => editLines(removeDone)} title="Remove every ticked item">
+              Remove done ({done})
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" icon={<Pencil />} onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        </>
+      )}
+    </div>
+  )
+
   return (
     <div className={cn('relative flex min-h-0 flex-col gap-2', className)}>
-      <div className={heading || editing ? 'flex items-center gap-2' : readOnly ? 'hidden' : 'absolute right-1 top-1 z-10 flex'}>
-        {heading && <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.1em] text-white">{page.title}</span>}
-        <div className={readOnly ? 'hidden' : 'ml-auto flex gap-1.5'}>
-          {editing ? (
-            <>
-              <DoneEditing saver={editor} onDone={() => void save()} disabled={busy} />
-            </>
-          ) : (
-            <>
-              {done > 0 && (
-                <Button size="sm" variant="ghost" icon={<CheckCheck />} onClick={() => editLines(removeDone)} title="Remove every ticked item">
-                  Remove done ({done})
-                </Button>
-              )}
-              <Button size="sm" variant="ghost" icon={<Pencil />} onClick={() => setEditing(true)}>
-                Edit
-              </Button>
-            </>
-          )}
+      {bar ? (
+        <AddressTools order={1}>{actions}</AddressTools>
+      ) : (
+        <div className={heading || editing ? 'flex items-center gap-2' : readOnly ? 'hidden' : 'absolute right-1 top-1 z-10 flex'}>
+          {heading && <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.1em] text-white">{page.title}</span>}
+          {actions}
         </div>
-      </div>
+      )}
       {editing ? (
         <MarkdownEditor
           value={text}
           onValue={editor.set}
           onSave={() => void saveRef.current()}
-          title={showName(page.title)}
+          title={bar ? undefined : showName(page.title)}
+          bar={bar}
           autoFocus
           placeholder='Write here, or type / for blocks. @kind:Name links anything, e.g. @page:"Page title"; @kind:Name#random rolls a value from it when you press Done.'
           className="min-h-64 flex-1"
