@@ -11,8 +11,8 @@ interface MapInteractionOverlayProps {
   brushSize: number
   zoom?: number
   onPaintTiles: (layerId: string, tiles: number[]) => void
-  onAddShape: (start: Point, end: Point) => void
   onPlaceObject: (at: Point) => void
+  onPlaceSpawner?: (at: Point) => void
 }
 
 export function MapInteractionOverlay({
@@ -23,17 +23,14 @@ export function MapInteractionOverlay({
   brushSize,
   zoom = 1,
   onPaintTiles,
-  onAddShape,
-  onPlaceObject
+  onPlaceObject,
+  onPlaceSpawner
 }: MapInteractionOverlayProps) {
   const [hoverTile, setHoverTile] = useState<{ col: number; row: number } | null>(null)
   const isPainting = useRef(false)
   // Sparse map of index -> new Gid for the active stroke (NO 65k array allocations on mousedown)
   const strokeChanges = useRef<Map<number, number>>(new Map())
   const previewCanvas = useRef<HTMLCanvasElement>(null)
-
-  const shapeStart = useRef<Point | null>(null)
-  const [currentShapeEnd, setCurrentShapeEnd] = useState<Point | null>(null)
 
   const tileW = map.tile.w || 32
   const tileH = map.tile.h || 32
@@ -43,7 +40,7 @@ export function MapInteractionOverlay({
     isPainting.current = false
   }, [activeTileLayer?.id, tool])
 
-  if (tool === 'select') return null
+  if (tool === 'select' || tool === 'shape') return null
 
   const getTileCoords = (e: PointerEvent): { col: number; row: number; point: Point } => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -58,32 +55,45 @@ export function MapInteractionOverlay({
   const stampIntoWorkingBuffer = (centerCol: number, centerRow: number) => {
     if (!activeTileLayer) return
     const { columns, rows, tiles } = activeTileLayer
-
-    const gidToStamp = tool === 'erase' ? 0 : selectedGid
     const offset = Math.floor(brushSize / 2)
-    const pCtx = previewCanvas.current?.getContext('2d')
 
     for (let dy = 0; dy < brushSize; dy++) {
       for (let dx = 0; dx < brushSize; dx++) {
-        const c = centerCol - offset + dx
-        const r = centerRow - offset + dy
-        if (c >= 0 && c < columns && r >= 0 && r < rows) {
-          const idx = r * columns + c
-          const currentVal = strokeChanges.current.has(idx)
-            ? strokeChanges.current.get(idx)
-            : tiles[idx]
+        const targetCol = centerCol - offset + dx
+        const targetRow = centerRow - offset + dy
 
-          if (currentVal !== gidToStamp) {
-            strokeChanges.current.set(idx, gidToStamp)
+        if (targetCol >= 0 && targetCol < columns && targetRow >= 0 && targetRow < rows) {
+          const idx = targetRow * columns + targetCol
+          const nextGid = tool === 'erase' ? 0 : selectedGid
+          const currentGid = strokeChanges.current.has(idx)
+            ? strokeChanges.current.get(idx)!
+            : tiles[idx] ?? 0
 
-            // Draw instant local stroke feedback on preview canvas
-            if (pCtx) {
-              pCtx.fillStyle = tool === 'erase' ? 'rgba(0,0,0,0.8)' : 'rgba(102, 252, 241, 0.45)'
-              pCtx.fillRect(c * tileW, r * tileH, tileW, tileH)
-            }
+          if (currentGid !== nextGid) {
+            strokeChanges.current.set(idx, nextGid)
+            drawTilePreview(targetCol, targetRow, nextGid)
           }
         }
       }
+    }
+  }
+
+  const drawTilePreview = (col: number, row: number, gid: number) => {
+    const canvas = previewCanvas.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const px = col * tileW
+    const py = row * tileH
+
+    ctx.clearRect(px, py, tileW, tileH)
+    if (gid > 0) {
+      ctx.fillStyle = 'rgba(102, 252, 241, 0.4)'
+      ctx.fillRect(px, py, tileW, tileH)
+      ctx.strokeStyle = '#66fcf1'
+      ctx.lineWidth = 1
+      ctx.strokeRect(px + 0.5, py + 0.5, tileW - 1, tileH - 1)
     }
   }
 
@@ -101,22 +111,19 @@ export function MapInteractionOverlay({
       if (pCtx) pCtx.clearRect(0, 0, map.size.w, map.size.h)
 
       stampIntoWorkingBuffer(col, row)
-    } else if (tool === 'shape') {
-      shapeStart.current = point
-      setCurrentShapeEnd(point)
     } else if (tool === 'object') {
       onPlaceObject(point)
+    } else if (tool === 'spawner') {
+      onPlaceSpawner?.(point)
     }
   }
 
   const handlePointerMove = (e: PointerEvent) => {
-    const { col, row, point } = getTileCoords(e)
+    const { col, row } = getTileCoords(e)
     setHoverTile({ col, row })
 
     if (isPainting.current && (tool === 'paint' || tool === 'erase')) {
       stampIntoWorkingBuffer(col, row)
-    } else if (shapeStart.current && tool === 'shape') {
-      setCurrentShapeEnd(point)
     }
   }
 
@@ -139,37 +146,11 @@ export function MapInteractionOverlay({
       const pCtx = previewCanvas.current?.getContext('2d')
       if (pCtx) pCtx.clearRect(0, 0, map.size.w, map.size.h)
     }
-
-    if (shapeStart.current && currentShapeEnd && tool === 'shape') {
-      const start = shapeStart.current
-      const end = currentShapeEnd
-      shapeStart.current = null
-      setCurrentShapeEnd(null)
-      const w = Math.abs(end.x - start.x)
-      const h = Math.abs(end.y - start.y)
-      if (w > 10 && h > 10) {
-        onAddShape(
-          { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y) },
-          { x: Math.max(start.x, end.x), y: Math.max(start.y, end.y) }
-        )
-      }
-    }
   }
 
   const handlePointerLeave = () => {
     setHoverTile(null)
   }
-
-  // Calculate box preview for zone/shape drawing
-  const shapeBox =
-    shapeStart.current && currentShapeEnd
-      ? {
-          x: Math.min(shapeStart.current.x, currentShapeEnd.x),
-          y: Math.min(shapeStart.current.y, currentShapeEnd.y),
-          w: Math.abs(currentShapeEnd.x - shapeStart.current.x),
-          h: Math.abs(currentShapeEnd.y - shapeStart.current.y)
-        }
-      : null
 
   const offset = Math.floor(brushSize / 2)
 
@@ -204,23 +185,6 @@ export function MapInteractionOverlay({
               tool === 'erase' ? 'rgba(255, 74, 110, 0.2)' : 'rgba(102, 252, 241, 0.2)'
           }}
         />
-      )}
-
-      {/* Box Drag Indicator */}
-      {shapeBox && (
-        <div
-          className="pointer-events-none absolute border-2 border-dashed border-accent bg-accent/15"
-          style={{
-            left: shapeBox.x,
-            top: shapeBox.y,
-            width: shapeBox.w,
-            height: shapeBox.h
-          }}
-        >
-          <span className="absolute -top-5 left-0 bg-black/90 px-1 font-mono text-[10px] text-accent">
-            {Math.round(shapeBox.w)} × {Math.round(shapeBox.h)}
-          </span>
-        </div>
       )}
     </div>
   )

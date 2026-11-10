@@ -6,17 +6,18 @@ import { places } from './user/places'
 import { HUB_TOKEN, hubFileInfo, hubFiles, hubRepoFacts, searchHub } from './model/hub'
 import { downloads } from './model/downloads'
 import { serviceKeys } from './model/keys'
-import { getSheet, saveSheet, sheetIds } from './library/sheets'
+import { getSheet, saveSheet, setSheetFaction, sheetIds } from './library/sheets'
 import { customCommands } from './commands/custom'
 import type { EngineRequestName, EngineRequests, EngineWireRequest, Events } from '@shared/protocol'
 import { ModelRegistry } from './model/registry'
 import { ModelHost } from './model/host'
-import { serverRelease } from './model/server/install'
+import { llamaLimits, serverBuild, serverDevices } from './model/server/install'
+import { Packs } from './packs'
+import { appFolder, machineRoot } from './install/paths'
 import { PARAMS } from './model/params'
 import { modelTraitSet } from '@shared/modelParams'
 import { Gateway } from './model/server/gateway'
 import { suggestPassword } from './model/server/password'
-import { LOG_LINES } from './model/server/process'
 import { memoryServer } from './mind/embedder'
 import { AgentRegistry } from './agents/registry'
 import { SessionStore } from './sessions/store'
@@ -37,6 +38,13 @@ import { themes } from './themes/store'
 import { storyRuns } from './stories'
 import { piperSpeak, piperVoices } from './tts'
 import './sources/builtin'
+import { LLAMA_SERVER } from './install/helpers/llamaServer'
+import { installEvents } from './install/events'
+import { installState, freeSpace } from './install/state'
+import { refreshReleases, choiceViews } from './install/releases'
+import { install, cancelJob } from './install/job'
+import { activate, addExisting, onActivated, removeVersion, verifyVersion } from './install/versions'
+import { change as changeInstall } from './install/store'
 import { setupCommands } from './commands/builtin'
 import { commandInfo, commandsFor, runCommand } from './commands/registry'
 import type { Ambience, AmbienceCue, Theme } from '@shared/theme'
@@ -102,8 +110,12 @@ import { characterMisfits, giveItem, joinCharacter, leaveCharacter, saveCharacte
 import { removeRuleSet } from '../modules/game/worldRules'
 import { saves } from './worlds/saves'
 import './worlds/playLayer'
-import { adoptOldPlay, bring, removeSave, removeWorldSaves, takeOut, travel } from './worlds/party'
+import { adoptOldPlay, bring, createNewWorldSave, removeSave, removeWorldSaves, takeOut, travel } from './worlds/party'
 import { decisions, storyActions } from '../modules/decisions/store'
+import { factions } from './factions/store'
+import { mapObjectsStore } from './mapObjects/store'
+import { triggerActionsStore } from './triggerActions/store'
+import { lootTablesStore } from './lootTables/store'
 import { widgetInfo } from './data/widgetSources'
 import { resolveThings } from '../modules/core/things'
 import './data/glances'
@@ -147,9 +159,29 @@ const models = new ModelRegistry()
 const host = new ModelHost((entry) => {
   const info = models.list().find((m) => m.id === entry.id)?.info ?? null
   const mmproj = models.projectorPath(entry.id)
-  return { mtpLayers: models.mtpLayers(entry.id), mmproj, architecture: info?.architecture ?? null, template: models.templateText(entry.id), traits: modelTraitSet(info, mmproj !== null) }
+  return { mtpLayers: models.mtpLayers(entry.id), mmproj, architecture: info?.architecture ?? null, template: models.templateText(entry.id), traits: modelTraitSet(info, mmproj !== null), build: serverBuild() }
 })
+const afterModelChange = <T>(id: string, result: T): T => {
+  emit('packs.changed', {})
+  if (host.loadedId === id) host.checkRestart(models.getConfig(id))
+  return result
+}
 reportChildren((pids) => emit('engine.children', { pids }))
+const packs = new Packs({ shippedDir: () => path.join(appFolder(), 'packs'), ownDir: () => path.join(machineRoot(), 'packs'), models, build: serverBuild, devices: serverDevices })
+models.setOverlay((id, own) => packs.overlay(id, own))
+void packs.reload().catch(() => undefined)
+installEvents.on('changed', (helper: string) => emit('install.changed', { helper }))
+const packsChanged = (): void => {
+  emit('packs.changed', {})
+  const id = host.loadedId
+  if (id) host.checkRestart(models.getConfig(id))
+}
+installEvents.onHelper(LLAMA_SERVER, packsChanged)
+installEvents.on('progress', (progress) => emit('install.progress', progress))
+onActivated(LLAMA_SERVER, async () => {
+  await host.restartOnActive()
+  await minds.embedder.restartOnActive()
+})
 void endLeftovers().then((n) => n && console.warn(`[llama-server] ended ${n} left over from an earlier run`)).catch(() => undefined)
 const agents = new AgentRegistry()
 agents.useFolders(agentFolders)
@@ -211,6 +243,10 @@ gameDefs.on('changed', () => emit('game.changed', {}))
 saves.on('changed', (world: string) => emit('saves.changed', { world }))
 decisions.on('changed', () => emit('decisions.changed', {}))
 storyActions.on('changed', () => emit('storyActions.changed', {}))
+factions.on('changed', () => emit('factions.changed', {}))
+mapObjectsStore.on('changed', () => emit('mapObjects.changed', {}))
+triggerActionsStore.on('changed', () => emit('triggerActions.changed', {}))
+lootTablesStore.on('changed', () => emit('lootTables.changed', {}))
 board.setNames((id) => agents.list().find((a) => a.id === id)?.name ?? 'an agent')
 scripts.onChange(() => emit('python.changed', {}))
 storyRuns.on('changed', () => emit('stories.changed', {}))
@@ -347,19 +383,33 @@ const handlers: Handlers = {
     }
   },
   'models.params': () => PARAMS,
-  'models.config.get': ({ id }) => models.getConfig(id),
-  'models.config.set': ({ id, patch }) =>
-    models.setConfig(id, patch, host.loadedId === id ? host.loadedConfig : null),
-  'models.config.reset': ({ id }) => models.resetConfig(id, host.loadedId === id ? host.loadedConfig : null),
-  'models.server.get': () => host.serverInfo(),
-  'models.server.release': () => serverRelease(),
+  'models.config.get': ({ id }) => models.ownConfig(id),
+  'packs.list': async ({ id }) => {
+    await packs.reload()
+    return packs.listing(id)
+  },
+  'packs.set': ({ id, on }) => {
+    packs.setOn(id, on)
+    emit('packs.changed', {})
+    return afterModelChange(id, packs.listing(id))
+  },
+  'packs.import': async ({ file }) => {
+    const title = await packs.importPack(file)
+    packsChanged()
+    return { title }
+  },
+  'packs.remove': async ({ file }) => {
+    await packs.removePack(file)
+    packsChanged()
+  },
+  'models.config.set': ({ id, patch }) => afterModelChange(id, models.setConfig(id, patch)),
+  'models.config.reset': ({ id }) => afterModelChange(id, models.resetConfig(id)),
   'models.projector.get': ({ id }) => ({ ...models.projectorFor(id), options: models.projectors().map(({ id: pid, name }) => ({ id: pid, name })) }),
-  'models.projector.set': ({ id, projector }) => ({ ...models.setProjector(id, projector), options: models.projectors().map(({ id: pid, name }) => ({ id: pid, name })) }),
-  'models.server.install': () => host.installServer((p) => emit('server.install', p)),
+  'models.projector.set': ({ id, projector }) => afterModelChange(id, { ...models.setProjector(id, projector), options: models.projectors().map(({ id: pid, name }) => ({ id: pid, name })) }),
   'models.template.get': ({ id }) => models.getTemplate(id),
   'models.template.set': ({ id, choice }) => {
     if (choice.type === 'jinja' && !choice.template.trim()) throw new Error('The Jinja template is empty. Paste a chat template, or set Chat template back to the one in the file.')
-    return models.setTemplate(id, choice)
+    return afterModelChange(id, models.setTemplate(id, choice))
   },
   'agents.list': () => agents.list(),
   'agents.get': ({ id }) => agents.get(id),
@@ -438,8 +488,63 @@ const handlers: Handlers = {
   'worlds.board': ({ id }) => worlds.board(id),
   'worlds.post': ({ id, author, to, message }) => worlds.post(id, author, to, message),
   'worlds.editPost': ({ id, index, message }) => worlds.editPost(id, index, message),
+  'worlds.flags': ({ id }) => worlds.flags(id),
+  'worlds.setFlag': ({ id, key, value }) => worlds.setFlag(id, key, value),
+  'factions.list': () => factions.list(),
+  'factions.get': ({ id }) => factions.get(id),
+  'factions.save': ({ faction, previousId }) => factions.save(faction, previousId ?? null),
+  'factions.delete': ({ id }) => { factions.remove(id); return true },
+  'mapObjects.list': () => mapObjectsStore.list(),
+  'mapObjects.get': ({ id }) => mapObjectsStore.get(id),
+  'mapObjects.save': ({ object, previousId }) => mapObjectsStore.save(object, previousId ?? null),
+  'mapObjects.delete': ({ id }) => { mapObjectsStore.remove(id); return true },
+  'triggerActions.list': () => triggerActionsStore.list(),
+  'triggerActions.get': ({ id }) => triggerActionsStore.get(id),
+  'triggerActions.save': ({ action, previousId }) => triggerActionsStore.save(action, previousId ?? null),
+  'triggerActions.delete': ({ id }) => { triggerActionsStore.remove(id); return true },
+  'lootTables.list': () => lootTablesStore.list(),
+  'lootTables.get': ({ id }) => lootTablesStore.find(id) ?? null,
+  'lootTables.save': ({ table, previousId }) => lootTablesStore.save(table, previousId ?? null),
+  'lootTables.delete': ({ id }) => { lootTablesStore.remove(id); return true },
+  'lootTables.roll': ({ id }) => lootTablesStore.roll(id),
   'stats.clear': () => clearStats(),
-  'server.status': async () => ({ installed: host.serverInfo().installed, logLines: LOG_LINES, chat: await host.chatServer(), memory: memoryServer(), network: gateway.status(), vram: await host.vram() }),
+  'server.status': async () => ({ build: serverBuild(), logLines: llamaLimits().logLines, chat: await host.chatServer(), memory: memoryServer(), network: gateway.status(), vram: await host.vram() }),
+  'server.build': () => serverBuild(),
+  'install.state': ({ helper }) => installState(helper),
+  'install.check': async ({ helper }) => {
+    await refreshReleases(helper)
+    return installState(helper)
+  },
+  'install.choices': ({ helper, tag }) => choiceViews(helper, tag),
+  'install.start': async ({ helper, tag, build, root }) => {
+    await install(helper, { tag, build, root })
+    return installState(helper)
+  },
+  'install.cancel': ({ helper }) => cancelJob(helper),
+  'install.activate': async ({ helper, version, restart }) => {
+    await activate(helper, version, restart)
+    return installState(helper)
+  },
+  'install.verify': async ({ helper, version }) => {
+    await verifyVersion(helper, version)
+    return installState(helper)
+  },
+  'install.remove': ({ helper, version }) => {
+    removeVersion(helper, version)
+    return installState(helper)
+  },
+  'install.addExisting': async ({ helper, folder }) => {
+    await addExisting(helper, folder)
+    return installState(helper)
+  },
+  'install.settings': ({ helper, values }) => {
+    changeInstall(helper, (r) => {
+      r.settings = values
+    })
+    installEvents.changed(helper)
+    return installState(helper)
+  },
+  'install.space': ({ folder }) => ({ free: freeSpace(folder) }),
   'server.stop': () => host.unload(),
   'server.restart': async () => {
     const id = host.loadedId
@@ -564,7 +669,7 @@ const handlers: Handlers = {
   'saves.all': () => saves.list(),
   'saves.get': ({ id }) => saves.get(id),
   'saves.current': ({ world }) => saves.current(world),
-  'saves.create': ({ world, name, copy }) => saves.create(world, name, copy),
+  'saves.create': ({ world, name, copy }) => (copy ? saves.create(world, name, true) : createNewWorldSave(world, name)),
   'saves.select': ({ world, id }) => saves.select(world, id),
   'saves.rename': ({ id, name }) => saves.rename(id, name),
   'saves.remove': ({ id }) => removeSave(id),
@@ -646,6 +751,7 @@ const handlers: Handlers = {
   'repos.get': ({ id }) => getRepo(id),
   'repos.save': (input) => saveRepo(input),
   'sheets.save': (input) => saveSheet(input),
+  'sheets.setFaction': ({ id, faction }) => setSheetFaction(id, faction),
   'library.remove': ({ entry }) => (removeEntry(entry), true),
   'tags.set': ({ entry, tags }) => {
     const { kind, id } = resolveEntry(entry, null, USER)

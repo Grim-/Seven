@@ -22,6 +22,10 @@ export function paramEditor(kind: ParamKind): ParamEditor | null {
   return editors.get(kind) ?? null
 }
 
+export function paramLabel(key: string, spec: ParamSpec): string {
+  return spec.label ?? key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
+}
+
 export function paramWide(editor: ParamEditor | null, spec: ParamSpec): boolean {
   const wide = editor?.wide
   return typeof wide === 'function' ? wide(spec) : wide === true

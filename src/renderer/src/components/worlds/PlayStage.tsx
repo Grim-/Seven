@@ -12,13 +12,25 @@ import { GameCanvas } from '../../game/react/GameCanvas'
 import { useLatest } from '../../game/react/useLatest'
 import { ExploreScene, type ExploreData } from '../../game/explore/ExploreScene'
 import type { ClockView } from '../../game/explore/WorldClock'
+import type { View } from '../../game/engine/Camera'
 import { engine as ipc } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
 import { useGameCatalog } from '../game/useGameCatalog'
 
+import type { BattleState } from '@shared/game/state/BattleStateMachine'
+
 export interface ClockControls {
   setSpeed: (speed: number) => void
   setPaused: (paused: boolean) => void
+}
+
+export interface StageNavigation {
+  walkTo: (target: Point, onArrive?: () => void) => boolean
+  smartApproach: (target: Point, onReach: () => void, reachDistance?: number) => boolean
+  stopWalk: () => void
+  centerOn?: (point: Point, zoom?: number) => void
+  focusEncounter?: (points: Point[], minZoom?: number, maxZoom?: number) => void
+  resetCamera?: () => void
 }
 
 interface Props {
@@ -40,14 +52,18 @@ interface Props {
   onTrigger: (trigger: TriggerDef, sheet: string) => void
   onTime?: (view: ClockView | null) => void
   onClock?: (controls: ClockControls | null) => void
+  onNavigation?: (nav: StageNavigation | null) => void
   onTarget?: (target: { sheet: string | null; at: Point; label: string }) => boolean
+  onCamera?: (camera: View) => void
+  aiming?: boolean
+  battle?: BattleState | null
   className?: string
 }
 
-export function PlayStage({ world, save, triggers, onTrigger, map, shapes, places, here, place, tokens, mine, selected, onPlace, onBlankMenu, tokenHandlers, objects, onTime, onClock, onTarget, className }: Props) {
+export function PlayStage({ world, save, triggers, onTrigger, map, shapes, places, here, place, tokens, mine, selected, onPlace, onBlankMenu, tokenHandlers, objects, onTime, onClock, onNavigation, onTarget, onCamera, aiming = false, battle = null, className }: Props) {
   const catalog = useGameCatalog()
-  const data: ExploreData = { map, shapes, names: Object.fromEntries(Object.keys(shapes).map((k) => [k, placeName(places, k)])), tokens, markers: here, mine, selected, catalog, save: save ? { id: save.id, clockId: save.clockId, clock: save.clock } : null, triggers, used: save?.used ?? [] }
-  const latest = useLatest({ data, world, onTrigger, onPlace, onBlankMenu, tokenHandlers, objects, onTime, onClock, onTarget })
+  const data: ExploreData = { map, shapes, names: Object.fromEntries(Object.keys(shapes).map((k) => [k, placeName(places, k)])), tokens, markers: here, mine, selected, catalog, save: save ? { id: save.id, clockId: save.clockId, clock: save.clock } : null, triggers, used: save?.used ?? [], aiming, battle }
+  const latest = useLatest({ data, world, onTrigger, onPlace, onBlankMenu, tokenHandlers, objects, onTime, onClock, onNavigation, onTarget, onCamera })
   const scene = useRef<ExploreScene | null>(null)
 
   useEffect(() => {
@@ -61,7 +77,10 @@ export function PlayStage({ world, save, triggers, onTrigger, map, shapes, place
       onReady={(engine, view) => {
         const s = new ExploreScene(latest.current.data, view)
         const on = s.events
-        on.on('place', ({ key }) => latest.current.onPlace(key))
+        on.on('place', ({ key, hit }) => {
+          if (latest.current.onTarget?.({ sheet: null, at: hit.world, label: 'there' })) return
+          latest.current.onPlace(key)
+        })
         on.on('blankMenu', ({ hit }) => latest.current.onTarget?.({ sheet: null, at: hit.world, label: 'there' }) || latest.current.onBlankMenu(hit.native, hit.world))
         on.on('token', ({ token, hit }) => latest.current.onTarget?.({ sheet: token.visitor.sheet, at: token.at, label: token.visitor.name }) || latest.current.tokenHandlers.onPick?.(token, hit.native))
         on.on('tokenMenu', ({ token, hit }) => latest.current.tokenHandlers.onMenu?.(token, hit.native))
@@ -73,6 +92,7 @@ export function PlayStage({ world, save, triggers, onTrigger, map, shapes, place
         on.on('object', ({ object, hit }) => latest.current.onTarget?.({ sheet: null, at: hit.world, label: 'the object' }) || latest.current.objects.onPick?.(object, hit.native))
         on.on('objectMenu', ({ object, hit }) => latest.current.objects.onMenu?.(object, hit.native))
         on.on('time', (view) => latest.current.onTime?.(view))
+        on.on('camera', (cam) => latest.current.onCamera?.(cam))
         on.on('trigger', ({ id, sheet }) => {
           const found = latest.current.data.triggers.find((t) => t.id === id)
           if (found) latest.current.onTrigger(found, sheet)
@@ -85,8 +105,17 @@ export function PlayStage({ world, save, triggers, onTrigger, map, shapes, place
         engine.scenes.replace(s)
         scene.current = s
         latest.current.onClock?.({ setSpeed: (n) => s.setSpeed(n), setPaused: (p) => s.setPaused(p) })
+        latest.current.onNavigation?.({
+          walkTo: (t, cb) => s.walkTo(t, cb),
+          smartApproach: (t, cb, d) => s.smartApproach(t, cb, d),
+          stopWalk: () => s.stopWalk(),
+          centerOn: (pt, zoom) => s.centerOn(pt, zoom),
+          focusEncounter: (points, minZoom, maxZoom) => s.focusEncounter(points, minZoom, maxZoom),
+          resetCamera: () => s.resetCamera()
+        })
         return () => {
           latest.current.onClock?.(null)
+          latest.current.onNavigation?.(null)
           scene.current = null
           engine.scenes.clear()
         }

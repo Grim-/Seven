@@ -3,6 +3,18 @@
 @import './theme/tokens.css';
 @import './theme/components.css';
 
+/* Dark theme enforcement for native dropdowns and popup menus */
+select, option, optgroup {
+  color-scheme: dark !important;
+  background-color: #0b0d12 !important;
+  color: #e5e7eb !important;
+}
+
+option:hover, option:focus, option:checked {
+  background-color: #1a1e28 !important;
+  color: var(--color-accent, #ffc919) !important;
+}
+
 .wk-fig svg {
   display: block;
   width: 100%;

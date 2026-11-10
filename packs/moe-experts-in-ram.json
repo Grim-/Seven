@@ -1,0 +1,9 @@
+{
+  "id": "moe-experts-in-ram",
+  "title": "Keep MoE experts in RAM when the model is bigger than VRAM",
+  "for": "Low-end GPU with lots of PC RAM, MoE experts on CPU",
+  "why": "Keeps every expert's weights in RAM (--cpu-moe) so the attention, shared weights and context stay on the GPU. Each token only reads the few experts it uses, so this is usually faster than splitting whole layers between GPU and CPU.",
+  "source": "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+  "when": { "model": ["moe"], "fileExceedsVram": true, "buildHas": ["--cpu-moe"] },
+  "set": { "cpuMoeAll": true }
+}

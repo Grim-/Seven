@@ -33,8 +33,71 @@ export function zoomLabel(z: ZoomRange): string | null {
   return null
 }
 
+export type PropCollision = 'solid' | 'passable' | 'water'
+
+export type ObjectStateMatch = 'is_set' | 'is_not_set' | 'equals'
+
+export interface ObjectStateRule {
+  id: string
+  name?: string
+  priority?: number
+  flag: string
+  match?: ObjectStateMatch
+  value?: string | number | boolean
+  image?: string
+  collision?: PropCollision
+  opacity?: number
+  visible?: boolean
+}
+
+export interface ResolvedObjectState {
+  image: string
+  collision: PropCollision
+  opacity: number
+  visible: boolean
+  activeRuleId: string | null
+}
+
+export function resolveObjectState(
+  object: ObjectLayerData,
+  flags: Record<string, string | number | boolean> = {}
+): ResolvedObjectState {
+  const rules = object.states ?? []
+  const sorted = [...rules].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
+
+  for (const rule of sorted) {
+    const val = flags[rule.flag]
+    let matches = false
+    if (rule.match === 'is_not_set') {
+      matches = val === undefined || val === false || val === '' || val === 0
+    } else if (rule.match === 'equals') {
+      matches = String(val) === String(rule.value)
+    } else {
+      matches = Boolean(val)
+    }
+
+    if (matches) {
+      return {
+        image: rule.image || object.image,
+        collision: rule.collision ?? object.collision ?? 'solid',
+        opacity: typeof rule.opacity === 'number' ? rule.opacity : (typeof object.opacity === 'number' && object.opacity > 0 ? object.opacity : 1),
+        visible: rule.visible !== undefined ? rule.visible : (object.visible !== false),
+        activeRuleId: rule.id
+      }
+    }
+  }
+
+  return {
+    image: object.image,
+    collision: object.collision ?? 'solid',
+    opacity: typeof object.opacity === 'number' && object.opacity > 0 ? object.opacity : 1,
+    visible: object.visible !== false,
+    activeRuleId: null
+  }
+}
+
 export function newObject(name: string, image: string, imageSize: Size, at: Point): ObjectLayerData {
-  return { id: crypto.randomUUID(), kind: 'object', name, visible: true, opacity: 1, offset: at, zoom: ANY_ZOOM, image, size: imageSize, scale: 1, rotation: 0, entry: null, actions: '', decisions: '' }
+  return { id: crypto.randomUUID(), kind: 'object', name, visible: true, opacity: 1, offset: at, zoom: ANY_ZOOM, image, size: imageSize, scale: 1, rotation: 0, collision: 'solid', entry: null, actions: '', decisions: '', states: [] }
 }
 
 export function mapObjects(layers: MapLayer[]): ObjectLayerData[] {
@@ -103,9 +166,11 @@ export interface GroupLayerData extends LayerBase {
 
 export interface ObjectLayerData extends LayerBase, PictureLayer {
   kind: 'object'
-  entry: string | null
-  actions: string
-  decisions: string
+  collision?: PropCollision
+  entry?: string | null
+  actions?: string
+  decisions?: string
+  states?: ObjectStateRule[]
 }
 
 export type MapLayer = TileLayerData | ImageLayerData | GroupLayerData | ObjectLayerData
@@ -122,6 +187,29 @@ export interface Tileset {
   spacing: number
 }
 
+export type CreatureDisposition = 'hostile' | 'neutral' | 'friendly'
+export type SpawnerTriggerMode = 'map_load' | 'proximity' | 'on_flag' | 'action_only'
+export type SpawnerResetMode = 'never' | 'on_rest' | 'on_flag' | 'action_only' | 'on_map_enter'
+
+export interface CreatureSpawner {
+  id: string
+  name: string
+  monsterId: string
+  at: Point
+  scale?: number
+  facing?: number
+  faction?: string
+  disposition: CreatureDisposition
+  spawnWhen: SpawnerTriggerMode
+  triggerRadius?: number
+  spawnFlag?: string
+  resetWhen: SpawnerResetMode
+  resetFlag?: string
+  lootTableId?: string
+  actions?: string
+  decisions?: string
+}
+
 export interface MapData {
   id: string
   name: string
@@ -129,6 +217,9 @@ export interface MapData {
   tile: Size
   tilesets: Tileset[]
   layers: MapLayer[]
+  shapes?: Record<string, ShapeForm>
+  triggers?: TriggerDef[]
+  spawners?: CreatureSpawner[]
   updatedAt: number
 }
 
@@ -138,11 +229,28 @@ export interface Standing {
   decisions: string
 }
 
+export interface ConditionGating {
+  needsFlag?: string
+  hiddenIfFlag?: string
+}
+
+export function checkConditionGating(
+  gating: ConditionGating | undefined,
+  flags: Record<string, string | number | boolean> = {}
+): boolean {
+  if (!gating) return true
+  if (gating.needsFlag && !flags[gating.needsFlag]) return false
+  if (gating.hiddenIfFlag && Boolean(flags[gating.hiddenIfFlag])) return false
+  return true
+}
+
 export interface WorldMapUse {
   map: string
   shapes: Record<string, ShapeForm>
   stand: Record<string, Standing>
   triggers?: TriggerDef[]
+  layerGating?: Record<string, ConditionGating>
+  propGating?: Record<string, ConditionGating>
 }
 
 export type JourneyKind = 'moved' | 'action' | 'decision'
@@ -161,6 +269,7 @@ export interface PlaceVisitor {
   dnd: Pick<DndStats, 'hp' | 'ac' | 'stats' | 'conditions'> | null
   game?: EntityRecord | null
   gameRules?: string
+  faction?: string | null
   agent: string | null
 }
 
@@ -187,6 +296,35 @@ function cleanZoom(raw: unknown): ZoomRange {
   return { min: n(v.min), max: n(v.max) }
 }
 
+function cleanCollision(raw: unknown): PropCollision {
+  const s = String(raw).trim().toLowerCase()
+  return s === 'passable' || s === 'water' ? s : 'solid'
+}
+
+function cleanStateRule(raw: unknown): ObjectStateRule | null {
+  const v = obj(raw)
+  const flag = str(v.flag).trim()
+  if (!flag) return null
+  const matchRaw = str(v.match)
+  const match: ObjectStateMatch = matchRaw === 'is_not_set' || matchRaw === 'equals' ? matchRaw : 'is_set'
+  return {
+    id: str(v.id) || crypto.randomUUID(),
+    name: str(v.name),
+    priority: typeof v.priority === 'number' ? v.priority : 0,
+    flag,
+    match,
+    value: v.value !== undefined ? (typeof v.value === 'boolean' || typeof v.value === 'number' ? v.value : String(v.value)) : undefined,
+    image: str(v.image) || undefined,
+    collision: v.collision ? cleanCollision(v.collision) : undefined,
+    opacity: typeof v.opacity === 'number' ? Math.min(1, Math.max(0, v.opacity)) : undefined,
+    visible: v.visible !== undefined ? Boolean(v.visible) : undefined
+  }
+}
+
+function cleanStateRules(raw: unknown): ObjectStateRule[] {
+  return Array.isArray(raw) ? raw.map(cleanStateRule).filter((r): r is ObjectStateRule => r !== null) : []
+}
+
 function cleanLayer(raw: unknown): MapLayer | null {
   const v = obj(raw)
   const rawOpacity = typeof v.opacity === 'number' && Number.isFinite(v.opacity) && v.opacity > 0 ? v.opacity : 1
@@ -201,7 +339,19 @@ function cleanLayer(raw: unknown): MapLayer | null {
   const picture = (): PictureLayer => ({ image: str(v.image), size: size(v.size), scale: Math.max(0.01, num(v.scale, 1)), rotation: num(v.rotation, 0) % 360 })
   if (v.kind === 'image') return str(v.image) ? { ...base, kind: 'image', ...picture() } : null
   if (v.kind === 'group') return { ...base, kind: 'group', layers: cleanLayers(v.layers) }
-  if (v.kind === 'object') return str(v.image) ? { ...base, kind: 'object', ...picture(), entry: str(v.entry) || null, actions: str(v.actions), decisions: str(v.decisions) } : null
+  if (v.kind === 'object') {
+    if (!str(v.image)) return null
+    return {
+      ...base,
+      kind: 'object',
+      ...picture(),
+      collision: cleanCollision(v.collision),
+      entry: str(v.entry) || null,
+      actions: str(v.actions),
+      decisions: str(v.decisions),
+      states: cleanStateRules(v.states)
+    }
+  }
   return null
 }
 
@@ -239,9 +389,84 @@ function cleanTriggers(raw: unknown): TriggerDef[] {
   return Array.isArray(raw) ? raw.map((t) => cleanTrigger(t, cleanForm(obj(t).shape))).filter((t): t is TriggerDef => t !== null) : []
 }
 
+function cleanGating(raw: unknown): Record<string, ConditionGating> {
+  const out: Record<string, ConditionGating> = {}
+  for (const [k, v] of Object.entries(obj(raw))) {
+    const o = obj(v)
+    const needsFlag = str(o.needsFlag).trim()
+    const hiddenIfFlag = str(o.hiddenIfFlag).trim()
+    if (needsFlag || hiddenIfFlag) {
+      out[k] = {
+        ...(needsFlag ? { needsFlag } : {}),
+        ...(hiddenIfFlag ? { hiddenIfFlag } : {})
+      }
+    }
+  }
+  return out
+}
+
 export function cleanMapUses(raw: unknown): WorldMapUse[] {
   const list = Array.isArray(obj(raw).maps) ? (obj(raw).maps as unknown[]) : []
-  return list.map(obj).filter((u) => typeof u.map === 'string' && u.map).map((u) => ({ map: String(u.map), shapes: cleanShapes(u.shapes), stand: cleanStand(u.stand), triggers: cleanTriggers(u.triggers) }))
+  return list.map(obj).filter((u) => typeof u.map === 'string' && u.map).map((u) => ({
+    map: String(u.map),
+    shapes: cleanShapes(u.shapes),
+    stand: cleanStand(u.stand),
+    triggers: cleanTriggers(u.triggers),
+    layerGating: cleanGating(u.layerGating),
+    propGating: cleanGating(u.propGating)
+  }))
+}
+
+function cleanSpawner(raw: unknown): CreatureSpawner | null {
+  const v = obj(raw)
+  const monsterId = str(v.monsterId).trim()
+  if (!monsterId) return null
+  const id = str(v.id) || crypto.randomUUID()
+  const name = str(v.name, monsterId)
+  const at = point(v.at)
+  const scale = typeof v.scale === 'number' && v.scale > 0 ? v.scale : 1
+  const facing = typeof v.facing === 'number' ? (v.facing % 360) : 0
+  const faction = str(v.faction) || undefined
+  const disp = str(v.disposition).toLowerCase()
+  const disposition: CreatureDisposition = disp === 'friendly' || disp === 'neutral' ? disp : 'hostile'
+
+  const sw = str(v.spawnWhen).toLowerCase()
+  const spawnWhen: SpawnerTriggerMode =
+    sw === 'proximity' || sw === 'on_flag' || sw === 'action_only' ? sw : 'map_load'
+  const triggerRadius = typeof v.triggerRadius === 'number' && v.triggerRadius > 0 ? v.triggerRadius : 128
+  const spawnFlag = str(v.spawnFlag) || undefined
+
+  const rw = str(v.resetWhen).toLowerCase()
+  const resetWhen: SpawnerResetMode =
+    rw === 'never' || rw === 'on_rest' || rw === 'on_flag' || rw === 'action_only' || rw === 'on_map_enter' ? rw : 'never'
+  const resetFlag = str(v.resetFlag) || undefined
+
+  const lootTableId = str(v.lootTableId) || undefined
+  const actions = str(v.actions)
+  const decisions = str(v.decisions)
+
+  return {
+    id,
+    name,
+    monsterId,
+    at,
+    scale,
+    facing,
+    faction,
+    disposition,
+    spawnWhen,
+    triggerRadius: spawnWhen === 'proximity' ? triggerRadius : undefined,
+    spawnFlag: spawnWhen === 'on_flag' ? spawnFlag : undefined,
+    resetWhen,
+    resetFlag: resetWhen === 'on_flag' ? resetFlag : undefined,
+    lootTableId,
+    actions,
+    decisions
+  }
+}
+
+export function cleanSpawners(raw: unknown): CreatureSpawner[] {
+  return Array.isArray(raw) ? raw.map(cleanSpawner).filter((s): s is CreatureSpawner => s !== null) : []
 }
 
 export function cleanMap(raw: unknown, id: string): MapData {
@@ -253,6 +478,9 @@ export function cleanMap(raw: unknown, id: string): MapData {
     tile: size(v.tile),
     tilesets: Array.isArray(v.tilesets) ? v.tilesets.map(cleanTileset).filter((t): t is Tileset => t !== null) : [],
     layers: cleanLayers(v.layers),
+    shapes: cleanShapes(v.shapes),
+    triggers: cleanTriggers(v.triggers),
+    spawners: cleanSpawners(v.spawners),
     updatedAt: num(v.updatedAt, 0)
   }
 }
@@ -378,6 +606,13 @@ export function placesIn(where: string, world: string, places: Record<string, un
 }
 
 export function mapPictureIds(map: MapData): string[] {
-  const inLayers = (layers: MapLayer[]): string[] => layers.flatMap((l) => (l.kind === 'image' ? [l.image] : l.kind === 'group' ? inLayers(l.layers) : []))
+  const inLayers = (layers: MapLayer[]): string[] =>
+    layers.flatMap((l) =>
+      l.kind === 'image' || l.kind === 'object'
+        ? [l.image]
+        : l.kind === 'group'
+        ? inLayers(l.layers)
+        : []
+    )
   return [...new Set([...map.tilesets.map((t) => t.image), ...inLayers(map.layers)])]
 }

@@ -3,6 +3,7 @@ import { NO_SWAP, cleanSwap, hasSwap, parseSwap, swapSentence, swapText, type Ca
 export interface DecisionOption {
   text: string
   cards: CardSwap
+  action?: string | null
 }
 
 export interface Decision {
@@ -19,13 +20,15 @@ const optionShown = (o: DecisionOption) => (hasSwap(o.cards) ? `${o.text} (${swa
 const optionList = (d: Decision) => `${d.options.map(optionShown).join(' · ')}.${d.own ? ' They may answer something else.' : ''}`
 const cardsNote = (d: Decision) => (d.options.some((o) => hasSwap(o.cards)) ? ['The cards an option gains or loses are the user\'s: give or take them with give_card and take_card once it is chosen.'] : [])
 
-// export function decisionText(d: Decision): string {
-//   return [`${d.question} (${d.decider ? `${d.decider} decides` : 'you decide'})`, ...d.options.map((o) => `- ${o.text}${hasSwap(o.cards) ? ` | ${swapText(o.cards)}` : ''}`), ...(d.own ? [`- ${OWN_ANSWER}`] : [])].join('\n')
-// }
 export function decisionText(d: Decision): string {
-  const options = d.options.map(
-    (o) => `- ${o.text}${hasSwap(o.cards) ? ` | ${swapText(o.cards)}` : ''}`
-  )
+  const options = d.options.map((o) => {
+    const parts = [
+      o.text,
+      hasSwap(o.cards) ? swapText(o.cards) : '',
+      o.action ? `action: ${o.action}` : ''
+    ].filter(Boolean)
+    return `- ${parts.join(' | ')}`
+  })
 
   return [
     `${d.question} (${d.decider ? `${d.decider} decides` : 'you decide'})`,
@@ -34,8 +37,19 @@ export function decisionText(d: Decision): string {
   ].filter(Boolean).join('\n')
 }
 function parseOption(line: string): DecisionOption {
-  const [text, cards = ''] = line.slice(2).split(/\s\|\s(.*)/s)
-  return { text: text.trim(), cards: parseSwap(cards) }
+  const parts = line.slice(2).split(/\s\|\s/)
+  const text = parts[0]?.trim() ?? ''
+  let cards = NO_SWAP
+  let action: string | null = null
+  for (const part of parts.slice(1)) {
+    if (part.startsWith('action:')) {
+      action = part.slice(7).trim() || null
+    } else {
+      const parsed = parseSwap(part)
+      if (hasSwap(parsed)) cards = parsed
+    }
+  }
+  return { text, cards, action }
 }
 
 export function parseDecisions(text: string): Decision[] {
@@ -55,9 +69,9 @@ export function cleanDecision(raw: unknown): Decision {
   const v = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const text = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim() : null)
   const option = (x: unknown): DecisionOption | null => {
-    if (typeof x === 'string') return text(x) ? { text: text(x) as string, cards: NO_SWAP } : null
+    if (typeof x === 'string') return text(x) ? { text: text(x) as string, cards: NO_SWAP, action: null } : null
     const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>
-    return text(o.text) ? { text: text(o.text) as string, cards: cleanSwap(o.cards) } : null
+    return text(o.text) ? { text: text(o.text) as string, cards: cleanSwap(o.cards), action: text(o.action) } : null
   }
   const options = Array.isArray(v.options) ? v.options.map(option).filter((o): o is DecisionOption => o !== null) : []
   return { question: text(v.question) ?? 'What happens next?', options, own: v.own !== false, decider: text(v.decider) }

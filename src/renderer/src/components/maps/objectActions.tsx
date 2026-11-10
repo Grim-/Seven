@@ -1,7 +1,8 @@
-import { ExternalLink, MessageSquarePlus, Pencil, Trash2 } from 'lucide-react'
+import { ExternalLink, Footprints, MessageSquarePlus, Pencil, Trash2 } from 'lucide-react'
 import { parseActions } from '@shared/actions'
 import { parseDecisions } from '@shared/decisions'
 import type { ObjectLayerData } from '@shared/maps'
+import type { Point } from '@shared/shapes'
 import { confirmDelete, openMenu, type MenuEvent, type MenuItem } from '../ui'
 import type { MapObjectHandlers } from './mapObjects'
 import { openEntry } from '../../lib/library'
@@ -17,7 +18,7 @@ export function entryOf(object: ObjectLayerData): { kind: string; id: string } |
 
 export function objectPlay(object: ObjectLayerData, mapId: string, character: string | null, agents: string[], onChange: ((next: ObjectLayerData) => void) | null, world?: string): PlayHolder {
   return {
-    texts: { action: object.actions, decision: object.decisions },
+    texts: { action: object.actions ?? '', decision: object.decisions ?? '' },
     save: async (kind, text) => onChange?.({ ...object, ...(kind === 'action' ? { actions: text } : { decisions: text }) }),
     keepLabel: 'Keep on this object',
     character,
@@ -25,9 +26,20 @@ export function objectPlay(object: ObjectLayerData, mapId: string, character: st
   }
 }
 
-export function objectHandlers(world: string, mapId: string, character: string | null): MapObjectHandlers {
-  const open = (object: ObjectLayerData, e: MenuEvent) => openMenu(e, object.name, objectItems(object, objectPlay(object, mapId, character, [], null, world), null))
-  return { onPick: open, onMenu: open }
+export function objectHandlers(
+  world: string,
+  mapId: string,
+  character: string | null,
+  onWalk?: (target: Point) => void,
+  onApproach?: (target: Point, onReach: () => void) => void
+): MapObjectHandlers {
+  const open = (object: ObjectLayerData, e: MenuEvent) =>
+    openMenu(e, object.name, objectItems(object, objectPlay(object, mapId, character, [], null, world), null, onWalk, onApproach))
+  const pick = (object: ObjectLayerData) => {
+    const entry = entryOf(object)
+    if (entry) openEntry(entry.kind, entry.id)
+  }
+  return { onPick: pick, onMenu: open }
 }
 
 export interface ObjectEdit {
@@ -35,13 +47,55 @@ export interface ObjectEdit {
   onDelete: () => void
 }
 
-export function objectItems(object: ObjectLayerData, play: PlayHolder, edit: ObjectEdit | null): MenuItem[] {
+export function objectItems(
+  object: ObjectLayerData,
+  play: PlayHolder,
+  edit: ObjectEdit | null,
+  onWalk?: (target: Point) => void,
+  onApproach?: (target: Point, onReach: () => void) => void
+): MenuItem[] {
   const entry = entryOf(object)
+  const withApproach = (cb: () => void) => {
+    if (onApproach) onApproach(object.offset, cb)
+    else cb()
+  }
+
   return [
+    ...(onWalk
+      ? [
+          {
+            label: 'Move here',
+            icon: <Footprints className="h-4 w-4 text-cyan" />,
+            onSelect: () => onWalk(object.offset)
+          }
+        ]
+      : []),
     { label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(play.where.link ?? object.name, play.where.agents) },
-    ...parseActions(object.actions).map((a, i) => ({ ...actionItems(play, a, i)[0], label: a.attempt })),
-    ...parseDecisions(object.decisions).map((d, i) => ({ ...decisionItems(play, d, i, null)[0], label: d.question })),
-    ...(entry ? [{ label: 'Open', icon: <ExternalLink />, onSelect: () => openEntry(entry.kind, entry.id) }] : []),
+    ...parseActions(object.actions ?? '').map((a, i) => {
+      const item = actionItems(play, a, i)[0]
+      return {
+        ...item,
+        label: a.attempt,
+        onSelect: item.onSelect ? () => withApproach(item.onSelect!) : undefined
+      }
+    }),
+    ...parseDecisions(object.decisions ?? '').map((d, i) => {
+      const item = decisionItems(play, d, i, null)[0]
+      return {
+        ...item,
+        label: d.question,
+        onSelect: item.onSelect ? () => withApproach(item.onSelect!) : undefined
+      }
+    }),
+    ...(entry
+      ? [
+          {
+            label: 'Open',
+            icon: <ExternalLink />,
+            onSelect: () => withApproach(() => openEntry(entry.kind, entry.id))
+          }
+        ]
+      : []),
     ...(edit
       ? [
           ...newPlayItems(play),

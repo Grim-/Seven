@@ -29,8 +29,13 @@ worlds.setPlayLayer({
   stand: (world, map) => reading(world)?.stand[map] ?? {},
   setStand: (world, map, stand) =>
     writing(world, (s) => {
-      for (const sheet of Object.keys(stand)) if (!(sheet in s.characters)) throw new Error(`That character isn't in ${s.name}. Bring them into this save first.`)
-      return { ...s, stand: { ...s.stand, [map]: stand } }
+      const nextChars = { ...s.characters }
+      for (const sheet of Object.keys(stand)) {
+        if (!(sheet in nextChars)) {
+          nextChars[sheet] = { where: '', game: null }
+        }
+      }
+      return { ...s, characters: nextChars, stand: { ...s.stand, [map]: stand } }
     }),
   journeys: (world) => reading(world)?.journeys ?? {},
   addJourney: (world, sheet, entry) => writing(world, (s) => ({ ...s, journeys: { ...s.journeys, [sheet]: [...(s.journeys[sheet] ?? []), entry] } })),

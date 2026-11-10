@@ -3,9 +3,9 @@ import { engine } from '../../lib/ipc'
 import { useLive } from '../../lib/useLive'
 
 export function useMap(id: string): MapData | false | null {
-  return useLive(() => engine('maps.get', { id }).then((m) => m ?? false), 'maps.changed')
+  return useLive(() => engine('maps.get', { id }).then((m) => m ?? false), 'maps.changed', [id])
 }
 
 export function useWorldMaps(world: string): WorldMapUse[] | null {
-  return useLive(() => engine('worlds.maps', { id: world }).catch(() => []), 'worlds.changed')
+  return useLive(() => engine('worlds.maps', { id: world }).catch(() => []), 'worlds.changed', [world])
 }

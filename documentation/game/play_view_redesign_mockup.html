@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SEVEN // CRPG ACTION DECK & AGENT NARRATIVE HUD</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* STRICT SEVEN ZERO-RADIUS GEOMETRY & CYBER-TERMINAL CRPG THEME */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      border-radius: 0px !important;
+    }
+    :root {
+      --bg: #06080c;
+      --panel: rgba(8, 12, 18, 0.96);
+      --card: #0f1520;
+      --line: rgba(245, 158, 11, 0.32);
+      --line-bright: rgba(102, 252, 241, 0.55);
+      --accent: #ffc919;
+      --cyan: #66fcf1;
+      --alert: #ef4444;
+      --ok: #34d399;
+      --purple: #a855f7;
+      --orange: #f97316;
+      --dim: #94a3b8;
+      --faint: #475569;
+      --mono: ui-monospace, 'Cascadia Mono', Consolas, 'SFMono-Regular', Menlo, monospace;
+      --sans: 'Segoe UI', Inter, system-ui, sans-serif;
+    }
+    body {
+      background: var(--bg);
+      color: #ffffff;
+      font-family: var(--sans);
+      font-size: 11px;
+      line-height: 1.3;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+    }
+    .font-mono {
+      font-family: var(--mono);
+    }
+    .scanlines {
+      position: relative;
+    }
+    .scanlines::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.12) 1px, transparent 1px, transparent 2px);
+      pointer-events: none;
+      z-index: 25;
+    }
+    .hud-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.9);
+    }
+    /* BG3 STYLE DENSE GRID SLOTS (36x36px) */
+    .deck-slot {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      background: rgba(13, 19, 29, 0.95);
+      border: 1px solid rgba(245, 158, 11, 0.28);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.1s ease-out;
+      cursor: pointer;
+    }
+    .deck-slot:hover {
+      background: rgba(28, 40, 60, 0.98);
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(102, 252, 241, 0.35);
+      z-index: 10;
+    }
+    .deck-slot:active {
+      transform: translateY(1px);
+    }
+    .deck-slot.spent {
+      opacity: 0.32;
+      filter: grayscale(0.85);
+      cursor: not-allowed;
+      border-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    .slot-key {
+      position: absolute;
+      bottom: 1px;
+      left: 2px;
+      font-size: 7px;
+      font-weight: bold;
+      color: var(--dim);
+      line-height: 1;
+    }
+    .slot-cost {
+      position: absolute;
+      top: 1px;
+      right: 2px;
+      font-size: 7px;
+      font-weight: bold;
+      line-height: 1;
+    }
+    .slot-count {
+      position: absolute;
+      bottom: 1px;
+      right: 2px;
+      font-size: 8px;
+      font-weight: bold;
+      color: #ffffff;
+      line-height: 1;
+      text-shadow: 0 1px 2px #000;
+    }
+    /* RESOURCE PIPS */
+    .pip-dot {
+      width: 8px;
+      height: 8px;
+      transition: all 0.2s;
+    }
+    .pip-action {
+      background: #10b981;
+      border: 1px solid #34d399;
+      box-shadow: 0 0 5px rgba(168, 185, 129, 0.7);
+    }
+    .pip-action.spent {
+      background: transparent;
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+    .pip-bonus {
+      background: #f97316;
+      border: 1px solid #fb923c;
+      box-shadow: 0 0 5px rgba(249, 115, 22, 0.7);
+    }
+    .pip-bonus.spent {
+      background: transparent;
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+    .pip-reaction {
+      background: #a855f7;
+      border: 1px solid #c084fc;
+      box-shadow: 0 0 5px rgba(168, 85, 247, 0.7);
+    }
+    .pip-reaction.spent {
+      background: transparent;
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+    .pip-slot {
+      width: 7px;
+      height: 7px;
+      background: #38bdf8;
+      border: 1px solid #7dd3fc;
+      box-shadow: 0 0 4px rgba(56, 189, 248, 0.6);
+    }
+    .pip-slot.spent {
+      background: transparent;
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+    /* TOOLTIP */
+    .hud-tooltip {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s ease-out;
+      z-index: 60;
+      white-space: nowrap;
+    }
+    .deck-slot:hover .hud-tooltip {
+      opacity: 1;
+    }
+    /* DIEGETIC IN-WORLD SPEECH BUBBLES */
+    .speech-bubble {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      pointer-events: none;
+      z-index: 20;
+      background: rgba(9, 12, 17, 0.94);
+      border: 1px solid var(--cyan);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.85);
+      padding: 4px 8px;
+      white-space: nowrap;
+      animation: bubble-fade 3.2s forwards;
+    }
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 4px solid var(--cyan);
+    }
+    .speech-bubble-alert {
+      border-color: var(--alert);
+    }
+    .speech-bubble-alert::after {
+      border-top-color: var(--alert);
+    }
+    @keyframes bubble-fade {
+      0% { opacity: 0; transform: translate(-50%, -85%); }
+      12% { opacity: 1; transform: translate(-50%, -105%); }
+      75% { opacity: 1; transform: translate(-50%, -105%); }
+      100% { opacity: 0; transform: translate(-50%, -115%); }
+    }
+    /* RESIZE DIVIDER */
+    .deck-divider {
+      width: 5px;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.08);
+      border-left: 1px solid rgba(255, 255, 255, 0.15);
+      border-right: 1px solid rgba(255, 255, 255, 0.15);
+      cursor: col-resize;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .deck-divider::before {
+      content: '⋮';
+      font-size: 9px;
+      color: var(--dim);
+    }
+  </style>
+</head>
+<body class="scanlines">
+  <div id="game-app" class="relative flex flex-col h-screen w-screen overflow-hidden bg-[#06080c] font-mono text-white">
+
+    <!-- ========================================================================= -->
+    <!-- 1. TOP BAR: PURE WORLD STATUS & INITIATIVE QUEUE (NO TARGET CLUTTER)      -->
+    <!-- ========================================================================= -->
+    <header class="h-9 w-full bg-[#05070a] border-b border-[var(--line)] flex items-center justify-between px-3 shrink-0 z-40 text-[11px]">
+      
+      <!-- LEFT: WORLD / MAP STATUS -->
+      <div class="flex items-center gap-2.5 shrink-0">
+        <span class="text-white font-bold tracking-wider">//SEVEN</span>
+        <span class="text-[var(--faint)]">/</span>
+        <span class="text-[var(--cyan)] font-bold">WEST WEALD</span>
+        <span class="text-[var(--faint)]">/</span>
+        <button onclick="toggleCombatState()" id="combat-status-badge" class="px-2 py-0.5 border border-red-500/70 bg-red-950/40 text-red-400 font-bold text-[9px] hover:bg-red-900/60 cursor-pointer">
+          [COMBAT ACTIVE]
+        </button>
+      </div>
+
+      <!-- CENTER: INITIATIVE STRIP -->
+      <div id="initiative-flex-group" class="flex items-center gap-2 px-3 py-0.5 bg-black/60 border border-white/10">
+        <div class="flex items-center gap-1.5 pr-2 border-r border-white/15">
+          <span class="text-[8px] text-[var(--cyan)] font-bold uppercase tracking-widest">ROUND</span>
+          <span id="round-num-label" class="text-xs font-bold text-white">1</span>
+        </div>
+
+        <div class="flex items-center gap-1.5" id="initiative-strip">
+          <!-- Active Player -->
+          <div id="init-slot-0" class="relative w-6 h-6 border-2 border-[var(--cyan)] bg-neutral-900 flex items-center justify-center shadow-[0_0_8px_rgba(102,252,241,0.5)]">
+            <span class="font-bold text-[9px] text-[var(--cyan)]">AF</span>
+            <span class="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-[var(--cyan)] border border-black"></span>
+          </div>
+
+          <span class="text-[var(--faint)] text-[8px]">&rsaquo;</span>
+
+          <!-- Hostile Dire Wolf Alpha -->
+          <div id="init-slot-1" class="relative w-6 h-6 border border-red-500/80 bg-red-950/40 flex items-center justify-center opacity-75">
+            <span class="font-bold text-[9px] text-red-400">DW</span>
+            <span class="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-red-500 border border-black"></span>
+          </div>
+
+          <span class="text-[var(--faint)] text-[8px]">&rsaquo;</span>
+
+          <!-- Companion Lyra -->
+          <div id="init-slot-2" class="relative w-6 h-6 border border-sky-500/60 bg-sky-950/30 flex items-center justify-center opacity-65">
+            <span class="font-bold text-[9px] text-sky-400">LS</span>
+            <span class="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-sky-400 border border-black"></span>
+          </div>
+
+          <span class="text-[var(--faint)] text-[8px]">&rsaquo;</span>
+
+          <!-- Hostile Timber Wolf -->
+          <div id="init-slot-3" class="relative w-6 h-6 border border-red-500/80 bg-red-950/40 flex items-center justify-center opacity-60">
+            <span class="font-bold text-[9px] text-red-400">W2</span>
+            <span class="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-red-500 border border-black"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: CLOCK -->
+      <div class="flex items-center gap-2 text-[10px] text-[var(--dim)] shrink-0">
+        <span>DAY 1 &middot; 20:24</span>
+      </div>
+
+    </header>
+
+    <!-- ========================================================================= -->
+    <!-- 2. CINEMATIC DM AGENT NARRATIVE BROADCAST BANNER (DRAMATIC CONTEXT)       -->
+    <!-- Subtitle-style, docked under top header, subtle & non-colliding           -->
+    <!-- ========================================================================= -->
+    <div id="dm-narration-banner" class="absolute left-1/2 top-11 -translate-x-1/2 z-20 pointer-events-auto flex items-center gap-2 px-3 py-1 bg-black/90 border border-amber-500/40 shadow-[0_4px_16px_rgba(0,0,0,0.85)] max-w-2xl">
+      <span class="text-[8px] font-bold text-amber-400 uppercase tracking-widest border border-amber-500/40 bg-amber-950/50 px-1">DM AGENT</span>
+      <span id="dm-narration-text" class="text-[11px] text-neutral-200 truncate">The dire wolf bared its fangs, lunging from the brush as pine needles scatter across the stone ridge.</span>
+      <button onclick="document.getElementById('dm-narration-banner').classList.toggle('opacity-25')" class="text-[8px] text-[var(--faint)] hover:text-white cursor-pointer ml-1">[FADE]</button>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 3. VIEWPORT CANVAS + SYMMETRIC ALLIES & HOSTILES DOCKS                    -->
+    <!-- ========================================================================= -->
+    <div class="relative flex-1 w-full overflow-hidden bg-[#090d14]">
+
+      <!-- TACTICAL 2D CANVAS -->
+      <canvas id="tactical-canvas" class="absolute inset-0 w-full h-full cursor-crosshair"></canvas>
+
+      <!-- DIEGETIC IN-WORLD SPEECH BUBBLES CONTAINER -->
+      <div id="speech-bubbles-layer" class="absolute inset-0 pointer-events-none z-30"></div>
+
+      <!-- ===================================================================== -->
+      <!-- LEFT EDGE DOCK: ALLIED PARTY STACK                                    -->
+      <!-- ===================================================================== -->
+      <aside class="absolute left-3 top-3 z-30 pointer-events-auto flex flex-col gap-1.5 w-44">
+        <div class="flex items-center justify-between text-[8px] text-[var(--dim)] tracking-wider px-0.5 uppercase">
+          <span>Party (3)</span>
+          <span class="text-[var(--cyan)]">Allies</span>
+        </div>
+
+        <!-- ALISTAIR (ACTIVE) -->
+        <div id="party-card-0" onclick="switchPartyMember(0)" class="hud-panel p-1.5 flex items-center gap-2 cursor-pointer border-l-2 border-l-[var(--cyan)] bg-[rgba(102,252,241,0.08)] hover:bg-white/5 transition-all">
+          <div class="w-8 h-8 border border-[var(--cyan)] bg-neutral-900 flex items-center justify-center font-bold text-xs text-[var(--cyan)] shrink-0">
+            AF
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="font-bold text-white truncate">Alistair</span>
+              <span class="text-[8px] text-[var(--dim)]">LV 3</span>
+            </div>
+            <div class="h-1.5 w-full bg-neutral-950 border border-neutral-700 mt-1">
+              <div id="party-hp-bar-0" class="h-full bg-emerald-500" style="width: 100%;"></div>
+            </div>
+            <div class="flex justify-between text-[8px] text-[var(--dim)] mt-0.5 leading-none">
+              <span>HP</span>
+              <span id="party-hp-val-0" class="text-emerald-400">25/25</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- LYRA -->
+        <div id="party-card-1" onclick="switchPartyMember(1)" class="hud-panel p-1.5 flex items-center gap-2 cursor-pointer border-l-2 border-l-transparent hover:bg-white/5 opacity-70 hover:opacity-100 transition-all">
+          <div class="w-8 h-8 border border-neutral-700 bg-neutral-900 flex items-center justify-center font-bold text-xs text-sky-400 shrink-0">
+            LS
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="font-bold text-neutral-300 truncate">Lyra</span>
+              <span class="text-[8px] text-[var(--dim)]">LV 3</span>
+            </div>
+            <div class="h-1.5 w-full bg-neutral-950 border border-neutral-700 mt-1">
+              <div class="h-full bg-emerald-500" style="width: 85%;"></div>
+            </div>
+            <div class="flex justify-between text-[8px] text-[var(--dim)] mt-0.5 leading-none">
+              <span>HP</span>
+              <span class="text-emerald-400">17/20</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KAEL -->
+        <div id="party-card-2" onclick="switchPartyMember(2)" class="hud-panel p-1.5 flex items-center gap-2 cursor-pointer border-l-2 border-l-transparent hover:bg-white/5 opacity-70 hover:opacity-100 transition-all">
+          <div class="w-8 h-8 border border-neutral-700 bg-neutral-900 flex items-center justify-center font-bold text-xs text-amber-400 shrink-0">
+            BK
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="font-bold text-neutral-300 truncate">Kael</span>
+              <span class="text-[8px] text-[var(--dim)]">LV 3</span>
+            </div>
+            <div class="h-1.5 w-full bg-neutral-950 border border-neutral-700 mt-1">
+              <div class="h-full bg-emerald-500" style="width: 100%;"></div>
+            </div>
+            <div class="flex justify-between text-[8px] text-[var(--dim)] mt-0.5 leading-none">
+              <span>HP</span>
+              <span class="text-emerald-400">22/22</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ===================================================================== -->
+      <!-- RIGHT EDGE DOCK: ENEMY / OPPONENTS STACK (SYMMETRIC TO PARTY)         -->
+      <!-- ===================================================================== -->
+      <aside id="enemy-encounter-stack" class="absolute right-3 top-3 z-30 pointer-events-auto flex flex-col gap-1.5 w-48">
+        <div class="flex items-center justify-between text-[8px] text-[var(--dim)] tracking-wider px-0.5 uppercase">
+          <span>Hostiles (2)</span>
+          <span class="text-red-400">Click to Target</span>
+        </div>
+
+        <!-- DIRE WOLF ALPHA (TARGETED) -->
+        <div id="enemy-card-0" onclick="selectTargetEnemy(0)" class="hud-panel p-1.5 flex items-center gap-2 cursor-pointer border-r-2 border-r-red-500 bg-red-950/30 hover:bg-red-900/40 transition-all shadow-[0_0_8px_rgba(239,68,68,0.3)]">
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="font-bold text-white truncate">Dire Wolf Alpha</span>
+              <span class="text-[8px] border border-red-500/50 bg-red-950/60 px-1 text-red-300">AC 12</span>
+            </div>
+            <div class="h-1.5 w-full bg-neutral-950 border border-neutral-700 mt-1">
+              <div id="enemy-hp-bar-0" class="h-full bg-red-500 transition-all duration-200" style="width: 100%;"></div>
+            </div>
+            <div class="flex justify-between text-[8px] text-[var(--dim)] mt-0.5 leading-none">
+              <span class="text-red-400 font-bold">[TARGETED]</span>
+              <span id="enemy-hp-val-0" class="text-red-400 font-bold">15/15</span>
+            </div>
+          </div>
+          <div class="w-8 h-8 border border-red-500/80 bg-red-950 flex items-center justify-center font-bold text-xs text-red-400 shrink-0">
+            DW
+          </div>
+        </div>
+
+        <!-- TIMBER WOLF -->
+        <div id="enemy-card-1" onclick="selectTargetEnemy(1)" class="hud-panel p-1.5 flex items-center gap-2 cursor-pointer border-r-2 border-r-transparent hover:bg-red-950/20 opacity-70 hover:opacity-100 transition-all">
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="font-bold text-neutral-300 truncate">Timber Wolf</span>
+              <span class="text-[8px] border border-white/20 bg-black/40 px-1 text-neutral-400">AC 11</span>
+            </div>
+            <div class="h-1.5 w-full bg-neutral-950 border border-neutral-700 mt-1">
+              <div id="enemy-hp-bar-1" class="h-full bg-red-500 transition-all duration-200" style="width: 100%;"></div>
+            </div>
+            <div class="flex justify-between text-[8px] text-[var(--dim)] mt-0.5 leading-none">
+              <span class="text-[var(--faint)]">Secondary</span>
+              <span id="enemy-hp-val-1" class="text-neutral-400">11/11</span>
+            </div>
+          </div>
+          <div class="w-8 h-8 border border-neutral-700 bg-neutral-900 flex items-center justify-center font-bold text-xs text-neutral-400 shrink-0">
+            W2
+          </div>
+        </div>
+      </aside>
+
+      <!-- ===================================================================== -->
+      <!-- 4. BOTTOM-RIGHT: UNOBTRUSIVE COLLAPSIBLE COMBAT LOG DRAWER            -->
+      <!-- Defaults to compact 1-line pill; expands ONLY when clicked            -->
+      <!-- ===================================================================== -->
+      <div id="combat-log-drawer" class="absolute right-3 bottom-3 z-30 pointer-events-auto flex flex-col font-mono">
+        <!-- EXPANDED BODY (DEFAULT COLLAPSED/TUCKED AWAY) -->
+        <div id="combat-log-body-panel" class="hidden w-72 h-28 hud-panel flex flex-col mb-1 shadow-2xl">
+          <div class="h-5 bg-black/80 border-b border-white/10 px-2 flex items-center justify-between text-[8px] text-[var(--dim)]">
+            <span class="text-white font-bold uppercase tracking-wider">MECHANICAL LOG</span>
+            <div class="flex items-center gap-2">
+              <button onclick="clearCombatLog()" class="hover:text-white cursor-pointer">[CLEAR]</button>
+              <button onclick="toggleCombatLog(false)" class="text-[var(--cyan)] hover:text-white cursor-pointer">[COLLAPSE]</button>
+            </div>
+          </div>
+          <div id="combat-feed-body" class="flex-1 overflow-y-auto p-1.5 space-y-1 text-neutral-300 text-[9px] leading-tight">
+            <div class="text-[var(--faint)]">[Init] Alistair Finch (18) &gt; Dire Wolf (14) &gt; Lyra (12)</div>
+            <div class="text-[var(--cyan)]">[Turn 1] Alistair Finch active. Target: Dire Wolf Alpha.</div>
+          </div>
+        </div>
+
+        <!-- COMPACT 1-LINE TICKER PILL (UNOBTRUSIVE) -->
+        <button id="combat-log-pill" onclick="toggleCombatLog(true)" class="hud-panel px-2.5 py-1 flex items-center gap-2 text-[9px] hover:border-[var(--cyan)] transition-colors cursor-pointer bg-black/90">
+          <span class="w-1.5 h-1.5 bg-[var(--cyan)] animate-pulse"></span>
+          <span class="text-[var(--dim)]">LOG:</span>
+          <span id="log-pill-preview" class="text-neutral-300 truncate max-w-[200px]">Strike vs Dire Wolf: d20(14)+6=20 HIT</span>
+          <span class="text-[8px] text-[var(--cyan)] font-bold ml-1">[^ EXPAND]</span>
+        </button>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- 5. BOTTOM-CENTER: DENSE CONFIGURABLE CRPG ACTION DECK (BG3 STYLE)     -->
+      <!-- Features Resource Shelf, 3-Row Configurable Grid, Filter Tabs         -->
+      <!-- ===================================================================== -->
+      <div class="absolute left-1/2 bottom-2 -translate-x-1/2 z-30 pointer-events-auto flex flex-col items-center hud-panel p-1.5 gap-1 border-[var(--line-bright)] shadow-2xl">
+
+        <!-- TOP SHELF: RESOURCE BAR (PIPS, MATRIX, CHARGES, MOVEMENT GAUGE) -->
+        <div class="w-full flex items-center justify-between px-1 py-0.5 border-b border-white/10 bg-black/40 text-[9px]">
+          <!-- Pips: Action, Bonus, Reaction -->
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1.5" title="Action / Bonus / Reaction">
+              <div id="pip-action" class="pip-dot pip-action" title="Action: Ready"></div>
+              <div id="pip-bonus" class="pip-dot pip-bonus" title="Bonus Action: Ready"></div>
+              <div id="pip-reaction" class="pip-dot pip-reaction" title="Reaction: Primed"></div>
+            </div>
+
+            <!-- Class Charges (Artificer Infusions) -->
+            <div class="flex items-center gap-1 text-amber-400 font-bold border-l border-white/15 pl-2" title="Infusion Charges">
+              <span>⚡</span>
+              <span id="infusion-charge-label">3/3</span>
+            </div>
+
+            <!-- Spell Slot Matrix (Roman Numerals I & II) -->
+            <div class="flex items-center gap-2 border-l border-white/15 pl-2">
+              <div class="flex items-center gap-0.5" title="1st Level Spell Slots (2)">
+                <span class="text-[7px] text-sky-400 font-bold mr-0.5">I</span>
+                <div id="slot-pip-1-1" class="pip-slot"></div>
+                <div id="slot-pip-1-2" class="pip-slot"></div>
+              </div>
+              <div class="flex items-center gap-0.5" title="2nd Level Spell Slots (1)">
+                <span class="text-[7px] text-sky-400 font-bold mr-0.5">II</span>
+                <div id="slot-pip-2-1" class="pip-slot"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Movement Gauge (Continuous Cyan Meter) -->
+          <div class="flex items-center gap-2">
+            <span class="text-[8px] text-[var(--dim)]">SPEED:</span>
+            <div class="w-24 h-1.5 bg-neutral-950 border border-neutral-700">
+              <div id="movement-meter-fill" class="h-full bg-[var(--cyan)] transition-all duration-150" style="width: 100%;"></div>
+            </div>
+            <span id="movement-meter-label" class="text-[8px] text-[var(--cyan)] font-bold">30/30 FT</span>
+          </div>
+        </div>
+
+        <!-- MAIN DECK: 3-ROW DENSE TACTICAL ABILITY GRID WITH ADJUSTABLE SECTIONS -->
+        <div class="flex items-stretch gap-1">
+
+          <!-- SECTION 1: CHARACTER / META / UNIVERSAL MANEUVERS (3 cols x 3 rows) -->
+          <div id="deck-block-common" class="grid grid-rows-3 grid-flow-col gap-1">
+            <!-- Row 1: Dash (Z) | Dodge (X) | Disengage (C) -->
+            <button id="btn-dash" onclick="executeDeckAction('dash')" class="deck-slot" title="Dash">
+              <span class="slot-cost text-sky-400">BON</span>
+              <svg class="w-4 h-4 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v-2a4 4 0 0 1 4-4h4l3 3v3H4z"/><path d="M15 13l4 4-2 3H4v-4"/></svg>
+              <span class="slot-key">Z</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-sky-400">Dash [Z]</strong> (Bonus Action)<br>
+                Doubles movement budget (+30 ft).
+              </div>
+            </button>
+
+            <button id="btn-dodge" onclick="executeDeckAction('dodge')" class="deck-slot" title="Dodge">
+              <span class="slot-cost text-emerald-400">ACT</span>
+              <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span class="slot-key">X</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-emerald-400">Dodge [X]</strong> (1 Action)<br>
+                Attackers suffer disadvantage on attacks.
+              </div>
+            </button>
+
+            <button id="btn-disengage" onclick="executeDeckAction('disengage')" class="deck-slot" title="Disengage">
+              <span class="slot-cost text-emerald-400">ACT</span>
+              <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 4v6m0 0l3-3m-3 3L10 7"/><path d="M5 20h14"/></svg>
+              <span class="slot-key">C</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-emerald-400">Disengage [C]</strong> (1 Action)<br>
+                Movement does not provoke opportunity attacks.
+              </div>
+            </button>
+
+            <!-- Row 2: Parley (V) | Help (B) | Hide (F) -->
+            <button id="btn-parley" onclick="executeDeckAction('parley')" class="deck-slot" title="Parley">
+              <span class="slot-cost text-amber-400">ACT</span>
+              <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span class="slot-key">V</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-amber-400">Parley [V]</strong> (Meta / Social Action)<br>
+                Agent-curated dialogue opposed check to pacify or intimidate.
+              </div>
+            </button>
+
+            <button id="btn-help" onclick="executeDeckAction('help')" class="deck-slot" title="Help">
+              <span class="slot-cost text-emerald-400">ACT</span>
+              <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11h-5V6a2 2 0 0 0-4 0v5H4a2 2 0 0 0 0 4h5v5a2 2 0 0 0 4 0v-5h5a2 2 0 0 0 0-4z"/></svg>
+              <span class="slot-key">B</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-emerald-400">Help [B]</strong> (1 Action)<br>
+                Grant advantage to an ally's next attack or roll.
+              </div>
+            </button>
+
+            <button id="btn-hide" onclick="executeDeckAction('hide')" class="deck-slot" title="Hide">
+              <span class="slot-cost text-sky-400">BON</span>
+              <svg class="w-4 h-4 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span class="slot-key">F</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-sky-400">Hide [F]</strong> (Bonus Action)<br>
+                Stealth check to become unseen.
+              </div>
+            </button>
+
+            <!-- Row 3: Inspect (Q) | Shove (R) | Flee -->
+            <button onclick="executeDeckAction('inspect')" class="deck-slot" title="Inspect">
+              <span class="slot-cost text-[var(--dim)]">FREE</span>
+              <svg class="w-4 h-4 text-[var(--cyan)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <span class="slot-key">Q</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-[var(--cyan)]">Inspect [Q]</strong> (Free)<br>
+                Examine resistances, traits, and agent lore.
+              </div>
+            </button>
+
+            <button onclick="executeDeckAction('shove')" class="deck-slot" title="Shove">
+              <span class="slot-cost text-emerald-400">ACT</span>
+              <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v8H2z"/></svg>
+              <span class="slot-key">R</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-emerald-400">Shove [R]</strong> (1 Action)<br>
+                Push target 5 ft or knock prone on opposed Athletics.
+              </div>
+            </button>
+
+            <button onclick="executeDeckAction('flee')" class="deck-slot" title="Flee">
+              <span class="slot-cost text-red-400">ACT</span>
+              <svg class="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <span class="slot-key">ESC</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-red-400">Flee Combat</strong><br>
+                Attempt retreat to previous zone.
+              </div>
+            </button>
+          </div>
+
+          <!-- RESIZABLE SECTION DIVIDER -->
+          <div class="deck-divider"></div>
+
+          <!-- SECTION 2: CLASS ATTACKS & SPELLS (6 cols x 3 rows) -->
+          <div id="deck-block-spells" class="grid grid-rows-3 grid-flow-col gap-1">
+            <!-- Row 1: Battleaxe (1) | Fire Bolt (2) | Catapult (3) | Thunderwave (4) | Shield (5) | Infusion (6) -->
+            <button id="slot-1" onclick="useDeckSlot(1)" class="deck-slot border-[var(--cyan)]">
+              <span class="slot-cost text-emerald-400">ACT</span>
+              <svg class="w-4 h-4 text-[var(--cyan)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14.5 17.5 3 3 4-4-3-3"/><path d="m7.5 10.5 4-4 3 3-4 4"/><path d="m3 21 6-6"/></svg>
+              <span class="slot-key text-[var(--cyan)]">1</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-[var(--cyan)]">Battleaxe Strike [1]</strong> (1 Action)<br>
+                +6 vs AC &middot; 1d8+4 slashing &middot; Melee 5 ft
+              </div>
+            </button>
+
+            <button id="slot-2" onclick="useDeckSlot(2)" class="deck-slot border-amber-500/80">
+              <span class="slot-cost text-emerald-400">ACT</span>
+              <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+              <span class="slot-key text-amber-400">2</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-amber-400">Fire Bolt [2]</strong> (Cantrip &middot; 1 Action)<br>
+                +5 vs AC &middot; 1d10 fire &middot; Range 120 ft
+              </div>
+            </button>
+
+            <button id="slot-3" onclick="useDeckSlot(3)" class="deck-slot border-sky-500/80">
+              <span class="slot-cost text-sky-400">I</span>
+              <svg class="w-4 h-4 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              <span class="slot-key text-sky-400">3</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-sky-400">Thunderwave [3]</strong> (Level 1 &middot; 1 Action)<br>
+                2d8 thunder &middot; 15 ft cube &middot; Con save or push 10 ft
+              </div>
+            </button>
+
+            <!-- Row 2: Shield Reaction (4) | Arcane Weapon (5) | Catapult (6) | Faerie Fire | Cure Wounds | Grease -->
+            <button id="slot-4" onclick="useDeckSlot(4)" class="deck-slot border-purple-500/80">
+              <span class="slot-cost text-purple-400">REA</span>
+              <svg class="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span class="slot-key text-purple-400">4</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-purple-400">Shield [4]</strong> (Reaction &middot; Slot Lv 1)<br>
+                +5 AC against incoming attack until next turn.
+              </div>
+            </button>
+
+            <button id="slot-5" onclick="useDeckSlot(5)" class="deck-slot border-amber-500/60">
+              <span class="slot-cost text-sky-400">BON</span>
+              <svg class="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
+              <span class="slot-key text-amber-300">5</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-amber-300">Arcane Infusion [5]</strong> (Bonus Action &middot; 1 Charge)<br>
+                Weapon deals +1d4 force damage for 1 min.
+              </div>
+            </button>
+
+            <button id="slot-6" onclick="useDeckSlot(6)" class="deck-slot border-neutral-700">
+              <span class="slot-cost text-sky-400">I</span>
+              <svg class="w-4 h-4 text-neutral-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/></svg>
+              <span class="slot-key text-neutral-400">6</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-neutral-200">Catapult [6]</strong> (Level 1 &middot; 1 Action)<br>
+                Hurls 1-5 lb object up to 90 ft &middot; 3d8 bludgeoning
+              </div>
+            </button>
+
+            <!-- Row 3: Utility & Passive Spells -->
+            <button class="deck-slot border-neutral-800">
+              <span class="slot-cost text-sky-400">I</span>
+              <span class="text-[9px] text-purple-400 font-bold">FAER</span>
+              <span class="slot-key">7</span>
+            </button>
+
+            <button class="deck-slot border-neutral-800">
+              <span class="slot-cost text-sky-400">I</span>
+              <span class="text-[9px] text-emerald-400 font-bold">CURE</span>
+              <span class="slot-key">8</span>
+            </button>
+
+            <button class="deck-slot border-neutral-800">
+              <span class="slot-cost text-sky-400">I</span>
+              <span class="text-[9px] text-yellow-400 font-bold">GRES</span>
+              <span class="slot-key">9</span>
+            </button>
+          </div>
+
+          <!-- RESIZABLE SECTION DIVIDER -->
+          <div class="deck-divider"></div>
+
+          <!-- SECTION 3: INVENTORY ITEMS & CONSUMABLES (2 cols x 3 rows) -->
+          <div id="deck-block-items" class="grid grid-rows-3 grid-flow-col gap-1">
+            <!-- Healing Potion -->
+            <button onclick="useItem('potion')" class="deck-slot border-emerald-500/70">
+              <span class="slot-cost text-sky-400">BON</span>
+              <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 2h4"/><path d="M12 2v3"/><path d="M8.5 7.5 5 14a6 6 0 0 0 10 0l-3.5-6.5a2 2 0 0 0-3 0z"/></svg>
+              <span class="slot-count">x2</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-emerald-400">Healing Draught</strong> (Bonus Action)<br>
+                Heals 2d4+2 HP. 2 remaining.
+              </div>
+            </button>
+
+            <!-- Caltrops -->
+            <button onclick="useItem('caltrops')" class="deck-slot border-neutral-700">
+              <span class="slot-cost text-emerald-400">ACT</span>
+              <svg class="w-4 h-4 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 22h20L12 2z"/></svg>
+              <span class="slot-count">x1</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-neutral-300">Caltrops Hazard</strong> (1 Action)<br>
+                Area hazard: slows enemy movement.
+              </div>
+            </button>
+
+            <!-- Alchemist's Fire -->
+            <button onclick="useItem('alchemist_fire')" class="deck-slot border-amber-600/70">
+              <span class="slot-cost text-emerald-400">ACT</span>
+              <svg class="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"/><path d="m4.93 10.93 2.83 2.83"/><path d="M2 18h4"/><path d="M20 18h2"/><path d="m19.07 10.93-2.83 2.83"/></svg>
+              <span class="slot-count">x3</span>
+              <div class="hud-tooltip hud-panel p-1.5 text-[9px] text-white">
+                <strong class="text-amber-500">Alchemist's Fire</strong> (1 Action &middot; Range 20ft)<br>
+                Throws flask: 1d4 fire per turn until extinguished.
+              </div>
+            </button>
+
+            <!-- Scroll of Revivify -->
+            <button class="deck-slot border-sky-600/70">
+              <span class="slot-cost text-emerald-400">ACT</span>
+              <svg class="w-4 h-4 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+              <span class="slot-count">x1</span>
+            </button>
+
+            <!-- Antidote -->
+            <button class="deck-slot border-neutral-700">
+              <span class="slot-cost text-sky-400">BON</span>
+              <span class="text-[8px] text-emerald-300 font-bold">ANTI</span>
+              <span class="slot-count">x2</span>
+            </button>
+
+            <!-- Torch -->
+            <button class="deck-slot border-neutral-700">
+              <span class="slot-cost text-emerald-400">ACT</span>
+              <span class="text-[8px] text-amber-400 font-bold">TRCH</span>
+              <span class="slot-count">x4</span>
+            </button>
+          </div>
+
+          <!-- RESIZABLE SECTION DIVIDER -->
+          <div class="deck-divider"></div>
+
+          <!-- SECTION 4: ACTIVE UNIT TELEMETRY & COMPACT END TURN -->
+          <div class="flex flex-col justify-between pl-1">
+            <div class="flex items-center gap-1.5">
+              <div class="relative w-8 h-8 border border-[var(--cyan)] bg-neutral-900 flex flex-col items-center justify-center shrink-0">
+                <span class="font-bold text-[10px] text-[var(--cyan)]" id="active-portrait-initials">AF</span>
+                <span class="absolute -top-1 -right-1 bg-black border border-[var(--line)] text-[7px] px-0.5 text-[var(--accent)] font-bold">15</span>
+              </div>
+              <div class="flex flex-col text-[8px] leading-tight">
+                <span class="text-white font-bold truncate">Alistair</span>
+                <span id="player-hp-num" class="text-emerald-400 font-bold">25/25 HP</span>
+              </div>
+            </div>
+
+            <!-- COMPACT END TURN BUTTON (BG3 STYLE) -->
+            <button id="btn-end-turn" onclick="endTurn()" class="h-8 px-2.5 border border-[var(--cyan)] bg-[rgba(102,252,241,0.15)] hover:bg-[var(--cyan)] hover:text-black text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+              <div class="flex flex-col text-left leading-none">
+                <span class="font-bold text-[9px] uppercase tracking-wider">End Turn</span>
+                <span class="text-[7px] text-[var(--dim)]">[SPACE]</span>
+              </div>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- BOTTOM SHELF: CATEGORY FILTER PILL TABS -->
+        <div class="w-full flex items-center justify-between pt-0.5 border-t border-white/10 text-[8px]">
+          <div class="flex items-center gap-1">
+            <button onclick="filterDeck('all')" id="tab-all" class="px-2 py-0.5 bg-[rgba(102,252,241,0.15)] border border-[var(--cyan)] text-white font-bold cursor-pointer">ALL</button>
+            <button onclick="filterDeck('common')" id="tab-common" class="px-2 py-0.5 hover:bg-white/5 border border-transparent text-[var(--dim)] cursor-pointer">COMMON</button>
+            <button onclick="filterDeck('artificer')" id="tab-artificer" class="px-2 py-0.5 hover:bg-white/5 border border-transparent text-[var(--dim)] cursor-pointer">ARTIFICER</button>
+            <button onclick="filterDeck('items')" id="tab-items" class="px-2 py-0.5 hover:bg-white/5 border border-transparent text-[var(--dim)] cursor-pointer">ITEMS</button>
+            <button onclick="filterDeck('meta')" id="tab-meta" class="px-2 py-0.5 hover:bg-white/5 border border-transparent text-amber-400 cursor-pointer">META / PARLEY</button>
+          </div>
+
+          <div class="flex items-center gap-2 text-[var(--faint)]">
+            <span>GRID: 3x11</span>
+            <span>CONFIGURABLE DECK</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- GLOBAL BOTTOM BAR -->
+    <footer class="h-5 bg-[#05070a] border-t border-[var(--line)] flex items-center justify-between px-3 shrink-0 text-[9px] text-[var(--dim)] z-40">
+      <div class="flex items-center gap-3">
+        <span class="text-[var(--cyan)] font-bold">GRID TACTICAL HARNESS</span>
+        <span>1 TILE = 5 FT</span>
+        <span id="footer-tile-coord" class="text-white">TILE: (22, 16)</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-[var(--accent)] font-bold">SEVEN ENGINE V2 &middot; CRPG SPEC</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- SCRIPT -->
+  <script>
+    const canvas = document.getElementById('tactical-canvas');
+    const ctx = canvas.getContext('2d');
+
+    let inCombat = true;
+    let roundNum = 1;
+    let turnIndex = 0; // 0 = Player, 1 = Wolf Alpha, 2 = Lyra, 3 = Wolf 2
+    let activePartyIndex = 0;
+    let activeTargetEnemyIndex = 0;
+
+    let actionAvailable = true;
+    let bonusAvailable = true;
+    let reactionAvailable = true;
+    let infusionCharges = 3;
+    let spellSlotsL1 = 2;
+    let moveBudget = 30; // 30 feet = 6 tiles
+
+    const TILE_SIZE = 40;
+    let playerPos = { x: 22, y: 16 };
+    let wolfAlphaPos = { x: 26, y: 13 };
+    let wolfBetaPos = { x: 28, y: 17 };
+    let hoveredTile = { x: 22, y: 16 };
+
+    let playerHp = { cur: 25, max: 25 };
+    let enemies = [
+      { name: "Dire Wolf Alpha", ac: 12, hp: { cur: 15, max: 15 }, pos: wolfAlphaPos, initials: "DW" },
+      { name: "Timber Wolf", ac: 11, hp: { cur: 11, max: 11 }, pos: wolfBetaPos, initials: "W2" }
+    ];
+
+    let camera = { x: 0, y: 0 };
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      camera.x = playerPos.x * TILE_SIZE - canvas.width / 2 + TILE_SIZE / 2;
+      camera.y = playerPos.y * TILE_SIZE - canvas.height / 2 + TILE_SIZE / 2;
+      render();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // TOGGLE COMBAT STATE
+    function toggleCombatState() {
+      inCombat = !inCombat;
+      const statusBtn = document.getElementById('combat-status-badge');
+      const initGroup = document.getElementById('initiative-flex-group');
+      const enemyStack = document.getElementById('enemy-encounter-stack');
+      const endTurnBtn = document.getElementById('btn-end-turn');
+      const dmBanner = document.getElementById('dm-narration-banner');
+
+      if (inCombat) {
+        statusBtn.textContent = "[COMBAT ACTIVE]";
+        statusBtn.className = "px-2 py-0.5 border border-red-500/70 bg-red-950/40 text-red-400 font-bold text-[9px] hover:bg-red-900/60 cursor-pointer";
+        initGroup.classList.remove('invisible');
+        enemyStack.classList.remove('invisible');
+        endTurnBtn.classList.remove('invisible');
+        dmBanner.classList.remove('hidden');
+        logCombatMessage("Combat engaged. Hostile encounter active.");
+      } else {
+        statusBtn.textContent = "[EXPLORATION]";
+        statusBtn.className = "px-2 py-0.5 border border-amber-500/70 bg-amber-950/40 text-amber-400 font-bold text-[9px] hover:bg-amber-900/60 cursor-pointer";
+        initGroup.classList.add('invisible');
+        enemyStack.classList.add('invisible');
+        endTurnBtn.classList.add('invisible');
+        dmBanner.classList.add('hidden');
+        moveBudget = 30;
+        actionAvailable = true;
+        bonusAvailable = true;
+        updateResourceUI();
+        logCombatMessage("Exploration mode active. Free roam movement.");
+      }
+      render();
+    }
+
+    // DIEGETIC IN-WORLD SPEECH BUBBLES OVER TOKENS
+    function spawnSpeechBubble(pos, text, isAlert = false) {
+      const container = document.getElementById('speech-bubbles-layer');
+      const bubble = document.createElement('div');
+      bubble.className = `speech-bubble font-mono text-[10px] ${isAlert ? 'speech-bubble-alert text-red-300' : 'text-cyan'}`;
+      
+      const screenX = pos.x * TILE_SIZE - camera.x + TILE_SIZE / 2;
+      const screenY = pos.y * TILE_SIZE - camera.y - 4;
+      bubble.style.left = `${screenX}px`;
+      bubble.style.top = `${screenY}px`;
+      bubble.textContent = text;
+      
+      container.appendChild(bubble);
+      setTimeout(() => bubble.remove(), 3200);
+    }
+
+    // UPDATE DM AGENT NARRATIVE
+    function setDmNarration(text) {
+      document.getElementById('dm-narration-text').textContent = text;
+    }
+
+    // FILTER DECK TABS
+    function filterDeck(tab) {
+      const tabs = ['all', 'common', 'artificer', 'items', 'meta'];
+      tabs.forEach(t => {
+        const el = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          el.className = "px-2 py-0.5 bg-[rgba(102,252,241,0.15)] border border-[var(--cyan)] text-white font-bold cursor-pointer";
+        } else {
+          el.className = "px-2 py-0.5 hover:bg-white/5 border border-transparent text-[var(--dim)] cursor-pointer";
+        }
+      });
+
+      const blockCommon = document.getElementById('deck-block-common');
+      const blockSpells = document.getElementById('deck-block-spells');
+      const blockItems = document.getElementById('deck-block-items');
+
+      if (tab === 'all') {
+        blockCommon.classList.remove('hidden');
+        blockSpells.classList.remove('hidden');
+        blockItems.classList.remove('hidden');
+      } else if (tab === 'common' || tab === 'meta') {
+        blockCommon.classList.remove('hidden');
+        blockSpells.classList.add('hidden');
+        blockItems.classList.add('hidden');
+      } else if (tab === 'artificer') {
+        blockCommon.classList.add('hidden');
+        blockSpells.classList.remove('hidden');
+        blockItems.classList.add('hidden');
+      } else if (tab === 'items') {
+        blockCommon.classList.add('hidden');
+        blockSpells.classList.add('hidden');
+        blockItems.classList.remove('hidden');
+      }
+    }
+
+    // TOGGLE COMBAT LOG
+    function toggleCombatLog(expand) {
+      const body = document.getElementById('combat-log-body-panel');
+      const pill = document.getElementById('combat-log-pill');
+      if (expand) {
+        body.classList.remove('hidden');
+        pill.classList.add('hidden');
+      } else {
+        body.classList.add('hidden');
+        pill.classList.remove('hidden');
+      }
+    }
+
+    function switchPartyMember(idx) {
+      activePartyIndex = idx;
+      for (let i = 0; i < 3; i++) {
+        const card = document.getElementById(`party-card-${i}`);
+        if (i === idx) {
+          card.classList.add('border-l-[var(--cyan)]', 'bg-[rgba(102,252,241,0.08)]');
+          card.classList.remove('border-l-transparent');
+          card.style.opacity = '1';
+        } else {
+          card.classList.remove('border-l-[var(--cyan)]', 'bg-[rgba(102,252,241,0.08)]');
+          card.classList.add('border-l-transparent');
+          card.style.opacity = '0.7';
+        }
+      }
+      const initials = ['AF', 'LS', 'BK'];
+      document.getElementById('active-portrait-initials').textContent = initials[idx];
+      const names = ['Alistair Finch', 'Lyra Swift', 'Brother Kael'];
+      logCombatMessage(`Switched active character: ${names[idx]}`);
+      spawnSpeechBubble(playerPos, `Taking command: ${names[idx]}`);
+    }
+
+    function selectTargetEnemy(idx) {
+      activeTargetEnemyIndex = idx;
+      for (let i = 0; i < 2; i++) {
+        const card = document.getElementById(`enemy-card-${i}`);
+        if (i === idx) {
+          card.classList.add('border-r-red-500', 'bg-red-950/30', 'shadow-[0_0_8px_rgba(239,68,68,0.3)]');
+          card.classList.remove('border-r-transparent');
+          card.style.opacity = '1';
+        } else {
+          card.classList.remove('border-r-red-500', 'bg-red-950/30', 'shadow-[0_0_8px_rgba(239,68,68,0.3)]');
+          card.classList.add('border-r-transparent');
+          card.style.opacity = '0.7';
+        }
+      }
+      logCombatMessage(`Targeted: ${enemies[idx].name} (AC ${enemies[idx].ac}, HP ${enemies[idx].hp.cur}/${enemies[idx].hp.max})`);
+      render();
+    }
+
+    // DRAW MAP & TOKENS
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const startCol = Math.floor(camera.x / TILE_SIZE) - 1;
+      const endCol = startCol + Math.ceil(canvas.width / TILE_SIZE) + 2;
+      const startRow = Math.floor(camera.y / TILE_SIZE) - 1;
+      const endRow = startRow + Math.ceil(canvas.height / TILE_SIZE) + 2;
+
+      // 1. TERRAIN BASE
+      for (let c = startCol; c <= endCol; c++) {
+        for (let r = startRow; r <= endRow; r++) {
+          const sx = c * TILE_SIZE - camera.x;
+          const sy = r * TILE_SIZE - camera.y;
+
+          if (c < 14 || r < 8 || c > 36 || r > 28) {
+            ctx.fillStyle = '#0a1a2b';
+          } else if (c > 20 && r > 12 && c < 30 && r < 20) {
+            ctx.fillStyle = '#3a2d21';
+          } else {
+            ctx.fillStyle = (c + r) % 2 === 0 ? '#1b2d1c' : '#172719';
+          }
+          ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE);
+        }
+      }
+
+      // 2. REACHABLE TILES IN COMBAT
+      if (inCombat && turnIndex === 0 && moveBudget > 0) {
+        const maxTiles = Math.floor(moveBudget / 5);
+        ctx.fillStyle = 'rgba(102, 252, 241, 0.12)';
+        ctx.strokeStyle = 'rgba(102, 252, 241, 0.35)';
+
+        for (let dx = -maxTiles; dx <= maxTiles; dx++) {
+          for (let dy = -maxTiles; dy <= maxTiles; dy++) {
+            const cheb = Math.max(Math.abs(dx), Math.abs(dy));
+            if (cheb <= maxTiles) {
+              const tx = playerPos.x + dx;
+              const ty = playerPos.y + dy;
+              const sx = tx * TILE_SIZE - camera.x;
+              const sy = ty * TILE_SIZE - camera.y;
+              ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+              ctx.strokeRect(sx + 0.5, sy + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+            }
+          }
+        }
+
+        const dist = Math.max(Math.abs(hoveredTile.x - playerPos.x), Math.abs(hoveredTile.y - playerPos.y));
+        if (dist > 0 && dist <= maxTiles) {
+          const px = playerPos.x * TILE_SIZE - camera.x + TILE_SIZE / 2;
+          const py = playerPos.y * TILE_SIZE - camera.y + TILE_SIZE / 2;
+          const hx = hoveredTile.x * TILE_SIZE - camera.x + TILE_SIZE / 2;
+          const hy = hoveredTile.y * TILE_SIZE - camera.y + TILE_SIZE / 2;
+
+          ctx.beginPath();
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = '#66fcf1';
+          ctx.lineWidth = 2;
+          ctx.moveTo(px, py);
+          ctx.lineTo(hx, hy);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          const ftCost = dist * 5;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+          ctx.fillRect(hx + 10, hy - 18, 64, 16);
+          ctx.strokeStyle = '#66fcf1';
+          ctx.strokeRect(hx + 10, hy - 18, 64, 16);
+          ctx.fillStyle = '#66fcf1';
+          ctx.font = 'bold 10px monospace';
+          ctx.fillText(`${ftCost} FT (${dist}T)`, hx + 14, hy - 6);
+        }
+      }
+
+      // 3. TOKENS ON CANVAS
+      enemies.forEach((enemy, i) => {
+        const sx = enemy.pos.x * TILE_SIZE - camera.x;
+        const sy = enemy.pos.y * TILE_SIZE - camera.y;
+
+        const isTargeted = i === activeTargetEnemyIndex;
+        ctx.fillStyle = isTargeted ? 'rgba(239, 68, 68, 0.4)' : 'rgba(239, 68, 68, 0.2)';
+        ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        ctx.strokeStyle = isTargeted ? '#ff4d4d' : '#ef4444';
+        ctx.lineWidth = isTargeted ? 2.5 : 1.5;
+        ctx.strokeRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(enemy.initials, sx + TILE_SIZE / 2, sy + TILE_SIZE / 2 + 4);
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(sx - 6, sy - 10, TILE_SIZE + 12, 6);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(sx - 5, sy - 9, (TILE_SIZE + 10) * Math.max(0, enemy.hp.cur / enemy.hp.max), 4);
+      });
+
+      const pSx = playerPos.x * TILE_SIZE - camera.x;
+      const pSy = playerPos.y * TILE_SIZE - camera.y;
+      ctx.fillStyle = 'rgba(102, 252, 241, 0.25)';
+      ctx.fillRect(pSx + 2, pSy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      ctx.strokeStyle = '#66fcf1';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(pSx + 2, pSy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('FINCH', pSx + TILE_SIZE / 2, pSy + TILE_SIZE / 2 + 4);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.fillRect(pSx - 6, pSy - 10, TILE_SIZE + 12, 6);
+      ctx.fillStyle = '#34d399';
+      ctx.fillRect(pSx - 5, pSy - 9, (TILE_SIZE + 10) * Math.max(0, playerHp.cur / playerHp.max), 4);
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      const tx = Math.floor((mx + camera.x) / TILE_SIZE);
+      const ty = Math.floor((my + camera.y) / TILE_SIZE);
+
+      if (tx !== hoveredTile.x || ty !== hoveredTile.y) {
+        hoveredTile = { x: tx, y: ty };
+        document.getElementById('footer-tile-coord').textContent = `TILE: (${tx}, ${ty})`;
+        render();
+      }
+    });
+
+    canvas.addEventListener('click', (e) => {
+      for (let i = 0; i < enemies.length; i++) {
+        if (hoveredTile.x === enemies[i].pos.x && hoveredTile.y === enemies[i].pos.y) {
+          selectTargetEnemy(i);
+          return;
+        }
+      }
+
+      if (inCombat) {
+        if (turnIndex !== 0) return;
+        const maxTiles = Math.floor(moveBudget / 5);
+        const dist = Math.max(Math.abs(hoveredTile.x - playerPos.x), Math.abs(hoveredTile.y - playerPos.y));
+
+        if (dist > 0 && dist <= maxTiles) {
+          const ft = dist * 5;
+          moveBudget -= ft;
+          playerPos = { x: hoveredTile.x, y: hoveredTile.y };
+          updateResourceUI();
+          logCombatMessage(`Moved ${ft} ft. (${moveBudget} ft remaining)`);
+          render();
+        }
+      } else {
+        playerPos = { x: hoveredTile.x, y: hoveredTile.y };
+        render();
+      }
+    });
+
+    // EXECUTE UNIVERSAL / META ACTIONS
+    function executeDeckAction(type) {
+      if (!inCombat) {
+        logCombatMessage(`Exploration: Used ${type}.`);
+        return;
+      }
+      if (turnIndex !== 0) return;
+
+      if (type === 'dash') {
+        if (!bonusAvailable) {
+          logCombatMessage("Cannot Dash: Bonus action already spent!");
+          return;
+        }
+        bonusAvailable = false;
+        moveBudget += 30;
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, "Accelerating!");
+        setDmNarration("Alistair surges forward with arcane momentum, doubling his speed.");
+        logCombatMessage("Dash (Bonus Action): Movement doubled to " + moveBudget + " ft.");
+        render();
+      } else if (type === 'dodge') {
+        if (!actionAvailable) {
+          logCombatMessage("Cannot Dodge: Action already spent!");
+          return;
+        }
+        actionAvailable = false;
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, "Defensive stance!");
+        setDmNarration("Alistair assumes a protective warding posture, watching for lunges.");
+        logCombatMessage("Dodge (Action): Disadvantage on incoming attacks.");
+      } else if (type === 'disengage') {
+        if (!actionAvailable) {
+          logCombatMessage("Cannot Disengage: Action already spent!");
+          return;
+        }
+        actionAvailable = false;
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, "Backing off cleanly.");
+        logCombatMessage("Disengage (Action): Safe movement enabled.");
+      } else if (type === 'parley') {
+        if (!actionAvailable) {
+          logCombatMessage("Cannot Parley: Action already spent!");
+          return;
+        }
+        actionAvailable = false;
+        updateResourceUI();
+        const d20 = Math.floor(Math.random() * 20) + 1;
+        spawnSpeechBubble(playerPos, "Hold! Stand down or be cleaved!");
+        setDmNarration("Alistair raises his weapon and roars a command. The dire wolf hesitates, assessing his resolve.");
+        logCombatMessage(`Parley Check: d20(${d20}) + 3 = ${d20 + 3} vs DC 14 Intimidation. Success: Target hesitates.`);
+      } else if (type === 'help') {
+        actionAvailable = false;
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, "Lyra, strike now!");
+        logCombatMessage("Help Action: Granted advantage to Lyra's next strike.");
+      } else if (type === 'hide') {
+        bonusAvailable = false;
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, "Fading into brush...");
+        logCombatMessage("Hide Action: Stealth check 16 vs Passive Perception 13.");
+      } else if (type === 'inspect') {
+        const target = enemies[activeTargetEnemyIndex];
+        logCombatMessage(`[Inspect] ${target.name}: AC ${target.ac}, Speed 40ft, Keen Hearing and Smell.`);
+        setDmNarration(`Inspection reveals ${target.name} has advantage on Perception checks and pack tactics.`);
+      } else if (type === 'shove') {
+        actionAvailable = false;
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, "Get back!");
+        logCombatMessage("Shove: Target pushed 5 ft away.");
+      } else if (type === 'flee') {
+        logCombatMessage("Retreat: Disengaged from battle.");
+      }
+    }
+
+    // USE CLASS SLOTS & SPELLS
+    function useDeckSlot(slot) {
+      if (turnIndex !== 0 && inCombat) return;
+
+      const target = enemies[activeTargetEnemyIndex];
+
+      if (slot === 1) { // Battleaxe Strike
+        if (inCombat && !actionAvailable) {
+          logCombatMessage("Action already spent this turn!");
+          return;
+        }
+        if (inCombat) actionAvailable = false;
+        updateResourceUI();
+
+        const d20 = Math.floor(Math.random() * 20) + 1;
+        const total = d20 + 6;
+        const hit = total >= target.ac;
+        const dmg = Math.floor(Math.random() * 8) + 1 + 4;
+
+        spawnSpeechBubble(playerPos, "Take this!");
+
+        if (hit) {
+          target.hp.cur = Math.max(0, target.hp.cur - dmg);
+          updateEnemyStackUI();
+          spawnSpeechBubble(target.pos, "*Yelps in pain!*", true);
+          setDmNarration(`Alistair's battleaxe cleaves into ${target.name}, sundering fur and hide for ${dmg} damage.`);
+          logCombatMessage(`Strike vs ${target.name}: d20(${d20}) + 6 = ${total} vs AC ${target.ac} -> HIT for ${dmg} Slashing!`);
+        } else {
+          spawnSpeechBubble(target.pos, "*Snarls and dodges!*", true);
+          setDmNarration(`Alistair's axe whistles through empty air as ${target.name} sidesteps the swing.`);
+          logCombatMessage(`Strike vs ${target.name}: d20(${d20}) + 6 = ${total} vs AC ${target.ac} -> MISS!`);
+        }
+        render();
+      } else if (slot === 2) { // Fire Bolt
+        if (inCombat && !actionAvailable) {
+          logCombatMessage("Action already spent this turn!");
+          return;
+        }
+        if (inCombat) actionAvailable = false;
+        updateResourceUI();
+
+        const d20 = Math.floor(Math.random() * 20) + 1;
+        const total = d20 + 5;
+        const hit = total >= target.ac;
+        const dmg = Math.floor(Math.random() * 10) + 1;
+
+        spawnSpeechBubble(playerPos, "Ignis!");
+
+        if (hit) {
+          target.hp.cur = Math.max(0, target.hp.cur - dmg);
+          updateEnemyStackUI();
+          spawnSpeechBubble(target.pos, "*Screeches in flame!*", true);
+          setDmNarration(`A streak of brilliant fire bursts against ${target.name}'s flank, scorching it for ${dmg} fire damage.`);
+          logCombatMessage(`Fire Bolt vs ${target.name}: d20(${d20}) + 5 = ${total} vs AC ${target.ac} -> HIT for ${dmg} Fire!`);
+        } else {
+          setDmNarration(`The bolt of flame detonates against the boulders behind ${target.name}.`);
+          logCombatMessage(`Fire Bolt vs ${target.name}: d20(${d20}) + 5 = ${total} vs AC ${target.ac} -> MISS!`);
+        }
+        render();
+      } else if (slot === 3) { // Thunderwave (Spends Slot 1)
+        if (spellSlotsL1 <= 0 || !actionAvailable) {
+          logCombatMessage("No 1st level spell slots remaining or Action spent!");
+          return;
+        }
+        spellSlotsL1--;
+        actionAvailable = false;
+        updateResourceUI();
+
+        spawnSpeechBubble(playerPos, "Begone!");
+        const dmg = Math.floor(Math.random() * 8) + Math.floor(Math.random() * 8) + 2;
+        target.hp.cur = Math.max(0, target.hp.cur - dmg);
+        updateEnemyStackUI();
+        setDmNarration(`A concussive shockwave ripples across the dirt, slamming ${target.name} back for ${dmg} thunder damage.`);
+        logCombatMessage(`Thunderwave (Slot Lv 1): Deal ${dmg} Thunder damage to ${target.name}!`);
+        render();
+      } else if (slot === 4) { // Shield
+        reactionAvailable = false;
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, "Aegis ward!");
+        logCombatMessage("Shield primed: +5 AC against next incoming strike.");
+      } else if (slot === 5) { // Arcane Infusion
+        if (infusionCharges <= 0 || !bonusAvailable) {
+          logCombatMessage("No infusion charges or bonus action spent!");
+          return;
+        }
+        infusionCharges--;
+        bonusAvailable = false;
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, "Blade infused.");
+        logCombatMessage("Arcane Infusion active: +1d4 Force damage.");
+      }
+    }
+
+    function useItem(item) {
+      if (item === 'potion') {
+        if (!bonusAvailable) {
+          logCombatMessage("Bonus action already spent!");
+          return;
+        }
+        bonusAvailable = false;
+        const heal = Math.floor(Math.random() * 4) + Math.floor(Math.random() * 4) + 4;
+        playerHp.cur = Math.min(playerHp.max, playerHp.cur + heal);
+        updatePlayerUI();
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, `*Drinks potion* (+${heal} HP)`);
+        setDmNarration(`Alistair downs a glowing draught, knitting his wounds for ${heal} hit points.`);
+        logCombatMessage(`Consumed Healing Draught: Restored ${heal} HP.`);
+        render();
+      } else if (item === 'caltrops') {
+        actionAvailable = false;
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, "Watch your step!");
+        logCombatMessage("Scattered Caltrops across 15 ft tile radius.");
+      } else if (item === 'alchemist_fire') {
+        actionAvailable = false;
+        updateResourceUI();
+        spawnSpeechBubble(playerPos, "Catch this!");
+        setDmNarration("The alchemist flask shatters on the dirt, igniting a sheet of viscous flame.");
+        logCombatMessage("Threw Alchemist's Fire.");
+      }
+    }
+
+    function updateResourceUI() {
+      const pipAct = document.getElementById('pip-action');
+      const pipBon = document.getElementById('pip-bonus');
+      const pipRea = document.getElementById('pip-reaction');
+      const moveFill = document.getElementById('movement-meter-fill');
+      const moveLabel = document.getElementById('movement-meter-label');
+
+      if (actionAvailable) {
+        pipAct.classList.remove('spent');
+        document.getElementById('slot-1').classList.remove('spent');
+        document.getElementById('slot-2').classList.remove('spent');
+        document.getElementById('slot-3').classList.remove('spent');
+        document.getElementById('btn-dodge').classList.remove('spent');
+        document.getElementById('btn-disengage').classList.remove('spent');
+        document.getElementById('btn-parley').classList.remove('spent');
+      } else {
+        pipAct.classList.add('spent');
+        document.getElementById('slot-1').classList.add('spent');
+        document.getElementById('slot-2').classList.add('spent');
+        document.getElementById('slot-3').classList.add('spent');
+        document.getElementById('btn-dodge').classList.add('spent');
+        document.getElementById('btn-disengage').classList.add('spent');
+        document.getElementById('btn-parley').classList.add('spent');
+      }
+
+      if (bonusAvailable) {
+        pipBon.classList.remove('spent');
+        document.getElementById('btn-dash').classList.remove('spent');
+        document.getElementById('btn-hide').classList.remove('spent');
+        document.getElementById('slot-5').classList.remove('spent');
+      } else {
+        pipBon.classList.add('spent');
+        document.getElementById('btn-dash').classList.add('spent');
+        document.getElementById('btn-hide').classList.add('spent');
+        document.getElementById('slot-5').classList.add('spent');
+      }
+
+      if (reactionAvailable) pipRea.classList.remove('spent');
+      else pipRea.classList.add('spent');
+
+      document.getElementById('infusion-charge-label').textContent = `${infusionCharges}/3`;
+      document.getElementById('slot-pip-1-1').classList.toggle('spent', spellSlotsL1 < 2);
+      document.getElementById('slot-pip-1-2').classList.toggle('spent', spellSlotsL1 < 1);
+
+      const pct = Math.max(0, Math.min(100, (moveBudget / 30) * 100));
+      moveFill.style.width = `${pct}%`;
+      moveLabel.textContent = `${moveBudget}/30 FT`;
+    }
+
+    function updateEnemyStackUI() {
+      enemies.forEach((enemy, i) => {
+        const pct = Math.max(0, (enemy.hp.cur / enemy.hp.max) * 100);
+        document.getElementById(`enemy-hp-bar-${i}`).style.width = `${pct}%`;
+        document.getElementById(`enemy-hp-val-${i}`).textContent = `${enemy.hp.cur}/${enemy.hp.max}`;
+      });
+    }
+
+    function updatePlayerUI() {
+      const pct = Math.max(0, (playerHp.cur / playerHp.max) * 100);
+      document.getElementById('player-hp-num').textContent = `${playerHp.cur}/${playerHp.max} HP`;
+      document.getElementById('party-hp-bar-0').style.width = `${pct}%`;
+      document.getElementById('party-hp-val-0').textContent = `${playerHp.cur}/${playerHp.max}`;
+    }
+
+    function endTurn() {
+      if (!inCombat || turnIndex !== 0) return;
+
+      turnIndex = 1;
+      document.getElementById('init-slot-0').className = "relative w-6 h-6 border border-neutral-700 bg-neutral-900 flex items-center justify-center opacity-60";
+      document.getElementById('init-slot-1').className = "relative w-6 h-6 border-2 border-red-500 bg-red-950/60 flex items-center justify-center shadow-[0_0_8px_rgba(239,68,68,0.6)]";
+
+      logCombatMessage("Passed turn. Dire Wolf Alpha attacks...");
+      spawnSpeechBubble(wolfAlphaPos, "*Lunges with bared fangs!*", true);
+
+      setTimeout(() => {
+        const d20 = Math.floor(Math.random() * 20) + 1;
+        const total = d20 + 5;
+        const hit = total >= 15;
+        const dmg = Math.floor(Math.random() * 6) + Math.floor(Math.random() * 6) + 3;
+
+        if (hit) {
+          playerHp.cur = Math.max(0, playerHp.cur - dmg);
+          updatePlayerUI();
+          spawnSpeechBubble(playerPos, "*Ugh!*", true);
+          setDmNarration(`The dire wolf sinks its teeth into Alistair's arm guard, tearing muscle for ${dmg} piercing damage.`);
+          logCombatMessage(`Dire Wolf Bite: d20(${d20}) + 5 = ${total} vs AC 15 -> HIT for ${dmg} Piercing!`);
+        } else {
+          spawnSpeechBubble(playerPos, "Deflected!");
+          setDmNarration(`Alistair parries the wolf's snapping maw with the haft of his axe.`);
+          logCombatMessage(`Dire Wolf Bite: d20(${d20}) + 5 = ${total} vs AC 15 -> MISS!`);
+        }
+
+        setTimeout(() => {
+          roundNum++;
+          document.getElementById('round-num-label').textContent = roundNum;
+          turnIndex = 0;
+          document.getElementById('init-slot-0').className = "relative w-6 h-6 border-2 border-[var(--cyan)] bg-neutral-900 flex items-center justify-center shadow-[0_0_8px_rgba(102,252,241,0.5)]";
+          document.getElementById('init-slot-1').className = "relative w-6 h-6 border border-red-500/80 bg-red-950/40 flex items-center justify-center opacity-75";
+
+          actionAvailable = true;
+          bonusAvailable = true;
+          moveBudget = 30;
+          updateResourceUI();
+          logCombatMessage(`[Round ${roundNum}] Alistair Finch's turn begins.`);
+          setDmNarration(`Round ${roundNum}: Alistair assesses the battlefield. The wolves circle for an opening.`);
+          render();
+        }, 600);
+      }, 750);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && inCombat && turnIndex === 0) {
+        e.preventDefault();
+        endTurn();
+      }
+    });
+
+    function logCombatMessage(text) {
+      const container = document.getElementById('combat-feed-body');
+      const div = document.createElement('div');
+      div.textContent = text;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+
+      document.getElementById('log-pill-preview').textContent = text;
+    }
+
+    function clearCombatLog() {
+      document.getElementById('combat-feed-body').innerHTML = '';
+      document.getElementById('log-pill-preview').textContent = 'Combat log cleared.';
+    }
+
+    resizeCanvas();
+    updateResourceUI();
+  </script>
+</body>
+</html>

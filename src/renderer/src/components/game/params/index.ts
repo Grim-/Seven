@@ -8,4 +8,4 @@ import './ValuesParam'
 import './ListParam'
 import './ComponentsParam'
 
-export { paramEditor, paramWide, registerParamEditor, type ParamEditor, type ParamEditorProps } from './registry'
+export { paramEditor, paramLabel, paramWide, registerParamEditor, type ParamEditor, type ParamEditorProps } from './registry'

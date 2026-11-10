@@ -14,6 +14,8 @@ export interface ParamSpec {
   host?: string
   long?: boolean
   of?: ParamSpec
+  section?: string
+  more?: boolean
 }
 
 export type ParamSchema = Record<string, ParamSpec>

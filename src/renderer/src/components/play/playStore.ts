@@ -6,6 +6,7 @@ export interface PlayWhere {
   link: string | null
   agents: string[]
   world?: string
+  map?: string
   sheet?: string | null
   deck?: DeckRef | null
   lead?: string

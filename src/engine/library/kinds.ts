@@ -34,6 +34,14 @@ import { skills } from '../skills'
 import { reminders } from '../reminders/store'
 import { worlds } from '../worlds/store'
 import { recall } from '../worlds/ops'
+import { factions } from '../factions/store'
+import { storedFactionText } from '@shared/game/factions'
+import { mapObjectsStore } from '../mapObjects/store'
+import { storedMapObjectText } from '@shared/game/mapObjects'
+import { triggerActionsStore } from '../triggerActions/store'
+import { storedTriggerActionText } from '@shared/game/triggerActions'
+import { lootTablesStore } from '../lootTables/store'
+import { storedLootTableText } from '@shared/game/lootTables'
 import { EXERCISE, WORKOUT, cleanExercise, cleanWorkout, workout } from '../workout/store'
 import { widgetLine } from '../present/places'
 import type { AssetMeta, Dashboard, EntryPreview, EntryViewData, ViewRef, WidgetSource, WorkoutPageType } from '@shared/types'
@@ -737,9 +745,9 @@ const worldKind: Kind = {
   group: 'Worlds',
   kind: 'world',
   family: 'world',
-  label: 'World',
+  label: 'World Editor',
   textParts: ['record'],
-  plural: 'Worlds',
+  plural: 'World Editor',
   exportable: true,
   export(id) {
     if (id.includes('/')) return exportRecord(this, id)
@@ -955,8 +963,8 @@ const mapKind: Kind = {
   presents: { chat: true, widget: ENTRY_WIDGET },
   group: 'Worlds',
   kind: 'map',
-  label: 'Map',
-  plural: 'Maps',
+  label: 'Map Editor',
+  plural: 'Map Editor',
   icon: 'map',
   description: 'maps: layers of tiles, pictures and objects that pan and zoom as one; worlds use them and draw their places on them',
   parts: [],
@@ -996,7 +1004,7 @@ const mapKind: Kind = {
       return `Places of ${w.name} on it:\n${placeLines(placeTree(all, shapes), all).join('\n') || '(none yet)'}`
     })
     const objects = mapObjects(m.layers).map((o) =>
-      [`- ${o.name}${o.entry ? ` (opens ${o.entry})` : ''}`, o.actions.trim() ? `  actions (attempts; roll with action_check):\n${o.actions.trim().replace(/^/gm, '    ')}` : '', o.decisions.trim() ? `  decisions (choices, never rolled):\n${o.decisions.trim().replace(/^/gm, '    ')}` : ''].filter(Boolean).join('\n')
+      [`- ${o.name}${o.entry ? ` (opens ${o.entry})` : ''}`, (o.actions ?? '').trim() ? `  actions (attempts; roll with action_check):\n${(o.actions ?? '').trim().replace(/^/gm, '    ')}` : '', (o.decisions ?? '').trim() ? `  decisions (choices, never rolled):\n${(o.decisions ?? '').trim().replace(/^/gm, '    ')}` : ''].filter(Boolean).join('\n')
     )
     return [`# ${m.name}`, `Layers: ${layerNames(m.layers).join(', ') || 'none'}.`, ...(objects.length ? [`Objects on it (generic: a door, a rock, a scroll; using one starts from there):\n${objects.join('\n')}`] : []), ...places].join('\n\n')
   },
@@ -1038,8 +1046,8 @@ function objectText(id: string): string {
   return [
     `# ${o.name}`,
     `An object on @map:${map.id}${o.entry ? `; using it opens @${o.entry}` : ''}.`,
-    o.actions.trim() ? `actions (attempts; roll one with action_check):\n${o.actions.trim()}` : '',
-    o.decisions.trim() ? `decisions (choices, never rolled; when the user decides, ask them with ask_user):\n${o.decisions.trim()}` : ''
+    (o.actions ?? '').trim() ? `actions (attempts; roll one with action_check):\n${(o.actions ?? '').trim()}` : '',
+    (o.decisions ?? '').trim() ? `decisions (choices, never rolled; when the user decides, ask them with ask_user):\n${(o.decisions ?? '').trim()}` : ''
   ]
     .filter(Boolean)
     .join('\n')
@@ -1054,11 +1062,23 @@ const objectKind: Kind = {
   description: 'objects placed on maps: a door, a rock, a scroll, with their own actions and decisions',
   parts: [],
   actions: [],
-  exportable: false,
-  resolveOnly: true,
+  exportable: true,
+  export(id) {
+    const o = mapObjectsStore.get(id)
+    return { title: o.name, markdown: storedMapObjectText(o), json: o }
+  },
   available: () => true,
-  search: () => [],
+  search(query, limit) {
+    const q = query.trim().toLowerCase()
+    return mapObjectsStore
+      .list()
+      .filter((o) => !q || o.name.toLowerCase().includes(q) || o.tags.some((tg) => tg.toLowerCase().includes(q)))
+      .slice(0, limit)
+      .map((o) => ({ kind: 'map_object', id: o.id, title: o.name, at: o.updatedAt }))
+  },
   resolve(ref) {
+    const found = mapObjectsStore.find(ref)
+    if (found) return found.id
     try {
       return objectOf(ref.trim()) && ref.trim()
     } catch {
@@ -1067,15 +1087,220 @@ const objectKind: Kind = {
   },
   title(id) {
     try {
+      const stored = mapObjectsStore.list().find((o) => o.id === id)
+      if (stored) return stored.name
       return objectOf(id).object.name
     } catch {
       return id
     }
   },
-  line: (id) => `object on ${objectOf(id).map.name}`,
-  pathOf: (id, ctx) => pathVia([[mapKind, id.split('/')[0]], [objectKind, id]], ctx),
-  card: objectText,
-  full: objectText
+  line: (id) => {
+    try {
+      const stored = mapObjectsStore.list().find((o) => o.id === id)
+      if (stored) return `${stored.collision} · ${stored.size.w}×${stored.size.h}px`
+      return `object on ${objectOf(id).map.name}`
+    } catch {
+      return 'map object'
+    }
+  },
+  pathOf: (id, ctx) => {
+    if (mapObjectsStore.list().some((o) => o.id === id)) {
+      return pathVia([[objectKind, id]], ctx)
+    }
+    return pathVia([[mapKind, id.split('/')[0]], [objectKind, id]], ctx)
+  },
+  card(id) {
+    try {
+      const stored = mapObjectsStore.list().find((o) => o.id === id)
+      if (stored) return storedMapObjectText(stored)
+      return objectText(id)
+    } catch {
+      return id
+    }
+  },
+  full(id) {
+    try {
+      const stored = mapObjectsStore.list().find((o) => o.id === id)
+      if (stored) return storedMapObjectText(stored)
+      return objectText(id)
+    } catch {
+      return id
+    }
+  },
+  remove(id) {
+    try {
+      mapObjectsStore.remove(id)
+    } catch {
+      // not a stored object
+    }
+  },
+  rename(id, name) {
+    try {
+      const o = mapObjectsStore.get(id)
+      mapObjectsStore.save({ ...o, name })
+    } catch {
+      // not a stored object
+    }
+  }
+}
+
+export const factionKind: Kind = {
+  group: 'Worlds',
+  kind: 'faction',
+  label: 'Faction',
+  plural: 'Factions',
+  icon: 'flag',
+  description: 'world factions, diplomatic allegiances, behavioral tenets, and hostility relations for NPCs, creatures, and the player',
+  parts: [],
+  actions: [],
+  exportable: true,
+  export(id) {
+    const f = factions.get(id)
+    return { title: f.name, markdown: storedFactionText(f), json: f }
+  },
+  available: () => true,
+  search(query, limit) {
+    const q = query.trim().toLowerCase()
+    return factions
+      .list()
+      .filter((f) => !q || f.name.toLowerCase().includes(q) || f.id.toLowerCase().includes(q) || f.tags.some((tg) => tg.toLowerCase().includes(q)))
+      .slice(0, limit)
+      .map((f) => ({ kind: 'faction', id: f.id, title: f.name, at: f.updatedAt }))
+  },
+  resolve(ref) {
+    return factions.find(ref)?.id ?? null
+  },
+  line(id) {
+    const f = factions.get(id)
+    return `${f.name} · default: ${f.defaultStance}${f.tags.length ? ` · #${f.tags.join(' #')}` : ''}`
+  },
+  card(id) {
+    return storedFactionText(factions.get(id))
+  },
+  full(id) {
+    return storedFactionText(factions.get(id))
+  },
+  title(id) {
+    try {
+      return factions.get(id).name
+    } catch {
+      return id
+    }
+  },
+  remove(id) {
+    factions.remove(id)
+  },
+  rename(id, name) {
+    void factions.save({ ...factions.get(id), name })
+  }
+}
+
+export const triggerActionKind: Kind = {
+  group: 'Worlds',
+  kind: 'trigger_action',
+  label: 'Trigger action',
+  plural: 'Trigger actions',
+  icon: 'play',
+  description: 'deterministic in-game action functions: teleports, items, stat modifications, creature spawns, and flag changes',
+  parts: [],
+  actions: [],
+  exportable: true,
+  export(id) {
+    const a = triggerActionsStore.get(id)
+    if (!a) throw new Error(`Trigger action ${id} not found`)
+    return { title: a.name, markdown: storedTriggerActionText(a), json: a }
+  },
+  available: () => true,
+  search(query, limit) {
+    const q = query.trim().toLowerCase()
+    return triggerActionsStore
+      .list()
+      .filter((a) => !q || a.name.toLowerCase().includes(q) || a.actionType.toLowerCase().includes(q) || a.tags.some((tg) => tg.toLowerCase().includes(q)))
+      .slice(0, limit)
+      .map((a) => ({ kind: 'trigger_action', id: a.id, title: a.name, at: a.updatedAt }))
+  },
+  resolve(ref) {
+    return triggerActionsStore.find(ref)?.id ?? null
+  },
+  line(id) {
+    const a = triggerActionsStore.get(id)
+    if (!a) return ''
+    return `${a.actionType}${a.tags.length ? ` · #${a.tags.join(' #')}` : ''}`
+  },
+  card(id) {
+    const a = triggerActionsStore.get(id)
+    return a ? storedTriggerActionText(a) : ''
+  },
+  full(id) {
+    const a = triggerActionsStore.get(id)
+    return a ? storedTriggerActionText(a) : ''
+  },
+  title(id) {
+    try {
+      return triggerActionsStore.get(id)?.name ?? id
+    } catch {
+      return id
+    }
+  },
+  remove(id) {
+    triggerActionsStore.remove(id)
+  },
+  rename(id, name) {
+    const a = triggerActionsStore.get(id)
+    triggerActionsStore.save({ ...a, name })
+  }
+}
+
+export const lootTableKind: Kind = {
+  group: 'Worlds',
+  kind: 'loot_table',
+  label: 'Loot table',
+  plural: 'Loot tables',
+  icon: 'gem',
+  description: 'weighted item drop tables, currency rolls, repo pulls, and cascading reward pools',
+  parts: [],
+  actions: [],
+  exportable: true,
+  export(id) {
+    const t = lootTablesStore.get(id)
+    return { title: t.name, markdown: storedLootTableText(t), json: t }
+  },
+  available: () => true,
+  search(query, limit) {
+    const q = query.trim().toLowerCase()
+    return lootTablesStore
+      .list()
+      .filter((t) => !q || t.name.toLowerCase().includes(q) || t.tags.some((tg) => tg.toLowerCase().includes(q)))
+      .slice(0, limit)
+      .map((t) => ({ kind: 'loot_table', id: t.id, title: t.name, at: t.updatedAt }))
+  },
+  resolve(ref) {
+    return lootTablesStore.find(ref)?.id ?? null
+  },
+  line(id) {
+    const t = lootTablesStore.get(id)
+    return `${t.entries.length} entries · ${t.rolls} roll(s)${t.tags.length ? ` · #${t.tags.join(' #')}` : ''}`
+  },
+  card(id) {
+    return storedLootTableText(lootTablesStore.get(id))
+  },
+  full(id) {
+    return storedLootTableText(lootTablesStore.get(id))
+  },
+  title(id) {
+    try {
+      return lootTablesStore.get(id).name
+    } catch {
+      return id
+    }
+  },
+  remove(id) {
+    lootTablesStore.remove(id)
+  },
+  rename(id, name) {
+    const t = lootTablesStore.get(id)
+    lootTablesStore.save({ ...t, name })
+  }
 }
 
 function nexusKinds(taken: Set<string>, claimed: Set<string>): Kind[] {
@@ -2319,7 +2544,7 @@ function withNexus(list: Kind[]): Kind[] {
 }
 
 function everyKind(): Kind[] {
-  return withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, storyKind, scriptKind, skillKind, reminderKind, chatKind, agentKind, themeKind, memoryKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
+  return withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, chatKind, agentKind, themeKind, memoryKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
 }
 
 setWidgetKinds(everyKind)
@@ -2337,7 +2562,7 @@ export function kinds(ctx: KindContext = USER): Kind[] {
 }
 
 export function allKinds(): { kind: string; label: string; description: string; short: string; rollable: boolean; parts: { name: string; description: string }[] }[] {
-  const list = withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, storyKind, scriptKind, skillKind, reminderKind, agentKind, themeKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
+  const list = withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, agentKind, themeKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
   const shortOf = (k: Kind) => {
     const label = k.label.toLowerCase()
     return /^[a-z][\w-]*$/.test(label) && !list.some((o) => o !== k && (o.kind === label || o.label.toLowerCase() === label)) ? label : k.kind
@@ -2350,7 +2575,7 @@ export function hiddenActions(agentId: string): Set<string> {
   const incognito = agentAccess.get(agentId)?.incognito === true
   const out = new Set<string>()
   if (!hidden.size && !incognito) return out
-  for (const k of withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, storyKind, scriptKind, skillKind, reminderKind, agentKind, themeKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind])) if (hidden.has(k.kind) || (incognito && k.lasting)) for (const a of k.actions) out.add(a)
+  for (const k of withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, agentKind, themeKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind])) if (hidden.has(k.kind) || (incognito && k.lasting)) for (const a of k.actions) out.add(a)
   return out
 }
 

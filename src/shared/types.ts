@@ -7,6 +7,7 @@ import type { CardSource } from './cardDecks'
 import type { PickDecisionProps } from './pickDecision'
 import type { RolledDecisionProps } from './rolledDecision'
 import type { OpposedProps } from './opposedCheck'
+import type { ParamSchema } from './game/core/params'
 export type ModelStatus = 'unloaded' | 'loading' | 'ready' | 'error'
 
 export type RemoteApi = 'openai' | 'anthropic'
@@ -112,6 +113,7 @@ export interface ChatServerStatus {
   modelName: string
   pid: number | null
   startedAt: number
+  version: string
   args: string[]
   contextSize: number
   device: string | null
@@ -161,7 +163,7 @@ export interface NetworkStatus {
 }
 
 export interface ServerStatus {
-  installed: string | null
+  build: ServerBuild | null
   logLines: number
   chat: ChatServerStatus | null
   memory: MemoryServerStatus
@@ -187,6 +189,7 @@ export interface ParamDef {
   label: string
   group: ParamGroup
   section: ParamSection
+  more?: boolean
   flag?: string[]
   boolMap?: [string, string]
   target: ParamTarget
@@ -214,6 +217,7 @@ export interface ModelHostState {
   progress: number
   contextSize: number | null
   error: string | null
+  restartNeeded: boolean
 }
 
 export interface ProjectorChoice {
@@ -222,27 +226,129 @@ export interface ProjectorChoice {
   options: { id: string; name: string }[]
 }
 
-export interface ServerRelease {
-  installed: string | null
-  latest: string | null
+export interface PackSetting {
+  key: string
+  label: string
+  value: ParamDef['default']
 }
 
-export interface ServerInfo {
-  installed: string | null
+export interface PackView {
+  id: string
+  title: string
+  for: string
+  why: string
+  source: string
+  shipped: boolean
+  file: string
+  sets: PackSetting[]
+  on: boolean
+  failed: string[]
+  invalid: string | null
+  overridden: string[]
 }
 
-export interface ServerInstallProgress {
-  stage: 'download' | 'extract' | 'done'
+export interface PackValue {
+  value: ParamDef['default']
+  pack: string
+  title: string
+}
+
+export interface PackListing {
+  packs: PackView[]
+  values: Record<string, PackValue>
+  effective: ModelConfig
+  folder: string
+}
+
+export interface ServerBuild {
+  version: string
+  label: string
+  flags: string[] | null
+}
+
+export interface InstallRelease {
+  tag: string
+  name: string
+  publishedAt: string | null
+  url: string | null
+}
+
+export interface InstallChoice {
+  build: string
+  label: string
+  size: number
+  unavailable: string | null
+  notes: string[]
+  files: { name: string; size: number }[]
+}
+
+export interface InstallCheck {
+  at: number
+  ok: boolean
+  version: string
+  devices: string
+  error: string | null
+}
+
+export interface InstallVersion {
+  id: string
+  tag: string | null
+  build: string | null
+  label: string
+  folder: string
+  external: boolean
+  installedAt: number | null
+  checksum: boolean | null
+  check: InstallCheck | null
+  inUse: string[]
+}
+
+export type InstallStage = 'resolve' | 'download' | 'checksum' | 'unpack' | 'verify' | 'done' | 'failed' | 'cancelled'
+
+export const INSTALL_ENDS: InstallStage[] = ['done', 'failed', 'cancelled']
+
+export function versionFolder(tag: string, build: string): string {
+  return `${tag}-${build}`
+}
+
+export function installRunning(p: { stage: InstallStage } | null): boolean {
+  return p !== null && !INSTALL_ENDS.includes(p.stage)
+}
+
+export interface InstallProgress {
+  helper: string
+  tag: string
+  build: string
+  stage: InstallStage
   received: number
   total: number
-  tag: string
+  file: string | null
+  error: string | null
+  version: string | null
+}
+
+export interface InstallHelperState {
+  id: string
+  title: string
+  about: string
+  source: string
+  program: string
+  root: string
+  defaultRoot: string
+  active: string | null
+  versions: InstallVersion[]
+  releases: InstallRelease[]
+  checkedAt: number | null
+  update: InstallRelease | null
+  job: InstallProgress | null
+  settings: Record<string, unknown>
+  schema: ParamSchema
 }
 
 export type ChatTemplate = { type: 'auto' } | { type: 'jinja'; template: string }
 
 export interface ModelConfigResult {
   config: ModelConfig
-  reloadRequired: boolean
 }
 
 export const SAMPLING_KEYS = ['temperature', 'topP', 'topK', 'minP', 'repeatPenalty', 'maxTokens'] as const
@@ -1304,6 +1410,7 @@ export interface CharacterSheet {
   dnd: DndStats | null
   game?: EntityRecord | null
   gameRules?: string
+  faction?: string | null
   save?: string
   story: Story
   image: string | null

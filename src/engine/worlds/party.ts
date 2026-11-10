@@ -1,4 +1,4 @@
-import { placesIn } from '@shared/maps'
+import { mapArea, placesIn } from '@shared/maps'
 import { PLACE_TYPE_KEY } from '@shared/world'
 import type { GameSave } from '@shared/game/save'
 import { shapeBounds } from '@shared/shapes'
@@ -50,9 +50,54 @@ export function removeWorldSaves(world: string): number {
   return list.length
 }
 
+export function createNewWorldSave(world: string, name: string): GameSave {
+  const save = saves.create(world, name, false)
+  if (!worlds.exists(world)) return save
+
+  const w = worlds.meta(world)
+  const stood = worlds.oldStand(world)
+  const standingSheets = new Set<string>()
+  for (const standMap of Object.values(stood)) {
+    for (const sheetId of Object.keys(standMap)) {
+      standingSheets.add(sheetId)
+    }
+  }
+  if (w.player) standingSheets.add(w.player)
+
+  // Ensure designated player character is physically placed on the first map if not already positioned
+  if (w.player) {
+    const isPlaced = Object.values(stood).some((m) => Boolean(m[w.player!]))
+    if (!isPlaced) {
+      const firstMap = Object.keys(stood)[0] ?? worlds.mapUses(world)[0]?.map
+      if (firstMap) {
+        const m = maps.get(firstMap)
+        const area = m ? mapArea(m) : { w: 800, h: 600 }
+        const at = { x: Math.round(area.w / 2), y: Math.round(area.h / 2) }
+        stood[firstMap] = {
+          ...(stood[firstMap] ?? {}),
+          [w.player]: { at, actions: '', decisions: '' }
+        }
+      }
+    }
+  }
+
+  for (const sheetId of standingSheets) {
+    try {
+      bring(save.id, sheetId, '')
+    } catch {
+      // Ignore if sheet doesn't exist
+    }
+  }
+
+  return saves.change(save.id, (v) => ({
+    ...v,
+    stand: { ...stood }
+  }))
+}
+
 export function adoptOldPlay(world: string): GameSave {
   if (!worlds.exists(world)) throw new WorldError(`There is no world "${world}"`)
-  const save = saves.current(world)
+  const save = saves.current(world) ?? createNewWorldSave(world, 'Save 1')
   const places = worlds.schema(world).types[PLACE_TYPE_KEY] ? worlds.entities(world, PLACE_TYPE_KEY, false, 'template') : {}
   const stood = worlds.oldStand(world)
   const standing = new Set(Object.values(stood).flatMap((list) => Object.keys(list)))

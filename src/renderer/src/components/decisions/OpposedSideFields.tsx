@@ -3,6 +3,7 @@ import type { OpposedSide } from '@shared/opposedCheck'
 import { Input, NumberField } from '../ui'
 import { SheetSelect } from '../data/sheet/SheetSelect'
 import { SkillSelect } from './SkillSelect'
+import { TriggerActionSelect } from '../game/TriggerActionSelect'
 
 export function OpposedSideFields({ title, side, targets, onChange, editable = false }: { title: string; side: OpposedSide; targets: CheckTarget[]; onChange: (next: OpposedSide) => void; editable?: boolean }) {
   return (
@@ -16,6 +17,14 @@ export function OpposedSideFields({ title, side, targets, onChange, editable = f
       <SheetSelect value={side.sheet} noneLabel="Someone without a sheet" onChange={(sheet, name) => onChange({ ...side, sheet, name: name ?? (side.sheet ? '' : side.name) })} />
       {editable && !side.sheet && <Input value={side.name} onChange={(e) => onChange({ ...side, name: e.target.value })} placeholder="Who (the gate guard)" />}
       {editable && <Input value={side.does} onChange={(e) => onChange({ ...side, does: e.target.value })} placeholder="Winning means… (spots the lie)" />}
+      {editable && (
+        <TriggerActionSelect
+          value={side.action}
+          onChange={(action) => onChange({ ...side, action })}
+          placeholder="No in-game trigger on win"
+          className="h-7 text-[11px]"
+        />
+      )}
       <div className="flex items-center gap-2">
         <SkillSelect targets={targets} value={side.against} onChange={(against) => onChange({ ...side, against })} className="min-w-0 flex-1" />
         {!side.sheet && (

@@ -1,7 +1,7 @@
-import { Pointer, Paintbrush, Eraser, Square, Box, ImagePlus, Sparkles, Layers } from 'lucide-react'
+import { Pointer, Paintbrush, Eraser, Square, Box, ImagePlus, Sparkles, Layers, Skull } from 'lucide-react'
 import { Button } from '../ui'
 
-export type MapTool = 'select' | 'paint' | 'erase' | 'shape' | 'object'
+export type MapTool = 'select' | 'paint' | 'erase' | 'shape' | 'object' | 'spawner'
 
 interface OverlayToolbarProps {
   tool: MapTool
@@ -81,9 +81,20 @@ export function OverlayToolbar({
           active={tool === 'object'}
           onClick={() => onSelectTool('object')}
           icon={<Box className="h-3.5 w-3.5" />}
-          title="Place an interactive object or NPC (O)"
+          title="Place an interactive object or prop (O)"
         >
           Object
+        </Button>
+
+        <Button
+          size="sm"
+          variant="secondary"
+          active={tool === 'spawner'}
+          onClick={() => onSelectTool('spawner')}
+          icon={<Skull className="h-3.5 w-3.5 text-alert" />}
+          title="Place a creature spawner template (C)"
+        >
+          Creature Spawner
         </Button>
 
         <Button

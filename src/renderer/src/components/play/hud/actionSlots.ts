@@ -90,14 +90,20 @@ function saveAllSlots(data: Record<string, (ActionSlotDef | null)[]>): void {
   }
 }
 
-export function getActionSlots(sheet: string, defaultAbilities?: Ability[]): (ActionSlotDef | null)[] {
+export const DEFAULT_TOTAL_SLOTS = 48
+
+export function getActionSlots(
+  sheet: string,
+  defaultAbilities?: Ability[],
+  totalSlots = DEFAULT_TOTAL_SLOTS
+): (ActionSlotDef | null)[] {
   const all = loadAllSlots()
   if (all[sheet] && Array.isArray(all[sheet])) {
     const list = all[sheet]
-    return Array.from({ length: 9 }, (_, i) => list[i] ?? null)
+    return Array.from({ length: totalSlots }, (_, i) => list[i] ?? null)
   }
-  // Default to first 9 abilities if available
-  const initial: (ActionSlotDef | null)[] = Array.from({ length: 9 }, (_, i) => {
+  // Default to first abilities if available
+  const initial: (ActionSlotDef | null)[] = Array.from({ length: totalSlots }, (_, i) => {
     const a = defaultAbilities?.[i]
     if (!a) return null
     return {
@@ -110,28 +116,49 @@ export function getActionSlots(sheet: string, defaultAbilities?: Ability[]): (Ac
   return initial
 }
 
-export function setActionSlot(sheet: string, index: number, def: ActionSlotDef): void {
-  if (index < 0 || index >= 9) return
+export function setActionSlot(
+  sheet: string,
+  index: number,
+  def: ActionSlotDef,
+  totalSlots = DEFAULT_TOTAL_SLOTS
+): void {
+  if (index < 0 || index >= totalSlots) return
   const all = loadAllSlots()
-  const current = getActionSlots(sheet)
+  const current = getActionSlots(sheet, undefined, totalSlots)
   current[index] = def
   all[sheet] = current
   saveAllSlots(all)
 }
 
-export function clearActionSlot(sheet: string, index: number): void {
-  if (index < 0 || index >= 9) return
+export function clearActionSlot(
+  sheet: string,
+  index: number,
+  totalSlots = DEFAULT_TOTAL_SLOTS
+): void {
+  if (index < 0 || index >= totalSlots) return
   const all = loadAllSlots()
-  const current = getActionSlots(sheet)
+  const current = getActionSlots(sheet, undefined, totalSlots)
   current[index] = null
   all[sheet] = current
   saveAllSlots(all)
 }
 
-export function swapActionSlots(sheet: string, fromIndex: number, toIndex: number): void {
-  if (fromIndex < 0 || fromIndex >= 9 || toIndex < 0 || toIndex >= 9 || fromIndex === toIndex) return
+export function swapActionSlots(
+  sheet: string,
+  fromIndex: number,
+  toIndex: number,
+  totalSlots = DEFAULT_TOTAL_SLOTS
+): void {
+  if (
+    fromIndex < 0 ||
+    fromIndex >= totalSlots ||
+    toIndex < 0 ||
+    toIndex >= totalSlots ||
+    fromIndex === toIndex
+  )
+    return
   const all = loadAllSlots()
-  const current = getActionSlots(sheet)
+  const current = getActionSlots(sheet, undefined, totalSlots)
   const temp = current[fromIndex]
   current[fromIndex] = current[toIndex]
   current[toIndex] = temp
@@ -139,25 +166,31 @@ export function swapActionSlots(sheet: string, fromIndex: number, toIndex: numbe
   saveAllSlots(all)
 }
 
-export function useActionSlots(sheet: string | null | undefined, defaultAbilities?: Ability[]): (ActionSlotDef | null)[] {
+export function useActionSlots(
+  sheet: string | null | undefined,
+  defaultAbilities?: Ability[],
+  totalSlots = DEFAULT_TOTAL_SLOTS
+): (ActionSlotDef | null)[] {
   const [slots, setSlots] = useState<(ActionSlotDef | null)[]>(() =>
-    sheet ? getActionSlots(sheet, defaultAbilities) : Array.from({ length: 9 }, () => null)
+    sheet
+      ? getActionSlots(sheet, defaultAbilities, totalSlots)
+      : Array.from({ length: totalSlots }, () => null)
   )
 
   useEffect(() => {
     if (!sheet) {
-      setSlots(Array.from({ length: 9 }, () => null))
+      setSlots(Array.from({ length: totalSlots }, () => null))
       return
     }
 
     const update = () => {
-      setSlots(getActionSlots(sheet, defaultAbilities))
+      setSlots(getActionSlots(sheet, defaultAbilities, totalSlots))
     }
 
     update()
     window.addEventListener(EVENT_NAME, update)
     return () => window.removeEventListener(EVENT_NAME, update)
-  }, [sheet, defaultAbilities])
+  }, [sheet, defaultAbilities, totalSlots])
 
   return slots
 }

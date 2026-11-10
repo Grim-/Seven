@@ -10,16 +10,17 @@ import { rollAction } from './play'
 import { useCheckTargets } from './useCheckTargets'
 import type { PlayWhere } from './playStore'
 import { CardSwapField } from './CardSwapField'
+import { TriggerActionSelect } from '../game/TriggerActionSelect'
 
-const BLANK_CHECK: ActionCheck = { against: CHANCE, difficulty: MIDDLE, base: BASE - 1, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP }
-export const BLANK_ACTION: Action = { attempt: '', needs: 'any', by: null, roller: 'player', checks: [BLANK_CHECK], pass: '', fail: '', passCards: NO_SWAP, failCards: NO_SWAP }
+const BLANK_CHECK: ActionCheck = { against: CHANCE, difficulty: MIDDLE, base: BASE - 1, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null }
+export const BLANK_ACTION: Action = { attempt: '', needs: 'any', by: null, roller: 'player', checks: [BLANK_CHECK], pass: '', fail: '', passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null }
 const NEEDS = (['any', 'all'] as const).map((value) => ({ value, label: NEEDS_LABEL[value] }))
 
 interface Props {
   initial: Action
   character: string | null
   where: PlayWhere
-  onKeep?: (text: string) => void
+  onKeep?: (text: string, action?: Action) => void
   onChange?: (action: Action) => void
   keepLabel: string
 }
@@ -35,7 +36,29 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
   const targets = useCheckTargets(mine)
   const setCheck = (i: number, patch: Partial<ActionCheck>) => set({ ...a, checks: a.checks.map((c, j) => (j === i ? { ...c, ...patch } : c)) })
   const toggleDetails = (i: number) => setOpenDetails((prev) => ({ ...prev, [i]: !prev[i] }))
-  const ready = Boolean(a.attempt.trim())
+
+  const getReadyAction = (): Action => {
+    const fallbackName =
+      a.checks[0]?.against && a.checks[0].against !== CHANCE
+        ? `${a.checks[0].against} check`
+        : 'Interact'
+    return {
+      ...a,
+      attempt: a.attempt.trim() || fallbackName
+    }
+  }
+
+  const handleRoll = () => {
+    const readyAction = getReadyAction()
+    if (!a.attempt.trim()) set(readyAction)
+    rollAction(readyAction, mine, where)
+  }
+
+  const handleKeep = () => {
+    const readyAction = getReadyAction()
+    if (!a.attempt.trim()) set(readyAction)
+    onKeep?.(actionText(readyAction), readyAction)
+  }
 
   const bestChance = a.checks.length
     ? Math.max(...a.checks.map((c) => chanceOf(c.against && c.against !== CHANCE ? (findTarget(targets, c.against)?.bonus ?? 0) : 0, targetOf(c))))
@@ -165,6 +188,20 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
                     <CardSwapField value={c.passCards} onChange={(passCards) => setCheck(i, { passCards })} />
                     <CardSwapField value={c.failCards} onChange={(failCards) => setCheck(i, { failCards })} />
                   </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <TriggerActionSelect
+                      value={c.passAction}
+                      onChange={(passAction) => setCheck(i, { passAction })}
+                      placeholder="No in-game trigger on pass"
+                      className="h-7 text-[11px]"
+                    />
+                    <TriggerActionSelect
+                      value={c.failAction}
+                      onChange={(failAction) => setCheck(i, { failAction })}
+                      placeholder="No in-game trigger on fail"
+                      className="h-7 text-[11px]"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -192,6 +229,12 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
             className="h-8 text-[12.5px]"
           />
           <CardSwapField value={a.passCards} onChange={(passCards) => set({ ...a, passCards })} />
+          <TriggerActionSelect
+            value={a.passAction}
+            onChange={(passAction) => set({ ...a, passAction })}
+            placeholder="No in-game action on pass"
+            className="h-8 text-[11.5px]"
+          />
         </div>
 
         <div className="flex flex-col gap-2 border border-alert/40 bg-alert/[0.05] p-3">
@@ -206,13 +249,25 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
             className="h-8 text-[12.5px]"
           />
           <CardSwapField value={a.failCards} onChange={(failCards) => set({ ...a, failCards })} />
+          <TriggerActionSelect
+            value={a.failAction}
+            onChange={(failAction) => set({ ...a, failAction })}
+            placeholder="No in-game action on fail"
+            className="h-8 text-[11.5px]"
+          />
         </div>
       </div>
 
       {/* Bottom Bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line/40 pt-2">
         <div className="flex items-center gap-3">
-          <Button size="sm" icon={<Dices />} disabled={!ready} onClick={() => rollAction(a, mine, where)}>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<Dices className="h-3.5 w-3.5 text-accent" />}
+            onClick={handleRoll}
+            title="Roll this action right now"
+          >
             Roll it
           </Button>
           <span className="font-mono text-xs text-dim">
@@ -220,7 +275,13 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
           </span>
         </div>
         {onKeep && (
-          <Button size="sm" variant="ghost" icon={<Save />} disabled={!ready} onClick={() => onKeep(actionText(a))}>
+          <Button
+            size="sm"
+            variant="primary"
+            icon={<Save className="h-3.5 w-3.5" />}
+            onClick={handleKeep}
+            title={keepLabel}
+          >
             {keepLabel}
           </Button>
         )}

@@ -8,6 +8,8 @@ import { CardSwapLine } from './CardSwapLine'
 import { engine } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
 import { playOutItem } from './playOut'
+import { dispatchOutcome } from '../../game/triggerActions/runner'
+import { createGameExecutionContext } from '../../game/triggerActions/buildContext'
 
 export function DecisionPrompt({ decision, where }: { decision: Decision; where: PlayWhere }) {
   const [chosen, setChosen] = useState<DecisionOption | null>(null)
@@ -18,13 +20,23 @@ export function DecisionPrompt({ decision, where }: { decision: Decision; where:
     const text = decisionMade(decision, choice, option.cards)
     if (where.world && where.sheet) void engine('worlds.addJourney', { id: where.world, sheet: where.sheet, kind: 'decision', text: `Chose "${choice}" for "${decision.question}"` }).catch(failed('Could not note it in the journey'))
     if (where.deck && hasSwap(option.cards)) void engine('decks.swap', { ref: where.deck, swap: option.cards }).catch(failed('Could not change the cards'))
+
+    if (option.action && where.world) {
+      const ctx = createGameExecutionContext({
+        world: where.world,
+        map: where.map ?? '',
+        sheet: where.sheet ?? ''
+      })
+      void dispatchOutcome({ triggerActionId: option.action }, ctx)
+    }
+
     if (where.onText) {
       where.onText(playText(where, text))
       return closePlay()
     }
-    setChosen({ text: choice, cards: option.cards })
+    setChosen({ text: choice, cards: option.cards, action: option.action })
   }
-  const ownOption = { text: own, cards: NO_SWAP }
+  const ownOption: DecisionOption = { text: own, cards: NO_SWAP, action: null }
   return (
     <div className="flex flex-col gap-2.5">
       <div className="text-[15px] font-semibold leading-snug text-white">{decision.question}</div>

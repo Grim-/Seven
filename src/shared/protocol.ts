@@ -11,6 +11,10 @@ import type { Action, ActionResult } from './actions'
 import type { Decision } from './decisions'
 import type { CardSwap, DeckRef } from './cardDecks'
 import type { Ambience, AmbienceCue, Theme } from './theme'
+import type { StoredFaction } from './game/factions'
+import type { StoredMapObject } from './game/mapObjects'
+import type { StoredTriggerAction } from './game/triggerActions'
+import type { StoredLootTable, ResolvedLootDrop } from './game/lootTables'
 import type {
   KindInfo,
   PlayerCommand,
@@ -55,12 +59,14 @@ import type {
   Dashboard,
   ContextUsage,
   PromptView,
-  ServerInfo,
   ServerStatus,
+  ServerBuild,
+  InstallHelperState,
+  InstallChoice,
+  InstallProgress,
+  PackListing,
   NetworkSettings,
   NetworkStatus,
-  ServerInstallProgress,
-  ServerRelease,
   ProjectorChoice,
   ModelFacts,
   OverlayMode,
@@ -162,9 +168,6 @@ export interface EngineRequests {
   'models.config.get': Req<{ id: string }, ModelConfig>
   'models.config.set': Req<{ id: string; patch: ModelConfig }, ModelConfigResult>
   'models.config.reset': Req<{ id: string }, ModelConfigResult>
-  'models.server.get': Req<void, ServerInfo>
-  'models.server.release': Req<void, ServerRelease>
-  'models.server.install': Req<void, ServerInfo>
   'models.projector.get': Req<{ id: string }, ProjectorChoice>
   'models.projector.set': Req<{ id: string; projector: string | null }, ProjectorChoice>
   'models.template.get': Req<{ id: string }, ChatTemplate>
@@ -256,11 +259,46 @@ export interface EngineRequests {
   'worlds.board': Req<{ id: string }, WorldPost[]>
   'worlds.post': Req<{ id: string; author: string; to: string; message: string }, WorldPost>
   'worlds.editPost': Req<{ id: string; index: number; message: string | null }, WorldPost[]>
+  'worlds.flags': Req<{ id: string }, Record<string, string | number | boolean>>
+  'worlds.setFlag': Req<{ id: string; key: string; value: string | number | boolean | null }, Record<string, string | number | boolean>>
+  'factions.list': Req<void, StoredFaction[]>
+  'factions.get': Req<{ id: string }, StoredFaction | null>
+  'factions.save': Req<{ faction: StoredFaction; previousId?: string | null }, StoredFaction>
+  'factions.delete': Req<{ id: string }, boolean>
+  'mapObjects.list': Req<void, StoredMapObject[]>
+  'mapObjects.get': Req<{ id: string }, StoredMapObject | null>
+  'mapObjects.save': Req<{ object: StoredMapObject; previousId?: string | null }, StoredMapObject>
+  'mapObjects.delete': Req<{ id: string }, boolean>
+  'triggerActions.list': Req<void, StoredTriggerAction[]>
+  'triggerActions.get': Req<{ id: string }, StoredTriggerAction | null>
+  'triggerActions.save': Req<{ action: StoredTriggerAction; previousId?: string | null }, StoredTriggerAction>
+  'triggerActions.delete': Req<{ id: string }, boolean>
+  'lootTables.list': Req<void, StoredLootTable[]>
+  'lootTables.get': Req<{ id: string }, StoredLootTable | null>
+  'lootTables.save': Req<{ table: StoredLootTable; previousId?: string | null }, StoredLootTable>
+  'lootTables.delete': Req<{ id: string }, boolean>
+  'lootTables.roll': Req<{ id: string }, ResolvedLootDrop>
   'stats.summary': Req<void, StatsSummary>
   'stats.clear': Req<void, void>
   'server.status': Req<void, ServerStatus>
   'server.stop': Req<void, ModelHostState>
   'server.restart': Req<void, ModelHostState>
+  'server.build': Req<void, ServerBuild | null>
+  'install.state': Req<{ helper: string }, InstallHelperState>
+  'install.check': Req<{ helper: string }, InstallHelperState>
+  'install.choices': Req<{ helper: string; tag: string }, InstallChoice[]>
+  'install.start': Req<{ helper: string; tag: string; build: string; root: string }, InstallHelperState>
+  'install.cancel': Req<{ helper: string }, void>
+  'install.activate': Req<{ helper: string; version: string; restart: boolean }, InstallHelperState>
+  'install.verify': Req<{ helper: string; version: string }, InstallHelperState>
+  'install.remove': Req<{ helper: string; version: string }, InstallHelperState>
+  'install.addExisting': Req<{ helper: string; folder: string }, InstallHelperState>
+  'install.settings': Req<{ helper: string; values: Record<string, unknown> }, InstallHelperState>
+  'install.space': Req<{ folder: string }, { free: number | null }>
+  'packs.list': Req<{ id: string }, PackListing>
+  'packs.set': Req<{ id: string; on: string[] }, PackListing>
+  'packs.import': Req<{ file: string }, { title: string }>
+  'packs.remove': Req<{ file: string }, void>
   'network.set': Req<{ on?: boolean; settings?: Partial<NetworkSettings> }, NetworkStatus>
   'network.password.suggest': Req<void, string>
   'network.password.set': Req<{ password: string }, NetworkStatus>
@@ -342,7 +380,7 @@ export interface EngineRequests {
   'saves.list': Req<{ world: string }, WorldSaves>
   'saves.all': Req<void, SaveMeta[]>
   'saves.get': Req<{ id: string }, GameSave>
-  'saves.current': Req<{ world: string }, GameSave>
+  'saves.current': Req<{ world: string }, GameSave | null>
   'saves.create': Req<{ world: string; name: string; copy: boolean }, GameSave>
   'saves.select': Req<{ world: string; id: string }, GameSave>
   'saves.rename': Req<{ id: string; name: string }, GameSave>
@@ -409,7 +447,8 @@ export interface EngineRequests {
   'repos.list': Req<void, RepoEntry[]>
   'repos.get': Req<{ id: string }, RepoEntry>
   'repos.save': Req<{ id: string | null; title: string; tags: string[]; scope: 'use' | 'run'; values: string[] }, RepoEntry>
-  'sheets.save': Req<{ id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; story?: Story }, CharacterSheet>
+  'sheets.save': Req<{ id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story }, CharacterSheet>
+  'sheets.setFaction': Req<{ id: string; faction: string | null }, CharacterSheet>
   'library.rollText': Req<{ text: string }, { text: string; rolled: { token: string; value: string; error?: string }[] }>
   'library.remove': Req<{ entry: string }, boolean>
   'library.clearKind': Req<{ kind: string }, { removed: number; failed: number }>
@@ -484,8 +523,12 @@ export type CodedErrorWire = { [ERROR_MARKER]: { code: string; message: string }
 export const LONG_REQUESTS: ReadonlySet<EngineRequestName> = new Set<EngineRequestName>([
   'models.load',
   'models.remote.test',
-  'models.server.release',
-  'models.server.install',
+  'install.check',
+  'install.start',
+  'install.activate',
+  'install.verify',
+  'install.addExisting',
+  'server.restart',
   'models.fillInfo',
   'vault.migrate',
   'mind.search',
@@ -584,7 +627,9 @@ export interface Events {
   'browser.open': { url: string | null }
   'browser.status': { text: string }
   'model.state': ModelHostState
-  'server.install': ServerInstallProgress
+  'install.changed': { helper: string }
+  'install.progress': InstallProgress
+  'packs.changed': Record<string, never>
   'network.changed': NetworkStatus
   'engine.children': { pids: number[] }
   'engine.restart': null
@@ -617,6 +662,10 @@ export interface Events {
   'saves.changed': { world: string }
   'decisions.changed': Record<string, never>
   'storyActions.changed': Record<string, never>
+  'factions.changed': Record<string, never>
+  'mapObjects.changed': Record<string, never>
+  'triggerActions.changed': Record<string, never>
+  'lootTables.changed': Record<string, never>
   'themes.changed': Theme[]
   'ambience.changed': { sessionId: string; ambience: Ambience }
   'ambience.cue': AmbienceCue

@@ -20,21 +20,45 @@ export function WorldMaps({ worldId, onStart }: { worldId: string; onStart: (pla
       .then(() => setShown(map))
       .catch(failed('Could not use the map'))
   const items = (map: string): MenuItem[] => [
-    { label: 'Open in Maps', icon: <ExternalLink />, onSelect: () => openEntry('map', map) },
+    { label: 'Open in Map Editor', icon: <ExternalLink />, onSelect: () => openEntry('map', map) },
     { label: 'Stop using', icon: <Unlink />, danger: true, onSelect: () => confirmDelete(`Stop using ${nameOf(map)}?`, "This world's places drawn on it come off; the map itself stays in Maps.", () => engine('worlds.dropMap', { id: worldId, map }), undefined, 'Stop using') }
   ]
   const tabMenu = (e: MouseEvent, map: string) => openMenu(e, nameOf(map), items(map))
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <ShellTabs value={current ?? ''} options={(uses ?? []).map((u) => ({ value: u.map, label: nameOf(u.map) }))} onChange={setShown} onMenu={tabMenu}>
-        <Popover trigger={<span className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-accent hover:text-white"><Plus className="h-3.5 w-3.5" />Use a map</span>} title="Use a map from Maps">
+        <Popover trigger={<span className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-accent hover:text-white"><Plus className="h-3.5 w-3.5" />Use a map</span>} title="Use a map from Map Editor">
           {(close) => <EntryPicker kind="map" title="Use a map" inline onClose={close} onPick={(hit) => (use(hit.id), close())} />}
         </Popover>
         {current && (
-          <button type="button" onClick={() => openEntry('map', current)} className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-dim hover:text-accent">
-            <ExternalLink className="h-3.5 w-3.5" />
-            Open in Maps
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openEntry('map', current)}
+              className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-dim hover:text-accent"
+              title="Open this map in the Map Editor"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Open in Map Editor
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                confirmDelete(
+                  `Remove ${nameOf(current)} from this world?`,
+                  "This world's places drawn on it will be detached; the map itself remains safe in Maps.",
+                  () => engine('worlds.dropMap', { id: worldId, map: current }),
+                  undefined,
+                  'Remove from World'
+                )
+              }
+              className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-alert/70 hover:text-alert border border-alert/30 bg-alert/5 px-2 py-0.5 hover:bg-alert/15 transition-colors"
+              title="Remove this map from this world"
+            >
+              <Unlink className="h-3.5 w-3.5 text-alert" />
+              Remove from World
+            </button>
+          </div>
         )}
       </ShellTabs>
       {uses && !uses.length && <EmptyState title="No maps yet">Use a map from Maps to draw this world's places on it. Maps are made, imported and edited in Maps; a world only links to them.</EmptyState>}

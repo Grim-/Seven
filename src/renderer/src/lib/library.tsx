@@ -28,7 +28,15 @@ const EVENTS: EventName[] = [
   'themes.changed',
   'timeline.changed',
   'routines.changed',
-  'dnd.changed'
+  'dnd.changed',
+  'game.changed',
+  'decisions.changed',
+  'storyActions.changed',
+  'factions.changed',
+  'mapObjects.changed',
+  'triggerActions.changed',
+  'maps.changed',
+  'saves.changed'
 ]
 
 export function onLibraryChange(fn: () => void): () => void {

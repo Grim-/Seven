@@ -350,7 +350,7 @@ export class ChatRunner extends EventEmitter {
   }
 
   private stateKey(modelId: string): string {
-    return `${modelId}\u0000${JSON.stringify(this.host.loadedConfig ?? {})}`
+    return `${modelId}\u0000${this.host.stateKey() ?? ''}`
   }
 
   private hashHistory(history: ChatHistoryItem[]): string {

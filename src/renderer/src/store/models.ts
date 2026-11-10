@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { MODEL_KINDS, type ModelConfig, type ModelConfigResult, type ModelEntry, type ModelHostState, type ParamDef } from '@shared/types'
-import { engine } from '../lib/ipc'
+import { engine, on } from '../lib/ipc'
 
 interface ModelsState {
   list: ModelEntry[]
@@ -21,7 +21,7 @@ interface ModelsState {
 export const useModels = create<ModelsState>((set) => ({
   list: [],
   params: [],
-  host: { status: 'unloaded', modelId: null, progress: 0, contextSize: null, error: null },
+  host: { status: 'unloaded', modelId: null, progress: 0, contextSize: null, error: null, restartNeeded: false },
   refresh: async () => {
     const [list, params, host] = await Promise.all([engine('models.list'), engine('models.params'), engine('models.state')])
     set({ list, params, host })
@@ -46,6 +46,8 @@ export const useModels = create<ModelsState>((set) => ({
   setConfig: (id, patch) => engine('models.config.set', { id, patch }),
   resetConfig: (id) => engine('models.config.reset', { id })
 }))
+
+on('model.state', (host) => useModels.setState({ host }))
 
 export function isRunnable(m: ModelEntry): boolean {
   return m.info ? MODEL_KINDS[m.info.kind].runnable : true

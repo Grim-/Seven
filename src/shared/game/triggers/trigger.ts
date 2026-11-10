@@ -12,6 +12,7 @@ export interface TriggerDef {
   once: boolean
   needsItem: string
   needsFlag: string
+  hiddenIfFlag?: string
   setsFlag: string
   values: Record<string, unknown>
 }
@@ -55,11 +56,12 @@ export function cleanTrigger(raw: unknown, shape: ShapeForm | null): TriggerDef 
     once: v.once === true,
     needsItem: str(v.needsItem),
     needsFlag: str(v.needsFlag),
+    hiddenIfFlag: str(v.hiddenIfFlag),
     setsFlag: str(v.setsFlag),
     values: resolveParams(type.params, obj(v.values))
   }
 }
 
 export function newTrigger(type: TriggerType, shape: ShapeForm): TriggerDef {
-  return { id: crypto.randomUUID(), name: type.label, type: type.type, shape, fires: type.fires, once: false, needsItem: '', needsFlag: '', setsFlag: '', values: resolveParams(type.params, {}) }
+  return { id: crypto.randomUUID(), name: type.label, type: type.type, shape, fires: type.fires, once: false, needsItem: '', needsFlag: '', hiddenIfFlag: '', setsFlag: '', values: resolveParams(type.params, {}) }
 }

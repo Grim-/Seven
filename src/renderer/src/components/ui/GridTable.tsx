@@ -1,4 +1,4 @@
-import { createContext, useContext, type FocusEvent, type ReactNode } from 'react'
+import { createContext, useContext, type FocusEvent, type MouseEvent, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 
 export interface GridColumn {
@@ -37,17 +37,17 @@ export function GridTable({ columns, empty, children }: { columns: GridColumn[];
   )
 }
 
-export function GridRow({ onClick, selected, onBlur, children }: { onClick?: () => void; selected?: boolean; onBlur?: (e: FocusEvent<HTMLDivElement>) => void; children: ReactNode }) {
+export function GridRow({ onClick, onContextMenu, selected, onBlur, children }: { onClick?: () => void; onContextMenu?: (e: MouseEvent<HTMLElement>) => void; selected?: boolean; onBlur?: (e: FocusEvent<HTMLDivElement>) => void; children: ReactNode }) {
   const template = useContext(Template)
   const className = cn('grid w-full items-center gap-x-3 border-b border-line/20 px-3.5 py-1.5 text-left', onClick && 'hover:bg-white/[0.03]', selected && 'bg-accent/10')
   if (onClick)
     return (
-      <button onClick={onClick} style={{ gridTemplateColumns: template }} className={className}>
+      <button onClick={onClick} onContextMenu={onContextMenu} style={{ gridTemplateColumns: template }} className={className}>
         {children}
       </button>
     )
   return (
-    <div onBlur={onBlur} style={{ gridTemplateColumns: template }} className={className}>
+    <div onBlur={onBlur} onContextMenu={onContextMenu} style={{ gridTemplateColumns: template }} className={className}>
       {children}
     </div>
   )

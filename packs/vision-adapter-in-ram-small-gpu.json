@@ -1,0 +1,9 @@
+{
+  "id": "vision-adapter-in-ram-small-gpu",
+  "title": "Vision adapter in RAM on GPUs under 6 GB",
+  "for": "GPU under 6 GB, vision adapter in PC RAM",
+  "why": "Keeps the vision adapter out of VRAM (--no-mmproj-offload) so that memory goes to the language model. Pictures take longer to read.",
+  "source": "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+  "when": { "model": ["vision"], "vramBelowGb": 6, "buildHas": ["--mmproj-offload"] },
+  "set": { "projectorOnGpu": false }
+}

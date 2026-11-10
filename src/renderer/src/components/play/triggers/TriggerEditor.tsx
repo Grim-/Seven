@@ -2,8 +2,9 @@ import { triggerType, type TriggerDef } from '@shared/game/triggers'
 import { ITEM_TEMPLATES } from '@shared/game/defs'
 import type { ParamSchema } from '@shared/game/core'
 import { shapeBounds, type ShapeForm } from '@shared/shapes'
-import { Eyebrow, SaveState, useAutosavedState } from '../../ui'
+import { Eyebrow, Field, FieldGrid, SaveState, useAutosavedState } from '../../ui'
 import { ParamFields } from '../../game/ParamFields'
+import { FlagSelect } from '../../game/FlagSelect'
 import { triggerUi } from './registry'
 
 const COMMON: ParamSchema = {
@@ -12,9 +13,7 @@ const COMMON: ParamSchema = {
   once: { label: 'Once only', kind: 'flag', default: false, description: 'After it has happened once in a save, it is gone.' },
   width: { label: 'Width', kind: 'number', default: 64, min: 4, description: 'Width of the area in map pixels.' },
   height: { label: 'Height', kind: 'number', default: 64, min: 4, description: 'Height of the area in map pixels.' },
-  needsItem: { label: 'Needs an item', kind: 'template', templateKind: ITEM_TEMPLATES, default: '', description: 'The character must carry this item.' },
-  needsFlag: { label: 'Needs a flag', kind: 'text', default: '', description: 'A flag another trigger set in this save.' },
-  setsFlag: { label: 'Sets a flag', kind: 'text', default: '', description: 'A flag this sets in the save when it happens.' }
+  needsItem: { label: 'Needs an item', kind: 'template', templateKind: ITEM_TEMPLATES, default: '', description: 'The character must carry this item.' }
 }
 
 function resized(shape: ShapeForm, w: number, h: number): ShapeForm {
@@ -40,6 +39,24 @@ export function TriggerEditor({ start, world, onSave }: { start: TriggerDef; wor
           <SaveState status={state.status} error={state.error} />
         </div>
         <ParamFields dense schema={COMMON} values={common} onChange={setCommon} />
+        <FieldGrid dense>
+          <Field label="Needs a flag" tip="A flag another trigger set in this save.">
+            <FlagSelect
+              world={world}
+              value={t.needsFlag}
+              onChange={(f) => state.set({ ...t, needsFlag: f ?? '' })}
+              placeholder="None"
+            />
+          </Field>
+          <Field label="Sets a flag" tip="A flag this sets in the save when it happens.">
+            <FlagSelect
+              world={world}
+              value={t.setsFlag}
+              onChange={(f) => state.set({ ...t, setsFlag: f ?? '' })}
+              placeholder="None"
+            />
+          </Field>
+        </FieldGrid>
       </section>
       <section className="flex flex-col gap-3 border-t border-line/50 pt-4">
         <div className="flex items-baseline gap-3">

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Copy, KeyRound, RefreshCw, Sparkles, Unlock } from 'lucide-react'
 import type { NetworkSettings, NetworkStatus } from '@shared/types'
-import { AlertBox, Button, GridRow, GridTable, Input, Modal, NumberField, Panel, SaveState, SettingRow, Toggle, useAutosavedState, type GridColumn } from '../ui'
+import { AlertBox, Button, GridRow, GridTable, Input, Modal, NumberField, SaveState, SettingCard, SettingRow, Toggle, useAutosavedState, type GridColumn } from '../ui'
 import { engine } from '../../lib/ipc'
 import { copyText, failed } from '../../lib/notify'
 import { formatRelative } from '../../lib/format'
@@ -49,7 +49,8 @@ export function NetworkPanel({ network }: { network: NetworkStatus }) {
   const unlock = (address: string) => void engine('network.unlock', { address }).catch(failed('Could not unlock'))
 
   return (
-    <Panel title="Network access" bodyClassName="flex flex-col gap-3 p-3">
+    <SettingCard title="Network access">
+      <div className="flex flex-col gap-3 p-3.5">
       <p className="text-[12.5px] text-dim">
         Lets other devices on your network use your models through an OpenAI-compatible API over HTTPS. llama-server itself stays on this PC; Seven checks the password on every request and passes it on. A device asking for a different model loads it, but only while Seven is not writing.
       </p>
@@ -150,6 +151,7 @@ export function NetworkPanel({ network }: { network: NetworkStatus }) {
           ))}
         </GridTable>
       </div>
-    </Panel>
+      </div>
+    </SettingCard>
   )
 }

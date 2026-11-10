@@ -10,6 +10,11 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!scripts/**'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+extraFiles:
+  - from: packs
+    to: packs
+    filter:
+      - '*.json'
 asarUnpack:
   - resources/**
   - '**/node_modules/@vscode/ripgrep/bin/**/*'

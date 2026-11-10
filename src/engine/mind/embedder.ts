@@ -1,6 +1,6 @@
 import type { MemoryServerStatus } from '@shared/types'
 import { LlamaServer } from '../model/server/process'
-import { serverExe } from '../model/server/install'
+import { llamaLimits, serverExe, serverLease, serverVersion } from '../model/server/install'
 import { readHeader } from '../model/gguf/read'
 
 export interface Embedding {
@@ -51,14 +51,18 @@ export class Embedder {
 
   private async startServer(modelPath: string): Promise<void> {
     const exe = serverExe()
-    if (!exe) throw new Error('llama-server is not installed yet. Install it in Models.')
+    const version = serverVersion()
+    if (!exe || !version) throw new Error('llama-server is not set up yet. Install or pick a version in Models > llama-server.')
     const info = await readHeader(modelPath, { size: false }).catch(() => null)
     const size = String(Math.min(MAX_CONTEXT, info?.contextLength ?? MAX_CONTEXT))
     this.server = await LlamaServer.start({
       exe,
+      version,
       modelPath,
       args: ['--embedding', '--no-webui', '-np', '1', '-ngl', '0', '--device', 'none', '-c', size, '-b', size, '-ub', size],
       signal: new AbortController().signal,
+      limits: llamaLimits(),
+      hold: () => serverLease(version, 'Memory search'),
       onExit: (message) => {
         this.error = message
         this.server = null
@@ -112,6 +116,10 @@ export class Embedder {
     } catch {
       return null
     }
+  }
+
+  async restartOnActive(): Promise<void> {
+    if (this.server && this.server.version !== serverVersion()) await this.unload()
   }
 
   async unload(): Promise<void> {

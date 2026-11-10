@@ -1,0 +1,9 @@
+{
+  "id": "q8-kv-cache-small-gpu",
+  "title": "8-bit context cache on GPUs under 8 GB",
+  "for": "GPU under 8 GB, context cache at half size",
+  "why": "Stores the context (KV cache) as Q8_0 instead of F16, halving its memory so more context or more of the model fits on a small GPU.",
+  "source": "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md",
+  "when": { "vramBelowGb": 8, "buildHas": ["--cache-type-k", "--cache-type-v"] },
+  "set": { "kvCacheKeyType": "Q8_0", "kvCacheValueType": "Q8_0" }
+}

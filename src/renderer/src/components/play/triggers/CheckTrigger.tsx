@@ -7,7 +7,7 @@ import { rollDie } from '@shared/storyRolls'
 import { signed } from '@shared/dnd'
 import { showName } from '@shared/ids'
 import type { PlaceVisitor } from '@shared/maps'
-import { ActionBar, Button } from '../../ui'
+import { ActionBar, Button, Field, FieldGrid, Input, Select } from '../../ui'
 import { Markdown } from '../../chat/Markdown'
 import { engine } from '../../../lib/ipc'
 import { failed } from '../../../lib/notify'
@@ -18,7 +18,10 @@ import { RollVerdict } from '../roll/RollVerdict'
 import { WhoRolls, type Roller } from '../roll/WhoRolls'
 import { closePlay, worldWhere } from '../playStore'
 import { playOutItem } from '../playOut'
-import { registerTriggerUi, type TriggerPanelProps } from './registry'
+import { FlagSelect } from '../../game/FlagSelect'
+import { ItemSelect } from '../../game/ItemSelect'
+import { useGameDefs } from '../../game/useGameDefs'
+import { registerTriggerUi, type TriggerPanelProps, type TriggerEditorProps } from './registry'
 
 const ROLL_MS = 700
 
@@ -129,4 +132,132 @@ function CheckPanel({ trigger, ctx }: TriggerPanelProps) {
   )
 }
 
-registerTriggerUi('check', { Panel: CheckPanel })
+function CheckEditor({ trigger, world, onValues }: TriggerEditorProps) {
+  const v = trigger.values
+  const set = (patch: Record<string, unknown>) => onValues({ ...v, ...patch })
+  const checks = useGameDefs('check').list ?? []
+  const creatures = useGameDefs(CREATURE_TEMPLATES).list ?? []
+
+  const against = String(v.against || 'dc')
+  const passFlag = String(v.passFlag || '')
+  const failFlag = String(v.failFlag || '')
+  const passItem = String(v.passItem || '')
+
+  return (
+    <div className="flex flex-col gap-3 font-mono text-[12px]">
+      <FieldGrid dense>
+        <Field label="What is tried" tip="Shown at the top, such as 'Search the well'. Empty uses trigger name.">
+          <Input
+            value={String(v.question ?? '')}
+            onChange={(e) => set({ question: e.target.value })}
+            placeholder={trigger.name}
+          />
+        </Field>
+        <Field label="Check" tip="What the character rolls.">
+          <Select
+            value={String(v.check ?? '')}
+            options={[{ value: '', label: 'Select a check...' }, ...checks.map((c) => ({ value: c.id, label: c.name }))]}
+            onChange={(check) => set({ check })}
+          />
+        </Field>
+        <Field label="Against" tip="Fixed DC or opposed contest against a creature.">
+          <Select
+            value={against}
+            options={[
+              { value: 'dc', label: 'Fixed DC' },
+              { value: 'creature', label: 'Opposed by Creature' }
+            ]}
+            onChange={(against) => set({ against })}
+          />
+        </Field>
+        {against === 'dc' ? (
+          <Field label="Difficulty (DC)" tip="The total needed to pass.">
+            <Input
+              type="number"
+              value={Number(v.dc) || 12}
+              onChange={(e) => set({ dc: Number(e.target.value) })}
+            />
+          </Field>
+        ) : (
+          <>
+            <Field label="Creature" tip="Who rolls against the player.">
+              <Select
+                value={String(v.creature ?? '')}
+                options={[{ value: '', label: 'Select creature...' }, ...creatures.map((c) => ({ value: c.id, label: c.name }))]}
+                onChange={(creature) => set({ creature })}
+              />
+            </Field>
+            <Field label="Creature's check" tip="Empty uses the same check.">
+              <Select
+                value={String(v.creatureCheck ?? '')}
+                options={[{ value: '', label: 'Same as character' }, ...checks.map((c) => ({ value: c.id, label: c.name }))]}
+                onChange={(creatureCheck) => set({ creatureCheck })}
+              />
+            </Field>
+          </>
+        )}
+      </FieldGrid>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="On a pass (text)" tip="Markdown shown on pass.">
+          <Input
+            value={String(v.pass ?? '')}
+            onChange={(e) => set({ pass: e.target.value })}
+            placeholder="You succeed..."
+          />
+        </Field>
+        <Field label="On a fail (text)" tip="Markdown shown on fail.">
+          <Input
+            value={String(v.fail ?? '')}
+            onChange={(e) => set({ fail: e.target.value })}
+            placeholder="You fail..."
+          />
+        </Field>
+      </div>
+
+      <FieldGrid dense>
+        <Field label="A pass sets flag" tip="Sets this world flag on pass.">
+          <FlagSelect
+            world={world}
+            value={passFlag}
+            onChange={(f) => set({ passFlag: f ?? '' })}
+            placeholder="None"
+          />
+        </Field>
+        <Field label="A fail sets flag" tip="Sets this world flag on fail.">
+          <FlagSelect
+            world={world}
+            value={failFlag}
+            onChange={(f) => set({ failFlag: f ?? '' })}
+            placeholder="None"
+          />
+        </Field>
+        <Field label="A pass finds (item)" tip="Reward item given on pass.">
+          <ItemSelect
+            value={passItem}
+            onChange={(item) => set({ passItem: item ?? '' })}
+            placeholder="None (no item reward)"
+          />
+        </Field>
+        <Field label="Item count">
+          <Input
+            type="number"
+            value={Number(v.passCount) || 1}
+            min={1}
+            onChange={(e) => set({ passCount: Number(e.target.value) })}
+          />
+        </Field>
+        <Field label="Gold found">
+          <Input
+            type="number"
+            value={Number(v.passGold) || 0}
+            min={0}
+            onChange={(e) => set({ passGold: Number(e.target.value) })}
+          />
+        </Field>
+      </FieldGrid>
+    </div>
+  )
+}
+
+registerTriggerUi('check', { Panel: CheckPanel, Editor: CheckEditor })

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { create } from 'zustand'
-import { ChevronDown, ChevronLeft, Dumbbell, FolderOpen, Gauge, Inbox, Maximize2, Minimize2, PanelRight, Plus, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, Database, Dumbbell, FolderOpen, Gauge, Inbox, Maximize2, Minimize2, PanelRight, Plus, Trash2, X } from 'lucide-react'
 import type { PanelItem, SidePanelPrefs } from '@shared/types'
 import { useApp } from '../../store/app'
 import type { DataSelection } from '../../store/data'
@@ -65,6 +65,14 @@ function FilesTab() {
   return <DataBrowser mode="panel" selected={selected} select={select} only={viewKinds('pages')} />
 }
 
+function DataTab() {
+  const locked = useLocked()
+  const selected = useSide((s) => s.files)
+  const select = useSide((s) => s.setFiles)
+  if (locked) return <div className="p-2.5"><LockedState what="Data" /></div>
+  return <DataBrowser mode="panel" selected={selected} select={select} />
+}
+
 export function PanelItems({ tab, empty }: { tab: string; empty: string }) {
   const { sessionId, items } = useActiveItems()
   const shown = useMemo(() => items.filter((i) => i.tab === tab).reverse(), [items, tab])
@@ -114,6 +122,7 @@ registerSideTab({
   render: () => <WorkoutPanel compact />
 })
 registerSideTab({ id: 'stats', label: 'Stats', icon: <Gauge className="h-3.5 w-3.5" />, order: 20, render: () => <StatsTab /> })
+registerSideTab({ id: 'data', label: 'Data', icon: <Database className="h-3.5 w-3.5" />, order: 5, render: () => <DataTab /> })
 registerSideTab({ id: 'files', label: 'Files', icon: <FolderOpen className="h-3.5 w-3.5" />, order: 0, render: () => <FilesTab /> })
 registerSideTab({
   id: 'outputs',
@@ -172,9 +181,45 @@ export function SidePanelToggle() {
   )
 }
 
+const KIND_TAB = 'kind:'
+
+function KindTab({ kind, label }: { kind: string; label: string }) {
+  const locked = useLocked()
+  const [sel, setSel] = useState<DataSelection>({ kind, id: 'all' })
+  if (locked) return <div className="p-2.5"><LockedState what={label} /></div>
+  const Screen = presentOf(sel.kind).Screen
+  const id = sel.id === 'all' ? null : sel.id
+  const select = (s: DataSelection | null) => setSel(s ?? { kind, id: 'all' })
+  const home = sel.kind === kind && sel.id === 'all'
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2 p-2.5">
+      {!home && (
+        <div className="flex items-center border-b border-line/50 pb-1.5">
+          <button onClick={() => setSel({ kind, id: 'all' })} className="flex items-center gap-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft hover:text-white">
+            <ChevronLeft className="h-3.5 w-3.5" /> {label}
+          </button>
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {Screen ? <Screen key={`${sel.kind}/${sel.id}`} kind={sel.kind} id={id} select={select} /> : <KindBrowser key={`${sel.kind}/${sel.id}`} kind={sel.kind} title={label} empty="Nothing here yet." initial={id} />}
+      </div>
+    </div>
+  )
+}
+
 export function SidePanel() {
   const [prefs, save] = usePrefs()
-  const { tabs, ctx, sessionId, items } = useTabs()
+  const { tabs: baseTabs, ctx, sessionId, items } = useTabs()
+  const kindList = useKindList()
+  const pinned = useApp((s) => s.settings?.trayKinds) ?? []
+  const activeKind = prefs.tab.startsWith(KIND_TAB) ? prefs.tab.slice(KIND_TAB.length) : null
+  const allKindKeys = [...new Set([...pinned, ...(activeKind ? [activeKind] : [])])]
+  const kindTabs: SideTabDef[] = allKindKeys.flatMap((k, i) => {
+    const info = kindList.find((x) => x.kind === k)
+    if (!info) return []
+    return [{ id: `${KIND_TAB}${k}`, label: info.plural, icon: <KindIcon name={info.icon} className="h-3.5 w-3.5" />, order: 1000 + i, render: () => <KindTab kind={k} label={info.plural} /> }]
+  })
+  const tabs = [...baseTabs, ...kindTabs]
   const seen = usePanel((s) => s.seen)
   const current = tabs.find((t) => t.id === prefs.tab) ?? tabs[0]
 
@@ -194,10 +239,29 @@ export function SidePanel() {
           <button
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect()
-              openMenu({ preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4 }, 'Side panel', tabs.map((tab) => {
-                const fresh = sessionId && tab.id !== current.id ? unseenIn(items, seen, sessionId, tab.id) : 0
-                return { label: `${tab.label}${fresh > 0 ? `  · ${fresh} new` : ''}${tab.id === current.id ? '  ✓' : ''}`, icon: tab.icon, onSelect: () => save({ tab: tab.id }) }
-              }))
+              openMenu({ preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4 }, 'Side panel', [
+                ...tabs.map((tab) => {
+                  const fresh = sessionId && tab.id !== current.id ? unseenIn(items, seen, sessionId, tab.id) : 0
+                  return { label: `${tab.label}${fresh > 0 ? `  · ${fresh} new` : ''}${tab.id === current.id ? '  ✓' : ''}`, icon: tab.icon, onSelect: () => save({ tab: tab.id }) }
+                }),
+                ...(kindList.length
+                  ? [
+                      { label: '', separator: true },
+                      {
+                        label: 'All Kinds',
+                        icon: <Database className="h-3.5 w-3.5" />,
+                        children: kindList
+                          .filter((k) => !tabs.some((t) => t.id === `${KIND_TAB}${k.kind}`))
+                          .sort((a, b) => a.plural.localeCompare(b.plural))
+                          .map((k) => ({
+                            label: k.plural,
+                            icon: <KindIcon name={k.icon} />,
+                            onSelect: () => save({ tab: `${KIND_TAB}${k.kind}` })
+                          }))
+                      }
+                    ]
+                  : [])
+              ])
             }}
             className="flex min-w-0 flex-1 items-center gap-2 border border-accent/60 bg-accent/10 px-2.5 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent hover:bg-accent/15"
           >
@@ -229,32 +293,6 @@ export const useTray = create<TrayState>((set) => ({
   expanded: false,
   set: (patch) => set(patch)
 }))
-
-const KIND_TAB = 'kind:'
-
-function KindTab({ kind, label }: { kind: string; label: string }) {
-  const locked = useLocked()
-  const [sel, setSel] = useState<DataSelection>({ kind, id: 'all' })
-  if (locked) return <div className="p-2.5"><LockedState what={label} /></div>
-  const Screen = presentOf(sel.kind).Screen
-  const id = sel.id === 'all' ? null : sel.id
-  const select = (s: DataSelection | null) => setSel(s ?? { kind, id: 'all' })
-  const home = sel.kind === kind && sel.id === 'all'
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 p-2.5">
-      {!home && (
-        <div className="flex items-center border-b border-line/50 pb-1.5">
-          <button onClick={() => setSel({ kind, id: 'all' })} className="flex items-center gap-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft hover:text-white">
-            <ChevronLeft className="h-3.5 w-3.5" /> {label}
-          </button>
-        </div>
-      )}
-      <div className="flex min-h-0 flex-1 flex-col">
-        {Screen ? <Screen key={`${sel.kind}/${sel.id}`} kind={sel.kind} id={id} select={select} /> : <KindBrowser key={`${sel.kind}/${sel.id}`} kind={sel.kind} title={label} empty="Nothing here yet." initial={id} />}
-      </div>
-    </div>
-  )
-}
 
 export function OutputTray() {
   const { tabs: allBuiltIn, ctx, sessionId, items } = useTabs()

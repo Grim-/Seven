@@ -10,7 +10,6 @@ import { WorldError } from './store'
 const ROOT = path.join(dataRoot, 'saves')
 const POINTERS = path.join(ROOT, 'current.json')
 const CHATS = path.join(ROOT, 'chats.json')
-const FIRST = 'Save 1'
 
 class SaveStore extends EventEmitter {
   private cache = new Map<string, GameSave>()
@@ -92,8 +91,8 @@ class SaveStore extends EventEmitter {
     return id ? this.read(id) : null
   }
 
-  current(world: string): GameSave {
-    return this.currentOrNull(world) ?? this.create(world, FIRST, false)
+  current(world: string): GameSave | null {
+    return this.currentOrNull(world)
   }
 
   worldSaves(world: string): WorldSaves {

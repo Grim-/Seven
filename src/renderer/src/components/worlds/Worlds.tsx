@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FolderOpen, Plus, Trash2 } from 'lucide-react'
+import { FolderOpen, Play, Plus, Trash2 } from 'lucide-react'
 import { inspectSchema, type WorldBinding, type WorldMeta, type WorldSchema } from '@shared/world'
 import { engine, on } from '../../lib/ipc'
 import { toast } from '../../store/toasts'
 import { errorText, formatRelative } from '../../lib/format'
-import { Button, EmptyState, Field, Input, LoadingScreen, Panel, SaveState, Select, TagInput, askText, useAutosavedState, confirmDelete } from '../ui'
+import { Button, EmptyState, Field, Input, Panel, SaveState, Select, TagInput, askText, useAutosavedState, confirmDelete } from '../ui'
 import { entryMenuAt } from '../../views/data/entryMenu'
 import { cn } from '../../lib/cn'
-import { WorldRecords } from './Records'
 import { WorldBoard } from './Board'
 import { SchemaEditor } from './SchemaEditor'
 import { WorldMaps } from '../maps/WorldMaps'
-import { WorldPlay } from './WorldPlay'
+import { WorldEntities } from './WorldEntities'
+import { useApp } from '../../store/app'
 import { setWhere } from '../maps/placeActions'
-import { bringHere } from '../play/bringHere'
 import { SheetSelect } from '../data/sheet/SheetSelect'
 import { ShellTabs } from '../ui'
 import { failed } from '../../lib/notify'
@@ -94,7 +93,7 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
   const list = useWorlds()
   const [first, firstType, firstKey] = (initial ?? '').split('/')
   const [selected, setSelected] = useState<string | null>(first || null)
-  const [tab, setTab] = useState<'play' | 'records' | 'maps' | 'board' | 'schema'>(first && firstType ? 'records' : 'play')
+  const [tab, setTab] = useState<'maps' | 'entities' | 'board' | 'schema'>(first && firstType ? 'entities' : 'maps')
   const [schemaMode, setSchemaMode] = useState<'visual' | 'json'>('visual')
   const [schema, setSchema] = useState<WorldSchema | null>(null)
   const world = list.find((w) => w.id === selected) ?? list[0] ?? null
@@ -126,7 +125,7 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
   return (
     <Panel
       className="min-w-0 flex-1"
-      title="Worlds"
+      title="World Editor"
       actions={
         <Button size="sm" variant="badge" icon={<Plus />} onClick={create}>
           New world
@@ -166,9 +165,8 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
                   value={tab}
                   onChange={setTab}
                   options={[
-                    { value: 'play', label: 'Play' },
-                    { value: 'records', label: 'Records' },
                     { value: 'maps', label: 'Maps' },
+                    { value: 'entities', label: 'Entities & Lore' },
                     { value: 'board', label: `Board ${world.posts}` },
                     { value: 'schema', label: 'Schema' }
                   ]}
@@ -183,24 +181,44 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
                   <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Your character</span>
                   <SheetSelect value={world.player} onChange={(sheet) => void engine('worlds.setPlayer', { id: world.id, sheet }).catch(failed('Could not set your character'))} className="h-7 w-40 text-[12px]" />
                 </span>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon={<Play className="h-3.5 w-3.5" />}
+                  onClick={() => {
+                    useApp.getState().setView('play')
+                  }}
+                  title="Switch to Play mode to play this world"
+                >
+                  Play World
+                </Button>
                 <Button size="sm" variant="ghost" icon={<Trash2 />} onClick={() => remove(world)}>
                   Delete world
                 </Button>
               </div>
-              {tab === 'records' && !schema && <LoadingScreen title={world.name} steps={[{ label: 'Records', done: false }]} />}
-              {tab === 'records' && schema && <WorldRecords key={world.id} worldId={world.id} schema={schema} initialType={world.id === first ? firstType : undefined} initialKey={world.id === first ? firstKey : undefined} />}
-              {tab === 'play' && <WorldPlay key={world.id} world={world.id} />}
               {tab === 'maps' && (
                 <WorldMaps
                   key={world.id}
                   worldId={world.id}
                   onStart={(place) => {
                     const player = world.player
-                    if (!player) return
-                    void bringHere(world.id, player)
-                      .then((ok) => (ok ? setWhere(player, place).then(() => setTab('play')) : undefined))
+                    if (!player) return toast.info('No active player', 'Select or create a character first.')
+                    void setWhere(player, place)
+                      .then(() => {
+                        toast.success('Starting location set', 'Character is ready. Entering Play mode...')
+                        useApp.getState().setView('play')
+                      })
                       .catch(failed('Could not start there'))
                   }}
+                />
+              )}
+              {tab === 'entities' && (
+                <WorldEntities
+                  key={world.id}
+                  world={world}
+                  schema={schema}
+                  initialType={world.id === first ? firstType : undefined}
+                  initialKey={world.id === first ? firstKey : undefined}
                 />
               )}
               {tab === 'board' && <WorldBoard key={world.id} worldId={world.id} />}

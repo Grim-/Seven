@@ -15,6 +15,7 @@ function visitorOf(s: CharacterSheet, agents: { id: string; sheet?: string | nul
     dnd: s.dnd ? { hp: s.dnd.hp, ac: s.dnd.ac, stats: s.dnd.stats, conditions: s.dnd.conditions } : null,
     game: s.game ?? null,
     gameRules: s.gameRules ?? '',
+    faction: s.faction ?? null,
     agent: agents.find((a) => a.sheet === s.id)?.id ?? null
   }
 }

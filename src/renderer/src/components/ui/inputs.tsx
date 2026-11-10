@@ -39,19 +39,21 @@ interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onC
   onChange: (value: string) => void
 }
 
-export function Select({ options, onChange, className, ...rest }: SelectProps) {
+export function Select({ options, onChange, className, style, ...rest }: SelectProps) {
   return (
     <select
       className={cn(base, 'h-9 cursor-pointer appearance-none bg-[length:12px] bg-[right_10px_center] bg-no-repeat px-2.5 pr-8', className)}
       style={{
         backgroundImage:
-          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffc919' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")"
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffc919' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+        colorScheme: 'dark',
+        ...style
       }}
       onChange={(e) => onChange(e.target.value)}
       {...rest}
     >
       {options.map((o) => (
-        <option key={o.value} value={o.value} className="bg-card text-white">
+        <option key={o.value} value={o.value} className="bg-[#0b0d12] text-white py-1">
           {o.label}
         </option>
       ))}

@@ -13,6 +13,8 @@ export interface ActionCheck {
   fail: string | null
   passCards: CardSwap
   failCards: CardSwap
+  passAction?: string | null
+  failAction?: string | null
 }
 
 export interface Action {
@@ -25,6 +27,8 @@ export interface Action {
   fail: string
   passCards: CardSwap
   failCards: CardSwap
+  passAction?: string | null
+  failAction?: string | null
 }
 
 export interface CheckTarget {
@@ -52,6 +56,7 @@ export interface ActionResult {
   deciding: string | null
   outcome: string
   cards: CardSwap
+  triggerAction: string | null
 }
 
 export const BASE = 10
@@ -94,7 +99,7 @@ export function chanceOf(bonus: number, target: number): number {
 }
 
 const d20 = () => 1 + Math.floor(Math.random() * 20)
-export const BLANK_CHECK: ActionCheck = { against: null, difficulty: null, base: null, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP }
+export const BLANK_CHECK: ActionCheck = { against: null, difficulty: null, base: null, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null }
 
 export function picksCheck(action: Action): boolean {
   return action.needs === 'any' && action.checks.length > 1
@@ -118,7 +123,9 @@ export function rollAction(action: Action, d: DndStats | null, character: Action
   const own = deciding === null ? null : passed ? checks[deciding].pass : checks[deciding].fail
   const ownCards = deciding === null ? null : passed ? checks[deciding].passCards : checks[deciding].failCards
   const cards = ownCards && hasSwap(ownCards) ? ownCards : passed ? action.passCards : action.failCards
-  return { attempt: action.attempt, needs: action.needs, character, rolls, passed, deciding: deciding === null ? null : rolls[deciding].label, outcome: own || (passed ? action.pass : action.fail), cards }
+  const ownAction = deciding === null ? null : passed ? checks[deciding].passAction : checks[deciding].failAction
+  const triggerAction = (ownAction ?? (passed ? action.passAction : action.failAction)) ?? null
+  return { attempt: action.attempt, needs: action.needs, character, rolls, passed, deciding: deciding === null ? null : rolls[deciding].label, outcome: own || (passed ? action.pass : action.fail), cards, triggerAction }
 }
 
 const signedSum = (r: CheckRoll) => `${r.roll} ${r.bonus < 0 ? '-' : '+'} ${Math.abs(r.bonus)} = ${r.total} against ${r.target}`
@@ -148,6 +155,8 @@ export function actionText(a: Action): string {
     const own = [
       c.pass ? `pass ${c.pass}` : '',
       c.fail ? `fail ${c.fail}` : '',
+      c.passAction ? `pass action: ${c.passAction}` : '',
+      c.failAction ? `fail action: ${c.failAction}` : '',
       ...cardLines(c)
     ].filter(Boolean).join(' | ')
 
@@ -159,6 +168,8 @@ export function actionText(a: Action): string {
     ...a.checks.map(check),
     `pass: ${a.pass}`,
     `fail: ${a.fail}`,
+    a.passAction ? `pass action: ${a.passAction}` : '',
+    a.failAction ? `fail action: ${a.failAction}` : '',
     ...cardLines(a)
   ].filter(Boolean).join('\n')
 }
@@ -198,7 +209,21 @@ function parseCheck(line: string): ActionCheck {
     for (const p of parts) for (const w of words) if (p.toLowerCase().startsWith(`${w} cards:`)) return parseSwap(p.slice(w.length + 7))
     return NO_SWAP
   }
-  return { against: against || null, difficulty: Number.isFinite(difficulty) ? difficulty : null, base: Number.isFinite(base) ? base : null, pass: pick(PASS_WORDS), fail: pick(FAIL_WORDS), passCards: cards(PASS_WORDS), failCards: cards(FAIL_WORDS) }
+  const actionRef = (words: string[]) => {
+    for (const p of parts) for (const w of words) if (p.toLowerCase().startsWith(`${w} action:`)) return p.slice(w.length + 8).trim() || null
+    return null
+  }
+  return {
+    against: against || null,
+    difficulty: Number.isFinite(difficulty) ? difficulty : null,
+    base: Number.isFinite(base) ? base : null,
+    pass: pick(PASS_WORDS),
+    fail: pick(FAIL_WORDS),
+    passCards: cards(PASS_WORDS),
+    failCards: cards(FAIL_WORDS),
+    passAction: actionRef(PASS_WORDS),
+    failAction: actionRef(FAIL_WORDS)
+  }
 }
 
 export function parseActions(text: string): Action[] {
@@ -223,7 +248,9 @@ export function parseActions(text: string): Action[] {
         pass: value(PASS_WORDS),
         fail: value(FAIL_WORDS),
         passCards: parseSwap(value(PASS_WORDS.map((w) => `${w} cards`))),
-        failCards: parseSwap(value(FAIL_WORDS.map((w) => `${w} cards`)))
+        failCards: parseSwap(value(FAIL_WORDS.map((w) => `${w} cards`))),
+        passAction: value(PASS_WORDS.map((w) => `${w} action`)) || null,
+        failAction: value(FAIL_WORDS.map((w) => `${w} action`)) || null
       }
     })
 }
@@ -232,7 +259,31 @@ export function cleanAction(raw: unknown): Action {
   const v = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const text = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim() : null)
   const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null)
-  const checks = Array.isArray(v.checks) ? (v.checks as Record<string, unknown>[]).map((c) => ({ against: text(c?.against), difficulty: num(c?.difficulty), base: num(c?.base), pass: text(c?.pass), fail: text(c?.fail), passCards: cleanSwap(c?.passCards), failCards: cleanSwap(c?.failCards) })) : []
+  const checks = Array.isArray(v.checks)
+    ? (v.checks as Record<string, unknown>[]).map((c) => ({
+        against: text(c?.against),
+        difficulty: num(c?.difficulty),
+        base: num(c?.base),
+        pass: text(c?.pass),
+        fail: text(c?.fail),
+        passCards: cleanSwap(c?.passCards),
+        failCards: cleanSwap(c?.failCards),
+        passAction: text(c?.passAction),
+        failAction: text(c?.failAction)
+      }))
+    : []
   const roller: RollerChoice = v.roller === 'agent' ? 'agent' : 'player'
-  return { attempt: text(v.attempt) ?? 'Does it work?', needs: v.needs === 'all' ? 'all' : 'any', by: text(v.by), roller, checks, pass: text(v.pass) ?? '', fail: text(v.fail) ?? '', passCards: cleanSwap(v.passCards), failCards: cleanSwap(v.failCards) }
+  return {
+    attempt: text(v.attempt) ?? 'Does it work?',
+    needs: v.needs === 'all' ? 'all' : 'any',
+    by: text(v.by),
+    roller,
+    checks,
+    pass: text(v.pass) ?? '',
+    fail: text(v.fail) ?? '',
+    passCards: cleanSwap(v.passCards),
+    failCards: cleanSwap(v.failCards),
+    passAction: text(v.passAction),
+    failAction: text(v.failAction)
+  }
 }

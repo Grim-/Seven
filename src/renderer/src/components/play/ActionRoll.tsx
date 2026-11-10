@@ -10,17 +10,35 @@ import { Die } from './Die'
 import { RollVerdict } from './roll/RollVerdict'
 import { closePlay, type PlayWhere } from './playStore'
 import { playOutItem } from './playOut'
+import { dispatchOutcome } from '../../game/triggerActions/runner'
+import { createGameExecutionContext } from '../../game/triggerActions/buildContext'
 
 const STEP_MS = 700
 
 export function ActionRoll({ result, where, onAgain }: { result: ActionResult; where: PlayWhere; onAgain: () => void }) {
   const [landed, setLanded] = useState(0)
+  const [executed, setExecuted] = useState(false)
+
   useEffect(() => {
     setLanded(0)
+    setExecuted(false)
     const timers = result.rolls.map((_, i) => window.setTimeout(() => setLanded(i + 1), STEP_MS * (i + 1)))
     return () => timers.forEach((t) => window.clearTimeout(t))
   }, [result])
+
   const done = landed >= result.rolls.length
+
+  useEffect(() => {
+    if (done && !executed && result.triggerAction && where.world) {
+      setExecuted(true)
+      const ctx = createGameExecutionContext({
+        world: where.world,
+        map: where.map ?? '',
+        sheet: result.character?.sheet ?? where.sheet ?? ''
+      })
+      void dispatchOutcome({ triggerActionId: result.triggerAction }, ctx)
+    }
+  }, [done, executed, result.triggerAction, where.world, where.map, where.sheet, result.character])
   const actions: MenuItem[] = [...(where.onText ? [] : [playOutItem(actionResultText(result), where)]), ...(where.lead ? [] : [{ label: 'Roll again', icon: <Dices />, onSelect: onAgain }]), { label: 'Close', icon: <X />, onSelect: closePlay }]
   return (
     <div className="flex flex-col gap-3">

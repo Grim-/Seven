@@ -40,7 +40,8 @@ interface Props {
 }
 
 export function PictureBox({ layer, editing, selected, hit, onChange, onPress, onClick, onMenu }: Props) {
-  const asset = useAsset(layer.image)
+  const isDataUri = layer.image.startsWith('data:')
+  const asset = useAsset(isDataUri ? '' : layer.image)
   const zoom = useViewZoom()
   const box = useRef<HTMLDivElement>(null)
   const drag = useSpaceDrag<Mode>(
@@ -48,7 +49,7 @@ export function PictureBox({ layer, editing, selected, hit, onChange, onPress, o
     (d) => onChange?.(patchOf(layer, d, zoom)),
     (e, mode) => mode === 'move' && onPress?.(e)
   )
-  if (!asset) return null
+  if (!isDataUri && !asset) return null
   const shown = { ...layer, ...(drag.live ? patchOf(layer, drag.live, zoom) : {}) }
   const offset = { x: shown.offset.x - layer.offset.x, y: shown.offset.y - layer.offset.y }
   return (
@@ -64,7 +65,7 @@ export function PictureBox({ layer, editing, selected, hit, onChange, onPress, o
       style={{ width: shown.size.w * shown.scale, height: shown.size.h * shown.scale, transform: `translate(${offset.x}px, ${offset.y}px) rotate(${shown.rotation}deg)`, transformOrigin: 'center' }}
       className={cn('relative', hit ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none', editing && 'cursor-move', selected && 'outline-dashed outline-1 outline-cyan')}
     >
-      <img src={assetUrl(asset)} alt={layer.name} draggable={false} className="block h-full w-full max-w-none select-none" />
+      <img src={isDataUri ? layer.image : assetUrl(asset!)} alt={layer.name} draggable={false} className="block h-full w-full max-w-none select-none" />
       {selected && editing && (
         <>
           <span data-hit onPointerDown={drag.begin('turn', box)} title="Turn (Shift: any angle)" className="shape-handle shape-point pointer-events-auto -top-5 left-1/2 cursor-grab rounded-full" />

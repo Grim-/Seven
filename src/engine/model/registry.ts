@@ -7,7 +7,7 @@ import { paths } from '../util/paths'
 import { remoteKeys } from './keys'
 import type { ApiTarget } from './apiChat'
 import { readJson, writeJson } from '../util/fs'
-import { normalize, reloadRequired } from './params'
+import { normalize } from './params'
 import { readHeader } from './gguf/read'
 
 interface ModelsFile {
@@ -19,7 +19,10 @@ interface ModelsFile {
   kinds?: Record<string, ModelKind>
   templates?: Record<string, ChatTemplate>
   projectors?: Record<string, string | null>
+  packs?: Record<string, string[]>
 }
+
+export type ConfigOverlay = (id: string, own: ModelConfig) => ModelConfig
 
 const INFO_VERSION = 5
 function readInfo(filePath: string): Promise<ModelInfo | null> {
@@ -272,7 +275,7 @@ export class ModelRegistry extends EventEmitter {
     const entry: ModelEntry = { id, name, remote: { api: input.api, baseUrl, model, hasKey: false }, path: '', sizeBytes: 0, quant: null, folder: null }
     this.data.models = [...this.data.models.filter((m) => m.id !== id), entry]
     if (input.key !== null) remoteKeys.set(id, input.key.trim() || null)
-    if (input.contextSize) this.data.configs[id] = normalize({ ...this.getConfig(id), contextSize: input.contextSize })
+    if (input.contextSize) this.data.configs[id] = normalize({ ...this.ownConfig(id), contextSize: input.contextSize })
     this.changed()
     return this.list().find((m) => m.id === id)!
   }
@@ -291,27 +294,53 @@ export class ModelRegistry extends EventEmitter {
     delete this.data.configs[id]
     if (this.data.templates) delete this.data.templates[id]
     if (this.data.projectors) delete this.data.projectors[id]
+    if (this.data.packs) delete this.data.packs[id]
     if (this.data.models.length === before) return false
     this.changed()
     return true
   }
 
-  getConfig(id: string): ModelConfig {
+  private overlay: ConfigOverlay | null = null
+
+  setOverlay(overlay: ConfigOverlay): void {
+    this.overlay = overlay
+  }
+
+  ownConfig(id: string): ModelConfig {
     return normalize(this.data.configs[id] ?? {})
   }
 
-  setConfig(id: string, patch: ModelConfig, loadedConfig: ModelConfig | null): ModelConfigResult {
-    this.get(id)
-    const config = normalize({ ...this.getConfig(id), ...patch })
-    this.data.configs[id] = config
-    this.save()
-    return { config, reloadRequired: loadedConfig ? reloadRequired(loadedConfig, config) : false }
+  getConfig(id: string): ModelConfig {
+    const own = this.ownConfig(id)
+    return this.overlay ? this.overlay(id, own) : own
   }
 
-  resetConfig(id: string, loadedConfig: ModelConfig | null): ModelConfigResult {
+  packsOf(id: string): string[] {
+    return this.data.packs?.[id] ?? []
+  }
+
+  setPacks(id: string, on: string[]): void {
+    this.get(id)
+    this.data.packs = { ...this.data.packs, [id]: on }
+    this.save()
+  }
+
+  infoFor(id: string): ModelInfo | null | undefined {
+    const m = this.data.models.find((x) => x.id === id)
+    return m ? this.infoOf(m, this.data.info?.[id]) : null
+  }
+
+  setConfig(id: string, patch: ModelConfig): ModelConfigResult {
+    this.get(id)
+    const config = normalize({ ...this.ownConfig(id), ...patch })
+    this.data.configs[id] = config
+    this.save()
+    return { config }
+  }
+
+  resetConfig(id: string): ModelConfigResult {
     delete this.data.configs[id]
     this.save()
-    const config = this.getConfig(id)
-    return { config, reloadRequired: loadedConfig ? reloadRequired(loadedConfig, config) : false }
+    return { config: this.ownConfig(id) }
   }
 }

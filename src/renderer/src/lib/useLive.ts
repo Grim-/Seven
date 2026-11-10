@@ -3,7 +3,7 @@ import type { EventName } from '@shared/protocol'
 import { on } from './ipc'
 import { onLibraryChange } from './library'
 
-export function useLive<T>(fetch: () => Promise<T>, event: EventName): T | null {
+export function useLive<T>(fetch: () => Promise<T>, event: EventName, deps?: unknown[]): T | null {
   const [value, setValue] = useState<T | null>(null)
   useEffect(() => {
     let live = true
@@ -17,7 +17,7 @@ export function useLive<T>(fetch: () => Promise<T>, event: EventName): T | null 
       live = false
       off()
     }
-  }, [event])
+  }, [event, ...(deps ?? [])])
   return value
 }
 

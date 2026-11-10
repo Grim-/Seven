@@ -19,6 +19,9 @@ import { TokenView, type TokenBar } from './TokenView'
 import { MoveMarker } from './MoveMarker'
 import { Walk } from './Walk'
 import { WorldClock, type ClockView } from './WorldClock'
+import type { BattleState, Combatant } from '@shared/game/state/BattleStateMachine'
+import { useGameState } from '../../components/play/state/gameStateStore'
+import { toast } from '../../store/toasts'
 
 export interface ExploreData {
   map: MapData
@@ -32,6 +35,8 @@ export interface ExploreData {
   save: { id: string; clockId: string; clock: ClockState } | null
   triggers: TriggerDef[]
   used: string[]
+  aiming?: boolean
+  battle?: BattleState | null
 }
 
 export interface ExploreEvents {
@@ -47,6 +52,7 @@ export interface ExploreEvents {
   object: { object: ObjectLayerData; hit: PointerHit }
   objectMenu: { object: ObjectLayerData; hit: PointerHit }
   blankMenu: { hit: PointerHit }
+  camera: View
 }
 
 const TOKEN_SMALLEST = 40
@@ -71,14 +77,18 @@ export class ExploreScene implements Scene {
   private gone = false
   private nav: NavGrid | null = null
   private navFor = ''
-  private walk: { view: TokenView; walk: Walk } | null = null
+  private walk: { view: TokenView; walk: Walk; onArrive?: () => void } | null = null
   private marker: MoveMarker | null = null
   private clock: WorldClock | null = null
   private clockFor = ''
   private night = new Graphics()
+  private battleGrid = new Graphics()
+  private battleRadius = new Graphics()
   private triggerAreas: PlaceAreas | null = null
   private inside = new Set<string>()
   private aim: string | null = null
+  private inBattle = false
+  private prevTurnActorId = ''
 
   constructor(
     private data: ExploreData,
@@ -93,14 +103,24 @@ export class ExploreScene implements Scene {
     this.areas = new PlaceAreas(engine)
     this.marker = new MoveMarker(engine)
     this.triggerAreas = new PlaceAreas(engine, 'purple')
+    this.battleGrid.eventMode = 'none'
+    this.battleRadius.eventMode = 'none'
     this.night.eventMode = 'none'
-    this.root.addChild(this.areas.root, this.triggerAreas.root, this.marker.root, this.tokenLayer, this.night)
+    this.root.addChild(this.areas.root, this.triggerAreas.root, this.battleGrid, this.battleRadius, this.marker.root, this.tokenLayer, this.night)
     this.label = new PlaceLabel(engine)
     engine.input.blank = {
       tap: (hit) => {
-        if (!this.walkTo(hit.world)) this.events.emit('place', { key: smallestAt(this.data.shapes, hit.world), hit })
+        if (this.data.battle && this.data.battle.status === 'active') {
+          this.walkTo(hit.world)
+        } else {
+          this.events.emit('place', { key: smallestAt(this.data.shapes, hit.world), hit })
+        }
       },
-      menu: (hit) => this.events.emit('blankMenu', { hit }),
+      menu: (hit) => {
+        if (!this.walkTo(hit.world)) {
+          this.events.emit('blankMenu', { hit })
+        }
+      },
       hover: (world) => {
         const trigger = world ? this.triggerAt(world) : null
         const key = world && !trigger ? smallestAt(this.data.shapes, world) : null
@@ -111,8 +131,16 @@ export class ExploreScene implements Scene {
     }
     void MapView.load(this.data.map, engine.assets, (target, object) =>
       engine.input.bind(target, {
-        tap: (hit) => this.events.emit('object', { object, hit }),
-        menu: (hit) => this.events.emit('objectMenu', { object, hit })
+        tap: (hit) => {
+          this.events.emit('object', { object, hit })
+        },
+        menu: (hit) => {
+          if (hit.native.shiftKey) {
+            this.walkTo(hit.world)
+          } else {
+            this.events.emit('objectMenu', { object, hit })
+          }
+        }
       })
     ).then((view) => {
       if (this.gone) return view.destroy()
@@ -194,15 +222,65 @@ export class ExploreScene implements Scene {
     return new Set(this.live().filter((t) => formHas(t.shape, point)).map((t) => t.id))
   }
 
-  private walkTo(target: Point): boolean {
+  walkTo(target: Point, onArrive?: () => void): boolean {
     const view = this.data.mine ? this.tokens.get(this.data.mine) : undefined
     if (!view) return false
+
+    const battle = this.data.battle
+    const inCombat = Boolean(battle && battle.status === 'active')
+
+    // Turn-based combat movement gating
+    if (inCombat && battle) {
+      const activeActor = battle.queue[battle.activeTurnIndex]
+      if (!activeActor || !activeActor.isPlayer) {
+        toast.info('Combat Turn', 'Waiting for enemy action to complete')
+        return false
+      }
+      if (battle.economy.movementRemaining <= 0) {
+        toast.info('Movement Speed', 'Movement budget depleted for this turn (0 FT)')
+        return false
+      }
+
+      const path = findPath(this.grid(), view.at, target)
+      if (!path || path.length < 2) {
+        this.marker?.show(target, false)
+        return true
+      }
+
+      // Discrete 5ft increments per tile
+      const tilesCount = path.length - 1
+      const distanceFeet = tilesCount * 5
+
+      if (distanceFeet > battle.economy.movementRemaining) {
+        toast.info('Movement Budget', `Destination requires ${distanceFeet} FT (${battle.economy.movementRemaining} FT remaining)`)
+        return false
+      }
+
+      const aimed = this.triggerAt(target)
+      this.aim = aimed && aimed.fires === 'interact' ? aimed.id : null
+      this.inside = this.zonesAt(view.at)
+
+      this.walk = {
+        view,
+        walk: new Walk(view.at, path, WALK_TILES_PER_SECOND * this.data.map.tile.w),
+        onArrive: () => {
+          // Deduct traveled feet from economy upon arrival
+          useGameState.getState().spendMovement(distanceFeet)
+          onArrive?.()
+        }
+      }
+      this.marker?.show(this.walk.walk.end, true)
+      return true
+    }
+
+    // Standard exploration walking (out of combat)
     const aimed = this.triggerAt(target)
     this.aim = aimed && aimed.fires === 'interact' ? aimed.id : null
     this.inside = this.zonesAt(view.at)
     if (this.aim && this.inside.has(this.aim)) {
       this.events.emit('trigger', { id: this.aim, sheet: view.sheet })
       this.aim = null
+      onArrive?.()
       return true
     }
     const path = findPath(this.grid(), view.at, target)
@@ -210,12 +288,30 @@ export class ExploreScene implements Scene {
       this.marker?.show(target, false)
       return true
     }
-    this.walk = { view, walk: new Walk(view.at, path, WALK_TILES_PER_SECOND * this.data.map.tile.w) }
+    this.walk = { view, walk: new Walk(view.at, path, WALK_TILES_PER_SECOND * this.data.map.tile.w), onArrive }
     this.marker?.show(this.walk.walk.end, true)
     return true
   }
 
-  private stopWalk(): void {
+  smartApproach(target: Point, onReach: () => void, reachDistance = this.data.map.tile.w * 1.5): boolean {
+    const view = this.data.mine ? this.tokens.get(this.data.mine) : undefined
+    if (!view) {
+      onReach()
+      return false
+    }
+    const distance = Math.hypot(view.at.x - target.x, view.at.y - target.y)
+    if (distance <= reachDistance) {
+      onReach()
+      return true
+    }
+    const grid = this.grid()
+    const cell = grid.cellOf(target)
+    const openCell = grid.nearestOpen(cell[0], cell[1])
+    const dest = openCell ? grid.centre(openCell[0], openCell[1]) : target
+    return this.walkTo(dest, onReach)
+  }
+
+  stopWalk(): void {
     if (!this.walk) return
     this.walk.view.stopWalking()
     this.marker?.hide()
@@ -241,7 +337,9 @@ export class ExploreScene implements Scene {
 
   private tokenLook(visitor: PlaceVisitor) {
     const theme = this.engine.theme
-    return visitor.sheet === this.data.mine ? theme.accent : visitor.agent ? theme.purple : theme.cyan
+    if (visitor.sheet === this.data.mine) return theme.accent
+    if (visitor.faction === 'monsters' || visitor.line?.startsWith('HOSTILE')) return theme.alert
+    return visitor.agent ? theme.purple : theme.cyan
   }
 
   private sync(): void {
@@ -264,8 +362,16 @@ export class ExploreScene implements Scene {
       const view = new TokenView(this.engine, token, { base, smallest: TOKEN_SMALLEST, label: true, border })
       view.setBars(this.barsOf(token))
       this.engine.input.bind(view.root, {
-        tap: (hit) => this.events.emit('token', { token: view.token, hit }),
-        menu: (hit) => this.events.emit('tokenMenu', { token: view.token, hit }),
+        tap: (hit) => {
+          this.events.emit('token', { token: view.token, hit })
+        },
+        menu: (hit) => {
+          if (hit.native.shiftKey) {
+            this.walkTo(hit.world)
+          } else {
+            this.events.emit('tokenMenu', { token: view.token, hit })
+          }
+        },
         drag: {
           move: (at) => {
             if (this.walk?.view === view) this.stopWalk()
@@ -288,7 +394,178 @@ export class ExploreScene implements Scene {
       this.tokens.delete(sheet)
     }
     this.syncMarkers()
+    this.syncBattle()
     this.zoom = 0
+  }
+
+  private syncBattle(): void {
+    const battle = this.data.battle
+    if (!battle || battle.status !== 'active') {
+      if (this.inBattle) {
+        this.inBattle = false
+        this.prevTurnActorId = ''
+        this.battleGrid.clear()
+        this.battleRadius.clear()
+        this.resetCamera()
+      }
+      return
+    }
+
+    const wasInBattle = this.inBattle
+    this.inBattle = true
+
+    const combatants = battle.queue
+    const activeActor = combatants[battle.activeTurnIndex]
+    const actorPoints = combatants.map((c) => c.at).filter((p): p is Point => Boolean(p))
+
+    // When entering battle for the first time, zoom into the encounter center
+    if (!wasInBattle && actorPoints.length > 0) {
+      this.focusEncounter(actorPoints)
+    } else if (activeActor && activeActor.id !== this.prevTurnActorId) {
+      this.prevTurnActorId = activeActor.id
+      if (activeActor.at) {
+        this.centerOn(activeActor.at)
+      }
+    }
+
+    // Render discrete reachable grid tiles via BFS
+    this.drawReachableTiles(activeActor, battle.economy.movementRemaining)
+  }
+
+  private drawReachableTiles(activeActor: Combatant | undefined, movementRemaining: number): void {
+    this.battleGrid.clear()
+    this.battleRadius.clear()
+    if (!activeActor?.at || movementRemaining <= 0) return
+
+    const tileW = this.data.map.tile.w || 32
+    const tileH = this.data.map.tile.h || 32
+    const grid = this.grid()
+    const startCell = grid.cellOf(activeActor.at)
+    const maxTiles = Math.floor(movementRemaining / 5)
+
+    if (maxTiles <= 0) return
+
+    // BFS to find all reachable cells within movement budget
+    const reachable = new Map<string, { col: number; row: number; dist: number }>()
+    const queue: [number, number, number][] = [[startCell[0], startCell[1], 0]]
+    const visited = new Set<string>([`${startCell[0]},${startCell[1]}`])
+
+    const DIRS: [number, number][] = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1]
+    ]
+
+    while (queue.length > 0) {
+      const [c, r, dist] = queue.shift()!
+      if (dist > 0) {
+        reachable.set(`${c},${r}`, { col: c, row: r, dist })
+      }
+
+      if (dist >= maxTiles) continue
+
+      for (const [dc, dr] of DIRS) {
+        const nc = c + dc
+        const nr = r + dr
+        const key = `${nc},${nr}`
+        if (visited.has(key)) continue
+        if (!grid.open(nc, nr)) continue
+
+        // Prevent diagonal movement cutting through blocked corners
+        if (dc !== 0 && dr !== 0) {
+          if (!grid.open(c + dc, r) || !grid.open(c, r + dr)) continue
+        }
+
+        visited.add(key)
+        queue.push([nc, nr, dist + 1])
+      }
+    }
+
+    const isPlayer = Boolean(activeActor.isPlayer)
+    const tileColor = isPlayer ? 0x00d8f6 : 0xff4d4d
+
+    // 1. Highlight active actor's origin tile with 2px sharp border
+    const originX = startCell[0] * tileW
+    const originY = startCell[1] * tileH
+    this.battleGrid
+      .rect(originX, originY, tileW, tileH)
+      .stroke({ width: 2, color: tileColor, alpha: 0.85 })
+
+    // 2. Render discrete square highlights for every reachable tile
+    for (const cell of reachable.values()) {
+      const x = cell.col * tileW
+      const y = cell.row * tileH
+      this.battleRadius
+        .rect(x + 1, y + 1, tileW - 2, tileH - 2)
+        .fill({ color: tileColor, alpha: 0.09 })
+        .stroke({ width: 1, color: tileColor, alpha: 0.35 })
+    }
+  }
+
+  focusEncounter(points: Point[], minZoom = 1.5, maxZoom = 2.4): void {
+    if (points.length === 0 || !this.engine) return
+    const screen = this.engine.app.screen
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const p of points) {
+      if (p.x < minX) minX = p.x
+      if (p.y < minY) minY = p.y
+      if (p.x > maxX) maxX = p.x
+      if (p.y > maxY) maxY = p.y
+    }
+    const tileW = this.data.map.tile.w || 32
+    const tileH = this.data.map.tile.h || 32
+    const padX = tileW * 3.5
+    const padY = tileH * 3.5
+    const width = Math.max(tileW * 4, maxX - minX + padX * 2)
+    const height = Math.max(tileH * 4, maxY - minY + padY * 2)
+    const midX = (minX + maxX) / 2
+    const midY = (minY + maxY) / 2
+
+    const calcZoom = Math.min(screen.width / width, screen.height / height) * 0.85
+    const zoom = Math.min(maxZoom, Math.max(minZoom, calcZoom))
+    this.engine.camera.set(
+      {
+        zoom,
+        x: screen.width / 2 - midX * zoom,
+        y: screen.height / 2 - midY * zoom
+      },
+      true
+    )
+  }
+
+  centerOn(point: Point, zoom?: number): void {
+    if (!this.engine) return
+    if (zoom !== undefined) {
+      const screen = this.engine.app.screen
+      this.engine.camera.set(
+        {
+          zoom,
+          x: screen.width / 2 - point.x * zoom,
+          y: screen.height / 2 - point.y * zoom
+        },
+        true
+      )
+    } else {
+      this.engine.camera.centerOn(point, true)
+    }
+  }
+
+  resetCamera(): void {
+    if (!this.engine) return
+    const mine = this.data.mine ? this.tokens.get(this.data.mine) : undefined
+    if (mine) {
+      this.engine.camera.centerOn(mine.at, true)
+    } else {
+      this.engine.camera.fit(true)
+    }
   }
 
   private syncMarkers(): void {
@@ -329,14 +606,17 @@ export class ExploreScene implements Scene {
     for (const t of this.live()) if (t.fires === 'enter' && now.has(t.id) && !this.inside.has(t.id)) this.events.emit('trigger', { id: t.id, sheet: going.view.sheet })
     this.inside = now
     if (!going.walk.done) return
+    const callback = going.onArrive
     this.stopWalk()
     const end = { x: Math.round(at.x), y: Math.round(at.y) }
     this.events.emit('arrive', { sheet: going.view.sheet, at: end, place: smallestAt(this.data.shapes, end) })
     if (this.aim && now.has(this.aim)) this.events.emit('trigger', { id: this.aim, sheet: going.view.sheet })
     this.aim = null
+    callback?.()
   }
 
   render(): void {
+    this.events.emit('camera', this.engine.camera.current)
     const zoom = this.engine.camera.zoom
     if (zoom !== this.zoom) {
       this.zoom = zoom
@@ -354,6 +634,8 @@ export class ExploreScene implements Scene {
     this.walk = null
     this.engine.input.blank = {}
     this.marker?.destroy()
+    this.battleGrid.destroy()
+    this.battleRadius.destroy()
     for (const t of this.tokens.values()) t.destroy()
     for (const m of this.markers.values()) m.destroy()
     this.tokens.clear()

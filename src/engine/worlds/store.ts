@@ -45,8 +45,33 @@ class WorldStore extends EventEmitter {
     return path.join(ROOT, id)
   }
 
-  private manifest(id: string): { name: string; updatedAt: number; player?: string | null; rules?: string; tags?: unknown } {
+  private manifest(id: string): { name: string; updatedAt: number; player?: string | null; rules?: string; tags?: unknown; flags?: Record<string, string | number | boolean> } {
     return readJson(path.join(this.dir(id), 'manifest.json'), { name: id, updatedAt: 0 })
+  }
+
+  flags(id: string): Record<string, string | number | boolean> {
+    const m = this.manifest(id)
+    return m.flags && typeof m.flags === 'object' ? m.flags : {}
+  }
+
+  setFlag(id: string, key: string, value: string | number | boolean | null): Record<string, string | number | boolean> {
+    const m = this.manifest(id)
+    const current: Record<string, string | number | boolean> = { ...(m.flags ?? {}) }
+    if (value === null) {
+      delete current[key]
+    } else {
+      current[key] = value
+    }
+    writeJson(path.join(this.dir(id), 'manifest.json'), { ...m, flags: current, updatedAt: Date.now() })
+    this.emit('changed', id)
+    return current
+  }
+
+  setFlags(id: string, flags: Record<string, string | number | boolean>): Record<string, string | number | boolean> {
+    const m = this.manifest(id)
+    writeJson(path.join(this.dir(id), 'manifest.json'), { ...m, flags, updatedAt: Date.now() })
+    this.emit('changed', id)
+    return flags
   }
 
   setPlayer(id: string, sheet: string | null): WorldMeta {
@@ -110,6 +135,7 @@ class WorldStore extends EventEmitter {
       player: m.player ?? null,
       rules: typeof m.rules === 'string' ? m.rules : '',
       tags: Array.isArray(m.tags) ? m.tags.filter((t): t is string => typeof t === 'string') : [],
+      flags: m.flags && typeof m.flags === 'object' ? m.flags : {},
       updatedAt: m.updatedAt
     }
   }
@@ -297,12 +323,31 @@ class WorldStore extends EventEmitter {
   }
 
   useMap(id: string, mapId: string): WorldMapUse[] {
-    if (!maps.get(mapId)) throw new WorldError(`There is no map "${mapId}". find with kind map lists them.`)
+    const targetMap = maps.get(mapId)
+    if (!targetMap) throw new WorldError(`There is no map "${mapId}". find with kind map lists them.`)
     const schema = this.schema(id)
     const placed = withPlaces(schema)
     if (placed !== schema) this.saveSchema(id, placed)
     const uses = this.mapUses(id)
-    return uses.some((u) => u.map === mapId) ? uses : this.saveMapUses(id, [...uses, { map: mapId, shapes: {}, stand: {} }])
+    if (uses.some((u) => u.map === mapId)) return uses
+
+    // Auto-create place entities in the world for any zones/shapes drawn on this map
+    const existingPlaces = this.entities(id, PLACE_TYPE_KEY, true, 'template')
+    for (const [key] of Object.entries(targetMap.shapes ?? {})) {
+      if (!existingPlaces[key]) {
+        this.put(id, PLACE_TYPE_KEY, key, { Name: key })
+      }
+    }
+
+    return this.saveMapUses(id, [
+      ...uses,
+      {
+        map: mapId,
+        shapes: { ...(targetMap.shapes ?? {}) },
+        stand: {},
+        triggers: [...(targetMap.triggers ?? [])]
+      }
+    ])
   }
 
   dropMap(id: string, mapId: string): WorldMapUse[] {

@@ -8,15 +8,23 @@ import { useLatest } from '../../../game/react/useLatest'
 import { GamePortrait, GameWindow, HudButton } from '../../../game/ui'
 import { gameScreen, gameScreens, type GameScreen } from './registry'
 import { useGameAct } from './useGameAct'
+import { useGameplaySettings } from '../settings/gameplaySettingsStore'
 
 const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
 
 export function GameMenu({ open, onOpen }: { open: string | null; onOpen: (id: string | null) => void }) {
   const latest = useLatest({ open, onOpen })
+  const binds = useGameplaySettings((s) => s.settings.keybinds)
+
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return
-      const screen = gameScreens().find((s) => s.key === e.key.toLowerCase())
+      const currentBinds = useGameplaySettings.getState().settings.keybinds
+      const screen = gameScreens().find((s) => {
+        const customBind = currentBinds[s.id]
+        if (customBind && (customBind.code === e.code || customBind.display.toLowerCase() === e.key.toLowerCase())) return true
+        return s.key === e.key.toLowerCase()
+      })
       if (!screen) return
       e.preventDefault()
       latest.current.onOpen(latest.current.open === screen.id ? null : screen.id)
@@ -27,7 +35,7 @@ export function GameMenu({ open, onOpen }: { open: string | null; onOpen: (id: s
   return (
     <div className="pointer-events-auto flex gap-1.5">
       {gameScreens().map((s) => (
-        <HudButton key={s.id} icon={s.icon} label={s.label} keyHint={s.key.toUpperCase()} active={open === s.id} onClick={() => onOpen(open === s.id ? null : s.id)} />
+        <HudButton key={s.id} icon={s.icon} label={s.label} keyHint={binds[s.id]?.display ?? s.key.toUpperCase()} active={open === s.id} onClick={() => onOpen(open === s.id ? null : s.id)} />
       ))}
     </div>
   )

@@ -2,11 +2,12 @@ import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
-import type { ChatServerStatus, ModelConfig, ModelEntry, ModelFacts, ModelHostState, ServerInfo, ServerInstallProgress } from '@shared/types'
+import type { ChatServerStatus, ModelConfig, ModelEntry, ModelFacts, ModelHostState } from '@shared/types'
+import { unsupportedFlags } from '@shared/modelParams'
 import { readBytes, removePath, writeBytes, writeUserFile } from '../util/fs'
 import { serverArgs, templateFile, type ServerModel } from './params'
 import { LlamaServer } from './server/process'
-import { installServer, installed, serverExe } from './server/install'
+import { llamaLimits, serverBuild, serverExe, serverLease, serverVersion } from './server/install'
 import type { ApiTarget } from './apiChat'
 
 function smiMemory(): Promise<{ used: number; total: number } | null> {
@@ -28,21 +29,17 @@ export class ModelHost extends EventEmitter {
   private served: Served | null = null
   private starting: AbortController | null = null
   private loading: Promise<void> | null = null
-  private state: ModelHostState = { status: 'unloaded', modelId: null, progress: 0, contextSize: null, error: null }
+  private loadingId: string | null = null
+  private wanted = 0
+  private state: ModelHostState = { status: 'unloaded', modelId: null, progress: 0, contextSize: null, error: null, restartNeeded: false }
 
   constructor(private serverModel: (entry: ModelEntry) => ServerModel) {
     super()
   }
 
-  serverInfo(): ServerInfo {
-    return { installed: installed()?.tag ?? null }
-  }
-
-  async installServer(onProgress: (p: ServerInstallProgress) => void): Promise<ServerInfo> {
-    if (this.loading) await this.loading.catch(() => undefined)
-    await this.unload()
-    await installServer(new AbortController().signal, onProgress)
-    return this.serverInfo()
+  async restartOnActive(): Promise<void> {
+    const served = this.served
+    if (served && served.server.version !== serverVersion()) await this.load(served.entry, served.config)
   }
 
   serverTarget(): ApiTarget {
@@ -64,7 +61,17 @@ export class ModelHost extends EventEmitter {
 
   needsRestart(config: ModelConfig): boolean {
     const s = this.served
-    return s !== null && serverArgs(config, this.serverModel(s.entry)).join('\u0000') !== s.server.args.join('\u0000')
+    return s !== null && (s.server.version !== serverVersion() || serverArgs(config, this.serverModel(s.entry)).join('\u0000') !== s.server.args.join('\u0000'))
+  }
+
+  checkRestart(config: ModelConfig): void {
+    const needed = this.needsRestart(config)
+    if (needed !== this.state.restartNeeded) this.setState({ restartNeeded: needed })
+  }
+
+  stateKey(): string | null {
+    const s = this.served
+    return s ? [s.entry.id, s.server.version, ...s.server.args].join('\u0000') : null
   }
 
   async saveState(file: string): Promise<void> {
@@ -128,7 +135,7 @@ export class ModelHost extends EventEmitter {
     if (!this.served) return null
     const { server } = this.served
     return {
-      server: { tag: installed()?.tag ?? null, mtp: server.args.some((a) => a.split(',').includes('draft-mtp')), vision: server.args.includes('--mmproj'), device: server.device, offload: server.offload, last: server.timings },
+      server: { tag: serverBuild()?.label ?? null, mtp: server.args.some((a) => a.split(',').includes('draft-mtp')), vision: server.args.includes('--mmproj'), device: server.device, offload: server.offload, last: server.timings },
       wrapper: 'llama-server',
       contextSize: server.contextSize,
       trainContextSize: server.trainContextSize ?? 0,
@@ -144,37 +151,49 @@ export class ModelHost extends EventEmitter {
   }
 
   async load(entry: ModelEntry, config: ModelConfig): Promise<ModelHostState> {
-    if (this.loading) await this.loading.catch(() => undefined)
+    const ticket = ++this.wanted
+    if (this.loading && this.loadingId !== entry.id) this.starting?.abort()
+    while (this.loading) await this.loading.catch(() => undefined)
+    if (ticket !== this.wanted) throw new Error(`Loading ${entry.name} was replaced by a newer load.`)
     if (this.served?.entry.id === entry.id && this.state.status === 'ready' && !this.needsRestart(config)) return this.getState()
     this.loading = this.serve(entry, config)
+    this.loadingId = entry.id
     try {
       await this.loading
     } finally {
       this.loading = null
+      this.loadingId = null
     }
     return this.getState()
   }
 
   private async serve(entry: ModelEntry, config: ModelConfig): Promise<void> {
     await this.unload()
-    this.setState({ status: 'loading', modelId: entry.id, progress: 0, contextSize: null, error: null })
+    this.setState({ status: 'loading', modelId: entry.id, progress: 0, contextSize: null, error: null, restartNeeded: false })
     const controller = new AbortController()
     this.starting = controller
     try {
       const exe = serverExe()
-      if (!exe) throw new Error('llama-server is not installed yet. Install it in Models, then load the model again.')
+      const version = serverVersion()
+      if (!exe || !version) throw new Error('llama-server is not set up yet. Install or pick a version in Models > llama-server, then load the model again.')
       const model = this.serverModel(entry)
+      const args = serverArgs(config, model)
+      const missing = model.build?.flags ? unsupportedFlags(args, model.build.flags) : []
+      if (missing.length) throw new Error(`llama-server ${model.build!.label} has no ${missing.join(', ')}. Make another version active in Models > llama-server, or change the model's settings.`)
       if (model.template) writeUserFile(templateFile(model.template), model.template)
       const server = await LlamaServer.start({
         exe,
+        version,
         modelPath: entry.path,
-        args: serverArgs(config, model),
+        args,
+        limits: llamaLimits(),
+        hold: () => serverLease(version, `Chat model ${entry.name}`),
         signal: controller.signal,
         onExit: (message) => {
           if (this.served?.server !== server) return
           this.emit('unloading', entry.id)
           this.served = null
-          this.setState({ status: 'error', modelId: null, progress: 0, contextSize: null, error: message })
+          this.setState({ status: 'error', modelId: null, progress: 0, contextSize: null, error: message, restartNeeded: false })
         }
       })
       this.served = { entry, config, server }
@@ -197,7 +216,7 @@ export class ModelHost extends EventEmitter {
     this.starting?.abort()
     const served = this.served
     if (!served) {
-      if (this.state.status !== 'error' && this.state.status !== 'loading') this.setState({ status: 'unloaded', modelId: null, progress: 0, contextSize: null })
+      if (this.state.status !== 'error' && this.state.status !== 'loading') this.setState({ status: 'unloaded', modelId: null, progress: 0, contextSize: null, restartNeeded: false })
       return this.getState()
     }
     this.emit('unloading', served.entry.id)
@@ -205,7 +224,7 @@ export class ModelHost extends EventEmitter {
     try {
       await served.server.stop()
     } finally {
-      this.setState({ status: 'unloaded', modelId: null, progress: 0, contextSize: null, error: null })
+      this.setState({ status: 'unloaded', modelId: null, progress: 0, contextSize: null, error: null, restartNeeded: false })
     }
     return this.getState()
   }
@@ -222,6 +241,7 @@ export class ModelHost extends EventEmitter {
       modelName: s.entry.name,
       pid: s.server.pid,
       startedAt: s.server.startedAt,
+      version: s.server.version,
       args: s.server.args,
       contextSize: s.server.contextSize,
       device: s.server.device,

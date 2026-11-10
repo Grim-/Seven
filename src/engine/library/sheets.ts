@@ -18,6 +18,7 @@ interface SheetData {
   dnd: DndStats | null
   game: EntityRecord | null
   gameRules: string
+  faction?: string | null
   save: string
   story: Story
 }
@@ -29,11 +30,12 @@ function gameRecord(raw: unknown): EntityRecord | null {
 }
 
 function clean(raw: unknown): SheetData {
-  const d = (raw && typeof raw === 'object' ? raw : {}) as { fields?: unknown; values?: unknown; dnd?: unknown; game?: unknown; gameRules?: unknown; save?: unknown; story?: unknown }
+  const d = (raw && typeof raw === 'object' ? raw : {}) as { fields?: unknown; values?: unknown; dnd?: unknown; game?: unknown; gameRules?: unknown; faction?: unknown; save?: unknown; story?: unknown }
   const fields = Array.isArray(d.fields) ? [...new Set(d.fields.map((f) => String(f).trim()).filter(Boolean))] : [...SHEET_FIELDS]
   const values: Record<string, string> = {}
   if (d.values && typeof d.values === 'object') for (const [k, v] of Object.entries(d.values as Record<string, unknown>)) if (typeof v === 'string') values[k] = v
-  return { fields, values, dnd: d.dnd ? cleanDnd(d.dnd) : null, game: gameRecord(d.game), gameRules: typeof d.gameRules === 'string' ? d.gameRules : '', save: typeof d.save === 'string' ? d.save : '', story: cleanStory(d.story, d.dnd) }
+  const faction = typeof d.faction === 'string' ? d.faction.trim() || null : null
+  return { fields, values, dnd: d.dnd ? cleanDnd(d.dnd) : null, game: gameRecord(d.game), gameRules: typeof d.gameRules === 'string' ? d.gameRules : '', faction, save: typeof d.save === 'string' ? d.save : '', story: cleanStory(d.story, d.dnd) }
 }
 
 function adoptDnd(): void {
@@ -116,7 +118,7 @@ export function onWhereChange(fn: (sheet: string, where: string) => void): void 
   whereWatchers.push(fn)
 }
 
-export function saveSheet(input: { id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; story?: Story }): CharacterSheet {
+export function saveSheet(input: { id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story }): CharacterSheet {
   const title = input.title.trim()
   if (!title) throw new Error('Give the character a name, e.g. Mira.')
   if (input.id) {
@@ -131,13 +133,30 @@ export function saveSheet(input: { id: string | null; title: string; fields: str
       }
     }
     const story = input.story ? (live ? { ...input.story, where: current.story.where } : input.story) : current.story
-    const value = clean({ fields: input.fields, values: input.values, dnd: input.dnd === undefined ? current.dnd : input.dnd, game: live || input.game === undefined ? current.game : input.game, gameRules: live ? current.gameRules : (input.gameRules ?? current.gameRules), save: current.save, story })
+    const value = clean({
+      fields: input.fields,
+      values: input.values,
+      dnd: input.dnd === undefined ? current.dnd : input.dnd,
+      game: live || input.game === undefined ? current.game : input.game,
+      gameRules: live ? current.gameRules : (input.gameRules ?? current.gameRules),
+      faction: input.faction === undefined ? current.faction : input.faction,
+      save: current.save,
+      story
+    })
     if (title !== page.title) data.pages.write({ ref: page.id, title })
     data.pages.setData(page.id, value)
     if (!live && value.story.where !== current.story.where) for (const fn of whereWatchers) fn(page.id, value.story.where)
     return getSheet(page.id)
   }
-  const value = clean({ fields: input.fields.length ? input.fields : SHEET_FIELDS, values: input.values, dnd: input.dnd ?? null, game: input.game ?? null, story: input.story })
+  const value = clean({
+    fields: input.fields.length ? input.fields : SHEET_FIELDS,
+    values: input.values,
+    dnd: input.dnd ?? null,
+    game: input.game ?? null,
+    gameRules: input.gameRules ?? '',
+    faction: input.faction ?? null,
+    story: input.story
+  })
   const page = data.pages.create({ title, type: SHEET_TYPE, data: value })
   return getSheet(page.id)
 }
@@ -157,6 +176,11 @@ export function setStory(ref: string, story: Story): CharacterSheet {
   return saveSheet({ id: s.id, title: s.title, fields: s.fields, values: s.values, story })
 }
 
+export function setSheetFaction(ref: string, faction: string | null): CharacterSheet {
+  const s = getSheet(ref)
+  return saveSheet({ id: s.id, title: s.title, fields: s.fields, values: s.values, dnd: s.dnd, game: s.game, gameRules: s.gameRules, faction, story: s.story })
+}
+
 const sections: ((sheet: CharacterSheet) => string | null)[] = []
 
 export function registerSheetSection(section: (sheet: CharacterSheet) => string | null): void {
@@ -166,6 +190,7 @@ export function registerSheetSection(section: (sheet: CharacterSheet) => string 
 export function sheetMarkdown(ref: string, roleplay = false): string {
   const s = getSheet(ref)
   const parts = [`# ${s.title}`]
+  if (s.faction) parts.push(`## Faction\nAllegiance: @faction:${s.faction}`)
   if (s.dnd) parts.push(roleplay ? `## Who\n${dndRoleplay(s.dnd)}` : `## D&D\n${dndText(s.dnd)}`)
   for (const field of s.fields) {
     const text = (s.values[field] ?? '').trim()

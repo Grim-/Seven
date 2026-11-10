@@ -58,7 +58,7 @@ export class EngineSupervisor extends EventEmitter {
     const child = utilityProcess.fork(enginePath, [], {
       serviceName: 'seven-engine',
       stdio: 'inherit',
-      env: { ...process.env, SEVEN_HOME: dataDir, SEVEN_DEV: app.isPackaged ? '0' : '1', SEVEN_RESOURCES: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'resources') : path.join(app.getAppPath(), 'resources'), SEVEN_APP: app.isPackaged ? path.dirname(process.execPath) : app.getAppPath() }
+      env: { ...process.env, SEVEN_HOME: dataDir, SEVEN_DEV: app.isPackaged ? '0' : '1', SEVEN_RESOURCES: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'resources') : path.join(app.getAppPath(), 'resources'), SEVEN_APP: app.isPackaged ? path.dirname(process.execPath) : app.getAppPath(), SEVEN_MACHINE: app.getPath('userData') }
     })
     this.child = child
 

@@ -7,6 +7,7 @@ export interface OpposedSide {
   does: string
   against: string
   bonus: number
+  action?: string | null
 }
 
 export interface OpposedProps {

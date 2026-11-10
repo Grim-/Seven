@@ -1,15 +1,12 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
-import os from 'node:os'
 import net from 'node:net'
 import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { ServerTimings } from '@shared/types'
 import { removePath } from '../../util/fs'
-import { childEnded, childStarted } from './children'
-
-export const LOG_LINES = 200
-const POLL_MS = 250
+import { childEnded, childStarted, endIfServer } from './children'
+import type { ServerLimits } from './install'
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -23,6 +20,20 @@ function freePort(): Promise<number> {
   })
 }
 
+function portTaken(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const probe = net.createServer()
+    probe.once('error', () => resolve(true))
+    probe.listen(port, '127.0.0.1', () => probe.close(() => resolve(false)))
+  })
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+class PortTaken extends Error {}
+
 function wait(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms)
@@ -35,10 +46,13 @@ function wait(ms: number, signal: AbortSignal): Promise<void> {
 
 export interface ServerOptions {
   exe: string
+  version: string
   modelPath: string
   args: string[]
   signal: AbortSignal
+  limits: ServerLimits
   onExit: (message: string) => void
+  hold?: () => () => void
 }
 
 export class LlamaServer {
@@ -51,28 +65,42 @@ export class LlamaServer {
   private tail: string[] = []
   private stopping = false
   private exited: Promise<void>
+  private lastOutput = Date.now()
 
   private constructor(
     private child: ChildProcess,
     readonly port: number,
     readonly args: string[],
     readonly key: string,
-    readonly slotDir: string
+    readonly slotDir: string,
+    readonly version: string,
+    private limits: ServerLimits
   ) {
     this.exited = new Promise((resolve) => child.once('exit', () => resolve()))
-    const keep = (data: Buffer) => {
-      for (const line of data.toString().replace(/\x1b\[[0-9;]*m/g, '').split(/\r?\n/)) {
-        if (!line.trim()) continue
-        const offload = line.match(/offloaded (\d+)\/(\d+) layers to GPU/i)
-        if (offload) this.offload = { gpu: Number(offload[1]), total: Number(offload[2]) }
-        const device = line.match(/using device (\S+) \(([^)]+)\)/i)
-        if (device && !this.device) this.device = `${device[1]} (${device[2]})`
-        this.tail.push(line)
-        if (this.tail.length > LOG_LINES) this.tail.shift()
-      }
+    for (const stream of [child.stdout, child.stderr]) {
+      let rest = ''
+      stream?.on('data', (data: Buffer) => {
+        const lines = (rest + data.toString()).split(/\r?\n/)
+        rest = lines.pop() ?? ''
+        for (const line of lines) this.keep(line)
+      })
+      stream?.on('end', () => {
+        if (rest) this.keep(rest)
+        rest = ''
+      })
     }
-    child.stdout?.on('data', keep)
-    child.stderr?.on('data', keep)
+  }
+
+  private keep(raw: string): void {
+    const line = raw.replace(/\x1b\[[0-9;]*m/g, '')
+    if (!line.trim()) return
+    this.lastOutput = Date.now()
+    const offload = line.match(/offloaded (\d+)\/(\d+) layers to GPU/i)
+    if (offload) this.offload = { gpu: Number(offload[1]), total: Number(offload[2]) }
+    const device = line.match(/using device (\S+) \(([^)]+)\)/i)
+    if (device && !this.device) this.device = `${device[1]} (${device[2]})`
+    this.tail.push(line)
+    if (this.tail.length > this.limits.logLines) this.tail.shift()
   }
 
   get baseUrl(): string {
@@ -101,13 +129,25 @@ export class LlamaServer {
   }
 
   static async start(o: ServerOptions): Promise<LlamaServer> {
-    const port = await freePort()
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await LlamaServer.launch(o, await freePort())
+      } catch (err) {
+        if (!(err instanceof PortTaken) || attempt >= o.limits.portRetries) throw err
+      }
+    }
+  }
+
+  private static async launch(o: ServerOptions, port: number): Promise<LlamaServer> {
     const key = crypto.randomBytes(24).toString('hex')
-    const slotDir = fs.mkdtempSync(path.join(os.tmpdir(), 'seven-slots-'))
+    fs.mkdirSync(o.limits.slotFolder, { recursive: true })
+    const slotDir = fs.mkdtempSync(path.join(o.limits.slotFolder, 'seven-slots-'))
+    const release = o.hold?.() ?? (() => undefined)
     const args = ['-m', o.modelPath, '--host', '127.0.0.1', '--port', String(port), '--slot-save-path', slotDir, ...o.args]
     const server = await new Promise<LlamaServer>((resolve, reject) => {
       const child = spawn(o.exe, args, { cwd: path.dirname(o.exe), env: { ...process.env, LLAMA_API_KEY: key }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
       child.once('error', (err) => {
+        release()
         removePath(slotDir)
         reject(new Error(`llama-server could not start: ${err.message}`))
       })
@@ -117,21 +157,30 @@ export class LlamaServer {
           childStarted(pid)
           child.once('exit', () => childEnded(pid))
         }
-        resolve(new LlamaServer(child, port, o.args, key, slotDir))
+        resolve(new LlamaServer(child, port, o.args, key, slotDir, o.version, o.limits))
       })
     })
     server.child.once('exit', (code) => {
+      release()
       if (server.stopping) return
       removePath(server.slotDir)
       o.onExit(`llama-server stopped (exit code ${code ?? 'unknown'}).${server.tail.length ? `\n${server.lastLines()}` : ''}`)
     })
-    await server.ready(o.signal)
+    await server.ready(o.signal, port)
     return server
   }
 
-  private async ready(signal: AbortSignal): Promise<void> {
+  private async ready(signal: AbortSignal, port: number): Promise<void> {
     for (;;) {
-      if (this.child.exitCode !== null) throw new Error(`llama-server stopped while loading the model (exit code ${this.child.exitCode}).${this.tail.length ? `\n${this.lastLines()}` : ''}`)
+      if (this.child.exitCode !== null) {
+        const message = `llama-server stopped while loading the model (exit code ${this.child.exitCode}).${this.tail.length ? `\n${this.lastLines()}` : ''}`
+        throw (await portTaken(port)) ? new PortTaken(message) : new Error(message)
+      }
+      const silent = Date.now() - this.lastOutput
+      if (this.limits.stallSeconds > 0 && silent > this.limits.stallSeconds * 1000) {
+        await this.stop()
+        throw new Error(`llama-server wrote nothing for ${this.limits.stallSeconds} seconds while loading, so Seven stopped it. The limit is in llama-server settings.${this.tail.length ? `\n${this.lastLines()}` : ''}`)
+      }
       try {
         const res = await fetch(`${this.root}/health`, { signal })
         if (res.ok) break
@@ -143,7 +192,7 @@ export class LlamaServer {
         void err
       }
       try {
-        await wait(POLL_MS, signal)
+        await wait(this.limits.healthPollMs, signal)
       } catch (err) {
         await this.stop()
         throw err
@@ -177,10 +226,17 @@ export class LlamaServer {
     if (!res.ok) throw new Error(`llama-server could not ${action} the chat state: ${(await res.text().catch(() => '')) || res.status}`)
   }
 
+  private async exitWithin(seconds: number): Promise<boolean> {
+    return Promise.race([this.exited.then(() => true), sleep(seconds * 1000).then(() => false)])
+  }
+
   async stop(): Promise<void> {
     this.stopping = true
     if (this.child.exitCode === null && this.child.signalCode === null) this.child.kill()
-    await this.exited
+    if (!(await this.exitWithin(this.limits.stopSeconds)) && this.child.pid) {
+      await endIfServer(this.child.pid)
+      await this.exitWithin(this.limits.stopSeconds)
+    }
     removePath(this.slotDir)
   }
 }

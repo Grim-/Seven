@@ -193,7 +193,7 @@ function ActiveBar({
   }
 
   return (
-    <div className="pointer-events-auto absolute bottom-3 left-1/2 z-50 flex -translate-x-1/2 gap-1.5 border border-[#2b3c4c] bg-[#05080c]/95 p-1.5 shadow-[0_20px_48px_rgba(0,0,0,0.98)] backdrop-blur-md">
+    <div className="pointer-events-auto absolute bottom-3 left-1/2 z-50 flex -translate-x-1/2 gap-1.5 border border-line-bright bg-black/95 p-1.5 shadow-[0_20px_48px_rgba(0,0,0,0.98)] backdrop-blur-md">
       {Array.from({ length: 9 }).map((_, i) => {
         const slot = slots[i]
         const isOver = overIndex === i
@@ -209,7 +209,7 @@ function ActiveBar({
                 'relative flex h-[50px] w-[50px] select-none items-center justify-center border font-mono transition-all',
                 isOver
                   ? 'border-cyan bg-cyan/25 shadow-[0_0_18px_rgba(102,252,241,0.7)] scale-105'
-                  : 'border-[#223240] bg-[#070c12] hover:border-line-bright'
+                  : 'border-line/40 bg-black/60 hover:border-line'
               )}
               title={`Slot ${i + 1} (Empty)`}
             >
@@ -358,7 +358,7 @@ function EmptyBar() {
       {Array.from({ length: 9 }).map((_, i) => (
         <div
           key={i}
-          className="relative flex h-12 w-12 select-none items-center justify-center border border-line/60 bg-[#070b10] font-mono shadow-inner transition-colors"
+          className="relative flex h-12 w-12 select-none items-center justify-center border border-line/60 bg-black/60 font-mono shadow-inner transition-colors hover:border-line"
           title={`Slot ${i + 1} (Empty)`}
         >
           <span className="absolute left-1.5 top-0.5 font-mono text-[10px] font-bold text-dim">{i + 1}</span>

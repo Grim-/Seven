@@ -1,8 +1,9 @@
 import { createElement, type ComponentType, type ReactNode } from 'react'
-import { Blocks, Bot, Cpu, Database, FolderOpen, Gauge, LayoutDashboard, MessageSquare, NotebookPen, Server, Settings, Wrench } from 'lucide-react'
+import { Blocks, Bot, Cpu, Database, FolderOpen, Gamepad2, Gauge, LayoutDashboard, MessageSquare, NotebookPen, Server, Settings, Wrench } from 'lucide-react'
 import type { ViewId } from '@shared/types'
 import type { WindowApp } from '../store/windows'
 import { ChatView } from './ChatView'
+import { PlayView } from './PlayView'
 import { AgentsView } from './AgentsView'
 import { ModelsView } from './ModelsView'
 import { ToolsView } from './ToolsView'
@@ -29,6 +30,7 @@ const icon = (Icon: ComponentType) => createElement(Icon)
 
 export const MAIN_VIEWS: MainView[] = [
   { id: 'chat', label: 'Chat', icon: icon(MessageSquare), Component: ChatView, nav: 'tabs', app: 'chats' },
+  { id: 'play', label: 'Play', icon: icon(Gamepad2), Component: PlayView, nav: 'tabs' },
   { id: 'dashboards', label: 'Dashboards', icon: icon(LayoutDashboard), Component: DashboardsView, nav: 'tabs' },
   { id: 'data', label: 'Data', icon: icon(Database), Component: DataView, nav: 'tabs', app: 'data' },
   { id: 'pages', label: 'Files', icon: icon(FolderOpen), Component: FilesView, nav: 'tabs' },

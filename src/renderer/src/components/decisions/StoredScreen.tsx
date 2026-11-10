@@ -1,6 +1,7 @@
 import { useState, type ComponentType, type ReactNode } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import type { EventName } from '@shared/protocol'
+import { toId, stripRef } from '@shared/ids'
 import { Button, EmptyState, MakeOrSaved, SaveState, confirmDelete, useAutosavedState } from '../ui'
 import { engine } from '../../lib/ipc'
 import { useLive } from '../../lib/useLive'
@@ -12,7 +13,7 @@ export const NEW_ENTRY = '__new'
 interface Props<T extends { id: string; name: string }> extends KindScreenProps {
   what: string
   event: EventName
-  get: (id: string) => Promise<T>
+  get: (id: string) => Promise<T | null>
   save: (value: T, previousId: string | null) => Promise<T>
   blank: () => T
   badge?: (value: T) => string
@@ -63,10 +64,12 @@ function EditEntry<T extends { id: string; name: string }>({ kind, select, what,
 }
 
 export function StoredScreen<T extends { id: string; name: string }>(props: Props<T>) {
-  const { id, event, get } = props
-  const got = useLive(() => (id && id !== NEW_ENTRY ? get(id) : Promise.resolve(null)), event)
+  const { id, event, get, what } = props
+  const got = useLive(() => (id && id !== NEW_ENTRY ? get(id) : Promise.resolve(null)), event, [id])
   if (id === NEW_ENTRY) return <NewEntry {...props} />
   if (!id) return null
-  if (!got || got.id !== id) return <EmptyState title="Loading">One moment.</EmptyState>
+  if (got === undefined) return <EmptyState title="Loading">One moment.</EmptyState>
+  const matches = got && (got.id === id || toId(got.id) === toId(id) || got.id === stripRef(id))
+  if (!got || !matches) return <EmptyState title="Not found">This {what} was not found or has been removed.</EmptyState>
   return <EditEntry key={got.id} {...props} start={got} />
 }

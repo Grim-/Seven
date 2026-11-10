@@ -46,7 +46,7 @@ function sidePanel(value: unknown): SidePanelPrefs {
   return {
     open: typeof v.open === 'boolean' ? v.open : DEFAULTS.sidePanel.open,
     width: typeof v.width === 'number' && Number.isFinite(v.width) ? Math.round(Math.min(900, Math.max(280, v.width))) : DEFAULTS.sidePanel.width,
-    tab: typeof v.tab === 'string' && /^[a-z][a-z0-9_:-]{0,63}$/.test(v.tab) ? v.tab : DEFAULTS.sidePanel.tab
+    tab: typeof v.tab === 'string' && /^[a-zA-Z][a-zA-Z0-9_:-]{0,63}$/.test(v.tab) ? v.tab : DEFAULTS.sidePanel.tab
   }
 }
 

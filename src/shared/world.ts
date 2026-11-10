@@ -100,6 +100,7 @@ export interface WorldMeta {
   player: string | null
   rules: string
   tags: string[]
+  flags?: Record<string, string | number | boolean>
   updatedAt: number
 }
 

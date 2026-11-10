@@ -1,4 +1,4 @@
-import { UserPlus } from 'lucide-react'
+import { Plus, UserPlus } from 'lucide-react'
 import { placePath, type PlaceVisitor } from '@shared/maps'
 import { PLACE_TYPE, PLACE_TYPE_KEY, type WorldChanges, type WorldEntity } from '@shared/world'
 import { ActionBar, Eyebrow, Popover, SaveState, openMenu, useDraft, type MenuItem } from '../ui'
@@ -15,7 +15,6 @@ import { ChangedBy } from '../agents/ChangedBy'
 import { engine } from '../../lib/ipc'
 import { placeName } from './placeShapes'
 import { characterItems, setWhere } from './placeActions'
-import { bringHere } from '../play/bringHere'
 
 interface Props {
   world: string
@@ -65,13 +64,32 @@ export function PlaceCard({ world, placeKey, places, changes, here, actions, onS
             <Eyebrow>Who is here</Eyebrow>
             <span className="flex-1" />
             <Popover trigger={<UserPlus className="h-3.5 w-3.5 text-accent" />} title="Put a character here">
-              {(close) => <EntryPicker kind="sheet" title="Put a character here" inline onClose={close} onPick={(hit) => void bringHere(world, hit.id).then((ok) => (ok ? setWhere(hit.id, placeKey) : undefined)).then(close, failed('Could not move them'))} />}
+              {(close) => <EntryPicker kind="sheet" title="Put a character here" inline onClose={close} onPick={(hit) => void setWhere(hit.id, placeKey).then(close, failed('Could not move them'))} />}
             </Popover>
           </div>
-          {here.length ? here.map((v) => <CharacterRow key={v.sheet} visitor={v} onRemove={() => void setWhere(v.sheet, null).catch(failed('Could not remove them'))} onMenu={(e) => openMenu(e, v.name, characterItems(v, places, placeKey))} />) : <span className="text-[12px] text-faint">Nobody in this save is here.</span>}
+          {here.length ? here.map((v) => <CharacterRow key={v.sheet} visitor={v} onRemove={() => void setWhere(v.sheet, null).catch(failed('Could not remove them'))} onMenu={(e) => openMenu(e, v.name, characterItems(v, places, placeKey))} />) : <span className="text-[12px] text-faint">Nobody is stationed here.</span>}
         </div>
         <div className="flex flex-col gap-1.5">
-          <Eyebrow>Files</Eyebrow>
+          <div className="flex items-center gap-2">
+            <Eyebrow>Files &amp; Pages</Eyebrow>
+            <span className="flex-1" />
+            <Popover trigger={<Plus className="h-3.5 w-3.5 text-accent" />} title="Link page, sheet, or document">
+              {(close) => (
+                <EntryPicker
+                  kind={null}
+                  title="Link page, sheet, or document"
+                  inline
+                  onClose={close}
+                  onPick={(hit) => {
+                    const ref = `@${hit.kind}:${hit.id}`
+                    const next = draft.Files ? `${draft.Files} ${ref}` : ref
+                    change({ ...draft, Files: next })
+                    close()
+                  }}
+                />
+              )}
+            </Popover>
+          </div>
           <MarkdownEditor compact value={draft.Files} placeholder="@page:the_den @sheet:mara" onValue={(Files) => change({ ...draft, Files })} />
         </div>
         <LinkFaceList text={draft.Files} />

@@ -1,7 +1,8 @@
 import { PlayList } from '../PlayList'
 import type { PlayHolder } from '../playHolder'
 import { worldWhere } from '../playStore'
-import { registerTriggerUi, type TriggerPanelProps } from './registry'
+import { ObjectPlayManager } from '../../maps/ObjectPlayManager'
+import { registerTriggerUi, type TriggerPanelProps, type TriggerEditorProps } from './registry'
 
 function PlayPanel({ trigger, ctx }: TriggerPanelProps) {
   const text = (key: string) => String(trigger.values[key] ?? '')
@@ -19,4 +20,18 @@ function PlayPanel({ trigger, ctx }: TriggerPanelProps) {
   )
 }
 
-registerTriggerUi('play', { Panel: PlayPanel })
+function PlayEditor({ trigger, world, onValues }: TriggerEditorProps) {
+  const actionsText = String(trigger.values.actions ?? '')
+  const decisionsText = String(trigger.values.decisions ?? '')
+  return (
+    <ObjectPlayManager
+      actionsText={actionsText}
+      decisionsText={decisionsText}
+      onChangeActions={(next) => onValues({ ...trigger.values, actions: next })}
+      onChangeDecisions={(next) => onValues({ ...trigger.values, decisions: next })}
+      world={world}
+    />
+  )
+}
+
+registerTriggerUi('play', { Panel: PlayPanel, Editor: PlayEditor })

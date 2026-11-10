@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownAZ, ArrowDownWideNarrow, ArrowUpNarrowWide, Clock, Cloud, Copy, Cpu, Download, FilePlus, FolderOpen, Folders, Layers, PlugZap, Power, RotateCcw, Search, Star, Trash2 } from 'lucide-react'
-import type { ChatTemplate, ServerInfo, ServerInstallProgress, ModelConfig, ModelEntry, ModelKind, ModelTraitSet, ParamDef, ParamSection, RemoteApi, ThinkingLevel } from '@shared/types'
-import { fileList, fileListText, modelTraitSet, paramBlock } from '@shared/modelParams'
+import { ArrowDownAZ, ArrowDownWideNarrow, ArrowUpNarrowWide, Clock, Cloud, Copy, Cpu, Download, FilePlus, FolderOpen, Folders, Layers, PlugZap, Power, Search, Star, Trash2 } from 'lucide-react'
+import type { ModelEntry, ModelKind, RemoteApi } from '@shared/types'
+import { modelTraitSet } from '@shared/modelParams'
 import { useProjector } from '../components/models/useProjector'
 import { MODEL_KINDS, type HubModel } from '@shared/types'
 import { DownloadsCard } from '../components/models/DownloadsCard'
@@ -11,15 +11,18 @@ import { MTP_NOTE, modelTraits } from '../components/models/ModelTraits'
 import { modelFacets } from '../components/models/modelFacets'
 import { applyFacets, useFacetValues } from '../lib/facets'
 import { useViewPlace } from '../lib/viewPlace'
-import { applyModelArgs, modelArgsText } from '@shared/modelArgs'
-import { thinkingLabel } from '../lib/thinking'
-import { BackBar, Button, Eyebrow, Fact, FactGrid, FacetBar, FileField, FileListField, Input, KindShell, Modal, NumberField, Panel, SegmentBar, SaveState, Select, SettingRow, SliderNumber, StatusBadge, ShellTabs, Textarea, Toggle, ViewHeader, openMenu, useAutosavedState, type ShellItem, type ShellSort } from '../components/ui'
+import { BackBar, Button, Fact, FactGrid, FacetBar, Input, KindShell, Modal, NumberField, Panel, SegmentBar, SaveState, Select, SettingCard, SettingRow, StatusBadge, ShellTabs, TraitChips, ViewHeader, openMenu, useAutosavedState, type ShellItem, type ShellSort } from '../components/ui'
 import { isRunnable, modelBytes, useModels } from '../store/models'
-import { engine, main, on } from '../lib/ipc'
+import { engine, main } from '../lib/ipc'
 import { errorText, formatBytes } from '../lib/format'
 import { toast } from '../store/toasts'
-import { cn } from '../lib/cn'
 import { ModelFolders } from './ModelFolders'
+import { ModelSettings } from '../components/models/settings/ModelSettings'
+import { RemoteParams } from '../components/models/settings/RemoteParams'
+import { TemplateField } from '../components/models/settings/TemplateField'
+import { ProjectorField } from '../components/models/settings/ProjectorField'
+import { ArgsBox } from '../components/models/settings/ArgsBox'
+import { useModelConfig, type ModelConfigState } from '../components/models/settings/useModelConfig'
 import { failed, copyText } from '../lib/notify'
 import { useBusy } from '../lib/useBusy'
 
@@ -30,163 +33,6 @@ function dirOf(file: string): string {
   return file.replace(/[\\/][^\\/]*$/, '')
 }
 
-const SECTIONS: { id: ParamSection; label: string; open: boolean }[] = [
-  { id: 'memory', label: 'Memory and GPU', open: true },
-  { id: 'context', label: 'Context', open: true },
-  { id: 'speed', label: 'Speed', open: true },
-  { id: 'thinking', label: 'Thinking', open: true },
-  { id: 'sampling', label: 'Sampling', open: true },
-  { id: 'repetition', label: 'Repetition', open: false },
-  { id: 'vision', label: 'Vision', open: true },
-  { id: 'files', label: 'Add-on files', open: false },
-  { id: 'advanced', label: 'Advanced', open: false }
-]
-
-const REMOTE_KEYS = new Set(['contextSize', 'temperature', 'topP', 'maxTokens', 'thinking', 'thinkingLow', 'thinkingMedium', 'thinkingHigh'])
-
-function optionLabel(def: ParamDef, o: string): string {
-  return def.key === 'thinking' ? thinkingLabel(o as ThinkingLevel) : o
-}
-
-function ParamInput({ def, value, onChange }: { def: ParamDef; value: number | boolean | string; onChange: (v: number | boolean | string) => void }) {
-  if (def.type === 'bool') return <Toggle checked={value === true} onChange={onChange} label={value ? 'On' : 'Off'} />
-  if (def.type === 'select') return <Select value={String(value)} options={(def.options ?? []).map((o) => ({ value: o, label: optionLabel(def, o) }))} onChange={onChange} className="h-7 w-36 text-[12px]" />
-  if (def.type === 'text') return <Input value={String(value)} onChange={(e) => onChange(e.target.value)} className="h-7 w-72 font-mono text-[12px]" />
-  if (def.type === 'file') return <FileField value={String(value)} onChange={onChange} filters={def.files ? [def.files] : []} />
-  if (def.type === 'files') return <FileListField items={fileList(value)} onChange={(items) => onChange(fileListText(items))} filters={def.files ? [def.files] : []} />
-  const min = def.min ?? 0
-  const max = def.max ?? 100
-  const step = def.step ?? 1
-  if ((max - min) / step <= 4000) return <SliderNumber value={Number(value)} min={min} max={max} step={step} onChange={onChange} />
-  return <NumberField value={value as number} onChange={(v) => v !== undefined && onChange(v)} min={def.min} max={def.max} step={def.step} className="h-7 w-32 text-[12px]" />
-}
-
-function ArgsBox({ config, params, onChange }: { config: ModelConfig; params: ParamDef[]; onChange: (c: ModelConfig) => void }) {
-  const current = modelArgsText(config, params)
-  const [text, setText] = useState(current)
-  const [editing, setEditing] = useState(false)
-  const [unknown, setUnknown] = useState<string[]>([])
-  useEffect(() => {
-    if (!editing) setText(current)
-  }, [current, editing])
-  const apply = () => {
-    setEditing(false)
-    const result = applyModelArgs(config, text, params)
-    setUnknown(result.unknown)
-    onChange(result.config)
-  }
-  return (
-    <SettingRow wide label="llama.cpp options" hint="The settings below as llama.cpp command-line flags, e.g. -ngl 99 -c 16384 -fa on --temp 0.6. Paste a line from a model card and press Enter: the flags Seven can use fill in the settings below, flags it can't are listed underneath. Removing a flag puts that setting back to its default.">
-      <div className="flex w-full flex-col gap-1">
-        <Input
-          value={text}
-          onFocus={() => setEditing(true)}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={apply}
-          onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
-          placeholder="-ngl 99 -c 16384 -fa on --temp 0.6"
-          spellCheck={false}
-          className="h-8 font-mono text-[12px]"
-        />
-        {unknown.length > 0 && <span className="font-mono text-[11px] text-alert">Not supported here: {unknown.join('  ')}</span>}
-      </div>
-    </SettingRow>
-  )
-}
-
-function ParamsSection({ modelId, remote = false, traits = {} }: { modelId: string; remote?: boolean; traits?: ModelTraitSet }) {
-  const { params, getConfig, setConfig, resetConfig, host, load } = useModels()
-  const byKey = useMemo(() => new Map(params.map((p) => [p.key, p])), [params])
-  const [reloadRequired, setReloadRequired] = useState(false)
-  const autosave = useAutosavedState<ModelConfig | null>(
-    null,
-    async (c) => {
-      const result = await setConfig(modelId, c!)
-      if (result.reloadRequired) setReloadRequired(true)
-    },
-    { when: (c) => c !== null }
-  )
-  const config = autosave.value
-  const setConfigState = autosave.reset
-
-  useEffect(() => {
-    let cancelled = false
-    setReloadRequired(false)
-    getConfig(modelId)
-      .then((c) => !cancelled && setConfigState(c))
-      .catch(failed('Could not read settings'))
-    return () => {
-      cancelled = true
-    }
-  }, [modelId, getConfig])
-
-  if (!config) return null
-
-  const reset = async () => {
-    await autosave.flush()
-    const result = await resetConfig(modelId)
-    setConfigState(result.config)
-    setReloadRequired(result.reloadRequired)
-  }
-
-  const reload = async () => {
-    try {
-      await useModels.getState().unload()
-      await load(modelId)
-      setReloadRequired(false)
-    } catch (err) {
-      toast.error('Reload failed', errorText(err))
-    }
-  }
-
-  const shown = params.filter((p) => !remote || REMOTE_KEYS.has(p.key))
-  const hint = (def: ParamDef) => (remote && def.key === 'contextSize' ? "The model's context window in tokens, from the provider. Seven uses it to measure the chat and decide when to summarise." : def.hint)
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 border-b border-line/50 pb-1.5">
-        <Eyebrow className="flex-1">Settings</Eyebrow>
-        <Button size="sm" variant="ghost" icon={<RotateCcw />} onClick={() => void reset()}>
-          Reset all
-        </Button>
-        <SaveState status={autosave.status} error={autosave.error} />
-      </div>
-      {reloadRequired && host.modelId === modelId && (
-        <div className="flex items-center gap-3 border border-line border-l-2 border-l-accent bg-accent/5 px-3 py-2 text-[12.5px] text-white">
-          <span className="flex-1">Load settings changed. Reload the model to apply them.</span>
-          <Button size="sm" variant="badge" onClick={() => void reload()}>
-            Reload
-          </Button>
-        </div>
-      )}
-      {!remote && <ArgsBox config={config} params={params} onChange={(c) => autosave.set(c)} />}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(27rem,1fr))] items-start gap-3">
-        {SECTIONS.map((section) => {
-          const defs = shown.filter((p) => p.section === section.id)
-          if (!defs.length) return null
-          return (
-            <Panel key={section.id} title={section.label} collapsible defaultOpen={section.open} bodyClassName="flex flex-col px-3 py-1">
-              {defs.map((def) => {
-                const reason = remote ? null : paramBlock(def, config, traits, byKey)
-                const wide = def.type === 'files'
-                return (
-                  <SettingRow key={def.key} label={def.label} hint={hint(def)} wide={wide}>
-                    <div className={cn('flex flex-col gap-0.5', wide ? 'w-full' : 'items-end')}>
-                      <div aria-disabled={reason ? true : undefined} className={cn(wide && 'w-full', reason && 'pointer-events-none opacity-40')}>
-                        <ParamInput def={def} value={config[def.key] ?? def.default} onChange={(v) => autosave.set((c) => ({ ...c!, [def.key]: v }))} />
-                      </div>
-                      {reason && <span className="text-right text-[11px] text-faint">{reason}</span>}
-                    </div>
-                  </SettingRow>
-                )
-              })}
-            </Panel>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 function useActions() {
   const { host, load, unload, remove, setFavourite } = useModels()
@@ -207,107 +53,6 @@ function useActions() {
   const drop = (m: ModelEntry) => void remove(m.id).catch(failed('Remove failed'))
   const star = (m: ModelEntry) => void setFavourite(m.id, !m.favourite)
   return { toggle, useForSearch, showFolder, copyPath, drop, star }
-}
-
-function ServerControl() {
-  const status = useModels((s) => s.host.status)
-  const [info, setInfo] = useState<ServerInfo | null>(null)
-  const [latest, setLatest] = useState<string | null>(null)
-  const [getting, setGetting] = useState<ServerInstallProgress | null>(null)
-  useEffect(() => on('server.install', setGetting), [])
-  useEffect(() => {
-    void engine('models.server.get')
-      .then(setInfo)
-      .catch(() => undefined)
-  }, [status])
-  useEffect(() => {
-    void engine('models.server.release')
-      .then((r) => setLatest(r.latest))
-      .catch(() => setLatest(null))
-  }, [info?.installed])
-  if (!info) return null
-  const install = async () => {
-    setGetting({ stage: 'download', received: 0, total: 0, tag: latest ?? '' })
-    try {
-      setInfo(await engine('models.server.install'))
-      toast.success('llama-server installed', 'Load your model again.')
-    } catch (err) {
-      toast.error('Could not install llama-server', errorText(err))
-    } finally {
-      setGetting(null)
-    }
-  }
-  if (getting)
-    return (
-      <span className="flex w-40 flex-col gap-1">
-        <SegmentBar value={getting.total ? getting.received / getting.total : null} />
-        <span className="font-mono text-[11px] text-dim">{getting.stage === 'extract' ? 'Unpacking…' : getting.stage === 'done' ? 'Done' : getting.total ? `Downloading ${Math.round(getting.received / 1e6)} of ${Math.round(getting.total / 1e6)} MB` : 'Finding the build…'}</span>
-      </span>
-    )
-  if (!info.installed)
-    return (
-      <Button variant="primary" disabled={status === 'loading'} onClick={() => void install()}>
-        Install llama-server
-      </Button>
-    )
-  if (latest && latest !== info.installed)
-    return (
-      <Button variant="secondary" disabled={status === 'loading'} onClick={() => void install()}>
-        Update llama-server to {latest}
-      </Button>
-    )
-  return <span className="font-mono text-[11px] text-dim">llama-server {info.installed}</span>
-}
-
-function ProjectorField({ projector }: { projector: ReturnType<typeof useProjector> }) {
-  const { state } = projector
-  if (!state) return null
-  const options = [{ value: '', label: 'None' }, ...state.options.map((p) => ({ value: p.id, label: p.name }))]
-  const pick = (v: string) => projector.pick(v || null)
-  return (
-    <SettingRow label="Vision adapter" hint={`The mmproj file that lets this model see images. llama-server only; it reloads the model on the next message.${state.auto ? ' Picked from the same folder as the model.' : ''}`}>
-      <Select value={state.choice ?? ''} options={options} onChange={pick} className="h-7 w-72 text-[12px]" />
-    </SettingRow>
-  )
-}
-
-function TemplateField({ model }: { model: ModelEntry }) {
-  const [choice, setChoice] = useState<ChatTemplate | null>(null)
-  const template = useAutosavedState('', (t) => engine('models.template.set', { id: model.id, choice: { type: 'jinja', template: t } }).then(setChoice), { when: (t) => Boolean(t.trim()) })
-  const setText = template.reset
-  useEffect(() => {
-    void engine('models.template.get', { id: model.id })
-      .then((r) => {
-        setChoice(r)
-        setText(r.type === 'jinja' ? r.template : '')
-      })
-      .catch(() => undefined)
-  }, [model.id])
-  if (!choice) return null
-  const options = [
-    { value: 'auto', label: 'From the model file' },
-    { value: 'jinja', label: 'Custom Jinja template' }
-  ]
-  const pick = (v: string) => {
-    if (v === 'jinja') setChoice({ type: 'jinja', template: template.value })
-    else
-      void engine('models.template.set', { id: model.id, choice: { type: 'auto' } })
-        .then(setChoice)
-        .catch(failed('Could not change the template'))
-  }
-  return (
-    <>
-      <SettingRow label="Chat template" hint="How chats are formatted for this model. Paste your own when the template in the file is broken. Reloads the model on the next message.">
-        <Select value={choice.type} options={options} onChange={pick} className="h-7 w-72 text-[12px]" />
-      </SettingRow>
-      {choice.type === 'jinja' && (
-        <div className="flex flex-col gap-2">
-          <Textarea mono rows={10} value={template.value} onChange={(e) => template.set(e.target.value)} placeholder="Paste a Jinja chat template" />
-          <SaveState status={template.status} error={template.error} />
-        </div>
-      )}
-    </>
-  )
 }
 
 const API_OPTIONS: { value: RemoteApi; label: string }[] = [
@@ -438,8 +183,97 @@ function RemoteDetail({ model }: { model: ModelEntry }) {
         keySaved={spec.hasKey}
         onChange={autosave.set}
       />
-      <ParamsSection modelId={model.id} remote />
+      <RemoteParams modelId={model.id} />
     </Panel>
+  )
+}
+
+function ModelFacts({ model }: { model: ModelEntry }) {
+  const info = model.info
+  return (
+    <SettingCard title="Model">
+      <div className="p-3.5">
+          <FactGrid>
+            <Fact label="Type">
+              {info ? (
+                <Select
+                  value={info.kind}
+                  options={(Object.keys(MODEL_KINDS) as ModelKind[]).filter((k) => MODEL_KINDS[k].listed).map((k) => ({ value: k, label: MODEL_KINDS[k].label }))}
+                  onChange={(v) =>
+                    void engine('models.kind', { id: model.id, kind: v as ModelKind })
+                      .then((next) => useModels.setState({ list: next }))
+                      .catch(failed('Could not change the type'))
+                  }
+                  className="h-7 text-[12.5px]"
+                />
+              ) : info === null ? (
+                'Unreadable'
+              ) : (
+                '…'
+              )}
+            </Fact>
+            <Fact label="Architecture">{info?.architecture ?? '—'}</Fact>
+            <Fact label="Parameters">{info?.sizeLabel ?? '—'}</Fact>
+            <Fact label="Quant">{model.quant ?? '—'}</Fact>
+            <Fact label="File size">{formatBytes(model.sizeBytes)}</Fact>
+            <Fact label="Trained context">{info?.contextLength ? info.contextLength.toLocaleString() : '—'}</Fact>
+            <Fact label="Layers">{info?.layers ?? '—'}</Fact>
+            <Fact label="Embedding size">{info?.embeddingLength ?? '—'}</Fact>
+            <Fact label="Chat template">{info ? (info.chatTemplate ? 'Yes' : 'No') : '—'}</Fact>
+            {info?.experts && <Fact label="Experts">{`${info.experts.count}${info.experts.used ? `, ${info.experts.used} used per token` : ''}`}</Fact>}
+            {info?.mtpLayers && <Fact label="MTP layers" wide>{`${info.mtpLayers}. ${MTP_NOTE}`}</Fact>}
+            {info && MODEL_KINDS[info.kind].runnable && (
+              <Fact label="Importance matrix">{info.imatrix ? ['Used when quantized', info.imatrix.dataset, info.imatrix.chunks ? `${info.imatrix.chunks} chunks` : null].filter(Boolean).join(' · ') : 'Not used'}</Fact>
+            )}
+            {info?.author && <Fact label="Author">{info.author}</Fact>}
+            {info?.license && <Fact label="License">{info.license}</Fact>}
+            <Fact label="Last used">{model.lastUsedAt ? new Date(model.lastUsedAt).toLocaleString() : 'Never'}</Fact>
+            {info?.name && info.name !== model.name && <Fact label="Name inside the file" wide>{info.name}</Fact>}
+            <Fact label="Path" wide>
+              {model.path}
+            </Fact>
+          </FactGrid>
+      </div>
+    </SettingCard>
+  )
+}
+
+function ModelOverview({ model, state }: { model: ModelEntry; state: ModelConfigState }) {
+  const params = useModels((s) => s.params)
+  return (
+    <>
+      <ModelFacts model={model} />
+      <SettingCard title="Chat format">
+        <TemplateField model={model} />
+      </SettingCard>
+      {state.config && (
+        <SettingCard title="Command line">
+          <ArgsBox config={state.config} params={params} onChange={state.replace} />
+        </SettingCard>
+      )}
+    </>
+  )
+}
+
+function ReloadBar({ model }: { model: ModelEntry }) {
+  const host = useModels((s) => s.host)
+  const { unload, load } = useModels()
+  if (!host.restartNeeded || host.modelId !== model.id) return null
+  const reload = async () => {
+    try {
+      await unload()
+      await load(model.id)
+    } catch (err) {
+      toast.error('Reload failed', errorText(err))
+    }
+  }
+  return (
+    <div className="flex items-center gap-3 border border-line border-l-2 border-l-accent bg-accent/5 px-3 py-2 text-[12.5px] text-white">
+      <span className="flex-1">Settings changed since this model was loaded. Reload it to apply them.</span>
+      <Button size="sm" variant="badge" onClick={() => void reload()}>
+        Reload
+      </Button>
+    </div>
   )
 }
 
@@ -454,101 +288,62 @@ function ModelDetail({ model }: { model: ModelEntry }) {
   }, [model.id])
   const info = model.info
   const projector = useProjector(model.id)
+  const config = useModelConfig(model.id)
   const isLoaded = host.modelId === model.id && host.status === 'ready'
   const isLoading = host.modelId === model.id && host.status === 'loading'
   const embedding = info?.kind === 'embedding'
+  const chats = !embedding && info?.kind !== 'projector'
   return (
-    <Panel className="min-w-0 flex-1" bodyClassName="flex flex-col gap-5 overflow-y-auto p-4 [&>*]:shrink-0">
-      <div className="flex items-start gap-3">
-        <h2 className="min-w-0 flex-1 break-all font-mono text-[15px] font-bold leading-snug text-white">{model.name}</h2>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line/50 pb-2.5">
+        <h2 className="mr-2 min-w-0 break-all font-mono text-[15px] font-bold leading-snug text-white">{model.name}</h2>
         <button
           title={model.favourite ? 'Remove from favourites' : 'Favourite: keep at the top of model lists'}
           onClick={() => actions.star(model)}
           className={model.favourite ? 'text-accent' : 'text-faint hover:text-accent'}
         >
-          <Star className="h-5 w-5" fill={model.favourite ? 'currentColor' : 'none'} />
+          <Star className="h-4 w-4" fill={model.favourite ? 'currentColor' : 'none'} />
         </button>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {embedding ? (
-          <Button variant={searchModel === model.id ? 'secondary' : 'primary'} icon={<Search />} disabled={searchModel === model.id} onClick={() => (actions.useForSearch(model), setSearchModel(model.id))}>
-            {searchModel === model.id ? 'Used for memory search' : 'Use for memory search'}
-          </Button>
-        ) : isRunnable(model) ? (
-          <Button variant={isLoaded ? 'secondary' : 'primary'} icon={<Power />} disabled={host.status === 'loading'} onClick={() => void actions.toggle(model)}>
-            {isLoaded ? 'Unload' : 'Load'}
-          </Button>
-        ) : (
-          info && <span className="text-[12.5px] text-dim">{MODEL_KINDS[info.kind].note}</span>
-        )}
-        {isLoaded && <StatusBadge tone="ok">Loaded</StatusBadge>}
-        {isLoading && (
-          <>
-            <StatusBadge tone="busy">Loading</StatusBadge>
-            <SegmentBar value={null} className="w-40" />
-          </>
-        )}
-        <Button variant="ghost" icon={<FolderOpen />} onClick={() => actions.showFolder(model)}>
-          Show folder
-        </Button>
-        {model.folder === null && (
-          <Button variant="ghost" icon={<Trash2 />} onClick={() => actions.drop(model)}>
-            Remove
-          </Button>
-        )}
-      </div>
-      <FactGrid>
-        <Fact label="Type">
-          {info ? (
-            <Select
-              value={info.kind}
-              options={(Object.keys(MODEL_KINDS) as ModelKind[]).filter((k) => MODEL_KINDS[k].listed).map((k) => ({ value: k, label: MODEL_KINDS[k].label }))}
-              onChange={(v) =>
-                void engine('models.kind', { id: model.id, kind: v as ModelKind })
-                  .then((next) => useModels.setState({ list: next }))
-                  .catch(failed('Could not change the type'))
-              }
-              className="h-7 text-[12.5px]"
-            />
-          ) : info === null ? (
-            'Unreadable'
-          ) : (
-            '…'
+        <TraitChips traits={modelTraits(info, modelBytes(model))} />
+        <span className="ml-auto flex flex-wrap items-center gap-2">
+          {isLoaded && <StatusBadge tone="ok">Loaded</StatusBadge>}
+          {isLoading && (
+            <>
+              <StatusBadge tone="busy">Loading</StatusBadge>
+              <SegmentBar value={null} className="w-32" />
+            </>
           )}
-        </Fact>
-        <Fact label="Architecture">{info?.architecture ?? '—'}</Fact>
-        <Fact label="Parameters">{info?.sizeLabel ?? '—'}</Fact>
-        <Fact label="Quant">{model.quant ?? '—'}</Fact>
-        <Fact label="File size">{formatBytes(model.sizeBytes)}</Fact>
-        <Fact label="Trained context">{info?.contextLength ? info.contextLength.toLocaleString() : '—'}</Fact>
-        <Fact label="Layers">{info?.layers ?? '—'}</Fact>
-        <Fact label="Embedding size">{info?.embeddingLength ?? '—'}</Fact>
-        <Fact label="Chat template">{info ? (info.chatTemplate ? 'Yes' : 'No') : '—'}</Fact>
-        {info?.experts && <Fact label="Experts">{`${info.experts.count}${info.experts.used ? `, ${info.experts.used} used per token` : ''}`}</Fact>}
-        {info?.mtpLayers && <Fact label="MTP layers" wide>{`${info.mtpLayers}. ${MTP_NOTE}`}</Fact>}
-        {info && MODEL_KINDS[info.kind].runnable && (
-          <Fact label="Importance matrix">{info.imatrix ? ['Used when quantized', info.imatrix.dataset, info.imatrix.chunks ? `${info.imatrix.chunks} chunks` : null].filter(Boolean).join(' · ') : 'Not used'}</Fact>
-        )}
-        {info?.author && <Fact label="Author">{info.author}</Fact>}
-        {info?.license && <Fact label="License">{info.license}</Fact>}
-        <Fact label="Last used">{model.lastUsedAt ? new Date(model.lastUsedAt).toLocaleString() : 'Never'}</Fact>
-        {info?.name && info.name !== model.name && <Fact label="Name inside the file" wide>{info.name}</Fact>}
-        <Fact label="Path" wide>
-          {model.path}
-        </Fact>
-      </FactGrid>
-      {!embedding && info?.kind !== 'projector' && (
-        <Panel title="Chat format" bodyClassName="flex flex-col px-3 py-1">
-          <TemplateField model={model} />
-          <ProjectorField projector={projector} />
-        </Panel>
-      )}
-      {embedding ? (
-        <div className="text-[12.5px] text-dim">Embedding models aren't chatted with. Seven loads this one on the CPU when agents search their memory.</div>
+          {embedding ? (
+            <Button size="sm" variant={searchModel === model.id ? 'secondary' : 'primary'} icon={<Search />} disabled={searchModel === model.id} onClick={() => (actions.useForSearch(model), setSearchModel(model.id))}>
+              {searchModel === model.id ? 'Used for memory search' : 'Use for memory search'}
+            </Button>
+          ) : isRunnable(model) ? (
+            <Button size="sm" variant={isLoaded ? 'secondary' : 'primary'} icon={<Power />} disabled={host.status === 'loading'} onClick={() => void actions.toggle(model)}>
+              {isLoaded ? 'Unload' : 'Load'}
+            </Button>
+          ) : (
+            info && <span className="text-[12.5px] text-dim">{MODEL_KINDS[info.kind].note}</span>
+          )}
+          <Button size="sm" variant="ghost" icon={<FolderOpen />} onClick={() => actions.showFolder(model)}>
+            Show folder
+          </Button>
+          {model.folder === null && (
+            <Button size="sm" variant="ghost" icon={<Trash2 />} onClick={() => actions.drop(model)}>
+              Remove
+            </Button>
+          )}
+        </span>
+      </div>
+      <ReloadBar model={model} />
+      {chats ? (
+        <ModelSettings modelId={model.id} state={config} traits={modelTraitSet(info, projector.state ? projector.state.choice !== null : null)} overview={<ModelOverview model={model} state={config} />} leads={[{ section: 'vision', node: <ProjectorField projector={projector} /> }]} />
       ) : (
-        <ParamsSection modelId={model.id} traits={modelTraitSet(info, projector.state ? projector.state.choice !== null : null)} />
+        <div className="flex min-h-0 max-w-4xl flex-col gap-3 overflow-y-auto">
+          <ModelFacts model={model} />
+          {embedding && <div className="text-[12.5px] text-dim">Embedding models aren't chatted with. Seven loads this one on the CPU when agents search their memory.</div>}
+        </div>
       )}
-    </Panel>
+    </div>
   )
 }
 
@@ -673,7 +468,6 @@ export function ModelsView() {
         subtitle="GGUF models Seven can run on this machine."
         actions={
           <>
-            <ServerControl />
             <Button variant={folders ? 'secondary' : 'ghost'} icon={<Folders />} onClick={() => setFolders(!folders)}>
               Folders
             </Button>

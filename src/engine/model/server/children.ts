@@ -2,14 +2,20 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { removePath, writeUserFile } from '../../util/fs'
-import { serverRoot } from './install'
+import { machineRoot } from '../../install/paths'
+import { helperOf } from '../../install/registry'
+import { LLAMA_SERVER, LLAMA_SERVER_PROGRAM } from '../../install/helpers/llamaServer'
 
-const IMAGE = 'llama-server.exe'
+const IMAGE = LLAMA_SERVER_PROGRAM
 const live = new Set<number>()
 let report: (pids: number[]) => void = () => undefined
 
 function file(): string {
-  return path.join(serverRoot(), 'running.json')
+  return path.join(machineRoot(), `${LLAMA_SERVER}-running.json`)
+}
+
+function legacyFile(): string {
+  return path.join(helperOf(LLAMA_SERVER).defaultRoot(), 'running.json')
 }
 
 function save(): void {
@@ -47,16 +53,21 @@ export async function endIfServer(pid: number): Promise<boolean> {
   return true
 }
 
+function recorded(at: string): number[] {
+  try {
+    const pids = JSON.parse(fs.readFileSync(at, 'utf8')) as unknown
+    return Array.isArray(pids) ? pids.filter((p): p is number => typeof p === 'number') : []
+  } catch {
+    return []
+  }
+}
+
 export async function endLeftovers(): Promise<number> {
   if (process.platform !== 'win32') return 0
-  let pids: unknown
-  try {
-    pids = JSON.parse(fs.readFileSync(file(), 'utf8'))
-  } catch {
-    return 0
-  }
   let ended = 0
-  for (const pid of Array.isArray(pids) ? pids : []) if (typeof pid === 'number' && !live.has(pid) && (await endIfServer(pid))) ended += 1
-  if (!live.size) removePath(file())
+  for (const at of [file(), legacyFile()]) {
+    for (const pid of recorded(at)) if (!live.has(pid) && (await endIfServer(pid))) ended += 1
+    if (at !== file() || !live.size) removePath(at)
+  }
   return ended
 }

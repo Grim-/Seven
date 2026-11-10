@@ -1,9 +1,7 @@
 import type { ParamSchema } from '@shared/game/core/params'
 import { Field, FieldGrid } from '../ui'
 import { cn } from '../../lib/cn'
-import { paramEditor, paramWide } from './params'
-
-const words = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
+import { paramEditor, paramLabel, paramWide } from './params'
 
 export function ParamFields({ schema, values, onChange, dense = false }: { schema: ParamSchema; values: Record<string, unknown>; onChange: (next: Record<string, unknown>) => void; dense?: boolean }) {
   return (
@@ -11,7 +9,7 @@ export function ParamFields({ schema, values, onChange, dense = false }: { schem
       {Object.entries(schema).map(([key, spec]) => {
         const editor = paramEditor(spec.kind)
         return (
-          <Field key={key} label={spec.label ?? words(key)} hint={dense ? undefined : spec.description} tip={dense ? spec.description : undefined} group className={cn(paramWide(editor, spec) && 'col-span-full')}>
+          <Field key={key} label={paramLabel(key, spec)} hint={dense ? undefined : spec.description} tip={dense ? spec.description : undefined} group className={cn(paramWide(editor, spec) && 'col-span-full')}>
             {editor ? <editor.Editor spec={spec} value={values[key]} onChange={(v) => onChange({ ...values, [key]: v })} /> : <span className="text-[12px] text-faint">This can't be edited here yet.</span>}
           </Field>
         )

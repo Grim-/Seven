@@ -225,10 +225,6 @@ export class Gateway extends EventEmitter {
     return this.models.list().filter((m) => !this.models.isRemote(m.id) && m.info && MODEL_KINDS[m.info.kind].chats)
   }
 
-  private async busy(): Promise<boolean> {
-    return this.seven.busy() || this.inflight > 0 || (await this.host.processing())
-  }
-
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const address = plain(req.socket.remoteAddress ?? '')
     const client = this.client(address)
@@ -270,18 +266,19 @@ export class Gateway extends EventEmitter {
     const list = this.servable()
     const entry = list.find((m) => m.name === asked) ?? list.find((m) => m.id === asked) ?? (this.host.loadedId ? list.find((m) => m.id === this.host.loadedId) : undefined)
     if (!entry) return send(res, 404, asked ? `No model called ${asked}.` : 'Say which model to use.')
-    if (this.host.loadedId !== entry.id) {
-      if (await this.busy()) return send(res, 503, 'Seven is busy writing with another model. Try again when it is idle.')
-      this.models.assertRunnable(entry.id)
-      await this.host.load(entry, this.models.getConfig(entry.id))
-    }
-    client.model = entry.name
-    const target = this.host.serverTarget()
-    const abort = new AbortController()
-    res.on('close', () => abort.abort())
     this.inflight++
     this.changed()
     try {
+      if (this.host.loadedId !== entry.id) {
+        if (this.seven.busy() || this.inflight > 1 || (await this.host.processing())) return send(res, 503, 'Seven is busy writing with another model. Try again when it is idle.')
+        this.models.assertRunnable(entry.id)
+        await this.host.load(entry, this.models.getConfig(entry.id))
+      }
+      if (this.host.loadedId !== entry.id) return send(res, 503, 'Seven switched to another model. Try again.')
+      client.model = entry.name
+      const target = this.host.serverTarget()
+      const abort = new AbortController()
+      res.on('close', () => abort.abort())
       const upstream = await fetch(`${String(target.spec.baseUrl).replace(/\/v1$/, '')}${route}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${target.key}` },

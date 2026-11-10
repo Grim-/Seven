@@ -1,14 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
-import { Readable, Transform } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
 import type { DownloadItem } from '@shared/types'
 import { isVaultLocked } from '@shared/sealed'
 import { dataRoot } from '../util/paths'
 import { newId, readJson, writeJson } from '../util/fs'
 import { hubTokens } from './hub'
 import { hubUrl } from './gguf/read'
+import { fetchResumable, partOf, sizeOn } from '../net/resumable'
 
 const FILE = path.join(dataRoot, 'downloads.json')
 const ACTIVE: DownloadItem['state'][] = ['queued', 'downloading']
@@ -33,14 +32,6 @@ async function remoteSize(url: string, signal: AbortSignal): Promise<number> {
   const size = Number(res.headers.get('x-linked-size') ?? res.headers.get('content-length'))
   if (!Number.isFinite(size) || size <= 0) throw new Error(`Hugging Face did not say how big ${path.posix.basename(new URL(url).pathname)} is, so it can't be resumed safely.`)
   return size
-}
-
-function sizeOn(file: string): number {
-  try {
-    return fs.statSync(file).size
-  } catch {
-    return 0
-  }
 }
 
 class Downloads extends EventEmitter {
@@ -109,7 +100,7 @@ class Downloads extends EventEmitter {
       const files = this.targets(d)
       const sizes = await Promise.all(files.map((f) => remoteSize(f.url, controller.signal)))
       const total = sizes.reduce((n, s) => n + s, 0)
-      let received = files.reduce((n, f, i) => n + (sizeOn(f.target) === sizes[i] ? sizes[i] : Math.min(sizeOn(`${f.target}.part`), sizes[i])), 0)
+      let received = files.reduce((n, f, i) => n + (sizeOn(f.target) === sizes[i] ? sizes[i] : Math.min(sizeOn(partOf(f.target)), sizes[i])), 0)
       const began = Date.now()
       const startedWith = received
       const report = () => {
@@ -118,28 +109,16 @@ class Downloads extends EventEmitter {
         this.patch(d.id, { received, total, speed, secondsLeft: speed > 0 ? Math.round((total - received) / speed) : null }, false)
       }
       for (const [i, f] of files.entries()) {
-        if (sizeOn(f.target) === sizes[i]) continue
-        const part = `${f.target}.part`
-        let from = Math.min(sizeOn(part), sizes[i])
-        if (from < sizes[i]) {
-          const res = await fetch(f.url, { headers: { ...auth(), ...(from > 0 ? { Range: `bytes=${from}-` } : {}) }, signal: controller.signal })
-          if (!res.ok || !res.body) throw new Error(`Downloading ${path.basename(f.target)} failed: Hugging Face answered ${res.status}.`)
-          if (from > 0 && res.status !== 206) {
-            received -= from
-            from = 0
+        await fetchResumable(f.url, f.target, {
+          size: sizes[i],
+          what: path.basename(f.target),
+          signal: controller.signal,
+          headers: auth(),
+          onBytes: (n) => {
+            received += n
+            report()
           }
-          fs.mkdirSync(path.dirname(part), { recursive: true })
-          const count = new Transform({
-            transform(chunk: Buffer, _enc, done) {
-              received += chunk.length
-              report()
-              done(null, chunk)
-            }
-          })
-          await pipeline(Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]), count, fs.createWriteStream(part, { flags: from > 0 ? 'a' : 'w' }), { signal: controller.signal })
-        }
-        if (sizeOn(part) !== sizes[i]) throw new Error(`${path.basename(f.target)} came out the wrong size. Resume the download to try again.`)
-        fs.renameSync(part, f.target)
+        })
       }
       this.patch(d.id, { state: 'done', path: files[0].target, received: total, total, speed: 0, secondsLeft: 0 })
     } catch (err) {
@@ -179,7 +158,7 @@ class Downloads extends EventEmitter {
     this.save()
     if (item.state !== 'done') {
       try {
-        for (const f of this.targets(item)) fs.rmSync(`${f.target}.part`, { force: true })
+        for (const f of this.targets(item)) fs.rmSync(partOf(f.target), { force: true })
       } catch (err) {
         throw new Error(`Removed ${item.name} from downloads, but its partial file in ${item.folder} could not be cleaned up: ${err instanceof Error ? err.message : String(err)}`)
       }
