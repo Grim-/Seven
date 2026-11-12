@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Paperclip } from 'lucide-react'
 import { showName } from '@shared/ids'
 import { referenceHref, referencesIn } from '@shared/text'
 import { cn } from '../../lib/cn'
@@ -10,10 +11,16 @@ export function LinkFaceList({ text, className }: { text: string; className?: st
   const refs = useMemo(() => referencesIn(text), [text])
   if (!refs.length) return null
   return (
-    <div className={cn('flex flex-wrap gap-2', className)}>
+    <div className={cn('flex flex-wrap gap-2.5', className)}>
       {refs.map((r) => (
-        <button key={r.link} type="button" title={`Open ${showName(r.ref.replace(/^"|"$/g, ''))}`} onClick={() => openSevenLink(referenceHref(r.kind, r.ref))} className="w-40 text-left transition-transform hover:-translate-y-0.5">
-          <EntryFace link={r.link} />
+        <button
+          key={r.link}
+          type="button"
+          title={`Open ${showName(r.ref.replace(/^"|"$/g, ''))}`}
+          onClick={() => openSevenLink(referenceHref(r.kind, r.ref))}
+          className="w-48 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
+        >
+          <EntryFace link={r.link} compact />
         </button>
       ))}
     </div>
@@ -25,11 +32,21 @@ export function LinkFaces({ text }: { text: string }) {
   const [shown, setShown] = useViewPlace('chat.linkFaces', true)
   if (!refs.length) return null
   return (
-    <div className="mt-1.5 flex flex-col items-end gap-1">
-      {shown && <LinkFaceList text={text} className="justify-end" />}
-      <button type="button" onClick={() => setShown(!shown)} className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint hover:text-accent">
-        {shown ? 'Hide' : 'Show'} {refs.length} linked
-      </button>
+    <div className="mt-2.5 flex flex-col items-end gap-1.5 w-full">
+      <div className="flex items-center justify-between w-full border-t border-line/40 pt-1.5 font-mono text-[10px] uppercase tracking-wider text-dim">
+        <span className="flex items-center gap-1.5 text-accent font-semibold">
+          <Paperclip className="h-3 w-3" />
+          ATTACHED CONTEXT ({refs.length})
+        </span>
+        <button
+          type="button"
+          onClick={() => setShown(!shown)}
+          className="text-faint hover:text-white transition-colors cursor-pointer"
+        >
+          {shown ? '[-] COLLAPSE' : '[+] EXPAND'}
+        </button>
+      </div>
+      {shown && <LinkFaceList text={text} className="justify-end w-full" />}
     </div>
   )
 }

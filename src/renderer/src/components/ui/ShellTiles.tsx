@@ -8,7 +8,7 @@ export function ShellTiles({ items, adds, bind, scale }: ShellViewProps) {
       {items.map((item, i) => {
         const b = bind(item)
         return (
-          <button key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i)} className="shell-slate shell-enter group flex-col">
+          <button key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i, b.props.style)} className="shell-slate shell-enter group flex-col">
             <ShellSweep />
             <span className="flex items-center justify-between gap-2 border-b border-line/40 px-2 py-1 font-mono text-[9.5px] font-bold tracking-[0.16em]">
               <span className="truncate text-accent-soft">{item.tag ?? ''}</span>

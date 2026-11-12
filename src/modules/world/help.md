@@ -1,11 +1,11 @@
 # World tools
 
-You are one record in a world (your type and id are in the World section of your instructions). Every other record and the board are shared with the other agents in the world.
+You are in a world (your type and id are in the World section of your instructions, if bound). Every other record and the board are shared with the other agents in the world.
 
 ## Reading
-- world_recall with type and id null reads your own record.
-- world_recall(type, id) reads anyone's. Add field to read one field, query to filter its entries, sort "oldest" / "weight" for logs.
-- Ids are lower case with _ for spaces ("old_tom"). Not sure of an id? world_search("tom") first.
+- `world_recall` with type and id null reads your own record.
+- `world_recall(type, id)` reads anyone's. Add field to read one field, query to filter its entries, sort "oldest" / "weight" for logs.
+- Ids are lower case with _ for spaces ("old_tom"). Not sure of an id? `world_search("tom")` first.
 - Derived fields (like who is at a location) are read like fields; they can't be written.
 
 ## Writing your record (world_remember)
@@ -22,5 +22,14 @@ You are one record in a world (your type and id are in the World section of your
 - "has no X. Fields: …": use one of the listed names exactly.
 
 ## The board
-- world_post(message, to) posts signed as you; to is a record id or null for everyone.
-- world_board(limit, query) reads the latest posts. Check it when you come back to the world.
+- `world_post(message, to)` posts signed as you; to is a record id or null for everyone.
+- `world_board(limit, query)` reads the latest posts. Check it when you come back to the world.
+
+## World Builder & Authoring tools (DM / World Architect)
+If you have builder access, you can create, modify, and delete any world record:
+- `world_create(type, id, values)`: Create a new record. Fails if the id already exists.
+- `world_set_property(type, id, field, value)`: Set basic attributes, descriptions, or status on any record.
+- `world_entries(type, id, field, add/edit/remove/clear)`: Manage list and log entries across any record. Fixed entries are preserved.
+- `world_add_action(type, id, field, action/actions)`: Attach interactive actions with skill/stat checks, pass/fail narrative outcomes, and card gains/losses to any object, place, or character.
+- `world_add_decision(type, id, field, decision/decisions)`: Attach branching decision points with clear options, decider rules (user vs. agent), and card swap outcomes.
+- `world_delete(type, id)`: Deletes any record. Asks the user for confirmation first.

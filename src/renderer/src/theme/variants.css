@@ -1,0 +1,17 @@
+@custom-variant tablet (&:is(html[data-form='tablet'] *, html[data-form='phone'] *));
+@custom-variant phone (&:is(html[data-form='phone'][data-form='phone'] *));
+@custom-variant touch {
+  @media (pointer: coarse) {
+    &:is(html[data-form][data-form] *) {
+      @slot;
+    }
+  }
+}
+
+html[data-form='tablet'] {
+  --nav-h: calc(2.75rem + env(safe-area-inset-bottom));
+}
+
+html[data-form='phone'] {
+  --nav-h: calc(3rem + env(safe-area-inset-bottom));
+}

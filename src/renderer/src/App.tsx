@@ -38,7 +38,7 @@ export function App() {
   const fileDrop = useFileDrop((_, e, dropped) => void dropFiles(dropped, e.shiftKey))
   return (
     <MotionConfig reducedMotion="user">
-    <div className="relative flex h-full flex-col bg-bg text-text">
+    <div className="fixed inset-0 flex flex-col bg-bg text-text">
       <ThemeStage />
       <AudioHost />
       {!cinema && <TitleBar />}

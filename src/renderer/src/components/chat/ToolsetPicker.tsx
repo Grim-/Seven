@@ -10,7 +10,7 @@ export function ToolsetPicker({ agent }: { agent: AgentProfile }) {
   if (!list.length) return null
   const current = agent.toolsets ?? []
   return (
-    <Field group label="Toolset" hint="The agent's toolset. Changing it reloads this chat's context.">
+    <Field group label="Toolset">
       <div className="flex max-h-48 flex-col overflow-y-auto border border-line/60">
         {[{ id: '', name: 'No toolset', description: 'Only the tools turned on for this agent' }, ...list].map((t) => {
           const on = t.id ? current.length === 1 && current[0] === t.id : !current.length

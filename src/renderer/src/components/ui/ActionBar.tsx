@@ -1,11 +1,11 @@
 import { Button } from './Button'
-import { openMenu, type MenuItem } from './ContextMenu'
+import { openMenu, usableItems, type MenuItem } from './ContextMenu'
 import { cn } from '../../lib/cn'
 
 export function ActionBar({ items, row = false, className }: { items: MenuItem[]; row?: boolean; className?: string }) {
   return (
     <div className={cn(row ? 'flex flex-wrap gap-1.5' : 'grid grid-cols-2 gap-1.5', className)}>
-      {items
+      {usableItems(items)
         .filter((i) => !i.separator && i.label)
         .map((i) => {
           const btn = (

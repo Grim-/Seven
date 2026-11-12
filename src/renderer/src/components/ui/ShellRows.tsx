@@ -2,9 +2,9 @@ import type { ShellViewProps } from './shellTypes'
 import { ShellIcon, asideOf, enterStyle, shellState } from './ShellParts'
 import { TraitChips } from './TraitChips'
 
-const COLUMNS = '2.75rem 4.5rem minmax(0,1fr) minmax(0,10rem) 7rem'
+const COLUMNS = '2rem 4rem minmax(180px, 26rem) minmax(120px, 14rem) 8rem'
 
-export function ShellRows({ items, adds, bind, scale, asideLabel }: ShellViewProps) {
+export function ShellRows({ items, adds, bind, scale: _scale, asideLabel }: ShellViewProps) {
   return (
     <div className="flex flex-col font-mono text-[12px]">
       <div className="grid h-7 items-center gap-2.5 border-b border-line/40 px-2 text-[10px] uppercase tracking-[0.16em] text-faint" style={{ gridTemplateColumns: COLUMNS }}>
@@ -17,16 +17,16 @@ export function ShellRows({ items, adds, bind, scale, asideLabel }: ShellViewPro
       {items.map((item, i) => {
         const b = bind(item)
         return (
-          <button key={item.key} {...b.props} {...shellState(b)} className="shell-row shell-enter grid min-w-0 items-center gap-2.5 px-2 text-left" style={enterStyle(i, { gridTemplateColumns: COLUMNS, minHeight: `${2.1 * Math.max(1, scale)}rem` })}>
+          <button key={item.key} {...b.props} {...shellState(b)} className="shell-row shell-enter grid min-w-0 items-center gap-2.5 px-2 text-left" style={enterStyle(i, { ...b.props.style, gridTemplateColumns: COLUMNS, minHeight: '2.1rem' })}>
             <span className="text-faint">{String(i + 1).padStart(3, '0')}</span>
             <span>{item.tag && <span className="shell-tag">{item.tag}</span>}</span>
             <span className="flex min-w-0 items-center gap-2.5">
               {item.thumb ? (
-                <span className="shrink-0 overflow-hidden" style={{ width: `${2.4 * scale}rem`, height: `${1.4 * scale}rem` }}>
+                <span className="shrink-0 overflow-hidden" style={{ width: '2rem', height: '1.4rem' }}>
                   {item.thumb}
                 </span>
               ) : (
-                <ShellIcon scale={scale} className="text-dim">
+                <ShellIcon scale={1.1} className="text-dim">
                   {item.icon}
                 </ShellIcon>
               )}

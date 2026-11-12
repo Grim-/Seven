@@ -2,19 +2,27 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { createPortal } from 'react-dom'
 import { cn } from '../../lib/cn'
 import { useEscapeLayer } from '../../lib/escape'
-import { fitNear } from '../../lib/fitNear'
+import { fitNear, type NearAlign, type NearSide } from '../../lib/fitNear'
 
 export function Popover({
   trigger,
   children,
   className,
+  rootClassName,
+  triggerClassName,
   title,
+  side = 'bottom',
+  align = 'end',
   disabled = false
 }: {
   trigger: ReactNode
   children: ReactNode | ((close: () => void) => ReactNode)
   className?: string
+  rootClassName?: string
+  triggerClassName?: string
   title?: string
+  side?: NearSide
+  align?: NearAlign
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
@@ -29,8 +37,8 @@ export function Popover({
     const { left, top } = fitNear(
       anchor.getBoundingClientRect(),
       el.getBoundingClientRect(),
-      'bottom',
-      'end'
+      side,
+      align
     )
     el.style.left = `${left}px`
     el.style.top = `${top}px`
@@ -43,19 +51,19 @@ export function Popover({
     const observer = new ResizeObserver(place)
     observer.observe(box.current)
     return () => observer.disconnect()
-  }, [open])
+  }, [open, side, align])
 
   useEffect(() => {
     if (!open) return
     const inside = (e: Event) =>
       root.current?.contains(e.target as Node) || box.current?.contains(e.target as Node)
-    const down = (e: MouseEvent) => !inside(e) && close()
+    const down = (e: PointerEvent) => !inside(e) && close()
     const scroll = (e: Event) => !inside(e) && close()
-    window.addEventListener('mousedown', down)
+    window.addEventListener('pointerdown', down)
     window.addEventListener('scroll', scroll, true)
     window.addEventListener('resize', place)
     return () => {
-      window.removeEventListener('mousedown', down)
+      window.removeEventListener('pointerdown', down)
       window.removeEventListener('scroll', scroll, true)
       window.removeEventListener('resize', place)
     }
@@ -63,12 +71,19 @@ export function Popover({
 
   useEscapeLayer(open, close)
   return (
-    <div ref={root} className="relative">
+    <div ref={root} className={cn('relative', rootClassName)}>
       <button
+        type="button"
         onClick={() => setOpen(!open)}
+        onContextMenu={(e) => {
+          if (disabled) return
+          e.preventDefault()
+          e.stopPropagation()
+          setOpen(true)
+        }}
         disabled={disabled}
         title={title}
-        className="flex items-center"
+        className={cn('flex items-center text-left', triggerClassName)}
       >
         {trigger}
       </button>
@@ -79,7 +94,7 @@ export function Popover({
             data-layer
             style={{ position: 'fixed', left: 0, top: 0, visibility: 'hidden' }}
             className={cn(
-              'z-[500] flex max-h-[calc(100vh-8px)] flex-col overflow-y-auto border border-line bg-[#0b0b0b] shadow-xl',
+              'z-[500] flex max-h-[calc(100vh-8px)] tablet:max-h-[calc(100%-12px)] tablet:max-w-[calc(100%-8px)] flex-col overflow-y-auto border border-line bg-[#0b0b0b] shadow-xl',
               className
             )}
           >

@@ -23,16 +23,18 @@ import { ChatEntryChat, ChatEntryStage, ChatEntryWidget } from '../chat/ChatEntr
 import { MindChat, MindWidget } from '../mind/MindChat'
 import { AgentChat, AgentStage, AgentWidget } from '../agents/AgentChat'
 import { ScriptPart } from '../python/Python'
-import { useState, useEffect } from 'react'
-import { Download, ExternalLink, FileIcon, FolderOpen, ListPlus, MessageSquare, Pencil, Play, Trash2 } from 'lucide-react'
-import { pageKindOf, pageTypeOfKind } from '@shared/types'
+import { useState, useEffect, useMemo } from 'react'
+import { ChevronLeft, ChevronRight, Download, ExternalLink, FileIcon, FolderOpen, ListPlus, MessageSquare, Pencil, Play, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { pageKindOf, pageTypeOfKind, type AssetMeta } from '@shared/types'
 import { showName } from '@shared/ids'
 import { Button, EmptyState, Modal, Panel, askText, type MenuItem, confirmDelete } from '../ui'
-import { FileEditor } from '../pictures/FileEditor'
+import { FileEditor, VIEWABLE_MEDIA_KINDS } from '../pictures/FileEditor'
 import { useData } from '../../store/data'
 import { engine, main } from '../../lib/ipc'
 import { chooseFiles } from '../../lib/importFiles'
 import { errorText, formatBytes, formatRelative } from '../../lib/format'
+import { useViewPlace } from '../../lib/viewPlace'
+import { transitionView } from '../../lib/viewTransition'
 import { useDashboards } from '../../store/dashboards'
 import { useAgents } from '../../store/agents'
 import { useSessions } from '../../store/sessions'
@@ -190,19 +192,95 @@ registerKindUi('page:addon', {
 })
 
 function AssetScreen({ id, select }: KindScreenProps) {
-  const asset = useData((s) => s.assets.find((a) => a.id === id))
+  const assets = useData((s) => s.assets)
+  const asset = assets.find((a) => a.id === id)
   const [deleting, setDeleting] = useState(false)
+  const [showInspector, setShowInspector] = useViewPlace<boolean>('fileViewer.inspectorOpen', false)
+
   if (!id) return null
   if (!asset) return <EmptyState title="Deleted">This file no longer exists.</EmptyState>
+
+  const viewables = useMemo(() => {
+    const folder = asset.parent ?? null
+    return assets.filter((a) => (a.parent ?? null) === folder && (VIEWABLE_MEDIA_KINDS as readonly string[]).includes(a.kind))
+  }, [assets, asset.parent])
+
+  const currentIndex = useMemo(() => {
+    return viewables.findIndex((a) => a.id === asset.id)
+  }, [viewables, asset.id])
+
+  const prevAsset = currentIndex > 0 ? viewables[currentIndex - 1] : null
+  const nextAsset = currentIndex >= 0 && currentIndex < viewables.length - 1 ? viewables[currentIndex + 1] : null
+
+  const onNavigate = (target: AssetMeta | null) => {
+    if (!target) return
+    transitionView(() => {
+      select({ kind: 'file', id: target.id })
+    })
+  }
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return
+      if (e.key === 'ArrowLeft' && prevAsset) {
+        e.preventDefault()
+        onNavigate(prevAsset)
+      } else if (e.key === 'ArrowRight' && nextAsset) {
+        e.preventDefault()
+        onNavigate(nextAsset)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [prevAsset, nextAsset])
+
   const open = (reveal: boolean) => void main('asset.open', { id: asset.id, reveal }).catch(failed('Could not open'))
+
   return (
     <Panel
       className="flex-1"
       title={asset.name}
       meta={`${asset.kind} · ${formatBytes(asset.size)}`}
-      bodyClassName="flex flex-col gap-3 overflow-auto"
+      bodyClassName="flex min-h-0 flex-1 p-0 overflow-hidden"
       actions={
         <>
+          {viewables.length > 1 && (
+            <div className="flex items-center gap-1 font-mono text-[11px] border border-line/50 bg-black/40 px-1 py-0.5 mr-1">
+              <button
+                type="button"
+                title="Previous file (Left Arrow)"
+                disabled={!prevAsset}
+                onClick={() => onNavigate(prevAsset)}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 text-dim hover:text-white disabled:opacity-30 disabled:hover:text-dim cursor-pointer disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span>PREV</span>
+              </button>
+              <span className="px-1.5 text-accent font-semibold tracking-wider">
+                {currentIndex + 1} / {viewables.length}
+              </span>
+              <button
+                type="button"
+                title="Next file (Right Arrow)"
+                disabled={!nextAsset}
+                onClick={() => onNavigate(nextAsset)}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 text-dim hover:text-white disabled:opacity-30 disabled:hover:text-dim cursor-pointer disabled:cursor-not-allowed"
+              >
+                <span>NEXT</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+          <Button
+            size="sm"
+            variant={showInspector ? 'primary' : 'ghost'}
+            icon={<SlidersHorizontal className="h-3.5 w-3.5" />}
+            onClick={() => setShowInspector(!showInspector)}
+            title={showInspector ? 'Hide editor and metadata tools' : 'Show editor and metadata tools'}
+          >
+            {showInspector ? 'Hide Tools' : 'Inspect'}
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => open(false)}>
             Open
           </Button>
@@ -218,15 +296,16 @@ function AssetScreen({ id, select }: KindScreenProps) {
         </>
       }
     >
-      <FileEditor asset={asset} />
-      <div className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1 font-mono text-[11.5px]">
-        <span className="text-faint">ID</span>
-        <span className="text-white/85 select-text">{asset.id}</span>
-        <span className="text-faint">From</span>
-        <span className="text-white/85">{asset.source.original ?? '—'}</span>
-        <span className="text-faint">Added</span>
-        <span className="text-white/85">{new Date(asset.createdAt).toLocaleString()}</span>
-      </div>
+      <FileEditor
+        asset={asset}
+        onPrev={prevAsset ? () => onNavigate(prevAsset) : undefined}
+        onNext={nextAsset ? () => onNavigate(nextAsset) : undefined}
+        hasPrev={Boolean(prevAsset)}
+        hasNext={Boolean(nextAsset)}
+        positionText={viewables.length > 1 ? `${currentIndex + 1} / ${viewables.length}` : undefined}
+        showInspector={showInspector}
+        onToggleInspector={() => setShowInspector(!showInspector)}
+      />
       {deleting && (
         <Modal
           open

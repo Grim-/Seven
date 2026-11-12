@@ -139,6 +139,22 @@ export interface NetworkSettings {
   maxFailures: number
   lockMinutes: number
   maxRequestMb: number
+  pingSeconds: number
+  idleMinutes: number
+  maxMessageMb: number
+  maxClients: number
+  bufferSoftMb: number
+  bufferHardMb: number
+  reconnectMinSeconds: number
+  reconnectMaxSeconds: number
+  pairCodeSeconds: number
+  pairCodeUses: number
+  maxUploadMb: number
+  uploadKeepMinutes: number
+  uploadFolder: string
+  announce: boolean
+  announceType: string
+  announceName: string
 }
 
 export interface NetworkClient {
@@ -150,9 +166,37 @@ export interface NetworkClient {
   model: string | null
 }
 
+export type DeviceLevelId = 'chat' | 'full' | 'admin'
+
+export interface NetworkDevice {
+  id: string
+  name: string
+  pairedAt: number
+  lastSeen: number
+  address: string | null
+  connected: boolean
+  level: DeviceLevelId
+}
+
+export interface PairingRequest {
+  id: string
+  name: string
+  address: string
+}
+
+export interface PairingInfo {
+  code: string
+  expiresAt: number
+  port: number
+  addresses: string[]
+  fingerprint: string
+  id: string
+}
+
 export interface NetworkStatus {
   on: boolean
   listening: boolean
+  announcing: boolean
   error: string | null
   addresses: string[]
   hasPassword: boolean
@@ -160,6 +204,8 @@ export interface NetworkStatus {
   fingerprint: string | null
   settings: NetworkSettings
   clients: NetworkClient[]
+  devices: NetworkDevice[]
+  pairing: { open: boolean; request: PairingRequest | null }
 }
 
 export interface ServerStatus {
@@ -167,7 +213,6 @@ export interface ServerStatus {
   logLines: number
   chat: ChatServerStatus | null
   memory: MemoryServerStatus
-  network: NetworkStatus
   vram: { used: number; total: number } | null
 }
 
@@ -427,6 +472,9 @@ export interface ToolsPrefs {
   skillsFolder: string
 }
 
+export type ToolChoiceMode = 'auto' | 'force_reason' | 'required' | 'none'
+export const TOOL_CHOICE_MODES = ['auto', 'force_reason', 'required', 'none'] as const
+
 export interface AgentProfile {
   id: string
   name: string
@@ -452,15 +500,26 @@ export interface AgentProfile {
   readAloud?: boolean
   reasoningStyle?: string | null
   thinking?: ThinkingLevel | null
+  toolChoice?: ToolChoiceMode | null
   mindAuto?: { recall: boolean }
   remindEvery?: number
   maxToolRounds?: number
   sheet?: string | null
+  sheets?: string[] | null
   player?: string | null
   cards?: CardSource | null
   createdBy?: string | null
   createdAt: number
   updatedAt: number
+}
+
+export function agentSheets(agent: { sheet?: string | null; sheets?: string[] | null } | null | undefined): string[] {
+  if (!agent) return []
+  const list = Array.isArray(agent.sheets) ? agent.sheets.filter((x): x is string => typeof x === 'string' && x.length > 0) : []
+  if (agent.sheet && !list.includes(agent.sheet)) {
+    return [agent.sheet, ...list]
+  }
+  return list
 }
 
 export type AvatarRef = { kind: 'file'; assetId: string } | { kind: 'coded'; type: string }
@@ -656,6 +715,7 @@ export interface SessionMeta {
   permissionMode: PermissionMode | null
   reasoningStyle?: string | null
   thinking?: ThinkingLevel | null
+  toolChoice?: ToolChoiceMode | null
   probe?: { subject: string; pageId: string } | null
   createdAt: number
   updatedAt: number
@@ -1283,6 +1343,7 @@ export interface Settings {
   sidePanel: SidePanelPrefs
   chatList: ChatListPrefs
   dataList: ChatListPrefs
+  pagesList: ChatListPrefs
   pagesWidth: number
   chatPictureHeight: number
   trayKinds: string[]

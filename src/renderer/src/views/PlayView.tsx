@@ -18,7 +18,6 @@ import { PromptPeek } from '../components/chat/PromptPeek'
 import { ContextMeter } from '../components/chat/ContextMeter'
 import { DraftAgentSelect } from '../components/chat/DraftAgentSelect'
 import { ChatSettings } from '../components/chat/ChatSettings'
-import { ModelPicker } from '../components/chat/ModelPicker'
 import { BackdropButton } from '../components/backdrop/Backdrop'
 import { GameplaySettingsModal } from '../components/play/settings/GameplaySettingsModal'
 import { toast } from '../store/toasts'
@@ -219,16 +218,21 @@ export function PlayView() {
           <PromptPeek />
           <ContextMeter />
           {active ? (
-            <StatusBadge tone="idle" className="text-teal font-mono text-[11px]">
-              {agent?.name ?? 'Agent'}
-            </StatusBadge>
+            <ChatSettings
+              agent={agent ?? null}
+              side="bottom"
+              align="end"
+              trigger={
+                <StatusBadge tone="idle" className="cursor-pointer text-teal font-mono text-[11px] hover:border-accent hover:text-accent" title={`${agent?.name ?? 'Agent'} settings · Click or right-click`}>
+                  {agent?.name ?? 'Agent'}
+                </StatusBadge>
+              }
+            />
           ) : (
             <div className="w-36">
               <DraftAgentSelect conv={conv} agentId={agentId} />
             </div>
           )}
-          <ChatSettings agent={agent ?? null} />
-          <ModelPicker agentModelId={agent?.modelId ?? null} />
           <BackdropButton sessionId={conv.sessionId} />
         </div>
       </header>

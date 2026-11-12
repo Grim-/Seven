@@ -5,15 +5,17 @@ import type { EngineSupervisor } from './engine-supervisor'
 import type { OverlayController } from './overlay'
 import type { Hotkey } from './hotkey'
 import type { Vault } from './vault'
-import { settings } from './settings'
+import { settings, remoteSettingsIn, remoteSettingsOut } from './settings'
 import { dataDir, missingVault } from './paths'
 import { hostPage } from './widgets'
 import { readImage } from './assets'
 import { clearAll, readHeader, writeBackup } from './backup'
 import { addVault, chooseVault, createVault, listVaults, removeVault, renameVault, restoreVault } from './vaults'
 import { errorCode } from '@shared/errors'
+import type { Gateway } from './network/gateway'
+import { suggestPassword } from './network/password'
 
-function coded(err: unknown): CodedErrorWire {
+export function coded(err: unknown): CodedErrorWire {
   const code = errorCode(err)
   if (!code) throw err
   return { [ERROR_MARKER]: { code, message: err instanceof Error ? err.message : String(err) } }
@@ -31,6 +33,7 @@ export interface IpcContext {
   overlay: OverlayController
   hotkey: Hotkey
   vault: Vault
+  gateway: Gateway
   showApp: (sessionId: string | null) => void
   quit: () => void
 }
@@ -46,7 +49,11 @@ async function askSavePath(win: BrowserWindow | null, name: string, filters?: El
   return result.canceled || !result.filePath ? null : result.filePath
 }
 
-export function registerIpc(ctx: IpcContext): void {
+export interface MainDispatch {
+  call: (name: MainRequestName, params: unknown) => Promise<unknown>
+}
+
+export function registerIpc(ctx: IpcContext): MainDispatch {
   const handlers: MainHandlers = {
     'overlay.resetPosition': () => ctx.overlay.resetPosition(),
     'vault.status': () => ctx.vault.check(),
@@ -106,8 +113,8 @@ export function registerIpc(ctx: IpcContext): void {
         if (error) throw new Error(error)
       }
     },
-    'settings.get': () => settings.get(),
-    'settings.set': (_win, patch) => settings.set(patch),
+    'settings.get': (win) => (win ? settings.get() : remoteSettingsOut(settings.get())),
+    'settings.set': (win, patch) => settings.set(win ? patch : remoteSettingsIn(patch)),
     'app.info': () => ({ version: app.getVersion(), dataDir, platform: process.platform, vaultMissing: missingVault }),
     'app.show': (_win, { sessionId }) => ctx.showApp(sessionId),
     'app.quit': () => ctx.quit(),
@@ -145,6 +152,20 @@ export function registerIpc(ctx: IpcContext): void {
       }
     },
     'engine.status': () => ctx.engine.status(),
+    'network.status': () => ctx.gateway.status(),
+    'network.set': (_win, { on, settings }) => ctx.gateway.set(on, settings),
+    'network.password.suggest': () => suggestPassword(),
+    'network.password.set': (_win, { password }) => ctx.gateway.setPassword(password),
+    'network.certificate.get': () => ctx.gateway.certificate(),
+    'network.certificate.renew': () => ctx.gateway.renewCertificate(),
+    'network.unlock': (_win, { address }) => ctx.gateway.unlock(address),
+    'network.pair.start': () => ctx.gateway.pairStart(),
+    'network.pair.cancel': () => ctx.gateway.pairCancel(),
+    'network.pair.allow': (_win, { requestId }) => ctx.gateway.pairAllow(requestId),
+    'network.pair.deny': (_win, { requestId }) => ctx.gateway.pairDeny(requestId),
+    'network.revoke': (_win, { deviceId }) => ctx.gateway.revoke(deviceId),
+    'network.unpairAll': () => ctx.gateway.unpairAll(),
+    'network.deviceLevel': (_win, { deviceId, level }) => ctx.gateway.setDeviceLevel(deviceId, level),
     'overlay.isExpanded': () => ctx.overlay.isExpanded(),
     'overlay.state': () => ctx.overlay.state(),
     'overlay.setMode': (_win, { mode, panel, items, focus }) => ctx.overlay.setMode(mode, { panel, items, focus }),
@@ -174,4 +195,12 @@ export function registerIpc(ctx: IpcContext): void {
       .then(() => handler(BrowserWindow.fromWebContents(event.sender), params))
       .catch(coded)
   })
+
+  return {
+    call: (name, params) => {
+      const handler = handlers[name] as ((win: BrowserWindow | null, p: unknown) => unknown) | undefined
+      if (!handler) return Promise.reject(new Error(`Unknown request: ${name}`))
+      return Promise.resolve().then(() => handler(null, params))
+    }
+  }
 }

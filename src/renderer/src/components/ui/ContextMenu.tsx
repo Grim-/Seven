@@ -6,7 +6,11 @@ import { Input } from './inputs'
 import { Modal } from './Modal'
 import { cn } from '../../lib/cn'
 import { useEscapeLayer } from '../../lib/escape'
+import { useHasForm } from '../../lib/form'
 import { failed } from '../../lib/notify'
+import { allowedRequest, hasCapability } from '../../lib/transport'
+import type { TransportNeed } from '@shared/transport'
+import type { EngineRequestName, MainRequestName } from '@shared/protocol'
 
 export interface MenuItem {
   label: string
@@ -17,6 +21,8 @@ export interface MenuItem {
   disabled?: boolean
   separator?: boolean
   children?: MenuItem[]
+  needs?: TransportNeed
+  calls?: { kind: 'engine'; name: EngineRequestName } | { kind: 'main'; name: MainRequestName }
 }
 
 interface MenuSpec {
@@ -61,10 +67,14 @@ let menus = 0
 
 export type MenuEvent = { preventDefault(): void; stopPropagation(): void; clientX: number; clientY: number }
 
+export function usableItems(items: MenuItem[]): MenuItem[] {
+  return items.filter((i) => (!i.needs || hasCapability(i.needs)) && (!i.calls || allowedRequest(i.calls.kind, i.calls.name))).map((i) => (i.children ? { ...i, children: usableItems(i.children) } : i))
+}
+
 export function openMenu(event: MenuEvent, title: string, items: MenuItem[]): void {
   event.preventDefault()
   event.stopPropagation()
-  const visible = items.filter((i) => i.separator || i.label)
+  const visible = usableItems(items).filter((i) => i.separator || i.label)
   if (!visible.length) return
   useMenu.setState({ menu: { id: ++menus, title, x: event.clientX, y: event.clientY, items: visible } })
 }
@@ -158,7 +168,7 @@ function Row({ item, index, onDone, onHover, open }: { item: MenuItem; index: nu
       }}
       style={{ animation: `seven-menu-row 170ms ease-out ${index * 40}ms both` }}
       className={cn(
-        'relative flex w-full items-center gap-2 overflow-hidden px-3 py-1.5 text-left font-mono text-[12px] transition-colors disabled:opacity-40',
+        'relative flex w-full items-center gap-2 overflow-hidden px-3 py-1.5 text-left font-mono text-[12px] transition-colors disabled:opacity-40 touch:py-2.5 touch:text-[13px]',
         item.danger ? 'text-alert hover:text-white' : 'text-accent hover:text-white',
         open && 'text-white'
       )}
@@ -186,9 +196,10 @@ function Panel({ title, items, x, y, flipTo = null, onDone, depth }: { title?: s
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const [sub, setSub] = useState<{ index: number; x: number; y: number; flipTo: number } | null>(null)
   const heading = useDecrypt(title ?? '', 0, 220)
+  const compact = useHasForm()
   useLayoutEffect(() => {
-    if (ref.current && body.current) setRows(columnRows(ref.current, body.current))
-  }, [items])
+    if (ref.current && body.current) setRows(compact ? null : columnRows(ref.current, body.current))
+  }, [items, compact])
   useLayoutEffect(() => {
     if (ref.current && rows !== undefined) setPos(place(ref.current, x, y, flipTo))
   }, [x, y, flipTo, rows])
@@ -199,7 +210,7 @@ function Panel({ title, items, x, y, flipTo = null, onDone, depth }: { title?: s
         data-seven-menu
         onMouseDown={(e) => e.stopPropagation()}
         style={{ left: pos?.left ?? x, top: pos?.top ?? y, visibility: pos ? 'visible' : 'hidden', zIndex: 10000 + depth, animation: 'seven-menu-in 150ms ease-out' }}
-        className={cn('fixed flex min-w-52 flex-col border border-line border-l-2 border-l-accent bg-sidebar/95 py-1 shadow-[0_12px_30px_rgba(0,0,0,0.85)] backdrop-blur-sm', !rows && 'max-w-80')}
+        className={cn('fixed flex min-w-52 flex-col border border-line border-l-2 border-l-accent bg-sidebar/95 py-1 shadow-[0_12px_30px_rgba(0,0,0,0.85)] backdrop-blur-sm tablet:max-h-[calc(100%-1rem)] tablet:max-w-[calc(100%-1rem)] tablet:overflow-y-auto', !rows && 'max-w-80')}
       >
         {title && (
           <div className="mb-1 flex items-center border-b border-line/60 px-3 py-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-accent-soft">
@@ -217,6 +228,7 @@ function Panel({ title, items, x, y, flipTo = null, onDone, depth }: { title?: s
               onDone={onDone}
               onHover={(el) => {
                 if (!el || !pos) return setSub(null)
+                if (compact) return setSub({ index: i, x: pos.left + 16, y: el.getBoundingClientRect().bottom, flipTo: pos.left + 16 })
                 setSub({ index: i, x: pos.left + el.offsetLeft + el.offsetWidth + 2, y: pos.top + el.offsetTop - 4, flipTo: pos.left + el.offsetLeft - 2 })
               }}
             />

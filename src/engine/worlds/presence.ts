@@ -6,7 +6,7 @@ import { agentAccess } from '../agents/access'
 import { worlds } from './store'
 import { saveInPlay } from './playLayer'
 
-function visitorOf(s: CharacterSheet, agents: { id: string; sheet?: string | null }[]): PlaceVisitor {
+export function visitorOf(s: CharacterSheet, agents: { id: string; sheet?: string | null }[]): PlaceVisitor {
   return {
     sheet: s.id,
     name: s.title,

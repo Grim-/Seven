@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AssetMeta, ChatMessage, ChatPart, ContextSummary, ContextUsage, PermissionMode, SessionMeta, ThinkingLevel, TodoItem, TodoList, ToolPart } from '@shared/types'
+import type { AssetMeta, ChatMessage, ChatPart, ContextSummary, ContextUsage, PermissionMode, SessionMeta, ThinkingLevel, ToolChoiceMode, TodoItem, TodoList, ToolPart } from '@shared/types'
 import { engine } from '../lib/ipc'
 import { DEFAULT_AGENT_ID } from './agents'
 import { importPaths } from '../lib/importFiles'
@@ -13,6 +13,7 @@ export interface ChatDraft {
   agentId: string
   style: string | null
   thinking: ThinkingLevel | null
+  toolChoice: ToolChoiceMode | null
   files: AssetMeta[]
   usage: ContextUsage | null
 }
@@ -30,6 +31,7 @@ interface SessionsState {
   instructionsChanged: Record<string, boolean>
   setDraftStyle: (key: string, style: string | null) => void
   setDraftThinking: (key: string, thinking: ThinkingLevel | null) => void
+  setDraftToolChoice: (key: string, toolChoice: ToolChoiceMode | null) => void
   attach: (key: string, paths: string[]) => Promise<void>
   detach: (key: string, id: string) => void
   summaries: Record<string, ContextSummary[]>
@@ -81,7 +83,7 @@ function pendingFrom(sessionId: string, messages: ChatMessage[], current: Record
 }
 
 export function draftOf(s: Pick<SessionsState, 'drafts' | 'defaultAgentId'>, key: string): ChatDraft {
-  return s.drafts[key] ?? { agentId: s.defaultAgentId, style: null, thinking: null, files: NO_FILES, usage: null }
+  return s.drafts[key] ?? { agentId: s.defaultAgentId, style: null, thinking: null, toolChoice: null, files: NO_FILES, usage: null }
 }
 
 export const useSessions = create<SessionsState>((set, get) => {
@@ -99,6 +101,7 @@ export const useSessions = create<SessionsState>((set, get) => {
   instructionsChanged: {},
   setDraftStyle: (key, style) => patchDraft(key, { style }),
   setDraftThinking: (key, thinking) => patchDraft(key, { thinking }),
+  setDraftToolChoice: (key, toolChoice) => patchDraft(key, { toolChoice }),
 
   attach: async (key, paths) => {
     if (!paths.length) return
@@ -182,10 +185,11 @@ export const useSessions = create<SessionsState>((set, get) => {
     if (conv.sessionId) return conv.sessionId
     const draft = draftOf(get(), conv.key)
     const created = await engine('sessions.create', { agentId: draft.agentId })
-    const meta = { ...created, ...(draft.style ? { reasoningStyle: draft.style } : {}), ...(draft.thinking ? { thinking: draft.thinking } : {}) }
+    const meta = { ...created, ...(draft.style ? { reasoningStyle: draft.style } : {}), ...(draft.thinking ? { thinking: draft.thinking } : {}), ...(draft.toolChoice ? { toolChoice: draft.toolChoice } : {}) }
     if (draft.style) await engine('sessions.setStyle', { id: meta.id, style: draft.style }).catch(() => undefined)
     if (draft.thinking) await engine('sessions.setThinking', { id: meta.id, thinking: draft.thinking }).catch(() => undefined)
-    patchDraft(conv.key, { style: null, thinking: null })
+    if (draft.toolChoice) await engine('sessions.setToolChoice', { id: meta.id, toolChoice: draft.toolChoice }).catch(() => undefined)
+    patchDraft(conv.key, { style: null, thinking: null, toolChoice: null })
     fresh.add(meta.id)
     set((s) => ({ list: [meta, ...s.list.filter((x) => x.id !== meta.id)], messages: { ...s.messages, [meta.id]: [] } }))
     conv.go(meta.id)

@@ -7,13 +7,17 @@ export function ShellGallery({ items, adds, bind, scale }: ShellViewProps) {
       {items.map((item, i) => {
         const b = bind(item)
         return (
-          <button key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i)} className="shell-holo shell-enter group px-2.5 pb-2.5 pt-3">
+          <button key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i, b.props.style)} className="shell-holo shell-enter group px-2.5 pb-2.5 pt-3">
             <span className="shell-corner left-0 top-0 border-l border-t" />
             <span className="shell-corner bottom-0 right-0 border-b border-r" />
             {item.thumb ? (
               <span className="shell-clip relative block aspect-[4/3] w-full overflow-hidden">
                 {item.thumb}
-                {(item.tag || item.subtitle) && <span className="absolute bottom-1 left-1.5 font-mono text-[9px] font-semibold tracking-[0.14em] text-cyan [text-shadow:0_0_6px_rgba(0,0,0,0.9)]">{[item.tag, item.subtitle].filter(Boolean).join(' // ')}</span>}
+                {(item.tag || item.subtitle) && (
+                  <span className="pointer-events-none absolute bottom-1 left-1.5 max-w-[calc(100%-0.75rem)] truncate border border-cyan/40 bg-black/85 px-1 py-0.5 font-mono text-[9px] font-semibold tracking-[0.12em] text-cyan opacity-0 transition-opacity group-hover:opacity-100">
+                    {[item.tag, item.subtitle].filter(Boolean).join(' // ')}
+                  </span>
+                )}
               </span>
             ) : (
               <span className="shell-holo-glyph flex aspect-[4/3] w-full items-center justify-center">

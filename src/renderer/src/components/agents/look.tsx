@@ -1,11 +1,14 @@
 import type { CSSProperties } from 'react'
-import type { AgentLook, AgentProfile, AssetMeta, AvatarState } from '@shared/types'
+import { agentSheets, type AgentLook, type AgentProfile, type AssetMeta, type AvatarState } from '@shared/types'
+import { showName } from '@shared/ids'
 import { useData, assetUrl } from '../../store/data'
 import { useAgents } from '../../store/agents'
 import { useAvatarState, useBubbles } from '../../store/reactions'
 import { cn } from '../../lib/cn'
 import { CodedAvatar } from './avatars'
 import { useAgentIdOf, useFocusedConversation } from '../../lib/conversation'
+import { useEntryPreview } from '../entries/entryPreview'
+import { AssetMedia } from '../pictures/AssetMedia'
 
 export function lookVars(look: AgentLook | null | undefined): CSSProperties {
   if (!look?.accent) return {}
@@ -66,7 +69,21 @@ function StateFx({ state }: { state: AvatarState }) {
   )
 }
 
-export function AgentAvatar({ agent, size = 24, className, sessionId, mood }: { agent: AgentProfile | null | undefined; size?: number; className?: string; sessionId?: string | null; mood?: AvatarState }) {
+export function AgentAvatar({
+  agent,
+  size = 64,
+  className,
+  sessionId,
+  mood,
+  showCharacterOverlay = true
+}: {
+  agent: AgentProfile | null | undefined
+  size?: number
+  className?: string
+  sessionId?: string | null
+  mood?: AvatarState
+  showCharacterOverlay?: boolean
+}) {
   const avatar = agent?.look.avatar
   const asset = useAsset(avatar?.kind === 'file' ? avatar.assetId : null)
   const live = useAvatarState(sessionId ?? null)
@@ -82,20 +99,78 @@ export function AgentAvatar({ agent, size = 24, className, sessionId, mood }: { 
       ))}
     </span>
   )
+
+  const sheets = agentSheets(agent)
+  const count = sheets.length
+  const hasSheet = Boolean(showCharacterOverlay && count > 0)
+  const primarySheet = sheets[0] ?? ''
+  const sheetPreview = useEntryPreview(hasSheet && primarySheet ? `@sheet:${primarySheet}` : '')
+  const validSheet = sheetPreview && !('missing' in sheetPreview) ? sheetPreview : null
+
+  const characterBadge = hasSheet && (
+    <span
+      className={cn(
+        'pointer-events-none absolute -bottom-1 -right-1 z-20 flex items-center justify-center overflow-hidden border border-accent bg-black shadow-[0_0_6px_rgba(0,0,0,0.9)]',
+        size < 20 ? 'h-1.5 w-1.5 -bottom-0.5 -right-0.5 border-none bg-accent' : ''
+      )}
+      title={
+        count > 1
+          ? `In character as ${count} characters (${validSheet ? showName(validSheet.title) : primarySheet} +${count - 1} more)`
+          : `In character: ${validSheet ? showName(validSheet.title) : primarySheet}`
+      }
+      style={
+        size >= 20
+          ? {
+              width: count === 1 && validSheet?.image ? Math.max(13, Math.round(size * 0.44)) : undefined,
+              height: Math.max(13, Math.round(size * 0.44)),
+              minWidth: Math.max(13, Math.round(size * 0.44))
+            }
+          : undefined
+      }
+    >
+      {size >= 20 && (
+        count > 1 ? (
+          <span className="flex h-full w-full items-center justify-center px-0.5 font-mono text-[7px] font-bold uppercase leading-none tracking-tight text-accent">
+            {count}C
+          </span>
+        ) : validSheet?.image ? (
+          <AssetMedia id={validSheet.image} className="h-full w-full object-cover" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center px-1 font-mono text-[7px] font-bold uppercase leading-none tracking-tight text-accent">
+            CHR
+          </span>
+        )
+      )}
+    </span>
+  )
+
+  const playedSummary = hasSheet
+    ? `${agent?.name ?? 'Agent'} (Playing ${count > 1 ? `${count} characters` : validSheet ? showName(validSheet.title) : primarySheet})`
+    : undefined
+
   if (avatar?.kind === 'coded') {
     return (
-      <span style={style} className={cn('relative inline-block shrink-0 overflow-visible border border-accent/60 bg-black', className)}>
+      <span
+        style={style}
+        title={playedSummary}
+        className={cn('relative inline-block shrink-0 overflow-visible border border-accent/60 bg-black', hasSheet && 'border-accent', className)}
+      >
         <span className="absolute inset-0 overflow-hidden">
           <CodedAvatar type={avatar.type} state={state} size={size} />
         </span>
         {overlay}
+        {characterBadge}
       </span>
     )
   }
   const motion = state === 'idle' && size < 40 ? '' : MOTION[state]
   if (asset && (asset.kind === 'image' || asset.kind === 'video')) {
     return (
-      <span style={style} className={cn('relative inline-block shrink-0 overflow-visible border border-accent/60 bg-black', className)}>
+      <span
+        style={style}
+        title={playedSummary}
+        className={cn('relative inline-block shrink-0 overflow-visible border border-accent/60 bg-black', hasSheet && 'border-accent', className)}
+      >
         <span className="absolute inset-0 overflow-hidden">
           <span className={cn('block h-full w-full', motion, state === 'sad' && 'grayscale-[0.5]')}>
             <Media asset={asset} className="h-full w-full" />
@@ -103,17 +178,24 @@ export function AgentAvatar({ agent, size = 24, className, sessionId, mood }: { 
           <StateFx state={state} />
         </span>
         {overlay}
+        {characterBadge}
       </span>
     )
   }
   return (
     <span
       style={{ ...style, fontSize: Math.max(9, Math.round(size * 0.45)) }}
-      className={cn('relative inline-flex shrink-0 items-center justify-center border border-accent/60 bg-accent/10 font-mono font-bold uppercase text-accent', className)}
+      title={playedSummary}
+      className={cn(
+        'relative inline-flex shrink-0 items-center justify-center border border-accent/60 bg-accent/10 font-mono font-bold uppercase text-accent',
+        hasSheet && 'border-accent',
+        className
+      )}
     >
       <span className={cn('inline-block', motion)}>{(agent?.name ?? '?').trim().charAt(0) || '?'}</span>
       <StateFx state={state} />
       {overlay}
+      {characterBadge}
     </span>
   )
 }

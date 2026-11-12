@@ -8,7 +8,7 @@ export function ShellDeck({ items, adds, bind, scale }: ShellViewProps) {
       {items.map((item, i) => {
         const b = bind(item)
         return (
-          <button key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i)} className="shell-enter group relative block min-w-0 text-left">
+          <button key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i, b.props.style)} className="shell-enter group relative block min-w-0 text-left">
             {item.face ?? (
               <ShellFace
                 title={item.title}

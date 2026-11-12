@@ -14,7 +14,7 @@ export function ReasoningStylePicker() {
   const fallback = agent.reasoningStyle ?? styles[0]?.name ?? 'none'
   const options = [{ value: '', label: `Style: ${fallback}` }, ...styles.map((s) => ({ value: s.name, label: s.name }))]
   return (
-    <Field label="Reasoning style" hint="Used by the reason tool from its next call. The first option is the agent's own.">
+    <Field label="Reasoning style">
       <Select value={value ?? ''} options={options} onChange={(v) => set(v || null)} className="h-8 text-[12px]" />
     </Field>
   )

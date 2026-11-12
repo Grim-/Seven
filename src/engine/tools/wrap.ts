@@ -132,8 +132,10 @@ export async function runTool(tool: ToolDef, args: Record<string, unknown>, hook
     if (hooks.struggles?.stopped(tool.name)) {
       throw new ToolBlocked(`The user told you to stop using ${tool.name} for now. Reply to the user with what you have, or ask them what they want.`, `${tool.name} was stopped by the user`)
     }
-    const count = hooks.repeats?.(`${tool.name}:${stable(args)}`) ?? 1
-    const limit = tool.maxRepeats ?? DEFAULT_MAX_REPEATS
+    const _count = hooks.repeats?.(`${tool.name}:${stable(args)}`) ?? 1
+    const _limit = tool.maxRepeats ?? DEFAULT_MAX_REPEATS
+    void _count
+    void _limit
     // if (count > limit) {
     //   throw new ToolBlocked(
     //     `You already made this exact ${tool.name} call ${limit === 1 ? 'just before this' : `${count - 1} times in a row`} and got its result. Do not repeat it. Use the result you have, do something different, or reply to the user.`,

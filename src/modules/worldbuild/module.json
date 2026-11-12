@@ -1,8 +1,0 @@
-{
-  "id": "worldbuild",
-  "name": "World builder",
-  "description": "Lets the agent create, change and delete any record in its world, and edit or remove entries. Needs the World module.",
-  "version": "1.0.0",
-  "apiVersion": 1,
-  "permission": "custom"
-}

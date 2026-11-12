@@ -4,6 +4,7 @@ import { cn } from '../../lib/cn'
 import { openMenu, type MenuItem } from './ContextMenu'
 import { pickWith, type Picking } from '../../lib/picking'
 import { dragEntries, droppedEntries, isEntryDrag } from '../../lib/entryDrag'
+import { getTransitionId, setTransitionId, transitionView } from '../../lib/viewTransition'
 import { ShellCards } from './ShellCards'
 import { ShellRows } from './ShellRows'
 import { ShellTiles } from './ShellTiles'
@@ -74,9 +75,9 @@ function load(ids: string[], layouts: ShellLayout[], sorts: ShellSort[]): Saved 
   }
 }
 
-function store(ids: string[], value: Saved): void {
+function store(id: string, value: Saved): void {
   try {
-    for (const id of ids) localStorage.setItem(`seven.shell.${id}`, JSON.stringify(value))
+    localStorage.setItem(`seven.shell.${id}`, JSON.stringify(value))
   } catch {
     return
   }
@@ -153,7 +154,7 @@ export function KindShell({
   const update = (next: Partial<Saved>) => {
     const value = { ...saved, ...next }
     setSaved(value)
-    store(ids, value)
+    store(id, value)
   }
 
   const shown = useMemo(() => {
@@ -174,14 +175,17 @@ export function KindShell({
   const View = LAYOUTS[layout].View
   const picked = picking.picked.filter((k) => shown.some((i) => i.key === k))
   const withPicked = (item: ShellItem) => (picked.includes(item.key) ? picked : [item.key])
+  const tid = getTransitionId()
   const bind = (item: ShellItem): ShellBinding => ({
     props: {
       ...drag(item),
+      style: tid === item.key ? ({ viewTransitionName: 'active-entry' } as React.CSSProperties) : undefined,
       onClick: (e: React.MouseEvent) => {
         const next = pickable ? pickWith(e, item.key, { ...picking, picked, selected: null, order: shown.map((i) => i.key) }) : null
         if (next) return setPicking(next)
         setPicking({ picked: [], anchor: item.key })
-        onOpen?.(item, shown)
+        setTransitionId(item.key)
+        transitionView(() => onOpen?.(item, shown), item.key)
       },
       onContextMenu: (e: React.MouseEvent) => onMenu?.(e, item, withPicked(item)),
       onDoubleClick: () => onDouble?.(item)

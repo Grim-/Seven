@@ -22,7 +22,7 @@ export function Modal({ open, title, onClose, footer, wide, bodyClassName, child
     {open && (
     <motion.div
       data-layer
-      className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm tablet:p-2 phone:p-0"
       style={{ zIndex: 100 + layer }}
       onMouseDown={onClose}
       initial={{ opacity: 0 }}
@@ -31,7 +31,7 @@ export function Modal({ open, title, onClose, footer, wide, bodyClassName, child
       transition={{ duration: 0.15 }}
     >
       <motion.div
-        className={cn('record', wide ? 'flex max-h-[92vh] w-[min(1240px,96vw)] flex-col' : 'w-[min(520px,92vw)]')}
+        className={cn('record', wide ? 'flex max-h-[92vh] w-[min(1240px,96vw)] flex-col' : 'w-[min(520px,92vw)]', wide ? 'tablet:w-full' : 'tablet:w-[520px]', 'tablet:flex tablet:max-h-full tablet:max-w-full tablet:flex-col phone:h-full phone:max-h-none phone:w-full phone:pt-[env(safe-area-inset-top)]')}
         onMouseDown={(e) => e.stopPropagation()}
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -40,12 +40,12 @@ export function Modal({ open, title, onClose, footer, wide, bodyClassName, child
       >
         <div className="record-header flex items-center justify-between">
           <span>{title}</span>
-          <button className="text-dim hover:text-alert" onClick={onClose}>
+          <button className="text-dim hover:text-alert touch:-my-2 touch:flex touch:h-10 touch:w-10 touch:items-center touch:justify-end" onClick={onClose}>
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className={cn('relative z-[2] font-sans text-[13.5px] text-white', bodyClassName ?? 'p-4')}>{children}</div>
-        {footer && <div className="relative z-[2] flex justify-end gap-2 border-t border-line/60 px-4 py-3">{footer}</div>}
+        <div className={cn('relative z-[2] font-sans text-[13.5px] text-white tablet:min-h-0 tablet:flex-1 tablet:overflow-y-auto', bodyClassName ?? 'p-4')}>{children}</div>
+        {footer && <div className="relative z-[2] flex justify-end gap-2 border-t border-line/60 px-4 py-3 tablet:shrink-0 tablet:flex-wrap phone:pb-[calc(0.75rem+env(safe-area-inset-bottom))]">{footer}</div>}
       </motion.div>
     </motion.div>
     )}

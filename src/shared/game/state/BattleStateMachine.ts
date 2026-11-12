@@ -320,12 +320,13 @@ export function executeAttack(
 export function combatantFromVisitor(
   visitor: PlaceVisitor,
   at?: Point,
-  isPlayer = false
+  isPlayer = false,
+  id = visitor.sheet
 ): Omit<Combatant, 'initiative'> {
   const dnd = visitor.dnd
   return {
-    id: visitor.sheet,
-    sheet: visitor.sheet,
+    id,
+    sheet: visitor.sheet || undefined,
     name: visitor.name,
     image: visitor.image,
     isPlayer,

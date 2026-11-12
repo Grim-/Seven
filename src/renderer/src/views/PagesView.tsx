@@ -5,7 +5,7 @@ import { create } from 'zustand'
 import MiniSearch from 'minisearch'
 import { ArrowUpToLine, BookOpen, ChevronDown, ChevronRight, Download, Folder, FolderInput, FolderOpen, FolderPlus, Hash, Plus, X } from 'lucide-react'
 import { pageKindOf, type LibrarySection, type PageMeta } from '@shared/types'
-import { AddressPane, Button, EmptyState, Gutter, MainPane, PaneHeader, ReadingPane, SidePane, Split, VirtualList, openMenu, type MenuItem } from '../components/ui'
+import { AddressPane, Button, EmptyState, ListPane, ListToggle, MainPane, PaneHeader, ReadingPane, Split, VirtualList, openMenu, type MenuItem } from '../components/ui'
 import { askNewFolder, folderNewItems, newPageMenu, renamePage, usePageTypes } from '../components/data/PageView'
 import { ancestorsOf, findPage, useData, type DataSelection } from '../store/data'
 import { FolderPath } from '../components/data/FolderPath'
@@ -23,6 +23,9 @@ import { pickWith } from '../lib/picking'
 import { dragEntries, droppedEntries, isEntryDrag } from '../lib/entryDrag'
 import { bulkItems, moveEntries, moveItems, tagItems } from '../components/data/bulkMenu'
 import { showInData } from '../lib/library'
+import { transitionView } from '../lib/viewTransition'
+import { useListPrefs } from '../lib/listPrefs'
+import { useCompactLayout } from '../lib/form'
 
 const ROOT = ''
 const INDEX_ID = 'all:wiki-index'
@@ -203,10 +206,16 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
   const specials = useSpecials()
   const special = selected && !current ? (specials.find((s) => s.id === selected) ?? null) : null
   const path = useMemo(() => (current ? ancestorsOf(current.id, byId) : []), [current, byId])
+  const assets = useData((s) => s.assets)
+  const currentAsset = selected && !current && !special ? (assets.find((a) => a.id === selected) ?? null) : null
+  const assetParent = currentAsset?.parent && byId.has(currentAsset.parent) ? currentAsset.parent : null
+  const assetTrail = useMemo(() => (assetParent ? ancestorsOf(assetParent, byId) : []), [assetParent, byId])
 
   useEffect(() => {
     if (path.length) reveal(path.map((p) => p.id))
-  }, [current?.id])
+    if (assetTrail.length) reveal(assetTrail.map((p) => p.id))
+    if (assetParent) reveal([assetParent])
+  }, [current?.id, currentAsset?.id])
 
   const tagsOf = (p: PageMeta): string[] => tagMap[`${pageKindOf(p.type)}/${p.id}`] ?? []
   const tagList = useMemo(() => {
@@ -412,14 +421,19 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
         )
       })
   const openPage = useOpenPage()
-  const listWidth = useApp((s) => s.settings?.pagesWidth ?? 288)
+  const [listPrefs, saveList] = useListPrefs('pagesList', { open: true, width: 288 })
+  const compact = useCompactLayout()
+  useEffect(() => {
+    if (compact) saveList({ open: false })
+  }, [selected])
   const kind = current ? pageKindOf(current.type) : null
   const Screen = kind ? presentOf(kind).Screen : undefined
+  const FileScreen = presentOf('file').Screen
 
   return (
     <div className="h-full min-h-0">
     <Split>
-      <SidePane id="pages" width={listWidth} min={200} max={640} reset={288} onWidth={(w) => void useApp.getState().updateSettings({ pagesWidth: w })}>
+      <ListPane id="pages" open={listPrefs.open} width={listPrefs.width} min={200} max={640} reset={288} onWidth={(w) => saveList({ width: w })} onClose={() => saveList({ open: false })}>
       <aside className="panel-box flex h-full w-full flex-col">
         <PaneHeader title="Pages" titleHint="Top level" count={pages.length} onTitle={() => select(null)} onTitleMenu={(e) => kindMenuAt(e, section, selectData)} back={onBack ? { label: 'All kinds', onClick: onBack } : undefined}>
           <Button size="sm" variant="ghost" icon={<FolderPlus />} title="New folder" onClick={() => askNewFolder(made(null))} />
@@ -491,24 +505,44 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
           <div className="min-h-6 flex-1" />
         </div>
       </aside>
-      </SidePane>
-      <Gutter resets="pages" />
-      <MainPane id="page">
+      </ListPane>
+      <MainPane id="page" className="flex-row">
+      <ListToggle open={listPrefs.open} onToggle={() => saveList({ open: !listPrefs.open })} what="the pages list" />
       <section className="flex h-full min-w-0 flex-1 flex-col gap-2">
-        {current && current.type === FOLDER_TYPE ? (
-          <AddressPane path={<FolderPath trail={path} current={showName(current.title)} rename={{ value: current.title, onSave: (title) => void renamePage(current.id, title) }} onPick={select} />} tools={<CopyLinkButton kind={pageKindOf(current.type)} id={current.id} />}>
-            <PageExplorer key={current.id} folder={current.id} onOpen={(id) => select(id)} onMenu={menu} />
-          </AddressPane>
+        {currentAsset ? (
+          <div style={{ viewTransitionName: 'active-entry' }} className="flex h-full min-h-0 flex-1 flex-col">
+            <ReadingPane className="p-0 flex-1">
+              <AddressPane
+                path={<FolderPath trail={assetTrail} current={currentAsset.name} up={assetParent} onPick={(id) => transitionView(() => select(id))} />}
+                tools={<CopyLinkButton kind="file" id={currentAsset.id} />}
+              >
+                {FileScreen ? (
+                  <FileScreen
+                    key={currentAsset.id}
+                    kind="file"
+                    id={currentAsset.id}
+                    select={(s) => transitionView(() => select(s ? s.id : assetParent))}
+                  />
+                ) : (
+                  <EmptyState title="No view">Could not display this file.</EmptyState>
+                )}
+              </AddressPane>
+            </ReadingPane>
+          </div>
+        ) : current && current.type === FOLDER_TYPE ? (
+          <PageExplorer key={current.id} folder={current.id} onOpen={(id) => transitionView(() => select(id))} onMenu={menu} />
         ) : current ? (
-          <ReadingPane className="p-0">
-            <AddressPane path={<FolderPath trail={path} current={showName(current.title)} rename={{ value: current.title, onSave: (title) => void renamePage(current.id, title) }} onPick={select} />} tools={<CopyLinkButton kind={pageKindOf(current.type)} id={current.id} />}>
-              {Screen ? <Screen key={kind} kind={kind!} id={current.id} select={screenSelect} /> : <EmptyState title="No view">This kind has no screen of its own.</EmptyState>}
-            </AddressPane>
-          </ReadingPane>
+          <div style={{ viewTransitionName: 'active-entry' }} className="flex h-full min-h-0 flex-1 flex-col">
+            <ReadingPane className="p-0 flex-1">
+              <AddressPane path={<FolderPath trail={path} current={showName(current.title)} rename={{ value: current.title, onSave: (title) => void renamePage(current.id, title) }} onPick={(id) => transitionView(() => select(id))} />} tools={<CopyLinkButton kind={pageKindOf(current.type)} id={current.id} />}>
+                {Screen ? <Screen key={kind} kind={kind!} id={current.id} select={screenSelect} /> : <EmptyState title="No view">This kind has no screen of its own.</EmptyState>}
+              </AddressPane>
+            </ReadingPane>
+          </div>
         ) : special ? (
           <AddressPane
             path={
-              <FolderPath trail={[{ id: INDEX_ID, title: INDEX_TITLE }, { id: null, title: 'Seven' }]} current={special.title} onPick={select}>
+              <FolderPath trail={[{ id: INDEX_ID, title: INDEX_TITLE }, { id: null, title: 'Seven' }]} current={special.title} onPick={(id) => transitionView(() => select(id))}>
                 <span className="ml-2 text-faint">generated, read only</span>
               </FolderPath>
             }
@@ -518,7 +552,7 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
         ) : selected === INDEX_ID ? (
           <AddressPane
             path={
-              <FolderPath trail={[]} current={INDEX_TITLE} onPick={select}>
+              <FolderPath trail={[]} current={INDEX_TITLE} onPick={(id) => transitionView(() => select(id))}>
                 <span className="ml-2 text-faint">every folder and page</span>
               </FolderPath>
             }
@@ -526,20 +560,7 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
             <GeneratedPage id={INDEX_ID} onEntry={openLink} />
           </AddressPane>
         ) : (
-          <PageExplorer
-            folder={null}
-            onOpen={(id) => select(id)}
-            onMenu={menu}
-            header={
-              <>
-                <span className="font-mono text-[12px] text-accent-soft">/</span>
-                <button onClick={() => select(INDEX_ID)} className="ml-2 flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-dim hover:text-white">
-                  <BookOpen className="h-3.5 w-3.5" />
-                  {INDEX_TITLE}
-                </button>
-              </>
-            }
-          />
+          <PageExplorer folder={null} onOpen={(id) => transitionView(() => select(id))} onMenu={menu} />
         )}
       </section>
       </MainPane>

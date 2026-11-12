@@ -3,7 +3,7 @@ import { useAgentIdOf, useConversation } from './conversation'
 import { useAgents } from '../store/agents'
 import { engine } from './ipc'
 import { failed } from './notify'
-import type { AgentProfile, SessionMeta, ThinkingLevel } from '@shared/types'
+import type { AgentProfile, SessionMeta, ThinkingLevel, ToolChoiceMode } from '@shared/types'
 
 interface Override<T> {
   meta: (m: SessionMeta) => T | null | undefined
@@ -39,4 +39,12 @@ export const THINKING_OVERRIDE: Override<ThinkingLevel> = {
   save: (id, thinking) => engine('sessions.setThinking', { id, thinking }),
   setDraft: (key, thinking) => useSessions.getState().setDraftThinking(key, thinking),
   what: 'thinking level'
+}
+
+export const TOOL_CHOICE_OVERRIDE: Override<ToolChoiceMode> = {
+  meta: (m) => m.toolChoice,
+  draft: (d) => d.toolChoice,
+  save: (id, toolChoice) => engine('sessions.setToolChoice', { id, toolChoice }),
+  setDraft: (key, toolChoice) => useSessions.getState().setDraftToolChoice(key, toolChoice),
+  what: 'tool execution mode'
 }

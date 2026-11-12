@@ -4,9 +4,6 @@ import { ChevronRight, FolderOpen, MessageSquarePlus, Plus, Shapes, Trash2, X } 
 import { KindAccess } from '../components/agents/KindAccess'
 import { DEFAULT_CONTEXT, DEFAULT_LIBRARY_ACCESS, PERMISSION_MODES, type ChatAccess, SAMPLING_KEYS, type AgentDraft, type AgentProfile, type PermissionMode, type PromptCost } from '@shared/types'
 import { BackBar, Button, Field, Input, KindShell, Modal, NumberField, Panel, Select, Slider, Toggle, ViewHeader, useAutosave, MakeOrSaved } from '../components/ui'
-import { SheetSelect } from '../components/data/sheet/SheetSelect'
-import { CardSourceSelect } from '../components/cards/CardSourceSelect'
-import type { CardSource } from '@shared/cardDecks'
 import { engine, main } from '../lib/ipc'
 import { DEFAULT_AGENT_ID, useAgents } from '../store/agents'
 import { useVault } from '../store/vault'
@@ -29,6 +26,7 @@ import { openEntry } from '../lib/library'
 import { useData } from '../store/data'
 import { useKindInfos } from '../lib/kinds'
 import { ThinkingSelect } from '../components/chat/ThinkingSelect'
+import { ToolChoiceSelect } from '../components/chat/ToolChoiceSelect'
 import { useViewPlace } from '../lib/viewPlace'
 
 const BLANK: AgentDraft = { name: 'New agent', description: '', modelId: null, systemPrompt: '', sampling: {}, workspace: null, modules: [...CORE_MODULES, 'ui'], permissionMode: 'ask' }
@@ -57,6 +55,7 @@ function toDraft(agent: AgentProfile): AgentDraft {
     offTools: [...(agent.offTools ?? [])],
     reasoningStyle: agent.reasoningStyle ?? null,
     thinking: agent.thinking ?? null,
+    toolChoice: agent.toolChoice ?? null,
     mindAuto: agent.mindAuto,
     remindEvery: agent.remindEvery,
     maxToolRounds: agent.maxToolRounds,
@@ -310,6 +309,13 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
         )}
         </div>
         </EditorSection>
+        <EditorSection id="prompt" title="System prompt" summary={draft.systemPrompt ? draft.systemPrompt.slice(0, 100) : 'None'} isNew={!draft.id}>
+          <div className="grid grid-cols-2 gap-x-5 gap-y-4">
+            <Field label="System prompt" className="col-span-2" hint="The agent's standing instructions. Kept at the top of every conversation.">
+              <LinkTextarea mono rolls={false} rows={14} value={draft.systemPrompt} onValue={(systemPrompt) => change({ ...draft, systemPrompt })} />
+            </Field>
+          </div>
+        </EditorSection>
         <EditorSection id="mind" title="Mind" summary={agentGroups(draft, toolsetList, modules).includes('mind') ? 'Memories, thoughts, journal and reasoning style' : 'Memories, thoughts, journal and reasoning style (Mind is not turned on for this agent)'} isNew={!draft.id}>
             {!agentGroups(draft, toolsetList, modules).includes('mind') && <div className="mb-2 text-[12px] text-accent">Mind is not turned on for this agent, so it can't remember, recall, think or reason. Turn it on under Tools.</div>}
             <div className="mb-3 flex flex-col gap-2">
@@ -322,9 +328,8 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
                 <NumberField value={draft.remindEvery ?? 5} min={0} max={100} step={1} onChange={(v) => change({ ...draft, remindEvery: v ?? 0 })} className="w-28" />
               </Field>
               {agentGroups(draft, toolsetList, modules).includes('mind') && <StylePicker value={draft.reasoningStyle ?? null} onChange={(reasoningStyle) => change({ ...draft, reasoningStyle })} />}
-              <SheetPicker value={draft.sheet ?? null} onChange={(sheet) => change({ ...draft, sheet })} />
-              <PlayerPicker player={draft.player ?? null} cards={draft.cards ?? null} onPlayer={(player) => change({ ...draft, player })} onCards={(cards) => change({ ...draft, cards })} />
               <ThinkingSelect value={draft.thinking ?? null} fallback="the model's setting" hint="How much this agent's model thinks before replying, unless a chat picks otherwise. Token limits for each level are set per model in Models." onChange={(thinking) => change({ ...draft, thinking })} />
+              <ToolChoiceSelect value={draft.toolChoice ?? null} fallback="Auto (Model decides)" hint="Optionally enforce that this agent calls a tool (such as reason) before it is allowed to generate speech or dialogue." onChange={(toolChoice) => change({ ...draft, toolChoice })} />
             </div>
             {draft.id && (
               <div className="flex h-[560px] min-h-0">
@@ -332,6 +337,7 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
               </div>
             )}
           </EditorSection>
+
         <EditorSection id="look" title="Look" summary="Picture, theme, colours and background" isNew={!draft.id}>
         <div className="grid grid-cols-2 gap-x-5 gap-y-4">
         <Field label="Voice" className="col-span-2" hint="Used when its replies are read aloud and when it speaks in scenes.">
@@ -346,13 +352,7 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
         <LookEditor draft={draft} onChange={change} />
         </div>
         </EditorSection>
-        <EditorSection id="prompt" title="System prompt" summary={draft.systemPrompt ? draft.systemPrompt.slice(0, 100) : 'None'} isNew={!draft.id}>
-        <div className="grid grid-cols-2 gap-x-5 gap-y-4">
-        <Field label="System prompt" className="col-span-2" hint="The agent's standing instructions. Kept at the top of every conversation.">
-          <LinkTextarea mono rolls={false} rows={14} value={draft.systemPrompt} onValue={(systemPrompt) => change({ ...draft, systemPrompt })} />
-        </Field>
-        </div>
-        </EditorSection>
+
         <EditorSection id="tools" title="Tools" summary={`${(draft.toolsets ?? []).length} toolsets, ${draft.modules.length} modules`} isNew={!draft.id}>
         <div className="grid grid-cols-2 gap-x-5 gap-y-4">
         <ToolsetPicker draft={draft} onChange={change} />
@@ -555,27 +555,6 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
         Delete "{draft.name}"? Chats that used it will fall back to the default agent. Its folder in Files, and everything in it, can be kept or deleted too.
       </Modal>
     </Panel>
-  )
-}
-
-function SheetPicker({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
-  return (
-    <Field label="Character" className="col-span-2" hint="A character sheet the agent plays. It goes at the top of its prompt, before the system prompt. Sheets are in Data.">
-      <SheetSelect value={value} onChange={onChange} className="h-8 text-[12px]" />
-    </Field>
-  )
-}
-
-function PlayerPicker({ player, cards, onPlayer, onCards }: { player: string | null; cards: CardSource | null; onPlayer: (id: string | null) => void; onCards: (source: CardSource | null) => void }) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <Field label="Your character" hint="The character you play in this agent's chats: your rolls and your cards are theirs.">
-        <SheetSelect value={player} onChange={onPlayer} className="h-8 text-[12px]" />
-      </Field>
-      <Field label="Cards" hint="The hand you play from in this agent's chats. A set starts a fresh deck in each new chat.">
-        <CardSourceSelect value={cards} onChange={onCards} className="h-8 text-[12px]" />
-      </Field>
-    </div>
   )
 }
 

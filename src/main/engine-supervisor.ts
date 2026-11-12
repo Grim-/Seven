@@ -40,9 +40,14 @@ export class EngineSupervisor extends EventEmitter {
   private stopping = false
   private state: EngineState = 'starting'
   private servers: number[] = []
+  private routes: { port: number; secret: string } | null = null
 
   status(): EngineStatus {
     return { state: this.state, restarts: this.restarts }
+  }
+
+  modelRoutes(): { port: number; secret: string } | null {
+    return this.routes
   }
 
   private setState(state: EngineState): void {
@@ -82,12 +87,17 @@ export class EngineSupervisor extends EventEmitter {
         this.servers = (message.payload as { pids: number[] }).pids
         return
       }
+      if (message.event === 'engine.modelRoutes') {
+        this.routes = message.payload as { port: number; secret: string }
+        return
+      }
       this.emit('event', message)
     })
 
     child.on('exit', (code) => {
       endServers(this.servers)
       this.servers = []
+      this.routes = null
       if (this.child !== child) return
       this.child = null
       this.rejectAll(new Error(`Engine exited with code ${code}`))
@@ -144,6 +154,7 @@ export class EngineSupervisor extends EventEmitter {
   stop(): void {
     this.stopping = true
     endServers(this.servers)
+    this.routes = null
     this.rejectAll(new Error('Engine stopped'))
     this.child?.kill()
     this.child = null

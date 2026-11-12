@@ -8,6 +8,10 @@ export interface SaveCharacter {
   where: string
 }
 
+export interface SaveCreature extends EntityRecord {
+  faction: string
+}
+
 export type SaveRecord = Record<string, unknown> | null
 
 export interface GameSave {
@@ -18,7 +22,7 @@ export interface GameSave {
   updatedAt: number
   clockId: string
   clock: ClockState
-  creatures: EntityRecord[]
+  creatures: SaveCreature[]
   flags: Record<string, string | number | boolean>
   used: string[]
   characters: Record<string, SaveCharacter>
@@ -81,7 +85,7 @@ export function cleanSave(raw: unknown, id: string): GameSave {
     updatedAt: num(v.updatedAt, 0),
     clockId: str(v.clockId),
     clock: cleanClockState(v.clock),
-    creatures: Array.isArray(v.creatures) ? v.creatures.filter(isRecord) : [],
+    creatures: Array.isArray(v.creatures) ? v.creatures.filter(isRecord).map((c) => ({ ...c, faction: str(obj(c).faction) })) : [],
     flags,
     used: Array.isArray(v.used) ? v.used.filter((u): u is string => typeof u === 'string') : [],
     characters: cleanCharacters(v.characters),

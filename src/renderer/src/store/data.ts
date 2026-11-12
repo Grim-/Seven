@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import type { AssetMeta, Page, PageMeta } from '@shared/types'
 import { linkFor } from '@shared/text'
 import { engine } from '../lib/ipc'
+import { remoteAssetUrl } from '../lib/transport'
 
 export type DataSelection = { kind: string; id: string }
 
@@ -125,7 +126,7 @@ export function useAsset(id: string): AssetMeta | null | undefined {
 }
 
 export function assetUrl(asset: AssetMeta): string {
-  return `seven-asset://${asset.id}/${encodeURIComponent(asset.file)}`
+  return remoteAssetUrl(asset.id, asset.file) ?? `seven-asset://${asset.id}/${encodeURIComponent(asset.file)}`
 }
 
 export function ancestorsOf(id: string, byId: Map<string, PageMeta>): PageMeta[] {

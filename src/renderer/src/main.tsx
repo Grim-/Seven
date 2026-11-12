@@ -1,10 +1,9 @@
 import './index.css'
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { App } from './App'
-import { Overlay } from './overlay/Overlay'
+import './transport/electron'
+import './transport/remote'
+import { startTransport } from './lib/transport'
+import { startFormWatch } from './lib/form'
 
-const mode = new URLSearchParams(window.location.search).get('mode') === 'overlay' ? 'overlay' : 'app'
-document.documentElement.dataset.mode = mode
-
-createRoot(document.getElementById('root')!).render(<StrictMode>{mode === 'overlay' ? <Overlay /> : <App />}</StrictMode>)
+startTransport()
+startFormWatch()
+void import('./start')

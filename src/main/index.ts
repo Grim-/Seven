@@ -8,9 +8,11 @@ import { OverlayController } from './overlay'
 import { Hotkey } from './hotkey'
 import { createTray, type SevenTray } from './tray'
 import { registerIpc } from './ipc'
+import { Gateway } from './network/gateway'
+import { Bridge } from './network/bridge'
 import { setupBrowser } from './browser'
 import { settings } from './settings'
-import { Channel } from '@shared/protocol'
+import { Channel, type EngineRequestName, type EventMessage } from '@shared/protocol'
 import { protocol } from 'electron'
 import { assetScheme, handleAssets } from './assets'
 import { resetWindow } from './windowState'
@@ -55,6 +57,8 @@ function showApp(sessionId: string | null): void {
 }
 
 let vault: Vault | null = null
+let gateway: Gateway | null = null
+let bridge: Bridge | null = null
 
 function quit(): void {
   quitting = true
@@ -83,8 +87,22 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     vault = new Vault(engine, broadcast)
-    registerIpc({ engine, overlay, hotkey, vault, showApp, quit })
-    engine.on('event', broadcast)
+    const network = new Gateway(() => engine.modelRoutes())
+    gateway = network
+    const ipc = registerIpc({ engine, overlay, hotkey, vault, gateway: network, showApp, quit })
+    const link = new Bridge(() => network.settings(), network.devices, network.uploads, (name, params) => engine.request(name as EngineRequestName, params as never), ipc, () => void network.refresh())
+    network.attachBridge({ connected: () => link.connectedDevices(), disconnect: (deviceId) => link.disconnectDevice(deviceId) })
+    bridge = link
+    network.on('server', (server) => link.attach(server))
+    network.on('changed', (status) => {
+      const message: EventMessage = { event: 'network.changed', payload: status }
+      broadcast(message)
+      link.feed(message)
+    })
+    engine.on('event', (message: EventMessage) => {
+      broadcast(message)
+      link.feed(message)
+    })
     setupBrowser(engine)
     engine.on('event', createNotifier(showApp))
 
@@ -100,6 +118,7 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     engine.start()
+    network.start()
 
     const startHidden = process.argv.includes('--hidden')
     ensureAppWindow(!startHidden)
@@ -126,6 +145,8 @@ if (!app.requestSingleInstanceLock()) {
     hotkey.dispose()
     vault?.wipeCopies()
     engine.stop()
+    bridge?.detach()
+    void gateway?.close()
     tray?.tray.destroy()
   })
 

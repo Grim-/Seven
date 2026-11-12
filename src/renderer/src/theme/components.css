@@ -89,6 +89,14 @@
     clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
   }
 
+  .bracket-left {
+    clip-path: polygon(0 0, 100% 8px, 100% calc(100% - 8px), 0 100%);
+  }
+
+  .bracket-right {
+    clip-path: polygon(0 8px, 100% 0, 100% 100%, 0 calc(100% - 8px));
+  }
+
   .card-deks {
     position: relative;
     border: 1px solid var(--color-line);
@@ -378,6 +386,14 @@
     aspect-ratio: 4 / 3;
     width: 100%;
     color: var(--c, var(--color-accent-soft));
+  }
+
+  .shell-face-art img,
+  .shell-face-art video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.4);
   }
 
   .shell-face-art > svg {
@@ -1070,6 +1086,50 @@
     from {
       opacity: 0;
       transform: translateY(6px);
+    }
+  }
+
+  ::view-transition-group(active-entry) {
+    animation-duration: 0.26s;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  ::view-transition-old(active-entry) {
+    animation: 0.08s ease-out forwards vt-fade-out;
+    object-fit: contain;
+  }
+
+  ::view-transition-new(active-entry) {
+    animation: 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards vt-fade-in;
+    object-fit: contain;
+  }
+
+  @keyframes vt-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes vt-fade-in {
+    0% {
+      opacity: 0;
+    }
+    30% {
+      opacity: 0.4;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation: none !important;
     }
   }
 

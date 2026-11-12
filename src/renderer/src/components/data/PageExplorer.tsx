@@ -1,20 +1,25 @@
-import { useMemo, type ReactNode } from 'react'
-import { CornerLeftUp, File, FileText, Folder } from 'lucide-react'
+import { useEffect, useMemo, type ReactNode } from 'react'
+import { BookOpen, File, FilePlus, FileText, Folder, FolderPlus, Upload } from 'lucide-react'
 import { FOLDER_TYPE, showName } from '@shared/ids'
 import { pageKindOf, type AssetMeta, type PageMeta } from '@shared/types'
-import { KindShell, TileIcon, menuAdds, openMenu, type ShellItem } from '../ui'
-import { useData } from '../../store/data'
+import { KindShell, TileIcon, openMenu, type ShellItem } from '../ui'
+import { ancestorsOf, useData } from '../../store/data'
 import { AssetMedia } from '../pictures/AssetMedia'
-import { KindIcon, openEntry } from '../../lib/library'
-import { folderNewItems, usePageTypes } from './PageView'
+import { KindIcon } from '../../lib/library'
+import { askNewFolder, folderNewItems, newPageMenu, renamePage, usePageTypes } from './PageView'
 import { rowMenu } from '../../views/data/entryMenu'
 import { bulkItems, moveEntries } from './bulkMenu'
 import { presentOf } from '../../registries/kinds'
+import { FolderPath } from './FolderPath'
+import { chooseFiles } from '../../lib/importFiles'
+import { CopyLinkButton } from './CopyLinkButton'
+import { VIEWABLE_MEDIA_KINDS } from '../pictures/FileEditor'
 
-const UP = '__up'
-const VIEWABLE: AssetMeta['kind'][] = ['image', 'video']
+const VIEWABLE = VIEWABLE_MEDIA_KINDS
+const INDEX_ID = 'all:wiki-index'
+const INDEX_TITLE = 'Wiki index'
 
-export function PageExplorer({ folder, header, onOpen, onOpenFile = (id) => openEntry('file', id), onMenu }: { folder: string | null; header?: ReactNode; onOpen: (id: string | null) => void; onOpenFile?: (id: string) => void; onMenu?: (e: React.MouseEvent, page: PageMeta) => void }) {
+export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMenu }: { folder: string | null; header?: ReactNode; onOpen: (id: string | null) => void; onOpenFile?: (id: string) => void; onMenu?: (e: React.MouseEvent, page: PageMeta) => void }) {
   const pages = useData((s) => s.pages)
   const assets = useData((s) => s.assets)
   const types = usePageTypes()
@@ -36,8 +41,27 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = (id) => open
     return { byId, kids, files, filesById: new Map(files.map((a) => [a.id, a])), counts }
   }, [pages, assets, folder])
 
-  const up = folder ? (byId.get(folder)?.parent ?? null) : undefined
+  const currentFolder = folder ? (byId.get(folder) ?? null) : null
+  const trail = useMemo(() => (folder ? ancestorsOf(folder, byId) : []), [folder, byId])
+  const up = folder ? (currentFolder?.parent ?? null) : undefined
   const parent = up && byId.has(up) ? up : null
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.altKey && e.key === 'ArrowUp') ||
+        (e.key === 'Backspace' && (e.target as HTMLElement)?.tagName !== 'INPUT' && (e.target as HTMLElement)?.tagName !== 'TEXTAREA')
+      ) {
+        if (folder !== null) {
+          e.preventDefault()
+          onOpen(parent)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [folder, parent, onOpen])
+
   const items: ShellItem[] = kids.map((p) => {
     const isFolder = p.type === FOLDER_TYPE
     const type = p.type ? types.find((t) => t.id === p.type) : undefined
@@ -71,32 +95,91 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = (id) => open
       group: 2
     })
   }
-  if (up !== undefined) items.unshift({ key: UP, title: '...', icon: <CornerLeftUp className="h-4 w-4" />, group: -1, target: true })
+
+  const navHeader = header ?? (
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <FolderPath
+        trail={trail}
+        current={currentFolder ? showName(currentFolder.title) : ''}
+        up={folder ? parent : undefined}
+        onPick={onOpen}
+        rename={currentFolder ? { value: currentFolder.title, onSave: (title) => void renamePage(currentFolder.id, title) } : undefined}
+      />
+      <div className="flex items-center gap-1 border-l border-line/40 pl-2">
+        <button
+          type="button"
+          title="New folder"
+          onClick={() => askNewFolder((id) => onOpen(id), folder)}
+          className="flex items-center gap-1 border border-line/50 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-dim hover:border-accent/60 hover:text-white transition-colors"
+        >
+          <FolderPlus className="h-3 w-3 text-accent-soft" />
+          <span className="hidden sm:inline">Folder</span>
+        </button>
+        <button
+          type="button"
+          title="New page"
+          onClick={(e) => newPageMenu(e, types, (id) => onOpen(id), folder)}
+          className="flex items-center gap-1 border border-line/50 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-dim hover:border-accent/60 hover:text-white transition-colors"
+        >
+          <FilePlus className="h-3 w-3 text-accent-soft" />
+          <span className="hidden sm:inline">Page</span>
+        </button>
+        <button
+          type="button"
+          title="Add files"
+          onClick={() => void chooseFiles(folder)}
+          className="flex items-center gap-1 border border-line/50 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-dim hover:border-accent/60 hover:text-white transition-colors"
+        >
+          <Upload className="h-3 w-3 text-accent-soft" />
+          <span className="hidden sm:inline">Upload</span>
+        </button>
+        {folder && <CopyLinkButton kind="folder" id={folder} />}
+        {!folder && (
+          <button
+            type="button"
+            title="Wiki index (all pages and folders)"
+            onClick={() => onOpen(INDEX_ID)}
+            className="flex items-center gap-1 border border-line/40 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-dim hover:border-accent/60 hover:text-white transition-colors"
+          >
+            <BookOpen className="h-3 w-3 text-accent-soft" />
+            <span className="hidden md:inline">{INDEX_TITLE}</span>
+          </button>
+        )}
+      </div>
+    </div>
+  )
 
   return (
-    <KindShell
-      layouts={['tiles', 'gallery', 'cards', 'deck', 'list']}
-      id={`pages.${folder ?? ''}`}
-      inherit="pages"
-      items={items}
-      header={header}
-      pickable
-      onOpen={(item) => {
-        if (!filesById.has(item.key)) return onOpen(item.key === UP ? parent : item.key)
-        onOpenFile(item.key)
+    <div
+      className="flex min-h-0 flex-1 flex-col"
+      onContextMenu={(e) => {
+        if ((e.target as HTMLElement).closest('button, [data-shell-item]')) return
+        openMenu(e, 'New', folderNewItems(types, (id) => onOpen(id), folder))
       }}
-      onMenu={(e, item, picked) => {
-        const many = picked.filter((k) => k !== UP)
-        if (many.length > 1) return openMenu(e, `${many.length} items`, bulkItems(many))
-        const file = filesById.get(item.key)
-        if (file) return rowMenu('file', file.id, file.name, () => onOpenFile(file.id))(e)
-        const p = byId.get(item.key)
-        if (!p) return
-        if (onMenu) onMenu(e, p)
-        else rowMenu(pageKindOf(p.type), p.id, p.title, () => onOpen(p.id))(e)
-      }}
-      onMove={(keys, target) => void moveEntries(keys.filter((k) => k !== UP), target === UP ? parent : target)}
-      adds={menuAdds(folderNewItems(types, (id) => onOpen(id), folder))}
-    />
+    >
+      <KindShell
+        layouts={['tiles', 'gallery', 'cards', 'deck', 'list']}
+        id={`pages.${folder ?? ''}`}
+        inherit="pages"
+        items={items}
+        header={navHeader}
+        pickable
+        onOpen={(item) => {
+          if (!filesById.has(item.key)) return onOpen(item.key)
+          onOpenFile(item.key)
+        }}
+        onMenu={(e, item, picked) => {
+          if (picked.length > 1) return openMenu(e, `${picked.length} items`, bulkItems(picked))
+          const file = filesById.get(item.key)
+          if (file) return rowMenu('file', file.id, file.name, () => onOpenFile(file.id))(e)
+          const p = byId.get(item.key)
+          if (!p) return
+          if (onMenu) onMenu(e, p)
+          else rowMenu(pageKindOf(p.type), p.id, p.title, () => onOpen(p.id))(e)
+        }}
+        onMove={(keys, target) => void moveEntries(keys, target)}
+      />
+    </div>
   )
 }
+

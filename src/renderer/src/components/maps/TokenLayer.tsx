@@ -1,5 +1,5 @@
 import type { MenuEvent } from '../ui/ContextMenu'
-import type { PlaceVisitor } from '@shared/maps'
+import type { TokenVisitor } from '@shared/maps'
 import type { Point } from '@shared/shapes'
 import { showName } from '@shared/ids'
 import { cn } from '../../lib/cn'
@@ -9,7 +9,7 @@ import { SheetPortrait } from '../data/SheetPortrait'
 import { HpBar } from './HpBar'
 
 export interface MapToken {
-  visitor: PlaceVisitor
+  visitor: TokenVisitor
   at: Point
 }
 
@@ -17,7 +17,7 @@ export interface TokenHandlers {
   mine?: string | null
   onPick?: (token: MapToken, e: MenuEvent) => void
   onMenu?: (token: MapToken, e: MenuEvent) => void
-  onMove?: (sheet: string, at: Point) => void
+  onMove?: (token: string, at: Point) => void
 }
 
 const SMALLEST = 40
@@ -27,7 +27,7 @@ function Token({ token, handlers, mapSize }: { token: MapToken; handlers: TokenH
   const px = Math.max(SMALLEST, mapSize * zoom)
   const drag = useSpaceDrag<'move'>(
     Boolean(handlers.onMove),
-    (d) => handlers.onMove?.(token.visitor.sheet, { x: Math.round(token.at.x + d.delta.x / zoom), y: Math.round(token.at.y + d.delta.y / zoom) }),
+    (d) => handlers.onMove?.(token.visitor.token, { x: Math.round(token.at.x + d.delta.x / zoom), y: Math.round(token.at.y + d.delta.y / zoom) }),
     (e) => handlers.onPick?.(token, e)
   )
   const shift = drag.live ? { x: drag.live.delta.x / zoom, y: drag.live.delta.y / zoom } : { x: 0, y: 0 }
@@ -47,7 +47,7 @@ function Token({ token, handlers, mapSize }: { token: MapToken; handlers: TokenH
       <span style={{ width: px, height: px }}>
         <SheetPortrait image={v.image} className={cn('h-full w-full border-2 shadow-[0_4px_14px_rgba(0,0,0,0.7)]', v.sheet === handlers.mine ? 'border-accent' : v.agent ? 'border-purple' : 'border-cyan')} />
       </span>
-      {v.dnd && <HpBar hp={v.dnd.hp} thin className="w-full" />}
+      {v.hp && <HpBar hp={v.hp} thin className="w-full" />}
       <span className="max-w-[160px] truncate bg-black/85 px-1.5 py-0.5 font-mono text-[11px] text-white">{showName(v.name)}</span>
     </div>
   )
@@ -57,7 +57,7 @@ export function TokenLayer({ tokens, handlers, mapSize }: { tokens: MapToken[]; 
   return (
     <span className="pointer-events-none absolute inset-0 z-[4]">
       {tokens.map((t) => (
-        <Token key={t.visitor.sheet} token={t} handlers={handlers} mapSize={mapSize} />
+        <Token key={t.visitor.token} token={t} handlers={handlers} mapSize={mapSize} />
       ))}
     </span>
   )

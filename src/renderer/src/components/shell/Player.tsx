@@ -10,9 +10,9 @@ function time(s: number): string {
   return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 }
 
-function Controls({ size = 'h-3.5 w-3.5' }: { size?: string }) {
+function Controls({ size = 'h-3.5 w-3.5', buttonClass }: { size?: string; buttonClass?: string }) {
   const playing = usePlayer((s) => s.playing)
-  const btn = 'flex items-center justify-center text-dim hover:text-white'
+  const btn = cn('flex items-center justify-center text-dim hover:text-white', buttonClass)
   return (
     <>
       <button title="Previous" onClick={previous} className={btn}>
@@ -31,9 +31,21 @@ function Controls({ size = 'h-3.5 w-3.5' }: { size?: string }) {
   )
 }
 
-export function MiniPlayer() {
+export function MiniPlayer({ layout = 'bar' }: { layout?: 'bar' | 'menu' }) {
   const current = usePlayer((s) => s.queue[s.index])
   if (!current) return null
+  if (layout === 'menu') {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="truncate text-[12px] normal-case text-white" title={current.name}>
+          {current.name}
+        </div>
+        <div className="flex items-center gap-2">
+          <Controls size="h-4 w-4" buttonClass="h-9 flex-1 border border-line/40 hover:border-line" />
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="flex items-center gap-1.5 normal-case">
       <span className="max-w-40 truncate text-white/80" title={current.name}>

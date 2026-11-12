@@ -1,8 +1,11 @@
 {
   "id": "world",
   "name": "World",
-  "description": "Puts the agent in a world: it is one record there, can read every record, change its own, search, and use the world's shared board. Link the agent to its record below.",
-  "version": "1.0.0",
+  "description": "Puts the agent in a world: read records, change its own, search, and use the shared board. With authoring tools, agents can also create, edit, or delete world records and attach interactive actions and decisions.",
+  "version": "1.1.0",
   "apiVersion": 1,
-  "permission": "custom"
+  "permission": "custom",
+  "toolPermissions": {
+    "world_delete": "ask"
+  }
 }

@@ -273,6 +273,12 @@ export interface PlaceVisitor {
   agent: string | null
 }
 
+export interface TokenVisitor extends PlaceVisitor {
+  token: string
+  source: string
+  hp: { cur: number; max: number } | null
+}
+
 export interface MapMeta {
   id: string
   name: string

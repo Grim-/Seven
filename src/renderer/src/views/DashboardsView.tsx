@@ -14,6 +14,7 @@ import { cn } from '../lib/cn'
 import { LockedState, useLocked } from '../components/vault/Vault'
 import { importPaths } from '../lib/importFiles'
 import { failed } from '../lib/notify'
+import { filePath } from '../lib/transport'
 
 function IconPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
@@ -159,7 +160,7 @@ function DashboardsViewBody() {
         try {
           const added: AssetMeta[] = []
           for (const file of files) {
-            const path = window.seven.pathForFile(file)
+            const path = filePath(file)
             if (path) added.push(...(await importPaths([path])))
             else {
               const bytes = new Uint8Array(await file.arrayBuffer())

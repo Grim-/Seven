@@ -2,6 +2,9 @@
 @import 'react-grid-layout/css/styles.css';
 @import './theme/tokens.css';
 @import './theme/components.css';
+@import './theme/variants.css';
+
+@custom-variant remote (&:where(html[data-transport='remote'] *));
 
 /* Dark theme enforcement for native dropdowns and popup menus */
 select, option, optgroup {

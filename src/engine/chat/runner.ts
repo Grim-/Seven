@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 import crypto from 'node:crypto'
 import type { ChatHistoryItem } from './items'
 import path from 'node:path'
-import type { AgentDraft, AgentProfile, ModelConfig, ThinkingLevel, ChatMessage, ChatPart, ContextSummary, ContextUsage, PermissionMode, PromptCost, PromptView, TurnPhaseKind, RewindPreview, SessionMeta, ToolPart } from '@shared/types'
+import type { AgentDraft, AgentProfile, ModelConfig, ThinkingLevel, ToolChoiceMode, ChatMessage, ChatPart, ContextSummary, ContextUsage, PermissionMode, PromptCost, PromptView, TurnPhaseKind, RewindPreview, SessionMeta, ToolPart } from '@shared/types'
 import type { Events } from '@shared/protocol'
 import type { ModelHost } from '../model/host'
 import { checkFits } from './fit'
@@ -433,7 +433,16 @@ export class ChatRunner extends EventEmitter {
 
   private promptFor(sessionId: string, agent: AgentProfile, tools: ToolDef[], memoryText: string): string {
     const probe = this.probeOf(sessionId)
-    if (!probe) return buildInstructions(agent, tools, memoryText)
+    if (!probe) {
+      let chosenToolChoice: ToolChoiceMode | null = null
+      try {
+        chosenToolChoice = this.sessions.get(sessionId).toolChoice ?? null
+      } catch {
+        chosenToolChoice = null
+      }
+      const effectiveAgent = chosenToolChoice !== null ? { ...agent, toolChoice: chosenToolChoice } : agent
+      return buildInstructions(effectiveAgent, tools, memoryText)
+    }
     return probeInstructions(agent, probe.subject, data.pages.find(probe.pageId)?.title ?? probePageTitle(probe.subject), tools.some((t) => t.name === 'ask_user'))
   }
 
@@ -839,9 +848,17 @@ export class ChatRunner extends EventEmitter {
     const fixed = estimateTokens((turn.systemPrompt ?? '') + JSON.stringify(definitions))
     turn.usageBase = { fixed, before: chat.used || fixed + estimateTokens(JSON.stringify(chat.getChatHistory().filter((h) => h.type !== 'system'))), size: chat.contextSize }
     this.phase(turn, 'reading')
+    let chosenToolChoice: ToolChoiceMode | null = null
+    try {
+      chosenToolChoice = this.sessions.get(sessionId).toolChoice ?? null
+    } catch {
+      chosenToolChoice = null
+    }
+    const effectiveToolChoice = chosenToolChoice ?? turn.agent.toolChoice ?? 'auto'
     try {
       await chat.prompt(turn.modelPrompt, {
         ...sampling,
+        toolChoice: effectiveToolChoice,
         maxRounds: turn.agent.maxToolRounds || undefined,
         images: turn.images,
         takeImages,

@@ -5,6 +5,7 @@ import { GameDefScreen, NEW_DEF } from './GameDefScreen'
 import { GameDefChat, GameDefWidget } from './GameDefChat'
 import { RuleSetChat, RuleSetScreen, RuleSetWidget } from './RuleSetScreen'
 import { SaveChat, SaveScreen, SaveWidget } from './SaveScreen'
+import './creatureTokens'
 
 registerKindUi(RULE_SET_KIND, {
   present: { Screen: RuleSetScreen, Chat: RuleSetChat, Stage: RuleSetChat, Widget: entryWidget(RuleSetWidget) },

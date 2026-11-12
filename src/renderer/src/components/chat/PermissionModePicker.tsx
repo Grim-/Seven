@@ -32,7 +32,7 @@ export function PermissionModePicker({ compact = false, labelled = false }: { co
   )
   if (labelled)
     return (
-      <Field label="Permissions" hint={info?.description}>
+      <Field label="Permissions">
         {select}
       </Field>
     )

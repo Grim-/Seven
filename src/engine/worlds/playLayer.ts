@@ -3,6 +3,7 @@ import { setSheetLayer } from '../library/sheets'
 import { currentActor } from '../timeline/actor'
 import { saves } from './saves'
 import { worlds } from './store'
+import { restand } from './tokenSources'
 
 export function saveInPlay(world: string, create: boolean): GameSave | null {
   const { sessionId } = currentActor()
@@ -27,16 +28,7 @@ worlds.setPlayLayer({
   records: (world, type) => reading(world)?.records[type] ?? {},
   setRecord: (world, type, key, value) => writing(world, (s) => ({ ...s, records: { ...s.records, [type]: { ...(s.records[type] ?? {}), [key]: value } } })),
   stand: (world, map) => reading(world)?.stand[map] ?? {},
-  setStand: (world, map, stand) =>
-    writing(world, (s) => {
-      const nextChars = { ...s.characters }
-      for (const sheet of Object.keys(stand)) {
-        if (!(sheet in nextChars)) {
-          nextChars[sheet] = { where: '', game: null }
-        }
-      }
-      return { ...s, characters: nextChars, stand: { ...s.stand, [map]: stand } }
-    }),
+  setStand: (world, map, stand) => writing(world, (s) => restand(s, map, stand)),
   journeys: (world) => reading(world)?.journeys ?? {},
   addJourney: (world, sheet, entry) => writing(world, (s) => ({ ...s, journeys: { ...s.journeys, [sheet]: [...(s.journeys[sheet] ?? []), entry] } })),
   board: (world) => reading(world)?.board ?? [],

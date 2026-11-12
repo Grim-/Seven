@@ -16,8 +16,7 @@ import { Packs } from './packs'
 import { appFolder, machineRoot } from './install/paths'
 import { PARAMS } from './model/params'
 import { modelTraitSet } from '@shared/modelParams'
-import { Gateway } from './model/server/gateway'
-import { suggestPassword } from './model/server/password'
+import { ModelRoutes } from './model/server/modelRoutes'
 import { memoryServer } from './mind/embedder'
 import { AgentRegistry } from './agents/registry'
 import { SessionStore } from './sessions/store'
@@ -109,7 +108,10 @@ import { gameDefs } from '../modules/game/store'
 import { characterMisfits, giveItem, joinCharacter, leaveCharacter, saveCharacter, tickCharacters, useAbility } from '../modules/game/characters'
 import { removeRuleSet } from '../modules/game/worldRules'
 import { saves } from './worlds/saves'
-import './worlds/playLayer'
+import './worlds/sheetTokens'
+import { resolveTokens } from './worlds/tokenSources'
+import { spawnCreature, updateCreature } from './worlds/creatures'
+import { saveInPlay } from './worlds/playLayer'
 import { adoptOldPlay, bring, createNewWorldSave, removeSave, removeWorldSaves, takeOut, travel } from './worlds/party'
 import { decisions, storyActions } from '../modules/decisions/store'
 import { factions } from './factions/store'
@@ -198,9 +200,9 @@ requests.on('changed', () => emit('ui.pending', requests.list()))
 const permissions = new PermissionStore()
 const checkpoints = new CheckpointStore((id) => sessions.files(id))
 const runner = new ChatRunner(host, models, agents, sessions, requests, permissions, checkpoints, emit)
-const gateway = new Gateway(host, models, { busy: () => runner.busy })
-gateway.on('changed', (status) => emit('network.changed', status))
-gateway.start()
+const modelRoutes = new ModelRoutes(host, models, { busy: () => runner.busy })
+modelRoutes.on('ready', (info) => emit('engine.modelRoutes', info))
+modelRoutes.start()
 setGuideSource({
   guides: () => guideModules(),
   guide: (moduleId, agentId) => guideText(moduleId, agentId ? (agents.list().find((a) => a.id === agentId) ?? null) : null),
@@ -463,6 +465,7 @@ const handlers: Handlers = {
   'worlds.journey': ({ id, sheet }) => worlds.journeys(id)[sheet] ?? [],
   'worlds.addJourney': ({ id, sheet, kind, text }) => worlds.addJourney(id, sheet, kind, text),
   'places.visitors': ({ sheets }) => visitorsOf(sheets),
+  'places.tokens': ({ world, tokens }) => resolveTokens(tokens, saveInPlay(world, false), world),
   'worlds.delete': ({ id }) => {
     removeWorldSaves(id)
     return worlds.delete(id)
@@ -508,7 +511,7 @@ const handlers: Handlers = {
   'lootTables.delete': ({ id }) => { lootTablesStore.remove(id); return true },
   'lootTables.roll': ({ id }) => lootTablesStore.roll(id),
   'stats.clear': () => clearStats(),
-  'server.status': async () => ({ build: serverBuild(), logLines: llamaLimits().logLines, chat: await host.chatServer(), memory: memoryServer(), network: gateway.status(), vram: await host.vram() }),
+  'server.status': async () => ({ build: serverBuild(), logLines: llamaLimits().logLines, chat: await host.chatServer(), memory: memoryServer(), vram: await host.vram() }),
   'server.build': () => serverBuild(),
   'install.state': ({ helper }) => installState(helper),
   'install.check': async ({ helper }) => {
@@ -552,12 +555,6 @@ const handlers: Handlers = {
     await host.unload()
     return host.load(models.get(id), models.getConfig(id))
   },
-  'network.set': ({ on, settings }) => gateway.set(on, settings),
-  'network.password.suggest': () => suggestPassword(),
-  'network.password.set': ({ password }) => gateway.setPassword(password),
-  'network.certificate.get': () => gateway.certificate(),
-  'network.certificate.renew': () => gateway.renewCertificate(),
-  'network.unlock': ({ address }) => gateway.unlock(address),
   'stats.summary': () => {
     const id = host.loadedId
     let modelName: string | null = null
@@ -635,6 +632,7 @@ const handlers: Handlers = {
   'sessions.setMode': ({ id, mode }) => sessions.update(id, { permissionMode: mode }),
   'sessions.setStyle': ({ id, style }) => sessions.update(id, { reasoningStyle: style }),
   'sessions.setThinking': ({ id, thinking }) => sessions.update(id, { thinking }),
+  'sessions.setToolChoice': ({ id, toolChoice }) => sessions.update(id, { toolChoice }),
   'sessions.editResult': ({ id, messageId, partId, text }) => runner.editResult(id, messageId, partId, text),
   'sessions.editReply': ({ id, messageId, edits }) => runner.editReply(id, messageId, edits),
   'sessions.rewindPreview': ({ id, messageId }) => runner.rewindPreview(id, messageId),
@@ -677,6 +675,8 @@ const handlers: Handlers = {
   'saves.takeOut': ({ sheet }) => takeOut(sheet),
   'saves.adopt': ({ world }) => adoptOldPlay(world),
   'saves.travel': ({ sheet, id, map, place }) => travel(sheet, id, map, place),
+  'saves.spawnCreature': ({ world, map, creature, faction, at }) => spawnCreature(world, map, creature, faction, at),
+  'saves.updateCreature': ({ world, creature, faction }) => updateCreature(world, creature, faction),
   'game.misfits': ({ sheet }) => characterMisfits(sheet),
   'game.giveItem': ({ sheet, item, count, gold }) => giveItem(sheet, item, count, gold),
   'game.useAbility': ({ sheet, ability, target, at, distance }) => useAbility(sheet, ability, target, at, distance),
@@ -889,7 +889,7 @@ const shutdown = async (): Promise<void> => {
     console.warn('[timeline] could not save on exit', err)
   }
   await modules.dispose().catch(() => undefined)
-  await gateway.close().catch(() => undefined)
+  await modelRoutes.close().catch(() => undefined)
   await host.dispose().catch(() => undefined)
   await minds.embedder.unload().catch(() => undefined)
   process.exit(0)

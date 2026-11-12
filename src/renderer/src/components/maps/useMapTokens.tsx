@@ -1,24 +1,18 @@
-import { Footprints, LogOut, MessageSquarePlus, Swords, UserCheck, UserPlus, Skull } from 'lucide-react'
-import { parseActions } from '@shared/actions'
-import { parseDecisions } from '@shared/decisions'
-import type { PlaceVisitor, Standing, WorldMapUse } from '@shared/maps'
+import { Footprints, LogOut, UserPlus, Skull } from 'lucide-react'
+import type { PlaceVisitor, Standing, TokenVisitor, WorldMapUse } from '@shared/maps'
 import { smallestAt, type Point } from '@shared/shapes'
 import type { WorldEntity } from '@shared/world'
 import { showName } from '@shared/ids'
-import { defaultDialogueTree } from '@shared/game/dialogue'
 import { openMenu, type MenuEvent, type MenuItem } from '../ui'
 import { EntryPicker } from '../library/EntryPicker'
 import { QuickCreatureSpawner } from './QuickCreatureSpawner'
 import { engine } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
 import { useLibraryData } from '../../lib/useLive'
-import { startChatItems } from '../../views/data/entryMenu'
 import { closePlay, showPlay, worldWhere } from '../play/playStore'
-import { actionItems, decisionItems, newPlayItems, type PlayHolder } from '../play/playHolder'
-import { useDialogue } from '../play/dialogue/dialogueStore'
-import { useGameState } from '../play/state/gameStateStore'
-import { combatantFromVisitor } from '@shared/game/state/BattleStateMachine'
-import { characterItems, setWhere } from './placeActions'
+import type { PlayHolder } from '../play/playHolder'
+import { tokenSourceUi, type TokenContext } from '../../registries/tokenSources'
+import { setWhere } from './placeActions'
 import { bringHere } from '../play/bringHere'
 import type { MapToken, TokenHandlers } from './TokenLayer'
 
@@ -38,11 +32,11 @@ const NONE: Standing = { at: { x: 0, y: 0 }, actions: '', decisions: '' }
 
 export function useMapTokens({ world, use, places, player, editing, save, onSelect, onWalk, onApproach }: Options) {
   const ids = Object.keys(use.stand)
-  const visitors = useLibraryData(() => (ids.length ? engine('places.visitors', { sheets: ids }) : Promise.resolve([] as PlaceVisitor[])), `tokens.${ids.join(',')}`) ?? []
-  const tokens: MapToken[] = visitors.map((visitor) => ({ visitor, at: use.stand[visitor.sheet].at }))
-  const setStanding = (sheet: string, next: Standing | null) => {
-    const { [sheet]: _old, ...rest } = use.stand
-    save({ ...use, stand: next ? { ...rest, [sheet]: next } : rest })
+  const visitors = useLibraryData(() => (ids.length ? engine('places.tokens', { world, tokens: ids }) : Promise.resolve([] as TokenVisitor[])), `tokens.${ids.join(',')}`) ?? []
+  const tokens: MapToken[] = visitors.filter((visitor) => visitor.token in use.stand).map((visitor) => ({ visitor, at: use.stand[visitor.token].at }))
+  const setStanding = (token: string, next: Standing | null) => {
+    const { [token]: _old, ...rest } = use.stand
+    save({ ...use, stand: next ? { ...rest, [token]: next } : rest })
   }
   const settle = (sheet: string, at: Point) => {
     const place = smallestAt(use.shapes, at)
@@ -58,102 +52,39 @@ export function useMapTokens({ world, use, places, player, editing, save, onSele
       where: worldWhere(`@sheet:${v.sheet}`, v.agent ? [v.agent] : [], world, player)
     }
   }
-  const items = (t: MapToken): MenuItem[] => {
-    const play = holder(t.visitor)
-    const standing = use.stand[t.visitor.sheet] ?? NONE
-    const isSelf = t.visitor.sheet === player
-
-    const withApproach = (cb: () => void) => {
-      if (onApproach) onApproach(t.at, cb)
-      else cb()
-    }
-
-    return [
-      ...(onWalk
-        ? [
-            {
-              label: 'Move here',
-              icon: <Footprints className="h-4 w-4 text-cyan" />,
-              onSelect: () => onWalk(t.at)
-            }
-          ]
-        : []),
-      ...(!isSelf
-        ? [
-            {
-              label: `Talk to ${showName(t.visitor.name)}`,
-              icon: <MessageSquarePlus className="h-4 w-4 text-cyan" />,
-              onSelect: () =>
-                withApproach(() => {
-                  if (onSelect) {
-                    onSelect(t.visitor.sheet)
-                  } else {
-                    const tree = defaultDialogueTree(t.visitor.sheet, t.visitor.name)
-                    useDialogue.getState().startDialogue(tree, t.visitor.name)
-                  }
-                })
-            },
-            {
-              label: 'Take Control (Set as Player)',
-              icon: <UserCheck />,
-              onSelect: () => void engine('worlds.setPlayer', { id: world, sheet: t.visitor.sheet }).catch(failed('Could not set player'))
-            },
-            {
-              label: 'Engage Combat',
-              icon: <Swords className="h-4 w-4 text-accent" />,
-              onSelect: () =>
-                withApproach(() => {
-                  const playerTok = tokens.find((tok) => tok.visitor.sheet === player)
-                  const playerCombatant = playerTok
-                    ? combatantFromVisitor(playerTok.visitor, playerTok.at, true)
-                    : {
-                        id: player ?? 'player',
-                        sheet: player ?? undefined,
-                        name: 'Player Character',
-                        isPlayer: true,
-                        hp: { cur: 12, max: 12 },
-                        ac: 14,
-                        speedMax: 30,
-                        at: t.at,
-                        attacks: [{ name: 'Strike', bonus: 4, damage: '1d8 + 2' }],
-                        faction: 'player'
-                      }
-                  const targetCombatant = combatantFromVisitor(t.visitor, t.at, false)
-                  useGameState.getState().startBattle([playerCombatant, targetCombatant])
-                })
-            }
-          ]
-        : []),
-      { label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(`@sheet:${t.visitor.sheet}`, t.visitor.agent ? [t.visitor.agent] : []) },
-      ...parseActions(standing.actions).map((a, i) => {
-        const item = actionItems(play, a, i)[0]
-        return {
-          ...item,
-          label: a.attempt,
-          onSelect: item.onSelect ? () => withApproach(item.onSelect!) : undefined
-        }
-      }),
-      ...parseDecisions(standing.decisions).map((d, i) => {
-        const item = decisionItems(play, d, i, null)[0]
-        return {
-          ...item,
-          label: d.question,
-          onSelect: item.onSelect ? () => withApproach(item.onSelect!) : undefined
-        }
-      }),
-      ...(editing ? newPlayItems(play) : []),
-      ...characterItems(t.visitor, places, smallestAt(use.shapes, t.at)),
-      ...(editing ? [{ label: 'Take off this map', icon: <LogOut />, danger: true, onSelect: () => setStanding(t.visitor.sheet, null) }] : [])
-    ]
-  }
+  const context = (t: MapToken): TokenContext => ({
+    token: t,
+    tokens,
+    world,
+    use,
+    places,
+    player,
+    editing,
+    standing: use.stand[t.visitor.token] ?? NONE,
+    holder: holder(t.visitor),
+    setStanding,
+    approach: (cb) => (onApproach ? onApproach(t.at, cb) : cb()),
+    openMenu: (e) => open(t, e),
+    onSelect
+  })
+  const items = (t: MapToken): MenuItem[] => [
+    ...(onWalk ? [{ label: 'Move here', icon: <Footprints className="h-4 w-4 text-cyan" />, onSelect: () => onWalk(t.at) }] : []),
+    ...(tokenSourceUi(t.visitor.source)?.items(context(t)) ?? []),
+    ...(editing ? [{ label: 'Take off this map', icon: <LogOut />, danger: true, onSelect: () => setStanding(t.visitor.token, null) }] : [])
+  ]
   const open = (t: MapToken, e: MenuEvent) => openMenu(e, showName(t.visitor.name), items(t))
   const handlers: TokenHandlers = {
     mine: player,
-    onPick: onSelect ? (t) => onSelect(t.visitor.sheet) : open,
+    onPick: (t, e) => {
+      const ui = tokenSourceUi(t.visitor.source)
+      if (ui?.pick) ui.pick(context(t), e)
+      else open(t, e)
+    },
     onMenu: open,
-    onMove: (sheet, at) => {
-      setStanding(sheet, { ...(use.stand[sheet] ?? NONE), at })
-      settle(sheet, at)
+    onMove: (token, at) => {
+      setStanding(token, { ...(use.stand[token] ?? NONE), at })
+      const t = tokens.find((x) => x.visitor.token === token)
+      if (t) tokenSourceUi(t.visitor.source)?.moved?.(context(t), at)
     }
   }
   const putHere = (at: Point): MenuItem => ({

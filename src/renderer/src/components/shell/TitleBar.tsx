@@ -1,8 +1,9 @@
-import { SegmentBar } from '../ui'
+import { ConnectionStatus, SegmentBar } from '../ui'
 import { useEffect, useState } from 'react'
 import { BookOpen, Brain, Copy, Hourglass, Lock, LockOpen, MessageCircleQuestion, Minus, PenLine, Square, Wrench, X } from 'lucide-react'
 import type { TurnPhase } from '@shared/types'
 import { main, on } from '../../lib/ipc'
+import { allowedRequest } from '../../lib/transport'
 import { useSessions } from '../../store/sessions'
 import { useAgents } from '../../store/agents'
 import { useModels } from '../../store/models'
@@ -72,9 +73,11 @@ function Activity({ running }: { running: string[] }) {
     <button
       onClick={() => openChat(id)}
       title={session ? `${session.title}: open the chat` : 'Open the chat'}
-      className="no-drag relative z-[2] ml-5 flex min-w-0 items-center gap-2 border-l border-line/50 pl-4 font-mono text-[11px] text-white/80 hover:text-white"
+      className="no-drag relative z-[2] ml-5 flex min-w-0 items-center gap-2 border-l border-line/50 pl-4 font-mono text-[11px] text-white/80 hover:text-white phone:ml-2 phone:gap-1.5 phone:pl-2"
     >
-      <Pulse />
+      <span className="contents phone:hidden">
+        <Pulse />
+      </span>
       <span className="truncate text-teal/90">{agent?.name ?? 'Agent'}</span>
       <span className="flex h-3.5 w-3.5 shrink-0 items-center text-dim [&>svg]:h-3.5 [&>svg]:w-3.5">{icon}</span>
       <span className="truncate text-dim">{text}</span>
@@ -91,8 +94,8 @@ function Clock() {
   }, [])
   return (
     <span className="relative z-[2] flex items-baseline gap-2 font-mono tabular-nums">
-      <span className="text-[10.5px] uppercase tracking-[0.14em] text-faint">{now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-      <span className="text-[13px] text-white/85">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+      <span className="text-[10.5px] uppercase tracking-[0.14em] text-faint phone:hidden">{now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+      <span className="text-[13px] text-white/85 phone:text-[12px]">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
     </span>
   )
 }
@@ -126,25 +129,29 @@ export function TitleBar() {
   const runningMap = useSessions((s) => s.running)
   const running = Object.keys(runningMap).filter((id) => runningMap[id])
 
+  const windowed = allowedRequest('main', 'window.isMaximized')
+
   useEffect(() => {
+    if (!windowed) return
     void main('window.isMaximized').then(setMaximized)
     return on('window.maximized', setMaximized)
-  }, [])
+  }, [windowed])
 
   return (
     <header
-      className="drag scanlines relative z-50 flex h-10 shrink-0 select-none items-center border-b border-line bg-gradient-to-r from-accent/10 via-black/60 to-black/80 pl-4 shadow-[0_10px_30px_rgba(0,0,0,0.9),0_0_15px_color-mix(in_srgb,var(--color-accent)_8%,transparent)]"
-      onDoubleClick={() => void main('window.toggleMaximize').then(setMaximized)}
+      className="drag scanlines relative z-50 flex h-10 shrink-0 select-none items-center border-b border-line bg-gradient-to-r from-accent/10 via-black/60 to-black/80 pl-4 phone:pl-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.9),0_0_15px_color-mix(in_srgb,var(--color-accent)_8%,transparent)]"
+      onDoubleClick={windowed ? () => void main('window.toggleMaximize').then(setMaximized) : undefined}
     >
-      <span className="relative z-[2] font-mono text-[19px] font-light tracking-[0.12em] text-white">
+      <span className="relative z-[2] shrink-0 font-mono text-[19px] font-light tracking-[0.12em] text-white phone:text-[15px]">
         <span className="text-accent">//</span>SEVEN
       </span>
       <Activity running={running} />
-      <div className="relative z-[2] ml-auto flex items-center gap-3 pr-3">
+      <div className="relative z-[2] ml-auto flex items-center gap-3 pr-3 phone:gap-1.5 phone:pr-2">
+        <ConnectionStatus />
         <Clock />
         <VaultGlyph />
       </div>
-      <div className="no-drag relative z-[2] flex h-full">
+      {windowed && <div className="no-drag relative z-[2] flex h-full">
         <button className="flex h-full w-12 items-center justify-center text-dim hover:bg-white/5 hover:text-white" onClick={() => void main('window.minimize')}>
           <Minus className="h-4 w-4" />
         </button>
@@ -157,7 +164,7 @@ export function TitleBar() {
         <button className="flex h-full w-12 items-center justify-center text-dim hover:bg-alert hover:text-white" onClick={() => void main('window.close')}>
           <X className="h-4 w-4" />
         </button>
-      </div>
+      </div>}
       <Progress />
     </header>
   )

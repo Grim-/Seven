@@ -1,7 +1,7 @@
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ChatHistoryItem, FunctionCallItem as ChatModelFunctionCall, ModelItem as ChatModelResponse, SegmentItem as ChatModelSegment } from '../chat/items'
-import type { RemoteSpec, ServerTimings } from '@shared/types'
+import type { RemoteSpec, ServerTimings, ToolChoiceMode } from '@shared/types'
 import fs from 'node:fs'
 import path from 'node:path'
 import { data } from '../data/hub'
@@ -34,6 +34,7 @@ type Handler = { description?: string; params?: unknown; handler: (params: unkno
 
 export interface PromptOptions extends ApiSampling {
   functions?: Record<string, Handler>
+  toolChoice?: ToolChoiceMode
   extra?: Record<string, unknown>
   maxRounds?: number
   images?: string[]
@@ -219,6 +220,28 @@ function anthropicMessages(items: ChatHistoryItem[], known: Set<string>): { syst
   return { system: system.join('\n\n'), messages: raw }
 }
 
+function resolveOpenAiToolChoice(choice: ToolChoiceMode | undefined, fns: Record<string, Handler>): OpenAI.Chat.ChatCompletionToolChoiceOption | undefined {
+  if (!choice || choice === 'auto') return undefined
+  if (choice === 'none') return 'none'
+  if (choice === 'required') return 'required'
+  if (choice === 'force_reason') {
+    if (fns['reason']) return { type: 'function', function: { name: 'reason' } }
+    return 'required'
+  }
+  return undefined
+}
+
+function resolveAnthropicToolChoice(choice: ToolChoiceMode | undefined, fns: Record<string, Handler>): Anthropic.Messages.ToolChoice | undefined {
+  if (!choice || choice === 'auto') return undefined
+  if (choice === 'required') return { type: 'any' }
+  if (choice === 'none') return undefined
+  if (choice === 'force_reason') {
+    if (fns['reason']) return { type: 'tool', name: 'reason' }
+    return { type: 'any' }
+  }
+  return undefined
+}
+
 async function openaiRound(target: ApiTarget, items: ChatHistoryItem[], o: PromptOptions): Promise<Round> {
   const client = new OpenAI({ apiKey: target.key || 'none', ...(target.spec.baseUrl ? { baseURL: target.spec.baseUrl } : {}) })
   const fns = o.functions ?? {}
@@ -235,6 +258,7 @@ async function openaiRound(target: ApiTarget, items: ChatHistoryItem[], o: Promp
       o.onResponseChunk?.({ text })
     }
   }
+  const toolChoice = resolveOpenAiToolChoice(o.toolChoice, fns)
   const stream = await client.chat.completions.create(
     {
       model: target.spec.model,
@@ -242,6 +266,7 @@ async function openaiRound(target: ApiTarget, items: ChatHistoryItem[], o: Promp
       stream: true,
       stream_options: { include_usage: true },
       ...(tools.length ? { tools } : {}),
+      ...(tools.length && toolChoice ? { tool_choice: toolChoice } : {}),
       ...(o.temperature !== undefined ? { temperature: o.temperature } : {}),
       ...(o.topP !== undefined ? { top_p: o.topP } : {}),
       ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
@@ -283,6 +308,7 @@ async function anthropicRound(target: ApiTarget, items: ChatHistoryItem[], o: Pr
   const round: Round = { text: '', thought: '', calls: [], input: 0, output: 0 }
   const byBlock = new Map<number, number>()
   const thinking = o.effort && o.budgets?.thoughtTokens ? Math.max(1024, o.budgets.thoughtTokens) : 0
+  const toolChoice = resolveAnthropicToolChoice(o.toolChoice, fns)
   const stream = await client.messages.create(
     {
       model: target.spec.model,
@@ -291,6 +317,7 @@ async function anthropicRound(target: ApiTarget, items: ChatHistoryItem[], o: Pr
       stream: true,
       ...(system ? { system } : {}),
       ...(tools.length ? { tools } : {}),
+      ...(tools.length && toolChoice ? { tool_choice: toolChoice } : {}),
       ...(thinking ? { thinking: { type: 'enabled' as const, budget_tokens: thinking } } : o.temperature !== undefined ? { temperature: Math.min(1, o.temperature) } : {})
     },
     { signal: o.signal }
@@ -388,7 +415,8 @@ export class ApiChat {
         this.capped = true
         break
       }
-      const r = await this.round(o)
+      const roundOpts = i === 0 ? o : (o.toolChoice && o.toolChoice !== 'auto' ? { ...o, toolChoice: 'auto' as const } : o)
+      const r = await this.round(roundOpts)
       if (r.thought) reply.response.push({ type: 'segment', segmentType: 'thought', text: r.thought, ended: true } satisfies ChatModelSegment)
       if (r.text) {
         reply.response.push(r.text)

@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
-import type { AgentProfile } from '@shared/types'
+import { agentSheets, type AgentProfile } from '@shared/types'
+import { showName } from '@shared/ids'
 import { AgentAvatar } from '../agents/look'
+import { CharacterAvatar } from './CharacterAvatar'
+import { useKindEntries } from '../../views/data/useKindEntries'
 import { Markdown } from './Markdown'
 import { assetUrl, findPage, useAsset, useData } from '../../store/data'
 import { openSevenLink } from '../../lib/links'
@@ -56,10 +59,34 @@ function Speaker({ name, agent }: { name: string; agent: AgentProfile | null }) 
   const pages = useData((s) => s.pages)
   const isAgent = agent && agent.name.trim().toLowerCase() === name.toLowerCase()
   const lower = name.toLowerCase()
-  const said = words(name)
-  const page = isAgent ? undefined : (findPage(pages, name) ?? pages.find((p) => p.title.toLowerCase().startsWith(`${lower} `)) ?? pages.find((p) => p.image && said.length > 0 && said.every((w) => words(p.title).includes(w))))
-  const picture = useAsset(page?.image ?? '')
+  const sheets = agentSheets(agent)
+  const librarySheets = useKindEntries('sheet')
+  const matchedSheet = useMemo(() => {
+    if (isAgent) return null
+    const fromRoster = sheets.find((s) => {
+      const sLower = s.toLowerCase()
+      const sName = showName(s).toLowerCase()
+      return sLower === lower || sName === lower || sName.startsWith(lower) || lower.startsWith(sName)
+    })
+    if (fromRoster) return fromRoster
+
+    if (librarySheets?.length) {
+      const fromLib = librarySheets.find((h) => {
+        const hTitle = h.title.toLowerCase()
+        const hId = showName(h.id).toLowerCase()
+        return hTitle === lower || hId === lower || hTitle.startsWith(lower) || lower.startsWith(hTitle)
+      })
+      if (fromLib) return fromLib.id
+    }
+    return null
+  }, [isAgent, sheets, librarySheets, lower])
+
   if (isAgent) return <AgentAvatar agent={agent} size={52} />
+  if (matchedSheet) return <CharacterAvatar sheetId={matchedSheet} size={52} openOnClick />
+
+  const said = words(name)
+  const page = findPage(pages, name) ?? pages.find((p) => p.title.toLowerCase().startsWith(`${lower} `)) ?? pages.find((p) => p.image && said.length > 0 && said.every((w) => words(p.title).includes(w)))
+  const picture = useAsset(page?.image ?? '')
   const h = hue(name)
   if (page && picture)
     return (

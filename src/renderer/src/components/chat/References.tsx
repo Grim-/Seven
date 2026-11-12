@@ -3,27 +3,36 @@ import { useAui, useAuiState } from '@assistant-ui/react'
 import type { TextMessagePartProps } from '@assistant-ui/react'
 import { X } from 'lucide-react'
 import { referenceHref, referencePattern } from '@shared/text'
+import { showName } from '@shared/ids'
 import { openSevenLink } from '../../lib/links'
 import { useIncludeText } from '../../lib/useIncludeText'
+import { useEntryPreview } from '../entries/entryPreview'
 
 export function Chip({ kind, refText, part = null, onRemove, onOpen }: { kind: string; refText: string; part?: string | null; onRemove?: () => void; onOpen?: () => void }) {
+  const cleanRef = refText.replace(/^"|"$/g, '')
+  const preview = useEntryPreview(`@${kind}:${cleanRef}`)
+  const displayTitle = preview && !('missing' in preview) ? preview.title : showName(cleanRef)
+  const displayKind = preview && !('missing' in preview) ? preview.label : kind.toUpperCase()
+
   const included = useIncludeText(kind, refText, onRemove ? null : part)
   const open = () => (onOpen ? onOpen() : openSevenLink(referenceHref(kind, refText)))
   if (included !== null)
     return (
-      <span role="link" title={`From @${kind}:${refText.replace(/^"|"$/g, '')}#${part}`} onClick={open} className="seven-include">
+      <span role="link" title={`From @${kind}:${cleanRef}#${part}`} onClick={open} className="seven-include cursor-pointer">
         {included}
       </span>
     )
   return (
-    <span className="seven-chip">
-      <button type="button" title={`Open ${kind} ${refText}`} onClick={open} className="inline-flex min-w-0 items-stretch">
-        <span className="seven-chip-kind">{kind}</span>
-        <span className="truncate px-1.5">{refText.replace(/^"|"$/g, '')}</span>
-        {part && <span className="shrink-0 pr-1.5 text-faint">#{part}</span>}
+    <span className="inline-flex items-center gap-1 border border-accent/40 bg-accent/15 px-1.5 py-0.5 font-mono text-[11px] text-white/95 align-baseline mx-0.5 select-none hover:border-accent hover:bg-accent/25 transition-colors">
+      <button type="button" title={`Open ${displayKind}: ${displayTitle}`} onClick={open} className="inline-flex min-w-0 items-center gap-1.5 cursor-pointer text-left">
+        <span className="border border-accent/50 bg-accent/30 px-1 py-0.2 font-mono text-[9px] font-bold uppercase tracking-wider text-accent">
+          {displayKind}
+        </span>
+        <span className="truncate max-w-[220px] font-semibold text-white/95">{displayTitle}</span>
+        {part && <span className="shrink-0 text-[10px] text-faint">#{part}</span>}
       </button>
       {onRemove && (
-        <button type="button" title="Remove" onClick={onRemove} className="pr-1 text-dim hover:text-alert">
+        <button type="button" title="Remove" onClick={onRemove} className="ml-0.5 text-dim hover:text-alert">
           <X className="h-3 w-3" />
         </button>
       )}

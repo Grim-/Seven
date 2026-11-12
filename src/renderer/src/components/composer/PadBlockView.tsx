@@ -87,13 +87,13 @@ function editPlay(pad: Pad, key: string, kind: PlayKind, text: string): void {
 
 function BlockFrame({ block, pad, drag, over, items, title, wide, badge, children }: { block: PadBlock; pad: Pad; drag: ReorderProps; over: boolean; items: MenuItem[]; title: string; wide: boolean; badge?: string; children: ReactNode }) {
   return (
-    <div onDragOver={drag.onDragOver} onDrop={drag.onDrop} onContextMenu={(e) => openMenu(e, title, items)} className={cn('group relative flex items-start gap-1', wide ? 'w-full' : 'w-48', over && 'outline outline-1 outline-accent')}>
-      <span draggable={drag.draggable} onDragStart={drag.onDragStart} onDragEnd={drag.onDragEnd} title="Drag to move" className="mt-1 cursor-grab text-faint opacity-0 group-hover:opacity-100">
+    <div onDragOver={drag.onDragOver} onDrop={drag.onDrop} onContextMenu={(e) => openMenu(e, title, items)} className={cn('group relative flex items-start gap-1 transition-all', wide ? 'w-full' : 'w-52', over && 'outline outline-1 outline-accent')}>
+      <span draggable={drag.draggable} onDragStart={drag.onDragStart} onDragEnd={drag.onDragEnd} title="Drag to reorder" className="mt-1 cursor-grab text-faint opacity-0 transition-opacity hover:text-accent group-hover:opacity-100">
         <GripVertical className="h-3.5 w-3.5" />
       </span>
       <div className="min-w-0 flex-1">{children}</div>
-      {badge && <span className="pad-badge absolute left-6 top-1">{badge}</span>}
-      <button type="button" title="Take out" onClick={() => pad.remove(block.key)} className="absolute -right-2 -top-2 z-10 border border-line bg-black/85 p-0.5 text-dim opacity-0 hover:border-alert hover:text-alert group-hover:opacity-100">
+      {badge && <span className="pad-badge absolute left-6 top-1 font-mono">{badge}</span>}
+      <button type="button" title="Remove from paper" onClick={() => pad.remove(block.key)} className="absolute -right-2 -top-2 z-10 border border-line bg-black/90 p-0.5 text-dim opacity-0 transition-opacity hover:border-alert hover:text-alert group-hover:opacity-100 cursor-pointer">
         <X className="h-3 w-3" />
       </button>
     </div>
@@ -123,6 +123,17 @@ function LinkBlockView({ block, pad, rollable, drag, over, wide, onWide, open, o
       <Clamp open={open} onOpen={onOpen}>
         {large && found && Chat ? <Chat kind={found.kind} id={found.id} part="" /> : <EntryFace link={base} />}
       </Clamp>
+      {rolls && (
+        <button
+          type="button"
+          title="Roll this item now"
+          onClick={rollNow}
+          className="absolute right-6 top-1 z-10 hidden items-center gap-1 border border-accent/60 bg-black/80 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent transition-colors hover:bg-accent/20 group-hover:flex cursor-pointer"
+        >
+          <Dices className="h-3 w-3" />
+          <span>Roll</span>
+        </button>
+      )}
     </BlockFrame>
   )
 }
@@ -141,7 +152,23 @@ export function PadBlockView(props: Props) {
   } else if (shape.as === 'decision') {
     const d = parseDecisions(block.text)[0]
     body = <PlayBlock tag="DECISION" purple title={d.question} lines={d.options.map((o) => o.text)} />
-  } else body = <LinkTextarea value={block.text} onValue={(text) => pad.replace(block.key, text)} rows={Math.max(2, block.text.split('\n').length)} placeholder="Write here…" className="pad-text w-full resize-none" />
+  } else {
+    body = (
+      <div className="flex w-full flex-col border border-line/50 bg-black/40 p-2.5 shadow-sm transition-all hover:border-line">
+        <div className="mb-1.5 flex items-center justify-between border-b border-line/25 pb-1 font-mono text-[10px] text-faint uppercase tracking-wider select-none">
+          <span className="font-bold text-dim">TEXT NOTE</span>
+          <span>{block.text.length} chars</span>
+        </div>
+        <LinkTextarea
+          value={block.text}
+          onValue={(text) => pad.replace(block.key, text)}
+          rows={Math.max(2, block.text.split('\n').length)}
+          placeholder="Write prompt text here… (type @ to reference kinds)"
+          className="pad-text w-full resize-none font-mono text-[13.5px] leading-relaxed"
+        />
+      </div>
+    )
+  }
   return (
     <BlockFrame block={block} pad={pad} drag={props.drag} over={props.over} items={items} title="On the paper" wide>
       {body}

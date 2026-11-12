@@ -2,6 +2,7 @@ import type { ModuleFactory } from '../../engine/modules/sdk'
 import type { ToolDef } from '../../engine/tools/types'
 import { registerModuleKind } from '../../engine/library/moduleKinds'
 import { gameKinds } from './kinds'
+import './tokens'
 
 for (const kind of gameKinds()) registerModuleKind('game', kind)
 

@@ -1,7 +1,7 @@
 import { toolGuide } from '../tools/signature'
 import { sheetMarkdown } from '../library/sheets'
 import os from 'node:os'
-import type { AgentProfile } from '@shared/types'
+import { agentSheets, type AgentProfile, type ToolChoiceMode } from '@shared/types'
 import type { ToolDef } from '../tools/types'
 import { detectShell } from '../tools/shell'
 import { modules } from '../modules/registry'
@@ -20,6 +20,15 @@ const ROLEPLAY = [
   '- narration as plain paragraphs.'
 ].join('\n')
 
+function deliberationDirective(mode: ToolChoiceMode | null | undefined): string {
+  if (mode !== 'force_reason') return ''
+  return [
+    '## Deliberation Protocol',
+    '- Before providing dialogue or in-character speech, you must deliberate using the reason tool.',
+    '- Weigh conflicting viewpoints and motives first, then formulate your decision.'
+  ].join('\n')
+}
+
 function memorySection(memoryText: string): string {
   return memoryText.trim() ? `## Pinned memories\nYour own, private to you. Find the rest with recall; things every agent should know live in pages.\n\n${memoryText.trim()}` : ''
 }
@@ -29,9 +38,15 @@ function filled(text: string, vars: Record<string, string>): string {
 }
 
 function characterOf(agent: AgentProfile): string {
-  if (!agent.sheet) return ''
+  const sheets = agentSheets(agent)
+  if (!sheets.length) return ''
   try {
-    return `## Your character\n${sheetMarkdown(agent.sheet, true).replace(/^# /, '### ').replace(/\n## /g, '\n#### ')}`
+    if (sheets.length === 1) {
+      return `## Your character\n${sheetMarkdown(sheets[0], true).replace(/^# /, '### ').replace(/\n## /g, '\n#### ')}`
+    }
+    return `## Your characters\nYou play the following characters in this conversation:\n\n${sheets
+      .map((s) => sheetMarkdown(s, true).replace(/^# /, '### ').replace(/\n## /g, '\n#### '))
+      .join('\n\n---\n\n')}`
   } catch {
     return ''
   }
@@ -86,7 +101,7 @@ function guidesSection(tools: ToolDef[]): string {
 }
 
 export function buildInstructions(agent: AgentProfile, tools: ToolDef[], memoryText = ''): string {
-  if (!tools.length) return [characterOf(agent), agent.systemPrompt, userSection(), agent.roleplay ? ROLEPLAY : '', memorySection(memoryText)].filter(Boolean).join('\n\n')
+  if (!tools.length) return [characterOf(agent), agent.systemPrompt, userSection(), agent.roleplay ? ROLEPLAY : '', deliberationDirective(agent.toolChoice), memorySection(memoryText)].filter(Boolean).join('\n\n')
   const env = [`- Operating system: ${os.type()} (${process.platform})`]
   const folders = linkedFolders.forAgent(agent.id)
   if (tools.some((t) => t.needsWorkspace)) {
@@ -114,6 +129,7 @@ export function buildInstructions(agent: AgentProfile, tools: ToolDef[], memoryT
     ].join('\n')
   ]
   if (agent.roleplay) sections.push(ROLEPLAY)
+  sections.push(deliberationDirective(agent.toolChoice))
   sections.push(libraryGuide(tools.map((t) => t.name), agent.id))
   sections.push(placesGuide(tools))
   if (tools.some((t) => t.name === 'world_recall')) sections.push(worldGuide(agent.world, tools.some((t) => t.name === 'world_create')))

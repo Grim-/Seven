@@ -8,7 +8,7 @@ export function ShellCards({ items, adds, bind, scale }: ShellViewProps) {
       {items.map((item, i) => {
         const b = bind(item)
         return (
-          <button key={item.key} {...b.props} {...shellState(b)} style={enterStyle(i)} className="shell-slate shell-enter group gap-3 p-2.5">
+          <button key={item.key} {...b.props} {...shellState(b)} style={enterStyle(i, b.props.style)} className="shell-slate shell-enter group gap-3 p-2.5">
             <ShellSweep />
             {item.thumb ? (
               <span className="shell-art shrink-0" style={{ width: `${4 * scale}rem`, height: `${4 * scale}rem` }}>

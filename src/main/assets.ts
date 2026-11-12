@@ -2,6 +2,7 @@ import { isAssetId } from '@shared/ids'
 import { net, protocol } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import type { ServerResponse } from 'node:http'
 import { pathToFileURL } from 'node:url'
 import { isSealed, isVaultLocked } from '@shared/sealed'
 import { dataDir } from './paths'
@@ -85,4 +86,62 @@ export function handleAssets(): void {
       return new Response('Not found', { status: 404 })
     }
   })
+}
+
+export function serveAssetBytes(res: ServerResponse, id: string, name: string | null, rangeHeader: string | null): void {
+  let found: StoredAsset | null
+  let sealed: boolean
+  try {
+    found = storedAsset(id)
+    sealed = found ? sealedFile(found.file) : false
+  } catch (err) {
+    res.writeHead(isVaultLocked(err) ? 423 : 404, { 'Content-Type': 'text/plain' })
+    res.end(isVaultLocked(err) ? 'Locked' : 'Not found')
+    return
+  }
+  if (!found || (name !== null && found.name !== name)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' })
+    res.end('Not found')
+    return
+  }
+  try {
+    const size = sealed ? mainSecure.size(found.file) : fs.statSync(found.file).size
+    const headers: Record<string, string> = {
+      'Content-Type': found.mime,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'no-store',
+      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(found.name)}`
+    }
+    const m = rangeHeader ? /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim()) : null
+    if (!m || (m[1] === '' && m[2] === '')) {
+      res.writeHead(200, { ...headers, 'Content-Length': String(size) })
+      if (sealed) res.end(mainSecure.readBytes(found.file))
+      else fs.createReadStream(found.file).on('error', () => res.destroy()).pipe(res)
+      return
+    }
+    let start = m[1] === '' ? Math.max(0, size - Number(m[2])) : Number(m[1])
+    let end = m[1] === '' ? size - 1 : m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1)
+    if (start >= size || start > end) {
+      res.writeHead(416, { 'Content-Range': `bytes */${size}` })
+      res.end()
+      return
+    }
+    start = Math.max(0, start)
+    if (!sealed) {
+      res.writeHead(206, { ...headers, 'Content-Length': String(end - start + 1), 'Content-Range': `bytes ${start}-${end}/${size}` })
+      fs.createReadStream(found.file, { start, end }).on('error', () => res.destroy()).pipe(res)
+      return
+    }
+    end = Math.min(end, start + 4 * 1024 * 1024 - 1)
+    const body = mainSecure.readRange(found.file, start, end)
+    res.writeHead(206, { ...headers, 'Content-Length': String(body.length), 'Content-Range': `bytes ${start}-${start + body.length - 1}/${size}` })
+    res.end(body)
+  } catch (err) {
+    if (res.headersSent) {
+      res.destroy()
+      return
+    }
+    res.writeHead(isVaultLocked(err) ? 423 : 404, { 'Content-Type': 'text/plain' })
+    res.end(isVaultLocked(err) ? 'Locked' : 'Not found')
+  }
 }

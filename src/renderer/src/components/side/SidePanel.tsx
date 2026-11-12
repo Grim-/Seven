@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { create } from 'zustand'
-import { ChevronDown, ChevronLeft, Database, Dumbbell, FolderOpen, Gauge, Inbox, Maximize2, Minimize2, PanelRight, Plus, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, Database, Dumbbell, FolderOpen, Gauge, Inbox, Maximize2, Minimize2, Plus, Trash2, X } from 'lucide-react'
 import type { PanelItem, SidePanelPrefs } from '@shared/types'
 import { useApp } from '../../store/app'
 import type { DataSelection } from '../../store/data'
@@ -26,6 +26,7 @@ import { KindBrowser } from '../data/KindBrowser'
 import './BrowserTab'
 import { useAgentIdOf, useConversation } from '../../lib/conversation'
 import { saveTrayKinds, useKindList } from '../../lib/kinds'
+import { useDrawerPrefs } from '../../lib/listPrefs'
 
 const MIN = 280
 const MAX = 900
@@ -43,9 +44,7 @@ export const useSide = create<SideState>((set) => ({
 }))
 
 function usePrefs(): [SidePanelPrefs, (patch: Partial<SidePanelPrefs>) => void] {
-  const prefs = useApp((s) => s.settings?.sidePanel) ?? DEFAULTS
-  const update = useApp((s) => s.updateSettings)
-  return [prefs, (patch) => void update({ sidePanel: { ...prefs, ...patch } })]
+  return useDrawerPrefs('sidePanel', DEFAULTS)
 }
 
 function useActiveItems(): { sessionId: string | null; items: PanelItem[] } {
@@ -164,19 +163,32 @@ function useTabs() {
   return { tabs, ctx, sessionId, items }
 }
 
-export function SidePanelToggle() {
+export function SidePanelToggle({ className }: { className?: string }) {
   const [prefs, save] = usePrefs()
   const { sessionId, items } = useActiveItems()
   const seen = usePanel((s) => s.seen)
   const unseen = !prefs.open && sessionId ? unseenIn(items, seen, sessionId, null) : 0
+  const open = prefs.open
   return (
     <button
-      title={prefs.open ? 'Hide side panel' : 'Show side panel'}
-      onClick={() => save({ open: !prefs.open })}
-      className={cn('relative flex h-7 w-7 items-center justify-center border', prefs.open ? 'border-accent/70 text-accent' : 'border-line/60 text-dim hover:text-white')}
+      type="button"
+      title={open ? 'Hide side panel' : 'Show side panel'}
+      onClick={() => save({ open: !open })}
+      className={cn(
+        'bracket-right group relative w-3.5 shrink-0 self-stretch min-h-[48px] cursor-pointer select-none border-y border-l transition-all outline-none',
+        open
+          ? 'border-accent/80 bg-accent/15 text-accent shadow-[0_0_10px_color-mix(in_srgb,var(--color-accent)_25%,transparent)]'
+          : 'border-line bg-black/60 text-dim hover:border-accent hover:bg-accent/10',
+        className
+      )}
     >
-      <PanelRight className="h-4 w-4" />
-      {unseen > 0 && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-accent" />}
+      <span
+        className={cn(
+          'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[1.5px] h-5 transition-all',
+          open ? 'bg-accent shadow-[0_0_8px_var(--color-accent)]' : 'bg-dim/70 group-hover:bg-accent'
+        )}
+      />
+      {unseen > 0 && <span className="absolute -top-1 -left-1 h-2 w-2 bg-accent shadow-[0_0_6px_var(--color-accent)]" />}
     </button>
   )
 }
@@ -231,8 +243,21 @@ export function SidePanel() {
 
   return (
     <>
+    <div
+      aria-hidden
+      onClick={() => save({ open: false })}
+      className="hidden phone:block absolute inset-0 z-20 bg-black/60 backdrop-blur-[1px]"
+    />
     <Gutter resets="side" />
-    <SidePane id="side" width={prefs.width} min={MIN} max={MAX} reset={DEFAULTS.width} onWidth={(w) => save({ width: w })}>
+    <SidePane
+      id="side"
+      width={prefs.width}
+      min={MIN}
+      max={MAX}
+      reset={DEFAULTS.width}
+      onWidth={(w) => save({ width: w })}
+      className="phone:absolute phone:inset-y-0 phone:right-0 phone:z-30 phone:w-[min(22rem,92vw)]! phone:max-w-[92vw]! phone:bg-bg phone:shadow-[-8px_0_24px_rgba(0,0,0,0.7)]"
+    >
     <motion.div className="flex h-full w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, ease: 'easeOut' }}>
       <section className="panel-box flex min-h-0 w-full flex-col overflow-hidden">
         <header className="flex shrink-0 items-center gap-1 border-b border-line/60 px-2 py-1.5">

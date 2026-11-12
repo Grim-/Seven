@@ -5,7 +5,7 @@ import { cleanCardSource } from '@shared/cardDecks'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
-import { cleanVoice, DEFAULT_CONTEXT, DEFAULT_LIBRARY_ACCESS, DEFAULT_LOOK, type LibraryAccess, type AgentLook, type AvatarRef, PERMISSION_MODES, SAMPLING_KEYS, THINKING_LEVELS, type ThinkingLevel, type AgentDraft, type ContextSettings, type AgentProfile, type PermissionMode, type SamplingOverrides } from '@shared/types'
+import { cleanVoice, DEFAULT_CONTEXT, DEFAULT_LIBRARY_ACCESS, DEFAULT_LOOK, type LibraryAccess, type AgentLook, type AvatarRef, PERMISSION_MODES, SAMPLING_KEYS, THINKING_LEVELS, type ThinkingLevel, TOOL_CHOICE_MODES, type ToolChoiceMode, type AgentDraft, type ContextSettings, type AgentProfile, type PermissionMode, type SamplingOverrides } from '@shared/types'
 import { paths } from '../util/paths'
 import { newId, readJson, removePath, writeJson } from '../util/fs'
 import { secure, vaultEvents } from '../util/secure'
@@ -22,6 +22,10 @@ const DEFAULT_PROMPT = [
 
 function cleanThinking(v: unknown): ThinkingLevel | null {
   return (THINKING_LEVELS as readonly unknown[]).includes(v) ? (v as ThinkingLevel) : null
+}
+
+function cleanToolChoice(v: unknown): ToolChoiceMode | null {
+  return (TOOL_CHOICE_MODES as readonly unknown[]).includes(v) ? (v as ToolChoiceMode) : null
 }
 
 function cleanSampling(input: SamplingOverrides | undefined): SamplingOverrides {
@@ -289,7 +293,11 @@ export class AgentRegistry extends EventEmitter {
       readAloud: (draft.readAloud ?? existing?.readAloud) === true,
       reasoningStyle: (draft.reasoningStyle === undefined ? existing?.reasoningStyle : draft.reasoningStyle) || null,
       thinking: cleanThinking(draft.thinking === undefined ? existing?.thinking : draft.thinking),
-      sheet: (draft.sheet === undefined ? existing?.sheet : draft.sheet) || null,
+      toolChoice: cleanToolChoice(draft.toolChoice === undefined ? existing?.toolChoice : draft.toolChoice),
+      sheet: (draft.sheets?.[0] ?? (draft.sheet === undefined ? existing?.sheet : draft.sheet)) || null,
+      sheets: draft.sheets !== undefined
+        ? (draft.sheets ?? [])
+        : existing?.sheets ?? (draft.sheet ? [draft.sheet] : existing?.sheet ? [existing.sheet] : []),
       player: (draft.player === undefined ? existing?.player : draft.player) || null,
       cards: cleanCardSource(draft.cards === undefined ? existing?.cards : draft.cards),
       mindAuto: cleanMindAuto(draft.mindAuto === undefined ? existing?.mindAuto : draft.mindAuto),

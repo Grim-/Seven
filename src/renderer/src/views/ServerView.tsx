@@ -11,14 +11,14 @@ import { VersionList } from '../components/install/VersionList'
 import { InstallWizard } from '../components/install/wizard/InstallWizard'
 import { ParamRows } from '../components/game/ParamRows'
 import { useViewPlace } from '../lib/viewPlace'
-import type { InstallHelperState, InstallProgress, ServerStatus } from '@shared/types'
+import type { InstallHelperState, InstallProgress, NetworkStatus, ServerStatus } from '@shared/types'
 
 const LLAMA_SERVER = 'llama-server'
 interface ServerPage extends BrowserSection {
   body: () => ReactNode
 }
 
-function ServerPages({ state, progress, status, reload }: { state: InstallHelperState; progress: InstallProgress | null; status: ServerStatus; reload: () => void }) {
+function ServerPages({ state, progress, status, network, reload }: { state: InstallHelperState; progress: InstallProgress | null; status: ServerStatus; network: NetworkStatus | null; reload: () => void }) {
   const settings = useHelperSettings(state)
   const [page, setPage] = useViewPlace('server.page', 'running')
   const [query, setQuery] = useState('')
@@ -41,7 +41,7 @@ function ServerPages({ state, progress, status, reload }: { state: InstallHelper
       )
     },
     { id: 'versions', label: 'Versions', count: state.versions.length, body: () => <VersionList state={state} /> },
-    { id: 'network', label: 'Network', hint: status.network.on ? 'On' : 'Off', body: () => <NetworkPanel network={status.network} /> },
+    { id: 'network', label: 'Network', hint: network?.on ? 'On' : 'Off', body: () => (network ? <NetworkPanel network={network} /> : null) },
     ...settingSections(state).map((s) => ({ id: `settings:${s}`, label: s, group: 'Settings', body: () => settingsCard(s, settingKeys(state, s)) }))
   ]
   const current = pages.find((p) => p.id === page) ?? pages[0]
@@ -62,12 +62,12 @@ function ServerPages({ state, progress, status, reload }: { state: InstallHelper
 }
 
 export function ServerView() {
-  const { status, reload } = useServerStatus(2000)
+  const { status, network, reload } = useServerStatus(2000)
   const { state, progress } = useInstallHelper(LLAMA_SERVER)
   return (
     <div className="flex h-full flex-col gap-3 p-5">
       <ViewHeader title="llama-server" subtitle="The installed versions, what the model servers are doing, and access from other devices on your network." />
-      {status && state && <ServerPages state={state} progress={progress} status={status} reload={reload} />}
+      {status && state && <ServerPages state={state} progress={progress} status={status} network={network} reload={reload} />}
     </div>
   )
 }

@@ -15,13 +15,17 @@ import {
   useAuiState
 } from '@assistant-ui/react'
 import { ArrowDown, ChevronRight, Copy, CornerDownLeft, Dices, FileIcon, GitFork, Paperclip, Pencil, RotateCcw, Shuffle, Square, Volume2, X } from 'lucide-react'
-import type { AgentProfile, AssetMeta, ChatMessage, PictureArea, RewindPreview } from '@shared/types'
+import { agentSheets, type AgentProfile, type AssetMeta, type ChatMessage, type PictureArea, type RewindPreview } from '@shared/types'
 import { AgentAvatar } from '../agents/look'
 import { cn } from '../../lib/cn'
 import { LinkTextarea } from '../data/LinkTextarea'
 import { Markdown } from './Markdown'
 import { speak, stopSpeaking, useSpeech } from '../../lib/speech'
-import { RoleplayText } from './Roleplay'
+import { parseRoleplay, RoleplayText } from './Roleplay'
+import { CharacterAvatar } from './CharacterAvatar'
+import { PlayerCharacterDock } from './PlayerCharacterDock'
+import { useEntryPreview } from '../entries/entryPreview'
+import { showName } from '@shared/ids'
 import { useSevenRuntime } from './runtime'
 import { ToolCard } from './ToolCard'
 import { AgentRef, useRoleplay } from './agentContext'
@@ -288,12 +292,18 @@ function VirtualMessages({ viewport }: { viewport: React.RefObject<HTMLDivElemen
 
 function UserMessage({ messageId }: { messageId: string }) {
   const conv = useConversation()
+  const agent = useContext(AgentRef)
   const look = useThreadLook()
   const rewind = useContext(RewindRequest)
   const fork = useContext(ForkRequest)
   const canRewind = rewind && !messageId.startsWith('__')
   const entrance = useEntrance(messageId)
   const text = useAuiState((s) => s.message.content.map((p) => (p.type === 'text' ? p.text : '')).join(''))
+  const worldPlayer = useWorldPlayer(agent?.world?.worldId ?? null)
+  const player = worldPlayer || agent?.player || null
+  const preview = useEntryPreview(player ? `@sheet:${player}` : '')
+  const valid = preview && !('missing' in preview) ? preview : null
+  const playerName = valid ? showName(valid.title) : player ? showName(player) : null
   return (
     <>
     <SummaryMarker messageId={messageId} />
@@ -322,7 +332,17 @@ function UserMessage({ messageId }: { messageId: string }) {
             </button>
           )}
           <MessageTime />
-          You
+          <span className="inline-flex items-center gap-1.5 font-mono">
+            {playerName ? (
+              <>
+                <span className="font-semibold text-white">{playerName}</span>
+                <span className="text-[10px] text-faint">(You)</span>
+              </>
+            ) : (
+              'You'
+            )}
+            {player && <CharacterAvatar sheetId={player} size={18} openOnClick />}
+          </span>
         </div>
         <MessageFiles messageId={messageId} />
         <div className={look.user.box}>
@@ -363,12 +383,38 @@ function AssistantMessage({
     return last?.id === messageId ? conv.sessionId : null
   })
   const entrance = useEntrance(messageId)
+  const sheets = agentSheets(agent)
+  const rawText = conv.sessionId && messageId ? messageText(conv.sessionId, messageId) : ''
+
+  const speakerSheet = useMemo(() => {
+    if (!sheets.length) return null
+    if (sheets.length === 1) return sheets[0]
+    if (rawText) {
+      const blocks = parseRoleplay(rawText)
+      const firstSay = blocks.find((b) => b.kind === 'say')
+      if (firstSay) {
+        const spk = firstSay.speaker.toLowerCase()
+        const match = sheets.find((s) => {
+          const sLower = s.toLowerCase()
+          const sName = showName(s).toLowerCase()
+          return sLower === spk || sName === spk || sName.startsWith(spk) || spk.startsWith(sName)
+        })
+        if (match) return match
+      }
+    }
+    return sheets[0] ?? null
+  }, [sheets, rawText])
+
+  const sheetPreview = useEntryPreview(speakerSheet ? `@sheet:${speakerSheet}` : '')
+  const validSheet = sheetPreview && !('missing' in sheetPreview) ? sheetPreview : null
+  const speakerName = validSheet ? showName(validSheet.title) : speakerSheet ? showName(speakerSheet) : null
+
   return (
     <MessagePrimitive.Root
       onContextMenu={(e) => {
         if (!messageId) return
         const text = messageText(conv.sessionId, messageId)
-        openMenu(e, `${label.toLowerCase()} reply`, [
+        openMenu(e, `${(speakerName ?? label).toLowerCase()} reply`, [
           { label: 'Copy reply', icon: <Copy />, disabled: !text, onSelect: () => void copyText(text, 'Copied', 'The reply, as markdown') },
           { label: 'Copy as plain text', icon: <Copy />, disabled: !text, onSelect: () => void copyText(text.replace(/[*_`#>]/g, ''), 'Copied', 'The reply, as plain text') },
           { label: 'Edit reply…', icon: <Pencil />, disabled: !edit || statusType === 'running', onSelect: () => edit?.(messageId) },
@@ -380,15 +426,30 @@ function AssistantMessage({
       }}
     >
       <motion.div className="flex" initial={entrance} animate={{ opacity: 1, y: 0 }} transition={ENTER}>
-      {agent && big > 0 && (
+      {speakerSheet && big > 0 ? (
+        <div className="mr-3 shrink-0 pt-0.5">
+          <CharacterAvatar sheetId={speakerSheet} size={big} openOnClick />
+        </div>
+      ) : agent && big > 0 ? (
         <div className="mr-3 shrink-0 pt-0.5">
           <AgentAvatar agent={agent} size={big} sessionId={liveSession} />
         </div>
-      )}
+      ) : null}
       <div className={cn('w-full min-w-0', look.agent.width)}>
         <div className={cn('mb-1 flex items-center gap-1.5', look.agent.label)}>
-          {agent && big === 0 && look.agent.avatar > 0 && <AgentAvatar agent={agent} size={look.agent.avatar} sessionId={liveSession} />}
-          {label}
+          {speakerSheet && big === 0 && look.agent.avatar > 0 ? (
+            <CharacterAvatar sheetId={speakerSheet} size={look.agent.avatar} openOnClick />
+          ) : agent && big === 0 && look.agent.avatar > 0 ? (
+            <AgentAvatar agent={agent} size={look.agent.avatar} sessionId={liveSession} />
+          ) : null}
+          {speakerSheet && speakerName ? (
+            <span className="inline-flex items-center gap-1">
+              <span className="font-semibold text-accent">{speakerName}</span>
+              <span className="text-[10px] text-faint">({label})</span>
+            </span>
+          ) : (
+            label
+          )}
           <MessageTime />
         </div>
         <div className={look.agent.body}>
@@ -429,8 +490,8 @@ function Composer({ running, placeholder }: { running: boolean; placeholder: str
   const hints = hidden === keys ? [] : all
   const pick = Math.min(selected, Math.max(0, hints.length - 1))
   const agent = useContext(AgentRef)
-  const { sessionId: activeId } = conv
-  const player = useWorldPlayer(agent?.world?.worldId ?? null)
+  const worldPlayer = useWorldPlayer(agent?.world?.worldId ?? null)
+  const player = worldPlayer || agent?.player || null
   const append = (text: string) => aui.composer.setText(current.trim() ? `${current.trimEnd()} ${text}` : text)
   const request = usePlayRequests((s) => s.byChat[conv.key])
   return (
@@ -455,7 +516,9 @@ function Composer({ running, placeholder }: { running: boolean; placeholder: str
           <PlayPanel character={player} where={{ link: null, agents: [], onText: append }} onClose={() => setTool(null)} />
         </div>
       )}
-      {look.avatar > 0 && agent && <AgentAvatar agent={agent} size={look.avatar} sessionId={activeId} className="mr-1" />}
+      {look.avatar > 0 && (
+        <PlayerCharacterDock agent={agent} size={look.avatar} className="mr-1" />
+      )}
       <ComposerTool title="Attach files" onClick={() => void main('dialog.openFiles').then((paths) => attachPaths(conv.key, paths))}>
         <Paperclip />
       </ComposerTool>

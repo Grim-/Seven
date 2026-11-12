@@ -13,6 +13,8 @@ export default defineConfig({
     resolve: { alias: { '@shared': shared } }
   },
   renderer: {
+    base: './',
+    build: { assetsDir: 'static' },
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src'),

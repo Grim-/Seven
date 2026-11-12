@@ -11,7 +11,7 @@ export function KindPicker({ section, onPick }: KindPickerProps) {
     <KindShell
       id={`pick-${section.kind}`}
       inherit={`kind-${section.kind}`}
-      layouts={Thumb ? ['tiles', 'cards', 'deck', 'list'] : ['cards', 'deck', 'list']}
+      layouts={Thumb ? ['cards', 'deck', 'tiles', 'list'] : ['cards', 'deck', 'list']}
       items={list.map((h) => kindItem(section, h))}
       onOpen={(item) => {
         const hit = list.find((h) => h.id === item.key)

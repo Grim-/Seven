@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { AgentProfile } from '@shared/types'
 import { AgentAvatar } from '../agents/look'
+import { ChatSettings } from './ChatSettings'
 import { useModels } from '../../store/models'
 import { useLivePhase } from './StatusLine'
 import { cn } from '../../lib/cn'
@@ -19,7 +20,20 @@ export function AgentPresence({ agent, sessionId, eyebrow, size, children }: { a
   return (
     <div className={cn('relative flex min-w-0 items-end', look.root)}>
       <span className="presence-frame notch-sm shrink-0">
-        <AgentAvatar agent={agent} size={look.avatar} sessionId={sessionId} className="border-accent" />
+        {agent ? (
+          <ChatSettings
+            agent={agent}
+            side="bottom"
+            align="start"
+            trigger={
+              <span className="cursor-pointer transition-opacity hover:opacity-90" title={`${agent.name}${agent.sheet ? ` (Playing @sheet:${agent.sheet})` : ''} · Click or right-click for settings`}>
+                <AgentAvatar agent={agent} size={look.avatar} sessionId={sessionId} className="border-accent" />
+              </span>
+            }
+          />
+        ) : (
+          <AgentAvatar agent={null} size={look.avatar} sessionId={sessionId} className="border-accent" />
+        )}
       </span>
       <div className="min-w-0 flex-1">
         {eyebrow && <div className="truncate font-mono text-[10px] uppercase tracking-[0.22em] text-accent-soft">{eyebrow}</div>}

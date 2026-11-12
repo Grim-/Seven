@@ -14,6 +14,25 @@ const COPIES = path.join(os.tmpdir(), 'seven-open')
 
 export const mainSecure = new SecureFs(dataDir, isPlainRel)
 
+const unlockWatchers = new Set<() => void>()
+
+export function onVaultUnlocked(watch: () => void): () => void {
+  unlockWatchers.add(watch)
+  return () => {
+    unlockWatchers.delete(watch)
+  }
+}
+
+function unlocked(): void {
+  for (const watch of unlockWatchers) {
+    try {
+      watch()
+    } catch (err) {
+      console.warn('[vault] a reload after unlocking failed', err)
+    }
+  }
+}
+
 function readFile(): VaultFile | null {
   try {
     return JSON.parse(fs.readFileSync(FILE, 'utf8')) as VaultFile
@@ -86,6 +105,7 @@ export class Vault {
       mainSecure.keys = publicKeys(this.file)
       throw new Error(`The passphrase is right, but the engine did not take the key: ${err instanceof Error ? err.message : String(err)}`)
     }
+    unlocked()
     return this.changed()
   }
 

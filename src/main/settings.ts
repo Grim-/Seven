@@ -11,6 +11,7 @@ const DEFAULTS: Settings = {
   sidePanel: { open: false, width: 380, tab: 'files' },
   chatList: { open: true, width: 288 },
   dataList: { open: true, width: 288, closed: ['weblog', 'board'] },
+  pagesList: { open: true, width: 288 },
   pagesWidth: 288,
   chatPictureHeight: 480,
   trayKinds: [],
@@ -33,6 +34,48 @@ const DEFAULTS: Settings = {
   droppedPictures: { ask: true, folder: '' }
 }
 
+const REMOTE_SETTINGS: Record<keyof Settings, boolean> = {
+  sidePanel: true,
+  chatList: true,
+  dataList: true,
+  pagesList: true,
+  pagesWidth: true,
+  chatPictureHeight: true,
+  trayKinds: true,
+  trayTabs: true,
+  trayPins: true,
+  favourites: true,
+  avatarSize: true,
+  backdrop: true,
+  chatBackdrop: true,
+  defaultTheme: true,
+  audio: true,
+  ambientBackground: true,
+  lastView: true,
+  voice: false,
+  modelFolders: false,
+  overlayEnabled: false,
+  hotkey: false,
+  overlayPosition: false,
+  startWithWindows: false,
+  droppedPictures: false
+}
+
+export function remoteSettingsOut(value: Settings): Settings {
+  const out = { ...value }
+  for (const key of Object.keys(REMOTE_SETTINGS) as (keyof Settings)[]) {
+    if (!REMOTE_SETTINGS[key]) (out as Record<keyof Settings, unknown>)[key] = structuredClone(DEFAULTS[key])
+  }
+  return out
+}
+
+export function remoteSettingsIn(patch: Partial<Settings>): Partial<Settings> {
+  for (const key of Object.keys(patch) as (keyof Settings)[]) {
+    if (!REMOTE_SETTINGS[key]) throw new Error(`The ${key} setting can only be changed on the PC.`)
+  }
+  return patch
+}
+
 function point(value: unknown): ScreenPoint | null {
   if (!value || typeof value !== 'object') return null
   const { x, y } = value as Record<string, unknown>
@@ -50,11 +93,11 @@ function sidePanel(value: unknown): SidePanelPrefs {
   }
 }
 
-function chatList(value: unknown, fallback: ChatListPrefs = DEFAULTS.chatList): ChatListPrefs {
+function chatList(value: unknown, fallback: ChatListPrefs = DEFAULTS.chatList, max = 560): ChatListPrefs {
   const v = (value && typeof value === 'object' ? value : {}) as Partial<ChatListPrefs>
   return {
     open: typeof v.open === 'boolean' ? v.open : fallback.open,
-    width: typeof v.width === 'number' && Number.isFinite(v.width) ? Math.round(Math.min(560, Math.max(200, v.width))) : fallback.width,
+    width: typeof v.width === 'number' && Number.isFinite(v.width) ? Math.round(Math.min(max, Math.max(200, v.width))) : fallback.width,
     ...(Array.isArray(v.closed) ? { closed: v.closed.filter((c): c is string => typeof c === 'string').slice(0, 100) } : fallback.closed ? { closed: fallback.closed } : {}),
     ...(Array.isArray(v.shown) ? { shown: v.shown.filter((c): c is string => typeof c === 'string').slice(0, 100) } : {})
   }
@@ -107,6 +150,7 @@ function sanitize(input: Partial<Settings>): Settings {
   return {
     chatList: chatList(input.chatList),
     dataList: chatList(input.dataList, DEFAULTS.dataList),
+    pagesList: chatList(input.pagesList, { ...DEFAULTS.pagesList, width: typeof input.pagesWidth === 'number' && Number.isFinite(input.pagesWidth) ? Math.round(Math.min(640, Math.max(200, input.pagesWidth))) : DEFAULTS.pagesList.width }, 640),
     trayPins: pins(input.trayPins).slice(0, 24),
     favourites: pins(input.favourites),
     trayTabs: Array.isArray(input.trayTabs) ? [...new Set(input.trayTabs.filter((k): k is string => typeof k === 'string' && /^[\w:.-]{1,64}$/.test(k)))] : DEFAULTS.trayTabs,

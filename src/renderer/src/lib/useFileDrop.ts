@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { filePath, hasCapability, sendFile } from './transport'
 
 export interface DroppedFile {
   path: string
@@ -36,10 +37,13 @@ export function useFileDrop(onPaths: (paths: string[], e: React.DragEvent, dropp
       e.preventDefault()
       e.stopPropagation()
       setOver(false)
-      const dropped = Array.from(e.dataTransfer.files)
-        .map((file) => ({ path: window.seven.pathForFile(file), file }))
-        .filter((d) => d.path)
-      if (dropped.length) onPaths(dropped.map((d) => d.path), e, dropped)
+      const files = Array.from(e.dataTransfer.files)
+      const dropped = files.map((file) => ({ path: filePath(file), file })).filter((d) => d.path)
+      if (dropped.length) return onPaths(dropped.map((d) => d.path), e, dropped)
+      if (!files.length || !hasCapability('sendFile')) return
+      void Promise.all(files.map(async (file) => ({ path: await sendFile(file), file })))
+        .then((sent) => onPaths(sent.map((d) => d.path), e, sent))
+        .catch(() => undefined)
     }
   }
   return { over, props }

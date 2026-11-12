@@ -112,7 +112,7 @@ export class SessionStore extends EventEmitter {
     return meta
   }
 
-  update(id: string, patch: Partial<Pick<SessionMeta, 'title' | 'agentId' | 'permissionMode' | 'reasoningStyle' | 'thinking' | 'probe'>>): SessionMeta {
+  update(id: string, patch: Partial<Pick<SessionMeta, 'title' | 'agentId' | 'permissionMode' | 'reasoningStyle' | 'thinking' | 'toolChoice' | 'probe'>>): SessionMeta {
     const current = this.get(id)
     if (patch.agentId && patch.agentId !== current.agentId && this.incognitoAgent(patch.agentId) !== (current.incognito === true)) throw new Error(current.incognito ? 'This is an incognito chat. Start a new chat to talk to an agent that is not incognito.' : 'That agent is incognito. Start a new chat with it instead.')
     const meta = { ...current, ...patch, updatedAt: Date.now() }

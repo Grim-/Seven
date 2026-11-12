@@ -6,7 +6,7 @@ import type { Story } from './story'
 import type { Routine, RoutineDraft } from './routines'
 import type { TimelineRow } from './timeline'
 import type { WorldChanges, WorldEntity, WorldMeta, WorldPost, WorldSchema } from './world'
-import type { JourneyEntry, JourneyKind, MapData, MapListing, PlaceVisitor, WorldMapUse } from './maps'
+import type { JourneyEntry, JourneyKind, MapData, MapListing, PlaceVisitor, TokenVisitor, WorldMapUse } from './maps'
 import type { Action, ActionResult } from './actions'
 import type { Decision } from './decisions'
 import type { CardSwap, DeckRef } from './cardDecks'
@@ -65,8 +65,10 @@ import type {
   InstallChoice,
   InstallProgress,
   PackListing,
+  DeviceLevelId,
   NetworkSettings,
   NetworkStatus,
+  PairingInfo,
   ProjectorChoice,
   ModelFacts,
   OverlayMode,
@@ -96,6 +98,7 @@ import type {
   ModelInfo,
   DownloadItem,
   ThinkingLevel,
+  ToolChoiceMode,
   RemoteApi,
   ModelHostState,
   ParamDef,
@@ -129,6 +132,7 @@ import type { CompendiumEntry, CompendiumKind, CompendiumRef } from './compendiu
 import type { CatalogData, GameDef } from './game/defs/defs'
 import type { RuleSet } from './game/defs/ruleSets'
 import type { EntityRecord } from './game/core/GameEntity'
+import type { Point } from './shapes'
 import type { ClockState } from './game/core/clock'
 import type { GameSave, SaveMeta, WorldSaves } from './game/save'
 import type { StoredDecision } from './storedDecision'
@@ -243,6 +247,7 @@ export interface EngineRequests {
   'worlds.journey': Req<{ id: string; sheet: string }, JourneyEntry[]>
   'worlds.addJourney': Req<{ id: string; sheet: string; kind: JourneyKind; text: string }, JourneyEntry>
   'places.visitors': Req<{ sheets: string[] }, PlaceVisitor[]>
+  'places.tokens': Req<{ world: string; tokens: string[] }, TokenVisitor[]>
   'maps.get': Req<{ id: string }, MapData | null>
   'maps.withPlace': Req<{ world: string; place: string }, { map: MapData; use: WorldMapUse } | null>
   'places.here': Req<{ world: string }, Record<string, PlaceVisitor[]>>
@@ -299,12 +304,6 @@ export interface EngineRequests {
   'packs.set': Req<{ id: string; on: string[] }, PackListing>
   'packs.import': Req<{ file: string }, { title: string }>
   'packs.remove': Req<{ file: string }, void>
-  'network.set': Req<{ on?: boolean; settings?: Partial<NetworkSettings> }, NetworkStatus>
-  'network.password.suggest': Req<void, string>
-  'network.password.set': Req<{ password: string }, NetworkStatus>
-  'network.certificate.get': Req<void, string | null>
-  'network.certificate.renew': Req<void, NetworkStatus>
-  'network.unlock': Req<{ address: string }, NetworkStatus>
   'backdrop.get': Req<{ sessionId: string }, ChatBackdrops>
   'themes.list': Req<void, Theme[]>
   'themes.save': Req<Omit<Partial<Theme>, 'id'> & { id: string | null }, Theme>
@@ -353,6 +352,7 @@ export interface EngineRequests {
   'sessions.fork': Req<{ id: string; messageId: string }, { session: SessionMeta; text: string }>
   'sessions.setStyle': Req<{ id: string; style: string | null }, SessionMeta>
   'sessions.setThinking': Req<{ id: string; thinking: ThinkingLevel | null }, SessionMeta>
+  'sessions.setToolChoice': Req<{ id: string; toolChoice: ToolChoiceMode | null }, SessionMeta>
   'sessions.editResult': Req<{ id: string; messageId: string; partId: string; text: string }, ToolPart>
   'sessions.editReply': Req<{ id: string; messageId: string; edits: { index: number; text: string }[] }, ChatMessage>
   'permissions.get': Req<void, PermissionRules>
@@ -389,6 +389,8 @@ export interface EngineRequests {
   'saves.takeOut': Req<{ sheet: string }, GameSave | null>
   'saves.adopt': Req<{ world: string }, GameSave>
   'saves.travel': Req<{ sheet: string; id: string; map: string; place: string }, GameSave>
+  'saves.spawnCreature': Req<{ world: string; map: string; creature: EntityRecord; faction: string; at: Point }, GameSave>
+  'saves.updateCreature': Req<{ world: string; creature: EntityRecord; faction?: string }, GameSave>
   'game.misfits': Req<{ sheet: string }, string[]>
   'game.giveItem': Req<{ sheet: string; item: string; count: number; gold: number }, { given: number; gold: number }>
   'game.useAbility': Req<{ sheet: string; ability: string; target: string | null; at: { x: number; y: number } | null; distance: number }, string>
@@ -596,6 +598,20 @@ export interface MainRequests {
   'overlay.dragStart': Req<void, void>
   'overlay.dragEnd': Req<void, void>
   'hotkey.set': Req<{ accelerator: string }, { ok: boolean; error: string | null }>
+  'network.status': Req<void, NetworkStatus>
+  'network.set': Req<{ on?: boolean; settings?: Partial<NetworkSettings> }, NetworkStatus>
+  'network.password.suggest': Req<void, string>
+  'network.password.set': Req<{ password: string }, NetworkStatus>
+  'network.certificate.get': Req<void, string | null>
+  'network.certificate.renew': Req<void, NetworkStatus>
+  'network.unlock': Req<{ address: string }, NetworkStatus>
+  'network.pair.start': Req<void, PairingInfo>
+  'network.pair.cancel': Req<void, NetworkStatus>
+  'network.pair.allow': Req<{ requestId: string }, NetworkStatus>
+  'network.pair.deny': Req<{ requestId: string }, NetworkStatus>
+  'network.revoke': Req<{ deviceId: string }, NetworkStatus>
+  'network.unpairAll': Req<void, NetworkStatus>
+  'network.deviceLevel': Req<{ deviceId: string; level: DeviceLevelId }, NetworkStatus>
 }
 
 export type MainRequestName = keyof MainRequests
@@ -632,6 +648,7 @@ export interface Events {
   'packs.changed': Record<string, never>
   'network.changed': NetworkStatus
   'engine.children': { pids: number[] }
+  'engine.modelRoutes': { port: number; secret: string }
   'engine.restart': null
   'models.changed': ModelEntry[]
   'downloads.changed': DownloadItem[]
@@ -692,6 +709,20 @@ export const Channel = {
 export type EngineWireRequest = { id: number; name: EngineRequestName; params: unknown }
 export type EngineWireResponse = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string; code?: string }
 export type EngineWireMessage = EngineWireResponse | EventMessage
+
+export type BridgeRequest =
+  | { id: number; kind: 'engine'; name: EngineRequestName; params: unknown }
+  | { id: number; kind: 'main'; name: MainRequestName; params: unknown }
+
+export type BridgeSubscription = { id?: undefined; subscribe: EventName[]; unsubscribe?: EventName[] } | { id?: undefined; subscribe?: EventName[]; unsubscribe: EventName[] }
+
+export type BridgeClientMessage = BridgeRequest | BridgeSubscription
+
+export type BridgeReply = { id: number; result?: unknown; error?: string }
+
+export type BridgeHello = { hello: { level: DeviceLevelId } }
+
+export type BridgeServerMessage = BridgeReply | EventMessage | BridgeHello
 
 export interface SevenApi {
   engine<K extends EngineRequestName>(name: K, params: EngineParams<K>): Promise<EngineResult<K>>
