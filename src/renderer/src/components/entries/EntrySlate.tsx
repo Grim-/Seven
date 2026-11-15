@@ -1,7 +1,7 @@
-import { useContext, useEffect, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import { ChevronDown, ChevronRight, ExternalLink, Layers, Maximize2, Minimize2, PanelRight, Sparkles, X } from 'lucide-react'
+import { AppWindow, ChevronDown, ChevronRight, ExternalLink, Layers, Maximize2, Minimize2, PanelRight, Sparkles, X } from 'lucide-react'
 import { showName } from '@shared/ids'
 import { on } from '../../lib/ipc'
 import { presentOf, setDefaultEntrySlate, type EntrySlateProps } from '../../registries/kinds'
@@ -10,12 +10,142 @@ import { AssetMedia } from '../pictures/AssetMedia'
 import { Facts, InsideSlateContext } from './EntryCard'
 import { Markdown } from '../chat/Markdown'
 import { showInData } from '../../lib/library'
-import { showInPanel } from '../data/showInPanel'
+import { showInPanel, slateSurfaceMenuItems } from '../data/showInPanel'
+import { openMenu } from '../ui'
 import { pinToChatTable } from '../chat/tabletopStore'
 import { useEscapeLayer } from '../../lib/escape'
+import { matchesKeybind, useKeybindLabel } from '../../store/keybinds'
 import { cn } from '../../lib/cn'
 
-export type SlateResizeEdge = 'r' | 'b' | 'br'
+interface SlateRect {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+interface RegisteredFocusSlate {
+  maximized: boolean
+  toggle: () => void
+}
+
+const slateFocusRegistry = new Map<string, RegisteredFocusSlate>()
+let lastPointerPos: { x: number; y: number } | null = null
+let focusListenersCount = 0
+
+function onFocusPointerMove(e: PointerEvent): void {
+  lastPointerPos = { x: e.clientX, y: e.clientY }
+}
+
+function findHoveredSlateId(): string | null {
+  if (lastPointerPos) {
+    const top = document.elementsFromPoint(lastPointerPos.x, lastPointerPos.y)[0]
+    const hit = top instanceof Element ? top.closest<HTMLElement>('[data-slate-focus-id]') : null
+    if (hit?.dataset.slateFocusId) return hit.dataset.slateFocusId
+  }
+  const hovered = document.querySelector<HTMLElement>('[data-slate-focus-id]:hover')
+  return hovered?.dataset.slateFocusId ?? null
+}
+
+function onFocusKeyDown(e: KeyboardEvent): void {
+  if (e.defaultPrevented || e.repeat) return
+  const t = e.target
+  if (t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return
+  if (!matchesKeybind('tabletop.focusSlate', e)) return
+  if (document.querySelector('[role="dialog"], [data-seven-menu]')) return
+
+  for (const entry of slateFocusRegistry.values()) {
+    if (entry.maximized) {
+      e.preventDefault()
+      e.stopPropagation()
+      entry.toggle()
+      return
+    }
+  }
+
+  const targetId = findHoveredSlateId()
+  const target = targetId ? slateFocusRegistry.get(targetId) : undefined
+  if (!target) return
+  e.preventDefault()
+  e.stopPropagation()
+  target.toggle()
+}
+
+function retainFocusListeners(): () => void {
+  if (focusListenersCount === 0) {
+    window.addEventListener('pointermove', onFocusPointerMove, { passive: true })
+    window.addEventListener('keydown', onFocusKeyDown, true)
+  }
+  focusListenersCount++
+  return () => {
+    focusListenersCount = Math.max(0, focusListenersCount - 1)
+    if (focusListenersCount === 0) {
+      window.removeEventListener('pointermove', onFocusPointerMove)
+      window.removeEventListener('keydown', onFocusKeyDown, true)
+    }
+  }
+}
+
+function focusFlipFromRect(rect: SlateRect | null): { x: number; y: number; scaleX: number; scaleY: number } {
+  if (!rect || typeof window === 'undefined') {
+    return { x: 0, y: 0, scaleX: 0.92, scaleY: 0.92 }
+  }
+  const vw = Math.max(320, window.innerWidth - 24)
+  const vh = Math.max(240, window.innerHeight - 24)
+  return {
+    x: rect.left + rect.width / 2 - window.innerWidth / 2,
+    y: rect.top + rect.height / 2 - window.innerHeight / 2,
+    scaleX: Math.max(0.16, Math.min(1, rect.width / vw)),
+    scaleY: Math.max(0.08, Math.min(1, rect.height / vh))
+  }
+}
+
+const FOCUS_RETICLES = [
+  'top-0 left-0 border-t-2 border-l-2',
+  'top-0 right-0 border-t-2 border-r-2',
+  'bottom-0 left-0 border-b-2 border-l-2',
+  'bottom-0 right-0 border-b-2 border-r-2'
+] as const
+
+export type SlateResizeEdge = 'l' | 'r' | 'b' | 'bl' | 'br'
+
+const RESIZE_HANDLES: {
+  edge: SlateResizeEdge
+  title: string
+  box: string
+  grip: string
+}[] = [
+  {
+    edge: 'l',
+    title: 'Drag left edge to resize slate',
+    box: 'group/rh absolute top-2 -left-1.5 bottom-3 z-20 flex w-3 cursor-ew-resize touch-none items-center justify-center',
+    grip: 'h-8 w-0.5 rounded-full bg-accent/0 transition-colors group-hover/rh:bg-accent/70'
+  },
+  {
+    edge: 'r',
+    title: 'Drag right edge to resize slate',
+    box: 'group/rh absolute top-2 -right-1.5 bottom-3 z-20 flex w-3 cursor-ew-resize touch-none items-center justify-center',
+    grip: 'h-8 w-0.5 rounded-full bg-accent/0 transition-colors group-hover/rh:bg-accent/70'
+  },
+  {
+    edge: 'b',
+    title: 'Drag bottom edge to resize slate',
+    box: 'group/rh absolute right-3 -bottom-1.5 left-3 z-20 flex h-3 cursor-ns-resize touch-none items-center justify-center',
+    grip: 'h-0.5 w-10 rounded-full bg-accent/0 transition-colors group-hover/rh:bg-accent/70'
+  },
+  {
+    edge: 'bl',
+    title: 'Drag corner to resize slate',
+    box: 'group/rh absolute -bottom-1 -left-1 z-30 flex h-6 w-6 cursor-nesw-resize touch-none items-end justify-start p-1',
+    grip: 'h-2 w-2 border-b-2 border-l-2 border-accent/0 transition-colors group-hover/rh:border-accent/80'
+  },
+  {
+    edge: 'br',
+    title: 'Drag corner to resize slate',
+    box: 'group/rh absolute -right-1 -bottom-1 z-30 flex h-6 w-6 cursor-nwse-resize touch-none items-end justify-end p-1',
+    grip: 'h-2.5 w-2.5 border-r-2 border-b-2 border-accent/70 transition-colors group-hover/rh:border-accent'
+  }
+]
 
 export function SlateContainer({
   title,
@@ -28,17 +158,22 @@ export function SlateContainer({
   width,
   height,
   fillCell = false,
+  interacting = false,
+  slateRef,
   onToggleExpand,
   onToggleMaximize,
   onHeaderPointerDown,
   onHeaderPointerMove,
   onHeaderPointerUp,
+  onHeaderPointerCancel,
   onResizePointerDown,
   onResizePointerMove,
   onResizePointerUp,
+  onResizePointerCancel,
   onPin,
   onShowInPanel,
   onOpenData,
+  onOpenIn,
   onRemove,
   actions,
   children,
@@ -54,26 +189,90 @@ export function SlateContainer({
   width?: number
   height?: number
   fillCell?: boolean
+  interacting?: boolean
+  slateRef?: Ref<HTMLDivElement>
   onToggleExpand?: () => void
   onToggleMaximize?: () => void
   onHeaderPointerDown?: (e: React.PointerEvent) => void
   onHeaderPointerMove?: (e: React.PointerEvent) => void
   onHeaderPointerUp?: (e: React.PointerEvent) => void
+  onHeaderPointerCancel?: (e: React.PointerEvent) => void
   onResizePointerDown?: (e: React.PointerEvent, edge: SlateResizeEdge) => void
   onResizePointerMove?: (e: React.PointerEvent) => void
   onResizePointerUp?: (e: React.PointerEvent) => void
+  onResizePointerCancel?: (e: React.PointerEvent) => void
   onPin?: () => void
   onShowInPanel?: () => void
   onOpenData?: () => void
+  onOpenIn?: (e: React.MouseEvent) => void
   onRemove?: () => void
   actions?: ReactNode
   children?: ReactNode
   className?: string
 }) {
+  const focusId = useId()
+  const focusKey = useKeybindLabel('tabletop.focusSlate')
   const [localMaximized, setLocalMaximized] = useState(false)
   const [justUpdated, setJustUpdated] = useState(false)
+  const [returnEcho, setReturnEcho] = useState<SlateRect | null>(null)
+  const boxRef = useRef<HTMLDivElement | null>(null)
+  const originRectRef = useRef<SlateRect | null>(null)
+  const wasMaximizedRef = useRef(false)
   const maximized = controlledMaximized ?? localMaximized
-  const toggleMaximize = onToggleMaximize ?? (() => setLocalMaximized((v) => !v))
+
+  const captureOriginRect = () => {
+    if (!boxRef.current) return
+    const r = boxRef.current.getBoundingClientRect()
+    if (r.width > 0 && r.height > 0) {
+      originRectRef.current = { left: r.left, top: r.top, width: r.width, height: r.height }
+    }
+  }
+
+  const toggleMaximize = () => {
+    if (!maximized) captureOriginRect()
+    if (onToggleMaximize) onToggleMaximize()
+    else setLocalMaximized((v) => !v)
+  }
+
+  const focusEntryRef = useRef<RegisteredFocusSlate>({ maximized: false, toggle: () => {} })
+  focusEntryRef.current = { maximized, toggle: toggleMaximize }
+
+  useEffect(() => {
+    const release = retainFocusListeners()
+    const proxy: RegisteredFocusSlate = {
+      get maximized() {
+        return focusEntryRef.current.maximized
+      },
+      toggle: () => focusEntryRef.current.toggle()
+    }
+    slateFocusRegistry.set(focusId, proxy)
+    return () => {
+      slateFocusRegistry.delete(focusId)
+      release()
+    }
+  }, [focusId])
+
+  useLayoutEffect(() => {
+    const prev = wasMaximizedRef.current
+    wasMaximizedRef.current = maximized
+    if (prev && !maximized) {
+      setReturnEcho(originRectRef.current)
+      const timer = setTimeout(() => setReturnEcho(null), 130)
+      return () => clearTimeout(timer)
+    }
+    if (!prev && maximized) {
+      setReturnEcho(null)
+    }
+    return undefined
+  }, [maximized])
+
+  const assignBoxRef = (el: HTMLDivElement | null) => {
+    boxRef.current = el
+    if (typeof slateRef === 'function') slateRef(el)
+    else if (slateRef && 'current' in slateRef) {
+      ;(slateRef as { current: HTMLDivElement | null }).current = el
+    }
+  }
 
   useEffect(() => {
     if (!entryKey) return
@@ -134,14 +333,28 @@ export function SlateContainer({
 
   const slateBody = (
     <motion.div
-      layout={!onResizePointerDown && !fillCell}
-      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      ref={assignBoxRef}
+      data-slate-focus-id={focusId}
+      onPointerEnter={() => {
+        if (!maximized) captureOriginRect()
+      }}
+      layout={!maximized && !onResizePointerDown && !fillCell}
+      initial={
+        maximized
+          ? { opacity: 0.72, ...focusFlipFromRect(originRectRef.current) }
+          : returnEcho
+            ? { opacity: 0.85, scale: 1.015 }
+            : false
+      }
+      animate={{ opacity: 1, x: 0, y: 0, scale: 1, scaleX: 1, scaleY: 1 }}
+      transition={
+        maximized
+          ? { duration: 0.155, ease: [0.16, 1, 0.3, 1] }
+          : { duration: 0.14, ease: [0.16, 1, 0.3, 1] }
+      }
       style={sizeStyle}
       className={cn(
-        'notch-sm group/slate relative flex flex-col border border-l-2 border-l-accent bg-[#060b10]/78 backdrop-blur-md transition-all',
-        justUpdated
-          ? 'border-accent shadow-[0_0_28px_color-mix(in_srgb,var(--color-accent)_35%,transparent)]'
-          : 'border-line shadow-[0_14px_38px_rgba(0,0,0,0.85)] hover:border-line/90',
+        'group/slate relative flex flex-col',
         maximized
           ? 'h-full w-full'
           : fillCell
@@ -152,26 +365,36 @@ export function SlateContainer({
         className
       )}
     >
-      {/* Header: single smooth compact line; click anywhere on header to expand/collapse (or restore when maximized), drag to move */}
       <div
-        onPointerDown={!maximized ? onHeaderPointerDown : undefined}
-        onPointerMove={!maximized ? onHeaderPointerMove : undefined}
-        onPointerUp={!maximized ? onHeaderPointerUp : undefined}
-        onClick={
-          maximized
-            ? toggleMaximize
-            : !onHeaderPointerDown
-              ? onToggleExpand
-              : undefined
-        }
         className={cn(
-          'slate-drag-handle flex h-7 shrink-0 items-center gap-1.5 overflow-hidden px-2.5 whitespace-nowrap select-none',
-          showBody && 'border-b border-line/40',
-          (onToggleExpand || onHeaderPointerDown || fillCell || maximized) && 'cursor-pointer hover:bg-white/[0.03]'
+          'notch-sm relative flex min-h-0 flex-1 flex-col border border-l-2 border-l-accent bg-[#060b10]/78 backdrop-blur-md',
+          !interacting && 'transition-[border-color,box-shadow]',
+          justUpdated
+            ? 'border-accent shadow-[0_0_28px_color-mix(in_srgb,var(--color-accent)_35%,transparent)]'
+            : 'border-line shadow-[0_14px_38px_rgba(0,0,0,0.85)] hover:border-line/90'
         )}
       >
+        {/* Header: single smooth compact line; click anywhere on header to expand/collapse (or restore when maximized), drag to move */}
+        <div
+          onPointerDown={!maximized ? onHeaderPointerDown : undefined}
+          onPointerMove={!maximized ? onHeaderPointerMove : undefined}
+          onPointerUp={!maximized ? onHeaderPointerUp : undefined}
+          onPointerCancel={!maximized ? onHeaderPointerCancel : undefined}
+          onClick={
+            maximized
+              ? toggleMaximize
+              : !onHeaderPointerDown
+                ? onToggleExpand
+                : undefined
+          }
+          className={cn(
+            '@container slate-drag-handle flex h-7 shrink-0 items-center gap-1.5 overflow-hidden px-2 whitespace-nowrap select-none @[160px]:px-2.5',
+            showBody && 'border-b border-line/40',
+            (onToggleExpand || onHeaderPointerDown || fillCell || maximized) && 'cursor-pointer hover:bg-white/[0.03]'
+          )}
+        >
         {onToggleExpand && !maximized && !fillCell && (
-          <span className="shrink-0 text-dim">
+          <span className="hidden shrink-0 text-dim @[130px]:inline-flex">
             {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           </span>
         )}
@@ -183,12 +406,12 @@ export function SlateContainer({
           {title}
         </span>
         {justUpdated && (
-          <span className="flex shrink-0 items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-mono text-[8.5px] font-bold uppercase leading-none tracking-[0.14em] text-accent animate-pulse">
+          <span className="hidden shrink-0 items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-mono text-[8.5px] font-bold uppercase leading-none tracking-[0.14em] text-accent animate-pulse @[180px]:flex">
             <Sparkles className="h-2.5 w-2.5" />
             UPDATED
           </span>
         )}
-        <span className="shrink-0 border border-teal/35 px-1 py-px font-mono text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-teal">
+        <span className="hidden shrink-0 border border-teal/35 px-1 py-px font-mono text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-teal @[220px]:inline-flex">
           {tag}
         </span>
         <div
@@ -198,8 +421,8 @@ export function SlateContainer({
         >
           <span
             className={cn(
-              'items-center gap-0.5',
-              showBody ? 'flex' : 'hidden group-hover/slate:flex'
+              'hidden items-center gap-0.5',
+              showBody ? '@[220px]:flex' : 'group-hover/slate:@[220px]:flex'
             )}
           >
             {actions}
@@ -233,11 +456,21 @@ export function SlateContainer({
                 <ExternalLink className="h-3 w-3" />
               </button>
             )}
+            {onOpenIn && (
+              <button
+                type="button"
+                onClick={onOpenIn}
+                title="Open in another view…"
+                className="p-0.5 text-dim transition-colors hover:text-accent cursor-pointer"
+              >
+                <AppWindow className="h-3 w-3" />
+              </button>
+            )}
           </span>
           <button
             type="button"
             onClick={toggleMaximize}
-            title={maximized ? 'Restore slate (Esc)' : 'Maximize slate'}
+            title={maximized ? `Restore slate (${focusKey} / Esc)` : `Maximize slate (${focusKey})`}
             className={cn(
               'p-0.5 transition-colors cursor-pointer',
               maximized ? 'text-accent hover:text-white' : 'text-dim hover:text-white'
@@ -258,46 +491,38 @@ export function SlateContainer({
         </div>
       </div>
 
-      {showBody && (
-        <InsideSlateContext.Provider value={true}>
-          <div
-            data-slate-body
-            className={cn(
-              'flex flex-col gap-2.5 overflow-y-auto px-3.5 py-3',
-              hasFixedHeight ? 'min-h-0 flex-1' : 'max-h-[420px]'
-            )}
-          >
-            {children}
-          </div>
-        </InsideSlateContext.Provider>
-      )}
+        {showBody && (
+          <InsideSlateContext.Provider value={true}>
+            <div
+              data-slate-body
+              className={cn(
+                'flex flex-col gap-2.5 overflow-y-auto px-3.5 py-3',
+                hasFixedHeight ? 'min-h-0 flex-1' : 'max-h-[420px]',
+                interacting && 'pointer-events-none select-none'
+              )}
+            >
+              {children}
+            </div>
+          </InsideSlateContext.Provider>
+        )}
+      </div>
 
-      {/* Direct resize handles for expanded slates in Tabletop mode */}
-      {expanded && !maximized && !fillCell && onResizePointerDown && (
-        <>
+      {/* Direct resize handles for expanded slates in Tabletop mode (outside .notch-sm clip-path) */}
+      {expanded && !maximized && !fillCell &&
+        onResizePointerDown &&
+        RESIZE_HANDLES.map((h) => (
           <div
-            onPointerDown={(e) => onResizePointerDown(e, 'r')}
+            key={h.edge}
+            title={h.title}
+            onPointerDown={(e) => onResizePointerDown(e, h.edge)}
             onPointerMove={onResizePointerMove}
             onPointerUp={onResizePointerUp}
-            className="absolute top-2 right-0 bottom-3 w-1.5 cursor-ew-resize"
-          />
-          <div
-            onPointerDown={(e) => onResizePointerDown(e, 'b')}
-            onPointerMove={onResizePointerMove}
-            onPointerUp={onResizePointerUp}
-            className="absolute right-3 bottom-0 left-2 h-1.5 cursor-ns-resize"
-          />
-          <div
-            title="Drag to resize slate"
-            onPointerDown={(e) => onResizePointerDown(e, 'br')}
-            onPointerMove={onResizePointerMove}
-            onPointerUp={onResizePointerUp}
-            className="group absolute right-0 bottom-0 flex h-4 w-4 cursor-nwse-resize items-end justify-end p-0.5"
+            onPointerCancel={onResizePointerCancel}
+            className={h.box}
           >
-            <span className="h-2.5 w-2.5 border-r-2 border-b-2 border-accent/60 transition-colors group-hover:border-accent" />
+            <span className={h.grip} />
           </div>
-        </>
-      )}
+        ))}
     </motion.div>
   )
 
@@ -306,19 +531,50 @@ export function SlateContainer({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.18 }}
+        transition={{ duration: 0.12, ease: 'easeOut' }}
         onClick={(e) => {
           if (e.target === e.currentTarget) toggleMaximize()
         }}
-        className="pointer-events-auto fixed inset-0 z-[200] flex items-center justify-center bg-black/92 p-3 backdrop-blur-md"
+        className="pointer-events-auto fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-3 backdrop-blur-md"
       >
-        {slateBody}
+        <div className="relative h-full w-full">
+          {slateBody}
+          <div className="pointer-events-none fixed inset-3 overflow-hidden">
+            <div
+              className="h-14 w-full bg-gradient-to-b from-transparent via-accent/20 to-transparent"
+              style={{ animation: 'seven-focus-scan 170ms cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+            />
+            {FOCUS_RETICLES.map((corner, i) => (
+              <motion.span
+                key={i}
+                initial={{ opacity: 0.9, scale: 1.35 }}
+                animate={{ opacity: 0.45, scale: 1 }}
+                transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                className={cn('absolute h-3 w-3 border-accent', corner)}
+              />
+            ))}
+          </div>
+        </div>
       </motion.div>,
       document.body
     )
   }
 
-  return slateBody
+  return (
+    <>
+      {slateBody}
+      {returnEcho &&
+        createPortal(
+          <motion.div
+            initial={{ opacity: 0.45, x: 0, y: 0, scaleX: 1, scaleY: 1 }}
+            animate={{ opacity: 0, ...focusFlipFromRect(returnEcho) }}
+            transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+            className="pointer-events-none fixed inset-3 z-[200] border border-accent/60 bg-accent/5 shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_22%,transparent)]"
+          />,
+          document.body
+        )}
+    </>
+  )
 }
 
 export function EntrySlate({
@@ -391,6 +647,21 @@ export function EntrySlate({
 
   if (insideSlate) return content
 
+  const openSurfaceMenu = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const r = e.currentTarget.getBoundingClientRect()
+    openMenu(
+      { preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4 },
+      title,
+      slateSurfaceMenuItems({
+        entryKind: resolvedKind,
+        entryId: resolvedId,
+        entryPart: part || null,
+        onPin: () => void pinToChatTable(resolvedKind, resolvedId, title)
+      })
+    )
+  }
+
   return (
     <SlateContainer
       title={title}
@@ -403,6 +674,7 @@ export function EntrySlate({
       onPin={() => void pinToChatTable(resolvedKind, resolvedId, title)}
       onShowInPanel={inspectInChat}
       onOpenData={openData}
+      onOpenIn={openSurfaceMenu}
       onRemove={onRemove}
     >
       {content}

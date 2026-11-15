@@ -89,7 +89,7 @@ export const useSurfaceSwitcher = create<SwitcherStore>((set) => ({
 export interface PendingBoardPlacement {
   dashboardId: string
   label: string
-  commit: (at: { x: number; y: number }) => Promise<void>
+  commit: (at: { x: number; y: number }, canvas?: { w: number; h: number } | null) => Promise<void>
 }
 
 interface PendingPlacementStore {
@@ -339,6 +339,9 @@ function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n))
 }
 
+const MIN_SLATE_W = 92
+const MIN_SLATE_H = 110
+
 function defaultTokenPose(index: number, widget?: Widget): WidgetTokenPose {
   const leftSide = index % 2 === 0
   const row = Math.floor(index / 2)
@@ -367,8 +370,8 @@ export function useWidgetTokenPoses(dashboard: Dashboard | null): Record<string,
     out[w.id] = {
       x: typeof cur?.x === 'number' ? cur.x : fallback.x,
       y: typeof cur?.y === 'number' ? cur.y : fallback.y,
-      w: typeof cur?.w === 'number' && cur.w >= 220 ? cur.w : fallback.w,
-      h: typeof cur?.h === 'number' && cur.h >= 140 ? cur.h : fallback.h,
+      w: typeof cur?.w === 'number' && cur.w >= MIN_SLATE_W ? cur.w : fallback.w,
+      h: typeof cur?.h === 'number' && cur.h >= MIN_SLATE_H ? cur.h : fallback.h,
       expanded: Boolean(cur?.expanded),
       surfaceId: typeof cur?.surfaceId === 'string' && cur.surfaceId ? cur.surfaceId : '0',
       rx: typeof cur?.rx === 'number' && Number.isFinite(cur.rx) ? clamp01(cur.rx) : (cur ? undefined : fallback.rx),
@@ -395,18 +398,28 @@ export function updateWidgetTokenPose(
   const fallback = defaultTokenPose(index, widget)
   const x = Math.max(SAFE_PAD, Math.round(patch.x ?? (typeof cur?.x === 'number' ? cur.x : fallback.x)))
   const y = Math.max(SAFE_PAD, Math.round(patch.y ?? (typeof cur?.y === 'number' ? cur.y : fallback.y)))
-  const w = Math.max(220, Math.round(patch.w ?? (typeof cur?.w === 'number' ? cur.w : fallback.w)))
-  const h = Math.max(140, Math.round(patch.h ?? (typeof cur?.h === 'number' ? cur.h : fallback.h)))
+  const w = Math.max(MIN_SLATE_W, Math.round(patch.w ?? (typeof cur?.w === 'number' ? cur.w : fallback.w)))
+  const h = Math.max(MIN_SLATE_H, Math.round(patch.h ?? (typeof cur?.h === 'number' ? cur.h : fallback.h)))
   const expanded = patch.expanded ?? Boolean(cur?.expanded)
   const surfaceId = patch.surfaceId ?? (typeof cur?.surfaceId === 'string' && cur.surfaceId ? cur.surfaceId : fallback.surfaceId)
 
-  let rx = typeof cur?.rx === 'number' && Number.isFinite(cur.rx) ? clamp01(cur.rx) : undefined
-  let ry = typeof cur?.ry === 'number' && Number.isFinite(cur.ry) ? clamp01(cur.ry) : undefined
-  let refW = typeof cur?.refW === 'number' && cur.refW > 0 ? cur.refW : undefined
-  let refH = typeof cur?.refH === 'number' && cur.refH > 0 ? cur.refH : undefined
+  const movedX = patch.x !== undefined
+  const movedY = patch.y !== undefined
+  let rx = movedX
+    ? undefined
+    : typeof cur?.rx === 'number' && Number.isFinite(cur.rx)
+      ? clamp01(cur.rx)
+      : cur
+        ? undefined
+        : fallback.rx
+  let ry = movedY ? undefined : typeof cur?.ry === 'number' && Number.isFinite(cur.ry) ? clamp01(cur.ry) : undefined
+  let refW = movedX ? undefined : typeof cur?.refW === 'number' && cur.refW > 0 ? cur.refW : undefined
+  let refH = movedY ? undefined : typeof cur?.refH === 'number' && cur.refH > 0 ? cur.refH : undefined
 
-  if (canvas && canvas.w > 0 && canvas.h > 0) {
-    const boxW = expanded ? Math.min(w, Math.max(220, canvas.w - SAFE_PAD * 2)) : Math.min(SLATE_COLLAPSED_W, Math.max(220, canvas.w - SAFE_PAD * 2))
+  // Only recalculate normalized anchors when x or y was explicitly moved; toggling expand/collapse must preserve the starting anchor.
+  const moved = movedX || movedY
+  if (moved && canvas && canvas.w > 0 && canvas.h > 0) {
+    const boxW = expanded ? Math.min(w, Math.max(MIN_SLATE_W, canvas.w - SAFE_PAD * 2)) : Math.min(SLATE_COLLAPSED_W, Math.max(MIN_SLATE_W, canvas.w - SAFE_PAD * 2))
     const availW = Math.max(1, canvas.w - SAFE_PAD * 2 - boxW)
     const availH = Math.max(1, canvas.h - SAFE_PAD * 2 - SLATE_HEADER_H)
     rx = clamp01((x - SAFE_PAD) / availW)

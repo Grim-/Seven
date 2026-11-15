@@ -323,6 +323,7 @@ export interface EngineRequests {
   'backdrop.set': Req<{ sessionId: string; scope: 'chat' | 'timed'; backdrop: Backdrop | null; minutes?: number }, ChatBackdrops>
   'panel.list': Req<{ sessionId: string }, PanelItem[]>
   'panel.showEntry': Req<{ sessionId: string; entry: string; part: string | null }, string>
+  'panel.showWidget': Req<{ sessionId: string; dashboardId: string; widgetId: string }, string>
   'panel.remove': Req<{ sessionId: string; id: string }, boolean>
   'panel.clear': Req<{ sessionId: string; tab: string }, boolean>
   'reminders.list': Req<void, Reminder[]>

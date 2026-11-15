@@ -14,7 +14,7 @@ import { formatRelative } from '../../lib/format'
 import { useAgents } from '../../store/agents'
 import { useTools } from '../../store/tools'
 import { agentGroups, useToolsets } from '../../store/toolsets'
-import { unseenIn, usePanel } from '../../store/panel'
+import { draftPanelKey, unseenIn, usePanel, useSide } from '../../store/panel'
 import { registerSideTab, sideTabs, type SideTabContext, type SideTabDef } from '../../registries/side'
 import { ViewRenderer } from '../../registries/views'
 import { BackBar, EmptyState, Gutter, Popover, SidePane, openMenu } from '../ui'
@@ -36,27 +36,20 @@ const MAX = 900
 const DEFAULTS: SidePanelPrefs = { open: false, width: 380, tab: 'files' }
 const EMPTY: PanelItem[] = []
 
-interface SideState {
-  files: DataSelection | null
-  setFiles: (s: DataSelection | null) => void
-}
-
-export const useSide = create<SideState>((set) => ({
-  files: null,
-  setFiles: (files) => set({ files })
-}))
+export { useSide }
 
 function usePrefs(): [SidePanelPrefs, (patch: Partial<SidePanelPrefs>) => void] {
   return useDrawerPrefs('sidePanel', DEFAULTS)
 }
 
-function useActiveItems(): { sessionId: string | null; items: PanelItem[] } {
-  const { sessionId } = useConversation()
-  const items = usePanel((s) => (sessionId ? (s.items[sessionId] ?? EMPTY) : EMPTY))
+function useActiveItems(): { panelKey: string; sessionId: string | null; items: PanelItem[] } {
+  const { key, sessionId } = useConversation()
+  const panelKey = sessionId ?? draftPanelKey(key)
+  const items = usePanel((s) => s.items[panelKey] ?? EMPTY)
   useEffect(() => {
     if (sessionId) void usePanel.getState().load(sessionId).catch(noteFailure('side', 'Could not load the side panel'))
   }, [sessionId])
-  return { sessionId, items }
+  return { panelKey, sessionId, items }
 }
 
 function FilesTab() {
@@ -130,9 +123,9 @@ function DataTab() {
 }
 
 export function PanelItems({ tab, empty }: { tab: string; empty: string }) {
-  const { sessionId, items } = useActiveItems()
+  const { panelKey, items } = useActiveItems()
   const shown = useMemo(() => items.filter((i) => i.tab === tab).reverse(), [items, tab])
-  if (!sessionId || !shown.length)
+  if (!shown.length)
     return (
       <div className="p-3">
         <EmptyState title="Nothing here yet">{empty}</EmptyState>
@@ -143,7 +136,7 @@ export function PanelItems({ tab, empty }: { tab: string; empty: string }) {
       <div className="flex shrink-0 items-center border-b border-line/40 px-2.5 py-1">
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{shown.length} item{shown.length === 1 ? '' : 's'}</span>
         <button
-          onClick={() => void usePanel.getState().clear(sessionId, tab)}
+          onClick={() => void usePanel.getState().clear(panelKey, tab)}
           className="ml-auto flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-dim hover:text-alert"
         >
           <Trash2 className="h-3 w-3" /> Clear
@@ -155,7 +148,7 @@ export function PanelItems({ tab, empty }: { tab: string; empty: string }) {
             <div className="flex items-center gap-2 border-b border-line/40 px-2.5 py-1">
               <span className="truncate text-[12px] text-white">{item.view.title ?? item.module}</span>
               <span className="ml-auto shrink-0 font-mono text-[10px] text-faint">{formatRelative(item.updatedAt)}</span>
-              <button title="Remove" onClick={() => void usePanel.getState().remove(sessionId, item.id)} className="text-dim hover:text-alert">
+              <button title="Remove" onClick={() => void usePanel.getState().remove(panelKey, item.id)} className="text-dim hover:text-alert">
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -203,7 +196,7 @@ function TypedPageTab({ type }: { type: string }) {
 }
 
 function useTabs() {
-  const { sessionId, items } = useActiveItems()
+  const { panelKey, sessionId, items } = useActiveItems()
   const agentId = useAgentIdOf(useConversation())
   const agents = useAgents((s) => s.list)
   const modules = useTools((s) => s.list)
@@ -217,14 +210,14 @@ function useTabs() {
     (id) => () => <PanelItems tab={id} empty="Nothing from this tool in this chat yet." />,
     (type) => () => <TypedPageTab type={type} />
   )
-  return { tabs, ctx, sessionId, items }
+  return { tabs, ctx, panelKey, sessionId, items }
 }
 
 export function SidePanelToggle({ className }: { className?: string }) {
   const [prefs, save] = usePrefs()
-  const { sessionId, items } = useActiveItems()
+  const { panelKey, items } = useActiveItems()
   const seen = usePanel((s) => s.seen)
-  const unseen = !prefs.open && sessionId ? unseenIn(items, seen, sessionId, null) : 0
+  const unseen = !prefs.open ? unseenIn(items, seen, panelKey, null) : 0
   const open = prefs.open
   return (
     <button
@@ -281,7 +274,7 @@ function KindTab({ kind, label }: { kind: string; label: string }) {
 
 export function SidePanel() {
   const [prefs, save] = usePrefs()
-  const { tabs: baseTabs, ctx, sessionId, items } = useTabs()
+  const { tabs: baseTabs, ctx, panelKey, items } = useTabs()
   const kindList = useKindList()
   const pinned = useApp((s) => s.settings?.trayKinds) ?? []
   const activeKind = prefs.tab.startsWith(KIND_TAB) ? prefs.tab.slice(KIND_TAB.length) : null
@@ -296,8 +289,8 @@ export function SidePanel() {
   const current = tabs.find((t) => t.id === prefs.tab) ?? tabs[0]
 
   useEffect(() => {
-    if (prefs.open && sessionId && current) usePanel.getState().markSeen(sessionId, current.id)
-  }, [prefs.open, sessionId, current?.id, items])
+    if (prefs.open && current) usePanel.getState().markSeen(panelKey, current.id)
+  }, [prefs.open, panelKey, current?.id, items])
 
   if (!prefs.open || !current) return null
 
@@ -326,7 +319,7 @@ export function SidePanel() {
               const r = e.currentTarget.getBoundingClientRect()
               openMenu({ preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4 }, 'Side panel', [
                 ...tabs.map((tab) => {
-                  const fresh = sessionId && tab.id !== current.id ? unseenIn(items, seen, sessionId, tab.id) : 0
+                  const fresh = tab.id !== current.id ? unseenIn(items, seen, panelKey, tab.id) : 0
                   return { label: `${tab.label}${fresh > 0 ? `  · ${fresh} new` : ''}${tab.id === current.id ? '  ✓' : ''}`, icon: tab.icon, onSelect: () => save({ tab: tab.id }) }
                 }),
                 ...(kindList.length
@@ -352,7 +345,7 @@ export function SidePanel() {
           >
             {current.icon}
             <span className="truncate">{current.label}</span>
-            {tabs.some((tab) => sessionId && tab.id !== current.id && unseenIn(items, seen, sessionId, tab.id) > 0) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
+            {tabs.some((tab) => tab.id !== current.id && unseenIn(items, seen, panelKey, tab.id) > 0) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
             <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0" />
           </button>
           <button title="Hide side panel" onClick={() => save({ open: false })} className="flex h-6 w-6 shrink-0 items-center justify-center text-dim hover:text-white">
@@ -388,7 +381,7 @@ export function openTrayTab(id: string): void {
 }
 
 export function OutputTray() {
-  const { tabs: allBuiltIn, ctx, sessionId, items } = useTabs()
+  const { tabs: allBuiltIn, ctx, panelKey, items } = useTabs()
   const pinned = useApp((s) => s.settings?.trayKinds) ?? []
   const shownTabs = useApp((s) => s.settings?.trayTabs) ?? []
   const saveTrayTabs = (next: string[]) => void useApp.getState().updateSettings({ trayTabs: next })
@@ -417,11 +410,11 @@ export function OutputTray() {
     return () => clearTimeout(timer)
   }, [current?.id])
   useEffect(() => {
-    if (current && sessionId) usePanel.getState().markSeen(sessionId, current.id)
-  }, [current?.id, sessionId, items])
+    if (current) usePanel.getState().markSeen(panelKey, current.id)
+  }, [current?.id, panelKey, items])
   const tabButton = (t: SideTabDef, close?: () => void) => {
     const active = t.id === tab
-    const fresh = !active && sessionId ? unseenIn(items, seen, sessionId, t.id) : 0
+    const fresh = !active ? unseenIn(items, seen, panelKey, t.id) : 0
     return (
       <button
         key={t.id}

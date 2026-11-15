@@ -3,7 +3,7 @@ import { Import, LayoutDashboard, Plus } from 'lucide-react'
 import { widgetUiOf } from '../../registries/widgets'
 import { useWidgetInfo } from '../../store/widgetInfo'
 import { useTools } from '../../store/tools'
-import type { AssetMeta, Dashboard } from '@shared/types'
+import type { AssetMeta, Dashboard, Widget } from '@shared/types'
 import { showName } from '@shared/ids'
 import { Button, KindShell, Modal, type ShellAdd, type ShellItem } from '../ui'
 import { KindExplorer } from '../library/KindExplorer'
@@ -27,20 +27,17 @@ export function fileThings(files: AssetMeta[]): string[] {
   return files.map((f) => `file/${f.id}`)
 }
 
-export async function placeOnBoard(
+function applyNewWidgetPoses(
   dashboardId: string,
-  things: string[],
+  updated: Dashboard,
+  addedWidgets: Widget[],
   at: { x: number; y: number } | null = null,
-  posePatch?: Partial<WidgetTokenPose>
-): Promise<void> {
-  if (!things.length) return
+  posePatch?: Partial<WidgetTokenPose>,
+  canvas?: { w: number; h: number } | null
+): void {
   const activeSurfaceId = getBoardSurfaces(dashboardId).activeId
-  const updated = await engine('widgets.place', { dashboardId, things, at: null })
-  useDashboards.getState().onChanged(updated.id, updated)
-  const count = things.length
-  const added = updated.widgets.slice(-count)
-  added.forEach((w, idx) => {
-    const widgetIndex = updated.widgets.length - count + idx
+  addedWidgets.forEach((w, idx) => {
+    const widgetIndex = Math.max(0, updated.widgets.indexOf(w))
     updateWidgetTokenPose(
       dashboardId,
       w.id,
@@ -50,9 +47,28 @@ export async function placeOnBoard(
         ...posePatch
       },
       widgetIndex,
-      w
+      w,
+      canvas
     )
   })
+}
+
+export async function placeOnBoard(
+  dashboardId: string,
+  things: string[],
+  at: { x: number; y: number } | null = null,
+  posePatch?: Partial<WidgetTokenPose>,
+  canvas?: { w: number; h: number } | null
+): Promise<void> {
+  if (!things.length) return
+  const beforeIds = new Set(
+    (useDashboards.getState().list.find((d) => d.id === dashboardId)?.widgets ?? []).map((w) => w.id)
+  )
+  const updated = await engine('widgets.place', { dashboardId, things, at: null })
+  useDashboards.getState().onChanged(updated.id, updated)
+  const added = updated.widgets.filter((w) => !beforeIds.has(w.id))
+  const targets = added.length > 0 ? added : updated.widgets.slice(-1)
+  applyNewWidgetPoses(dashboardId, updated, targets, at, posePatch, canvas)
 }
 
 function GlancesAndWidgetsTab({
@@ -95,27 +111,15 @@ function GlancesAndWidgetsTab({
       icon: widgetUiOf(p.kind)?.createIcon ?? <Plus />,
       onClick: () => {
         const label = p.create as string
-        const commit = async (pt?: { x: number; y: number }) => {
-          const activeSurfaceId = getBoardSurfaces(dashboard.id).activeId
+        const commit = async (pt?: { x: number; y: number }, canvas?: { w: number; h: number } | null) => {
           const updated = await engine('widgets.create', { dashboardId: dashboard.id, kind: p.kind })
           useDashboards.getState().onChanged(updated.id, updated)
           const newest = updated.widgets.at(-1)
-          if (newest) {
-            updateWidgetTokenPose(
-              dashboard.id,
-              newest.id,
-              {
-                surfaceId: activeSurfaceId,
-                ...(pt ? { x: pt.x, y: pt.y, expanded: true } : {})
-              },
-              updated.widgets.length - 1,
-              newest
-            )
-          }
+          if (newest) applyNewWidgetPoses(dashboard.id, updated, [newest], pt ?? null, undefined, canvas)
           toast.success(`Added to ${dashboard.name}`, label)
         }
         if (clickToPlace) {
-          setPending({ dashboardId: dashboard.id, label, commit: (pt) => commit(pt) })
+          setPending({ dashboardId: dashboard.id, label, commit: (pt, canvas) => commit(pt, canvas) })
           onAdded()
           return
         }
@@ -136,27 +140,15 @@ function GlancesAndWidgetsTab({
         const id = item.key.slice(colon + 1)
         const source = widgetUiOf(kind)?.choices?.source(id)
         if (!source) return
-        const commit = async (pt?: { x: number; y: number }) => {
-          const activeSurfaceId = getBoardSurfaces(dashboard.id).activeId
+        const commit = async (pt?: { x: number; y: number }, canvas?: { w: number; h: number } | null) => {
           const updated = await engine('widgets.add', { dashboardId: dashboard.id, title: null, source, view: null, options: null })
           useDashboards.getState().onChanged(updated.id, updated)
           const newest = updated.widgets.at(-1)
-          if (newest) {
-            updateWidgetTokenPose(
-              dashboard.id,
-              newest.id,
-              {
-                surfaceId: activeSurfaceId,
-                ...(pt ? { x: pt.x, y: pt.y, expanded: true } : {})
-              },
-              updated.widgets.length - 1,
-              newest
-            )
-          }
+          if (newest) applyNewWidgetPoses(dashboard.id, updated, [newest], pt ?? null, undefined, canvas)
           toast.success(`Added to ${dashboard.name}`, item.title)
         }
         if (clickToPlace) {
-          setPending({ dashboardId: dashboard.id, label: item.title, commit: (pt) => commit(pt) })
+          setPending({ dashboardId: dashboard.id, label: item.title, commit: (pt, canvas) => commit(pt, canvas) })
           onAdded()
           return
         }
@@ -184,8 +176,8 @@ export function AddPicker({ dashboard, onClose }: { dashboard: Dashboard; onClos
       setPending({
         dashboardId: dashboard.id,
         label,
-        commit: async (pt) => {
-          await placeOnBoard(dashboard.id, [`${kind}/${id}`], pt)
+        commit: async (pt, canvas) => {
+          await placeOnBoard(dashboard.id, [`${kind}/${id}`], pt, undefined, canvas)
           toast.success(`Added to ${dashboard.name}`, label)
         }
       })
@@ -206,8 +198,8 @@ export function AddPicker({ dashboard, onClose }: { dashboard: Dashboard; onClos
       setPending({
         dashboardId: dashboard.id,
         label,
-        commit: async (pt) => {
-          await placeOnBoard(dashboard.id, fileThings(added), pt)
+        commit: async (pt, canvas) => {
+          await placeOnBoard(dashboard.id, fileThings(added), pt, undefined, canvas)
           toast.success(`Added to ${dashboard.name}`, label)
         }
       })

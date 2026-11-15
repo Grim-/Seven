@@ -15,7 +15,8 @@ import { PageControls, PageFrame } from '../components/data/PageFrame'
 import { Button, EmptyState } from '../components/ui'
 import { formatBytes } from '../lib/format'
 import { cn } from '../lib/cn'
-import { Presentation, presentData, registerPresentation } from './presentations'
+import { showName } from '@shared/ids'
+import { Presentation, presentData, registerPresentation, type PresentationProps } from './presentations'
 import { showInData } from '../lib/library'
 
 function TextView({ data }: { data: unknown }) {
@@ -194,6 +195,26 @@ function WidgetResult({ data }: { data: unknown }) {
     </div>
   )
 }
+
+function WidgetStage({ fields }: PresentationProps) {
+  const d = fields as unknown as WidgetViewData
+  const dashboard = useDashboards((s) => s.list.find((x) => x.id === d.dashboardId))
+  const widget = dashboard?.widgets.find((w) => w.id === d.widgetId)
+  if (!dashboard || !widget) return <EmptyState title="Removed">This widget is no longer on its dashboard.</EmptyState>
+  return (
+    <div className="flex flex-col gap-3 border border-line/60 bg-bg/95 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.9)]">
+      <div className="flex items-center gap-3 border-b border-line/40 pb-2.5">
+        <span className="font-mono text-[14px] font-semibold uppercase tracking-[0.12em] text-white">{showName(widget.title)}</span>
+        <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-faint">on {dashboard.name}</span>
+      </div>
+      <div className="min-h-[360px] max-h-[75vh] overflow-auto">
+        <WidgetBody dashboard={dashboard} widget={widget} />
+      </div>
+    </div>
+  )
+}
+
+registerPresentation('widget', WidgetStage)
 
 function PageResult({ data, title }: { data: unknown; title?: string }) {
   const d = data as PageViewData

@@ -21,6 +21,8 @@ export interface MenuItem {
   disabled?: boolean
   separator?: boolean
   children?: MenuItem[]
+  submenu?: (close: () => void) => ReactNode
+  submenuTitle?: string
   needs?: TransportNeed
   calls?: { kind: 'engine'; name: EngineRequestName } | { kind: 'main'; name: MainRequestName }
 }
@@ -148,6 +150,7 @@ function place(el: HTMLElement, x: number, y: number, flipTo: number | null): { 
 function Row({ item, index, onDone, onHover, open }: { item: MenuItem; index: number; onDone: () => void; onHover: (el: HTMLElement | null) => void; open: boolean }) {
   const label = useDecrypt(item.label, index * 40)
   const [hovered, setHovered] = useState(false)
+  const hasSub = Boolean(item.children || item.submenu)
   if (item.separator) return <div className="my-1 h-px bg-line/50" />
   return (
     <button
@@ -155,11 +158,11 @@ function Row({ item, index, onDone, onHover, open }: { item: MenuItem; index: nu
       disabled={item.disabled}
       onMouseEnter={(e) => {
         setHovered(true)
-        onHover(item.children ? e.currentTarget : null)
+        onHover(hasSub ? e.currentTarget : null)
       }}
       onMouseLeave={() => setHovered(false)}
       onClick={(e) => {
-        if (item.children) {
+        if (hasSub) {
           onHover(e.currentTarget)
           return
         }
@@ -177,7 +180,7 @@ function Row({ item, index, onDone, onHover, open }: { item: MenuItem; index: nu
       <span className="relative w-3 text-[10px] opacity-70">{hovered || open ? '›' : '·'}</span>
       {item.icon && <span className="relative flex h-3.5 w-3.5 items-center [&>svg]:h-3.5 [&>svg]:w-3.5">{item.icon}</span>}
       <span className="relative min-w-0 flex-1 truncate">{label}</span>
-      {item.children && <ChevronRight className="relative h-3.5 w-3.5 opacity-70" />}
+      {hasSub && <ChevronRight className="relative h-3.5 w-3.5 opacity-70" />}
     </button>
   )
 }
@@ -189,7 +192,25 @@ function columnRows(panel: HTMLElement, body: HTMLElement): number | null {
   return Math.max(1, Math.floor(room / row))
 }
 
-function Panel({ title, items, x, y, flipTo = null, onDone, depth }: { title?: string; items: MenuItem[]; x: number; y: number; flipTo?: number | null; onDone: () => void; depth: number }) {
+function Panel({
+  title,
+  items,
+  customContent,
+  x,
+  y,
+  flipTo = null,
+  onDone,
+  depth
+}: {
+  title?: string
+  items: MenuItem[]
+  customContent?: ReactNode
+  x: number
+  y: number
+  flipTo?: number | null
+  onDone: () => void
+  depth: number
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const body = useRef<HTMLDivElement>(null)
   const [rows, setRows] = useState<number | null | undefined>(undefined)
@@ -198,11 +219,16 @@ function Panel({ title, items, x, y, flipTo = null, onDone, depth }: { title?: s
   const heading = useDecrypt(title ?? '', 0, 220)
   const compact = useHasForm()
   useLayoutEffect(() => {
+    if (customContent) {
+      setRows(null)
+      return
+    }
     if (ref.current && body.current) setRows(compact ? null : columnRows(ref.current, body.current))
-  }, [items, compact])
+  }, [items, compact, customContent])
   useLayoutEffect(() => {
     if (ref.current && rows !== undefined) setPos(place(ref.current, x, y, flipTo))
-  }, [x, y, flipTo, rows])
+  }, [x, y, flipTo, rows, customContent])
+  const subItem = sub ? items[sub.index] : undefined
   return (
     <>
       <div
@@ -210,7 +236,10 @@ function Panel({ title, items, x, y, flipTo = null, onDone, depth }: { title?: s
         data-seven-menu
         onMouseDown={(e) => e.stopPropagation()}
         style={{ left: pos?.left ?? x, top: pos?.top ?? y, visibility: pos ? 'visible' : 'hidden', zIndex: 10000 + depth, animation: 'seven-menu-in 150ms ease-out' }}
-        className={cn('fixed flex min-w-52 flex-col border border-line border-l-2 border-l-accent bg-sidebar/95 py-1 shadow-[0_12px_30px_rgba(0,0,0,0.85)] backdrop-blur-sm tablet:max-h-[calc(100%-1rem)] tablet:max-w-[calc(100%-1rem)] tablet:overflow-y-auto', !rows && 'max-w-80')}
+        className={cn(
+          'fixed flex min-w-52 flex-col border border-line border-l-2 border-l-accent bg-sidebar/95 py-1 shadow-[0_12px_30px_rgba(0,0,0,0.85)] backdrop-blur-sm tablet:max-h-[calc(100%-1rem)] tablet:max-w-[calc(100%-1rem)] tablet:overflow-y-auto',
+          !rows && !customContent && 'max-w-80'
+        )}
       >
         {title && (
           <div className="mb-1 flex items-center border-b border-line/60 px-3 py-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-accent-soft">
@@ -218,24 +247,40 @@ function Panel({ title, items, x, y, flipTo = null, onDone, depth }: { title?: s
             <span className="ml-0.5 inline-block h-[11px] w-[6px] bg-accent-soft" style={{ animation: 'seven-menu-cursor 1s steps(1) infinite' }} />
           </div>
         )}
-        <div ref={body} className={rows ? 'grid' : 'flex flex-col'} style={rows ? { gridTemplateRows: `repeat(${rows}, auto)`, gridAutoFlow: 'column', gridAutoColumns: 'minmax(13rem, max-content)' } : undefined}>
-          {items.map((item, i) => (
-            <Row
-              key={`${i}-${item.label}`}
-              item={item}
-              index={i}
-              open={sub?.index === i}
-              onDone={onDone}
-              onHover={(el) => {
-                if (!el || !pos) return setSub(null)
-                if (compact) return setSub({ index: i, x: pos.left + 16, y: el.getBoundingClientRect().bottom, flipTo: pos.left + 16 })
-                setSub({ index: i, x: pos.left + el.offsetLeft + el.offsetWidth + 2, y: pos.top + el.offsetTop - 4, flipTo: pos.left + el.offsetLeft - 2 })
-              }}
-            />
-          ))}
-        </div>
+        {customContent ? (
+          <div ref={body}>{customContent}</div>
+        ) : (
+          <div ref={body} className={rows ? 'grid' : 'flex flex-col'} style={rows ? { gridTemplateRows: `repeat(${rows}, auto)`, gridAutoFlow: 'column', gridAutoColumns: 'minmax(13rem, max-content)' } : undefined}>
+            {items.map((item, i) => (
+              <Row
+                key={`${i}-${item.label}`}
+                item={item}
+                index={i}
+                open={sub?.index === i}
+                onDone={onDone}
+                onHover={(el) => {
+                  if (!el || !pos) return setSub(null)
+                  if (compact) return setSub({ index: i, x: pos.left + 16, y: el.getBoundingClientRect().bottom, flipTo: pos.left + 16 })
+                  setSub({ index: i, x: pos.left + el.offsetLeft + el.offsetWidth + 2, y: pos.top + el.offsetTop - 4, flipTo: pos.left + el.offsetLeft - 2 })
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
-      {sub && items[sub.index]?.children && <Panel key={sub.index} items={items[sub.index].children!} x={sub.x} y={sub.y} flipTo={sub.flipTo} onDone={onDone} depth={depth + 1} />}
+      {sub && (subItem?.children || subItem?.submenu) && (
+        <Panel
+          key={sub.index}
+          title={subItem.submenuTitle}
+          items={subItem.children ?? []}
+          customContent={subItem.submenu?.(onDone)}
+          x={sub.x}
+          y={sub.y}
+          flipTo={sub.flipTo}
+          onDone={onDone}
+          depth={depth + 1}
+        />
+      )}
     </>
   )
 }

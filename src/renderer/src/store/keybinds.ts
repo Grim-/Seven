@@ -72,6 +72,7 @@ export const KEYBIND_DEFS: KeybindDef[] = [
 
   // Tabletop and SurfaceTops
   { id: 'tabletop.surfaceSwitcher', group: 'tabletop', label: 'SurfaceTop overview', hint: 'Open or close the SurfaceTop switcher map.', defaultSpec: { code: 'Space', ctrl: true, display: 'Ctrl+Space' } },
+  { id: 'tabletop.focusSlate', group: 'tabletop', label: 'Focus / maximize hovered slate', hint: 'Maximize the slate under your mouse cursor, or return it back when already maximized.', defaultSpec: { code: 'KeyF', display: 'F' } },
 
   // Files and viewer
   { id: 'files.parentFolder', group: 'files', label: 'Parent folder', hint: 'Go up one folder in the file explorer.', defaultSpec: { code: 'ArrowUp', alt: true, display: 'Alt+Up' } },

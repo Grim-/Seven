@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import ReactGridLayout, { useContainerWidth, type Layout } from 'react-grid-layout'
 import {
+  AppWindow,
   ArrowRightLeft,
-  Database,
   Eye,
   Layers,
   Maximize2,
@@ -17,7 +17,7 @@ import {
   X
 } from 'lucide-react'
 import type { CollectionViewKind, Dashboard, Widget } from '@shared/types'
-import { GRID_COLS, NAMED_SIZES, VIEW_LABELS } from '@shared/widgets'
+import { GRID_COLS, SIZE_PRESETS, VIEW_LABELS, type SizePreset } from '@shared/widgets'
 import { showName } from '@shared/ids'
 import { engine } from '../../lib/ipc'
 import { IN_APP } from '../../lib/mode'
@@ -30,7 +30,6 @@ import { useEscapeLayer } from '../../lib/escape'
 import { entryLink } from '../../store/data'
 import { matchesKeybind, useKeybindLabel } from '../../store/keybinds'
 import { useChatViewSwitcher } from '../../lib/chatViewMode'
-import { useDashboards } from '../../store/dashboards'
 import { toast } from '../../store/toasts'
 import { errorText } from '../../lib/format'
 import { failed } from '../../lib/notify'
@@ -40,7 +39,7 @@ import { ViewSwitcher } from '../data/CollectionView'
 import { AssetMedia } from '../pictures/AssetMedia'
 import { useEntryPreview } from '../entries/entryPreview'
 import { SlateContainer, type SlateResizeEdge } from '../entries/EntrySlate'
-import { showInPanel } from '../data/showInPanel'
+import { showInPanel, showWidgetInPanel, slateSurfaceMenuItems } from '../data/showInPanel'
 import {
   updateWidgetTokenPose,
   useBoardSurfaces,
@@ -60,11 +59,19 @@ import { cn } from '../../lib/cn'
 const CARD_W = 192
 const CARD_H = 128
 const GAP = 16
-const MIN_SLATE_W = 240
-const MIN_SLATE_H = 150
+const MIN_SLATE_W = 92
+const MIN_SLATE_H = 110
 const SAFE_PAD = 8
 const SLATE_COLLAPSED_W = 288
 const SLATE_HEADER_H = 34
+
+const EDGE_AXES: Record<SlateResizeEdge, { left?: boolean; right?: boolean; bottom?: boolean }> = {
+  l: { left: true },
+  r: { right: true },
+  b: { bottom: true },
+  bl: { left: true, bottom: true },
+  br: { right: true, bottom: true }
+}
 
 function usableCanvas(
   bounds: { w: number; h: number } | null,
@@ -143,6 +150,71 @@ function resolvePose(
   return clampPose(nextX, nextY, pose.w, pose.h, bounds, pose.expanded, bottomInset)
 }
 
+const PRESET_GRID_LINES = {
+  backgroundImage:
+    'linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)',
+  backgroundSize: 'calc(100% / 12) 100%, 100% calc(100% / 5)'
+} as const
+
+function SizePresetGrid({
+  activeW,
+  activeH,
+  onPick,
+  onClose
+}: {
+  activeW: number
+  activeH: number
+  onPick: (preset: SizePreset) => void
+  onClose: () => void
+}) {
+  return (
+    <div className="grid w-[312px] grid-cols-3 gap-1.5 p-2">
+      {SIZE_PRESETS.map((preset) => {
+        const wPct = Math.max(8, Math.round((preset.w / GRID_COLS) * 1000) / 10)
+        const hPct = Math.max(18, Math.round((Math.min(10, preset.h) / 10) * 1000) / 10)
+        const active = preset.w === activeW && preset.h === activeH
+        return (
+          <button
+            key={preset.id}
+            type="button"
+            onClick={() => {
+              onClose()
+              onPick(preset)
+            }}
+            className={cn(
+              'group flex flex-col gap-1 border p-1.5 text-left transition-colors cursor-pointer',
+              active
+                ? 'border-accent bg-accent/15 text-white'
+                : 'border-line/55 bg-bg-0/65 text-dim hover:border-accent/70 hover:bg-accent/10 hover:text-white'
+            )}
+          >
+            <div
+              style={PRESET_GRID_LINES}
+              className="relative h-9 w-full overflow-hidden border border-line/45 bg-[#04090e]/90"
+            >
+              <div
+                style={{ width: `${wPct}%`, height: `${hPct}%` }}
+                className={cn(
+                  'border-r border-b transition-colors',
+                  active
+                    ? 'border-accent bg-accent/45 shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_40%,transparent)]'
+                    : 'border-accent/75 bg-accent/25 group-hover:border-accent group-hover:bg-accent/35'
+                )}
+              />
+            </div>
+            <div className="flex items-baseline justify-between gap-1 font-mono leading-none">
+              <span className={cn('text-[10.5px] font-bold', active ? 'text-accent' : 'text-white')}>
+                {preset.w}×{preset.h}
+              </span>
+              <span className="truncate text-[8.5px] uppercase tracking-wider text-dim">{preset.label}</span>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function WidgetSlate({
   dashboard,
   widget,
@@ -188,23 +260,81 @@ function WidgetSlate({
   const subtitle = preview && !('missing' in preview) ? preview.line : undefined
   const switchViews = ui.switchViews?.(widget) ?? []
 
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null)
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; moved: boolean } | null>(null)
+  const [interacting, setInteracting] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const slateRef = useRef<HTMLDivElement>(null)
+  const rafRef = useRef<number>(0)
+  const dragRef = useRef<{
+    startX: number
+    startY: number
+    origX: number
+    origY: number
+    origW: number
+    origH: number
+    curX: number
+    curY: number
+    moved: boolean
+  } | null>(null)
   const resizeRef = useRef<{
     edge: SlateResizeEdge
     startX: number
     startY: number
+    origX: number
+    origY: number
     origW: number
     origH: number
+    curX: number
+    curY: number
+    curW: number
+    curH: number
+    moved: boolean
   } | null>(null)
 
   const safeCanvas = usableCanvas(bounds, bottomInset)
   const clampedSaved = resolvePose(pose, bounds, bottomInset)
-  const currentX = pos ? pos.x : clampedSaved.x
-  const currentY = pos ? pos.y : clampedSaved.y
-  const currentW = size ? size.w : clampedSaved.w
-  const currentH = size ? size.h : clampedSaved.h
+  const currentX = clampedSaved.x
+  const currentY = clampedSaved.y
+  const currentW = clampedSaved.w
+  const currentH = clampedSaved.h
+
+  const applyLiveGeometry = () => {
+    const r = resizeRef.current
+    const d = dragRef.current
+    if (r) {
+      if (wrapRef.current) wrapRef.current.style.left = `${r.curX}px`
+      if (slateRef.current) {
+        slateRef.current.style.width = `${r.curW}px`
+        slateRef.current.style.height = `${r.curH}px`
+      }
+      return
+    }
+    if (d?.moved && wrapRef.current) {
+      wrapRef.current.style.left = `${d.curX}px`
+      wrapRef.current.style.top = `${d.curY}px`
+    }
+  }
+
+  const scheduleGeometry = () => {
+    if (rafRef.current) return
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0
+      applyLiveGeometry()
+    })
+  }
+
+  const flushRaf = () => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = 0
+    }
+  }
+
+  // Re-assert live drag/resize geometry if a parent state update re-renders mid-gesture.
+  useLayoutEffect(() => {
+    applyLiveGeometry()
+  })
+
+  useEffect(() => () => flushRaf(), [])
 
   const remove = () =>
     void engine('widgets.remove', { dashboardId: dashboard.id, widgetId: widget.id }).catch(
@@ -231,7 +361,7 @@ function WidgetSlate({
       updateWidgetTokenPose(
         dashboard.id,
         widget.id,
-        { x: next.x, y: next.y, w: next.w, h: next.h, expanded: true },
+        { w: next.w, h: next.h, expanded: true },
         index,
         widget,
         safeCanvas
@@ -241,14 +371,35 @@ function WidgetSlate({
 
   const openInData = () => entry && openSevenLink(`seven:${entry}`)
 
+  const showInOutputs = () => {
+    if (entryKind && entryId) {
+      return void showInPanel(`${entryKind}/${entryId}`, entryPart, {
+        dashboardId: dashboard.id,
+        widgetId: widget.id,
+        title: widget.title,
+        dashboardName: dashboard.name
+      })
+    }
+    return void showWidgetInPanel(dashboard, widget)
+  }
+
+  const surfaceOptions = () =>
+    slateSurfaceMenuItems({
+      entryKind,
+      entryId,
+      entryPart,
+      dashboard,
+      widget,
+      onToggleMaximize,
+      maximized
+    })
+
   const toggleExpand = () => {
     if (inGrid) return
-    const nextExpanded = !pose.expanded
-    const nextClamped = clampPose(currentX, currentY, currentW, currentH, bounds, nextExpanded, bottomInset)
     updateWidgetTokenPose(
       dashboard.id,
       widget.id,
-      { x: nextClamped.x, y: nextClamped.y, expanded: nextExpanded },
+      { expanded: !pose.expanded },
       index,
       widget,
       safeCanvas
@@ -261,7 +412,17 @@ function WidgetSlate({
     if ((e.target as HTMLElement | null)?.closest('button, a, input, textarea')) return
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: currentX, origY: currentY, moved: false }
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: currentX,
+      origY: currentY,
+      origW: currentW,
+      origH: currentH,
+      curX: currentX,
+      curY: currentY,
+      moved: false
+    }
   }
 
   const onHeaderPointerMove = (e: React.PointerEvent) => {
@@ -269,61 +430,143 @@ function WidgetSlate({
     if (!d) return
     const dx = e.clientX - d.startX
     const dy = e.clientY - d.startY
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) d.moved = true
+    if (!d.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+      d.moved = true
+      setInteracting(true)
+    }
     if (d.moved) {
-      const next = clampPose(d.origX + dx, d.origY + dy, currentW, currentH, bounds, pose.expanded, bottomInset)
-      setPos({ x: next.x, y: next.y })
+      const next = clampPose(d.origX + dx, d.origY + dy, d.origW, d.origH, bounds, pose.expanded, bottomInset)
+      if (next.x !== d.curX || next.y !== d.curY) {
+        d.curX = next.x
+        d.curY = next.y
+        scheduleGeometry()
+      }
     }
   }
 
-  const onHeaderPointerUp = (e: React.PointerEvent) => {
+  const finishHeaderDrag = (e: React.PointerEvent, canceled: boolean) => {
     const d = dragRef.current
     if (!d) return
     dragRef.current = null
+    flushRaf()
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
-    if (d.moved && pos) {
-      updateWidgetTokenPose(dashboard.id, widget.id, { x: pos.x, y: pos.y }, index, widget, safeCanvas)
-      setPos(null)
+    setInteracting(false)
+    if (canceled) {
+      if (wrapRef.current) {
+        wrapRef.current.style.left = `${currentX}px`
+        wrapRef.current.style.top = `${currentY}px`
+      }
+      return
+    }
+    if (d.moved) {
+      if (wrapRef.current) {
+        wrapRef.current.style.left = `${d.curX}px`
+        wrapRef.current.style.top = `${d.curY}px`
+      }
+      updateWidgetTokenPose(dashboard.id, widget.id, { x: d.curX, y: d.curY }, index, widget, safeCanvas)
     } else {
       toggleExpand()
     }
   }
+
+  const onHeaderPointerUp = (e: React.PointerEvent) => finishHeaderDrag(e, false)
+  const onHeaderPointerCancel = (e: React.PointerEvent) => finishHeaderDrag(e, true)
 
   const onResizePointerDown = (e: React.PointerEvent, edge: SlateResizeEdge) => {
     if (inGrid || e.button !== 0) return
     e.preventDefault()
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
+    setInteracting(true)
     resizeRef.current = {
       edge,
       startX: e.clientX,
       startY: e.clientY,
+      origX: currentX,
+      origY: currentY,
       origW: currentW,
-      origH: currentH
+      origH: currentH,
+      curX: currentX,
+      curY: currentY,
+      curW: currentW,
+      curH: currentH,
+      moved: false
     }
   }
 
   const onResizePointerMove = (e: React.PointerEvent) => {
     const r = resizeRef.current
     if (!r) return
+    const axis = EDGE_AXES[r.edge]
     const dx = e.clientX - r.startX
     const dy = e.clientY - r.startY
-    const nextW = r.edge === 'r' || r.edge === 'br' ? r.origW + dx : r.origW
-    const nextH = r.edge === 'b' || r.edge === 'br' ? r.origH + dy : r.origH
-    const clamped = clampPose(currentX, currentY, nextW, nextH, bounds, true, bottomInset)
-    setSize({ w: clamped.w, h: clamped.h })
+    const usable = usableCanvas(bounds, bottomInset)
+
+    let nextX = r.origX
+    let nextW = r.origW
+    if (axis.left) {
+      const origRight = r.origX + r.origW
+      const maxWFromLeft = Math.max(r.origW, origRight - SAFE_PAD)
+      nextW = Math.min(maxWFromLeft, Math.max(MIN_SLATE_W, Math.round(r.origW - dx)))
+      nextX = origRight - nextW
+    } else if (axis.right) {
+      const maxWFromRight = usable ? Math.max(r.origW, usable.w - r.origX - SAFE_PAD) : 1600
+      nextW = Math.min(maxWFromRight, Math.max(MIN_SLATE_W, Math.round(r.origW + dx)))
+    }
+
+    let nextH = r.origH
+    if (axis.bottom) {
+      const maxUsableH = usable && usable.h > MIN_SLATE_H + SAFE_PAD * 2 ? usable.h - SAFE_PAD * 2 : 960
+      const maxBoundsH = bounds ? Math.max(r.origH, bounds.h - r.origY - SAFE_PAD) : maxUsableH
+      const maxH = Math.max(r.origH, Math.min(maxUsableH, maxBoundsH))
+      nextH = Math.min(maxH, Math.max(MIN_SLATE_H, Math.round(r.origH + dy)))
+    }
+
+    if (nextX !== r.curX || nextW !== r.curW || nextH !== r.curH) {
+      r.curX = nextX
+      r.curW = nextW
+      r.curH = nextH
+      r.moved = true
+      scheduleGeometry()
+    }
   }
 
-  const onResizePointerUp = (e: React.PointerEvent) => {
+  const finishResize = (e: React.PointerEvent, canceled: boolean) => {
     const r = resizeRef.current
     if (!r) return
     resizeRef.current = null
+    flushRaf()
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
-    if (size) {
-      updateWidgetTokenPose(dashboard.id, widget.id, { w: size.w, h: size.h }, index, widget, safeCanvas)
-      setSize(null)
+    setInteracting(false)
+    if (canceled || !r.moved) {
+      if (wrapRef.current) wrapRef.current.style.left = `${currentX}px`
+      if (slateRef.current) {
+        slateRef.current.style.width = `${currentW}px`
+        slateRef.current.style.height = `${currentH}px`
+      }
+      return
     }
+    if (wrapRef.current) wrapRef.current.style.left = `${r.curX}px`
+    if (slateRef.current) {
+      slateRef.current.style.width = `${r.curW}px`
+      slateRef.current.style.height = `${r.curH}px`
+    }
+    updateWidgetTokenPose(
+      dashboard.id,
+      widget.id,
+      {
+        ...(EDGE_AXES[r.edge].left ? { x: r.curX } : {}),
+        w: r.curW,
+        h: r.curH
+      },
+      index,
+      widget,
+      safeCanvas
+    )
   }
+
+  const onResizePointerUp = (e: React.PointerEvent) => finishResize(e, false)
+  const onResizePointerCancel = (e: React.PointerEvent) => finishResize(e, true)
 
   const moveToSurface = (surfaceId: string) => {
     updateWidgetTokenPose(dashboard.id, widget.id, { surfaceId }, index, widget, safeCanvas)
@@ -353,10 +596,15 @@ function WidgetSlate({
       {
         label: 'Size preset',
         icon: <Maximize2 />,
-        children: Object.entries(NAMED_SIZES).map(([name, s]) => ({
-          label: `${name[0].toUpperCase()}${name.slice(1)} (${s.w}×${s.h})`,
-          onSelect: () => resizeGridPreset(s)
-        }))
+        submenuTitle: 'Size · 12-Col Layout',
+        submenu: (close) => (
+          <SizePresetGrid
+            activeW={inGrid ? widget.layout.w : Math.round(currentW / 92)}
+            activeH={inGrid ? widget.layout.h : Math.round(currentH / 64)}
+            onPick={resizeGridPreset}
+            onClose={close}
+          />
+        )
       },
       ...(switchViews.length
         ? [
@@ -401,7 +649,11 @@ function WidgetSlate({
             }
           ]
         : []),
-      ...(IN_APP && entry ? [{ label: 'Open in Data', icon: <Database />, onSelect: openInData }] : []),
+      {
+        label: 'Open in…',
+        icon: <AppWindow />,
+        children: surfaceOptions()
+      },
       { label: '', separator: true },
       { label: 'Remove from board', icon: <Trash2 />, danger: true, onSelect: remove }
     ])
@@ -424,18 +676,29 @@ function WidgetSlate({
       width={!inGrid && pose.expanded ? currentW : undefined}
       height={!inGrid && pose.expanded ? currentH : undefined}
       fillCell={inGrid}
+      interacting={interacting}
+      slateRef={inGrid ? undefined : slateRef}
       onToggleExpand={inGrid ? undefined : toggleExpand}
       onToggleMaximize={onToggleMaximize}
       onHeaderPointerDown={inGrid ? undefined : onHeaderPointerDown}
       onHeaderPointerMove={inGrid ? undefined : onHeaderPointerMove}
       onHeaderPointerUp={inGrid ? undefined : onHeaderPointerUp}
+      onHeaderPointerCancel={inGrid ? undefined : onHeaderPointerCancel}
       onResizePointerDown={inGrid ? undefined : onResizePointerDown}
       onResizePointerMove={inGrid ? undefined : onResizePointerMove}
       onResizePointerUp={inGrid ? undefined : onResizePointerUp}
-      onShowInPanel={
-        entryKind && entryId ? () => void showInPanel(`${entryKind}/${entryId}`, entryPart) : undefined
-      }
+      onResizePointerCancel={inGrid ? undefined : onResizePointerCancel}
+      onShowInPanel={showInOutputs}
       onOpenData={IN_APP && entry ? openInData : undefined}
+      onOpenIn={(e) => {
+        e.stopPropagation()
+        const r = e.currentTarget.getBoundingClientRect()
+        openMenu(
+          { preventDefault() {}, stopPropagation() {}, clientX: r.left, clientY: r.bottom + 4 },
+          showName(widget.title),
+          surfaceOptions()
+        )
+      }}
       onRemove={remove}
       actions={
         <>
@@ -471,6 +734,7 @@ function WidgetSlate({
 
   return (
     <div
+      ref={wrapRef}
       data-slate
       style={{ left: currentX, top: currentY }}
       onPointerDownCapture={onFocusSlate}
@@ -812,8 +1076,8 @@ export function BoardTabletop({
       visibleWidgets.map(({ widget: w }) => ({
         i: w.id,
         ...w.layout,
-        minW: 2,
-        minH: 2
+        minW: 1,
+        minH: 1
       })),
     [visibleWidgets]
   )
@@ -847,23 +1111,7 @@ export function BoardTabletop({
     const pt = toDropCoords(e.clientX, e.clientY)
     try {
       const added = await importPaths(paths)
-      const updated = await engine('widgets.place', {
-        dashboardId: dashboard.id,
-        things: fileThings(added),
-        at: null
-      })
-      useDashboards.getState().onChanged(updated.id, updated)
-      const latest = updated.widgets[updated.widgets.length - 1]
-      if (latest) {
-        updateWidgetTokenPose(
-          dashboard.id,
-          latest.id,
-          { x: pt.x, y: pt.y, expanded: true, surfaceId: activeSlot.id },
-          updated.widgets.length - 1,
-          latest,
-          safeCanvas
-        )
-      }
+      await placeOnBoard(dashboard.id, fileThings(added), pt, undefined, safeCanvas)
     } catch (err) {
       toast.error('Could not add files', errorText(err))
     }
@@ -878,23 +1126,7 @@ export function BoardTabletop({
     const entries = droppedEntries(e)
     if (!entries.length) return
     const pt = toDropCoords(e.clientX, e.clientY)
-    void placeOnBoard(dashboard.id, entries)
-      .then(async () => {
-        await useDashboards.getState().refresh()
-        const refreshed = useDashboards.getState().list.find((d) => d.id === dashboard.id)
-        const newest = refreshed?.widgets.at(-1)
-        if (refreshed && newest) {
-          updateWidgetTokenPose(
-            refreshed.id,
-            newest.id,
-            { x: pt.x, y: pt.y, expanded: true, surfaceId: activeSlot.id },
-            refreshed.widgets.length - 1,
-            newest,
-            safeCanvas
-          )
-        }
-      })
-      .catch(failed('Could not put on board'))
+    void placeOnBoard(dashboard.id, entries, pt, undefined, safeCanvas).catch(failed('Could not put on board'))
   }
 
   const isGrid = layoutMode === 'grid'
@@ -965,7 +1197,7 @@ export function BoardTabletop({
                       inGrid
                       compact={compact}
                       active={activeWidgetId === widget.id}
-                      onFocusSlate={() => setActiveWidgetId(widget.id)}
+                      onFocusSlate={() => setActiveWidgetId((cur) => (cur === widget.id ? cur : widget.id))}
                       maximized={maximizedWidgetId === widget.id}
                       onToggleMaximize={() =>
                         setMaximizedWidgetId((cur) => (cur === widget.id ? null : widget.id))
@@ -990,7 +1222,7 @@ export function BoardTabletop({
               slots={surfaces.slots}
               compact={compact}
               active={activeWidgetId === widget.id}
-              onFocusSlate={() => setActiveWidgetId(widget.id)}
+              onFocusSlate={() => setActiveWidgetId((cur) => (cur === widget.id ? cur : widget.id))}
               maximized={maximizedWidgetId === widget.id}
               onToggleMaximize={() =>
                 setMaximizedWidgetId((cur) => (cur === widget.id ? null : widget.id))
@@ -1011,7 +1243,7 @@ export function BoardTabletop({
             const current = pendingPlacement
             setPendingPlacement(null)
             setCursorPt(null)
-            void current.commit(pt).catch(failed('Could not place on board'))
+            void current.commit(pt, safeCanvas).catch(failed('Could not place on board'))
           }}
           onContextMenu={(e) => {
             e.preventDefault()

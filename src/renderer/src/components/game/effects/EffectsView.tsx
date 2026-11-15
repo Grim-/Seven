@@ -8,26 +8,26 @@ import { pieceClass, toneOf } from './pieces'
 
 function Nodes({ nodes }: { nodes: EffectNode[] }) {
   return (
-    <>
+    <div className="flex flex-col gap-[0.45em]">
       {nodes.map((n, i) => (
-        <div key={i} className="flex flex-col gap-1">
-          <div style={{ '--tone': toneOf(n.def) } as CSSProperties} className="flex items-start gap-1.5 border-l-2 border-[var(--tone)] pl-1.5 leading-snug">
-            <NamedIcon name={pieceClass(n.def.type)?.ICON ?? 'Sparkles'} className="mt-[2px] h-3 w-3 shrink-0 text-[var(--tone)]" />
-            <span>
+        <div key={i} className="flex flex-col gap-[0.35em]">
+          <div style={{ '--tone': toneOf(n.def) } as CSSProperties} className="flex items-start gap-[0.45em] border-l-2 border-[var(--tone)] pl-[0.55em] leading-[1.65]">
+            <NamedIcon name={pieceClass(n.def.type)?.ICON ?? 'Sparkles'} className="mt-[0.3em] h-[1em] w-[1em] shrink-0 text-[var(--tone)]" />
+            <span className="min-w-0">
               <EffectSentence def={n.def} chips />
             </span>
           </div>
           {n.arms.map((arm, a) =>
             arm.nodes.length ? (
-              <div key={a} className="ml-2.5 flex flex-col gap-1">
-                <span className={arm.branch.tone === 'pass' ? 'font-mono text-[0.8em] uppercase tracking-wider text-ok' : 'font-mono text-[0.8em] uppercase tracking-wider text-alert'}>{arm.branch.label}</span>
+              <div key={a} className="ml-[0.5em] flex flex-col gap-[0.35em] border-l border-white/12 pl-[0.55em]">
+                <span className={arm.branch.tone === 'pass' ? 'font-mono text-[0.82em] font-semibold uppercase tracking-[0.08em] text-ok' : 'font-mono text-[0.82em] font-semibold uppercase tracking-[0.08em] text-alert'}>{arm.branch.label}</span>
                 <Nodes nodes={arm.nodes} />
               </div>
             ) : null
           )}
         </div>
       ))}
-    </>
+    </div>
   )
 }
 
@@ -35,10 +35,10 @@ export function EffectsView({ defs, lanes }: { defs: ComponentDef[]; lanes: Effe
   const tree = laneTree(defs, lanes).filter((l) => l.nodes.length)
   if (!tree.length) return <span className="text-faint">No effects.</span>
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-[0.75em]">
       {tree.map((l) => (
-        <div key={l.lane.event} className="flex flex-col gap-1">
-          <span className="font-mono text-[0.8em] uppercase tracking-wider text-dim">{l.lane.label}</span>
+        <div key={l.lane.event} className="flex flex-col gap-[0.4em]">
+          <span className="font-mono text-[0.82em] font-semibold uppercase tracking-[0.1em] text-dim">{l.lane.label}</span>
           <Nodes nodes={l.nodes} />
         </div>
       ))}

@@ -7,8 +7,8 @@ import type { Card } from '../cards/model'
 
 function Part({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
-      <b>{label}</b>
+    <div className="flex flex-col gap-[0.4em]">
+      <b className="font-mono text-[0.88em] uppercase tracking-[0.06em] text-white/95">{label}</b>
       {children}
     </div>
   )
@@ -18,7 +18,7 @@ export function RoleplayFace({ card }: { card: Card }) {
   if (card.use === 'action' && card.action) {
     const action = card.action
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-[0.65em]">
         <EffectsView defs={actionEffects(action)} lanes={ACTION_LANES} />
         {action.checks.map((c, i) =>
           actionEffects(c).length ? (
@@ -32,7 +32,7 @@ export function RoleplayFace({ card }: { card: Card }) {
   }
   if (card.use === 'decision' && card.decision)
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-[0.65em]">
         {card.decision.options.map((o, i) => (
           <Part key={i} label={o.text}>
             <EffectsView defs={optionEffects(o)} lanes={OPTION_LANES} />
@@ -42,7 +42,7 @@ export function RoleplayFace({ card }: { card: Card }) {
     )
   if (card.use === 'opposed' && card.opposed)
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-[0.65em]">
         {[card.opposed.a, card.opposed.b].map((side, i) => (
           <Part key={i} label={side.name || (i ? 'The target' : 'The player')}>
             <EffectsView defs={sideEffects(side)} lanes={SIDE_LANES} />

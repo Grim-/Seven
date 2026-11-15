@@ -8,6 +8,7 @@ import { importPaths } from '../lib/importFiles'
 import type { Conversation } from '../lib/conversation'
 import { dropSendOffer } from '../lib/composer'
 import type { ChatElement } from '@shared/chatElements'
+import { usePanel } from './panel'
 
 const PENDING_ID = '__pending__'
 const fresh = new Set<string>()
@@ -204,6 +205,7 @@ export const useSessions = create<SessionsState>((set, get) => {
     fresh.add(meta.id)
     set((s) => ({ list: [meta, ...s.list.filter((x) => x.id !== meta.id)], messages: { ...s.messages, [meta.id]: [] } }))
     conv.go(meta.id)
+    void usePanel.getState().promoteDraft(conv.key, meta.id)
     return meta.id
   },
 

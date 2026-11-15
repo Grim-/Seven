@@ -28,6 +28,7 @@ export function Chip({ kind, refText, action = null, part = null, onRemove, onOp
   const openFull = () => (onOpen ? onOpen() : openSevenLink(referenceHref(resolvedKind, resolvedId)))
 
   const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
     if (e.ctrlKey || e.metaKey || onOpen) {
       openFull()
       return
@@ -36,6 +37,7 @@ export function Chip({ kind, refText, action = null, part = null, onRemove, onOp
   }
 
   const handleMenu = (e: React.MouseEvent) => {
+    e.stopPropagation()
     openMenu(e, showName(displayTitle), [
       { label: 'Inspect here', icon: <Eye />, onSelect: () => setInspecting(true) },
       { label: 'Pin to chat table', icon: <Pin />, onSelect: () => pinToChatTable(resolvedKind, resolvedId, displayTitle) },
@@ -64,23 +66,23 @@ export function Chip({ kind, refText, action = null, part = null, onRemove, onOp
       <span
         ref={anchor}
         onContextMenu={handleMenu}
-        className="inline-flex items-center gap-1 border border-accent/40 bg-accent/15 px-1.5 py-0.5 font-mono text-[11px] text-white/95 align-baseline mx-0.5 select-none hover:border-accent hover:bg-accent/25 transition-colors"
+        className="seven-chip"
       >
         <button
           type="button"
           title={`${displayKind}: ${showName(displayTitle)}${action ? ` · Placeholder :${action} (pulls a fresh value on submit)` : ''} · Click to inspect in chat · Right-click for actions`}
           onClick={handleClick}
-          className="inline-flex min-w-0 items-center gap-1.5 cursor-pointer text-left"
+          className="seven-chip-btn"
         >
-          <span className="border border-accent/50 bg-accent/30 px-1 py-0.2 font-mono text-[9px] font-bold uppercase tracking-wider text-accent">
+          <span className="seven-chip-kind">
             {displayKind}
           </span>
-          <span className="truncate max-w-[220px] font-semibold text-white/95">{showName(displayTitle)}</span>
-          {action && <span className="shrink-0 border border-teal/40 bg-teal/15 px-1 text-[10px] font-semibold text-teal">:{action}</span>}
-          {part && <span className="shrink-0 text-[10px] text-faint">#{part}</span>}
+          <span className="seven-chip-title">{showName(displayTitle)}</span>
+          {action && <span className="seven-chip-action">:{action}</span>}
+          {part && <span className="seven-chip-part">#{part}</span>}
         </button>
         {onRemove && (
-          <button type="button" title="Remove" onClick={onRemove} className="ml-0.5 text-dim hover:text-alert">
+          <button type="button" title="Remove" onClick={onRemove} className="seven-chip-remove">
             <X className="h-3 w-3" />
           </button>
         )}

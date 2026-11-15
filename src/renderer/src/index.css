@@ -314,38 +314,6 @@ option:hover, option:focus, option:checked {
   background: repeating-linear-gradient(90deg, var(--color-line) 0 6px, transparent 6px 10px);
 }
 
-.seven-chip {
-  display: inline-flex;
-  max-width: 100%;
-  align-items: stretch;
-  margin: 0 2px;
-  vertical-align: 1px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--color-cyan);
-  background: color-mix(in srgb, var(--color-cyan) 7%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-cyan) 35%, transparent);
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%);
-}
-
-.seven-chip:hover {
-  border-color: var(--color-cyan);
-  background: color-mix(in srgb, var(--color-cyan) 14%, transparent);
-}
-
-.seven-chip-kind {
-  display: flex;
-  align-items: center;
-  padding: 0 5px;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-cyan) 55%, #fff);
-  background: color-mix(in srgb, var(--color-cyan) 18%, transparent);
-}
-
 .seven-include {
   white-space: pre-wrap;
   cursor: pointer;
@@ -498,4 +466,15 @@ option:hover, option:focus, option:checked {
   text-transform: uppercase;
   color: var(--color-accent);
   clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);
+}
+
+@keyframes seven-focus-scan {
+  0% {
+    transform: translateY(-20%);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(520%);
+    opacity: 0;
+  }
 }

@@ -21,6 +21,7 @@ import { PlayHost } from './components/play/PlayHost'
 import { PicturePickerHost } from './components/data/PicturePicker'
 import { CarryHost } from './components/carry/CarryModals'
 import { DropPicturesHost } from './components/files/DropPictures'
+import { StageOverlay } from './registries/presentations'
 import { useCinema, useCinemaKey } from './lib/cinema'
 
 export function App() {
@@ -60,6 +61,7 @@ export function App() {
       <CarryHost />
       <DropPicturesHost />
       <TooltipHost />
+      <StageOverlay />
       <UnlockDialog />
       <ReminderAlarms />
     </div>

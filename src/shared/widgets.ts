@@ -175,23 +175,44 @@ const SIZES: Record<string, Pick<WidgetLayout, 'w' | 'h'>> = {
   html: { w: 6, h: 6 }
 }
 
-export const NAMED_SIZES: Record<string, Pick<WidgetLayout, 'w' | 'h'>> = {
-  small: { w: 4, h: 5 },
-  medium: { w: 6, h: 6 },
-  large: { w: 8, h: 8 },
-  wide: { w: 12, h: 6 },
-  tall: { w: 4, h: 10 }
+export interface SizePreset {
+  id: string
+  label: string
+  w: number
+  h: number
 }
 
 export const GRID_COLS = 12
+
+export const SIZE_PRESETS: SizePreset[] = [
+  { id: '1x2', label: 'Micro', w: 1, h: 2 },
+  { id: '1x4', label: 'Slim', w: 1, h: 4 },
+  { id: '2x4', label: 'Narrow', w: 2, h: 4 },
+  { id: '2x2', label: 'Tile', w: 2, h: 2 },
+  { id: '3x4', label: 'Quarter', w: 3, h: 4 },
+  { id: '6x2', label: 'Half Strip', w: 6, h: 2 },
+  { id: 'small', label: 'Small', w: 4, h: 5 },
+  { id: 'medium', label: 'Medium', w: 6, h: 6 },
+  { id: 'large', label: 'Large', w: 8, h: 8 },
+  { id: '12x2', label: 'Banner', w: 12, h: 2 },
+  { id: 'wide', label: 'Wide', w: 12, h: 6 },
+  { id: '12x10', label: 'Full', w: 12, h: 10 },
+  { id: '3x8', label: 'Quarter Tall', w: 3, h: 8 },
+  { id: 'tall', label: 'Tall', w: 4, h: 10 },
+  { id: '6x10', label: 'Half Tall', w: 6, h: 10 }
+]
+
+export const NAMED_SIZES: Record<string, Pick<WidgetLayout, 'w' | 'h'>> = Object.fromEntries(
+  SIZE_PRESETS.map((p) => [p.id, { w: p.w, h: p.h }])
+)
 
 export function defaultSize(view: string): Pick<WidgetLayout, 'w' | 'h'> {
   return SIZES[view] ?? { w: 6, h: 6 }
 }
 
 export function placeWidget(existing: WidgetLayout[], size: Pick<WidgetLayout, 'w' | 'h'>): WidgetLayout {
-  const w = Math.min(GRID_COLS, Math.max(2, size.w))
-  const h = Math.max(2, size.h)
+  const w = Math.min(GRID_COLS, Math.max(1, size.w))
+  const h = Math.max(1, size.h)
   const overlaps = (x: number, y: number) => existing.some((l) => x < l.x + l.w && x + w > l.x && y < l.y + l.h && y + h > l.y)
   for (let y = 0; y < 400; y++) {
     for (let x = 0; x + w <= GRID_COLS; x++) if (!overlaps(x, y)) return { x, y, w, h }

@@ -34,7 +34,7 @@ export function EffectTokenButton({ name, spec, value, onChange }: { name: strin
 export function EffectTokenText({ name, spec, value, chip = false }: { name: string; spec: ParamSpec; value: unknown; chip?: boolean }) {
   const token = effectToken(spec.kind) ?? PARAM_TOKEN
   return (
-    <span className={cn('font-semibold text-white', chip && 'mx-0.5 inline-flex items-center border border-[color-mix(in_srgb,var(--tone)_45%,transparent)] bg-[color-mix(in_srgb,var(--tone)_10%,transparent)] px-1 font-mono text-[0.92em]')}>
+    <span className={cn('font-semibold text-white', chip && 'mx-[0.12em] inline rounded-[2px] border border-[color-mix(in_srgb,var(--tone)_45%,transparent)] bg-[color-mix(in_srgb,var(--tone)_10%,transparent)] px-[0.35em] py-[0.04em] font-mono text-[0.92em]')}>
       {isEmpty(value) ? `[${paramLabel(name, spec)}]` : <token.Text spec={spec} value={value} />}
     </span>
   )

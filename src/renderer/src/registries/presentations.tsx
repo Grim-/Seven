@@ -83,7 +83,7 @@ export function StageOverlay() {
   }, [playing, close])
   if (!playing) return null
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center overflow-hidden bg-black/85 p-6 backdrop-blur-sm" onClick={close}>
+    <div className="fixed inset-0 z-[195] flex items-center justify-center overflow-hidden bg-black/85 p-6 backdrop-blur-sm" onClick={close}>
       <button title="Close" onClick={close} className="absolute right-3 top-3 z-10 text-dim hover:text-white">
         <X className="h-5 w-5" />
       </button>

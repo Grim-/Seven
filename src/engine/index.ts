@@ -79,6 +79,7 @@ import { readLines } from './util/fs'
 import type { WebLogEntry } from '@shared/types'
 import type { Backdrop, ChatBackdrops, PanelItem, TodoList, Toolset } from '@shared/types'
 import { panel } from './panel/store'
+import { boardView } from './present/places'
 import { backdrops } from './backdrops'
 import { clearStats, summarize } from './turnstats'
 import { worlds } from './worlds/store'
@@ -601,6 +602,12 @@ const handlers: Handlers = {
   'backdrop.set': ({ sessionId, scope, backdrop, minutes }) => backdrops.set(sessionId, scope, backdrop, minutes),
   'panel.list': ({ sessionId }) => panel.list(sessionId),
   'panel.showEntry': ({ sessionId, entry, part }) => panel.show(sessionId, 'data', modules.panelTab('data'), { view: partView(entry, part), key: entry }),
+  'panel.showWidget': ({ sessionId, dashboardId, widgetId }) => {
+    const d = data.dashboards.get(dashboardId)
+    const w = d.widgets.find((x) => x.id === widgetId)
+    if (!w) throw new Error(`Widget "${widgetId}" not found`)
+    return panel.show(sessionId, 'dashboards', modules.panelTab('data'), { view: boardView(d, w), key: `widget:${w.id}` })
+  },
   'panel.remove': ({ sessionId, id }) => panel.remove(sessionId, (i) => i.id === id),
   'panel.clear': ({ sessionId, tab }) => panel.remove(sessionId, (i) => i.tab === tab),
   'weblog.list': () => readLines<WebLogEntry>(WEB_LOG).reverse().slice(0, 1000),

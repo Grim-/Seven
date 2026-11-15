@@ -208,8 +208,8 @@ export class DashboardStore {
   }
 
   private clampLayout(layout: WidgetLayout): WidgetLayout {
-    const w = Math.min(GRID_COLS, Math.max(2, Math.round(layout.w)))
-    const h = Math.min(40, Math.max(2, Math.round(layout.h)))
+    const w = Math.min(GRID_COLS, Math.max(1, Math.round(layout.w)))
+    const h = Math.min(40, Math.max(1, Math.round(layout.h)))
     const x = Math.min(GRID_COLS - w, Math.max(0, Math.round(layout.x)))
     const y = Math.max(0, Math.round(layout.y))
     return { x, y, w, h }

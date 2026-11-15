@@ -201,6 +201,7 @@ export const REMOTE_ENGINE: Record<EngineRequestName, RemoteLevelId> = {
   'backdrop.set': 'full',
   'panel.list': 'chat',
   'panel.showEntry': 'full',
+  'panel.showWidget': 'full',
   'panel.remove': 'full',
   'panel.clear': 'full',
   'reminders.list': 'chat',

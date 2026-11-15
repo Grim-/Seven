@@ -24,7 +24,7 @@ function Text({ value }: TokenProps) {
   return (
     <>
       {prettyFormula(source, cat)}
-      {r && <span className="font-normal text-[11px] text-dim">{`${r.lo}–${r.hi}`}</span>}
+      {r && <span className="ml-[0.35em] font-normal text-[0.82em] text-dim">{`${r.lo}–${r.hi}`}</span>}
     </>
   )
 }

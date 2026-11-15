@@ -39,6 +39,7 @@ import { matchesKeybind, useKeybindLabel } from '../../store/keybinds'
 import { ComposerReferences, UserTextPart } from './References'
 import { AlertBox, Button, EmptyState, Modal, VirtualList, openMenu, DropOverlay } from '../ui'
 import { engine, main } from '../../lib/ipc'
+import { IN_APP } from '../../lib/mode'
 import { useData } from '../../store/data'
 import { draftOf, useSessions } from '../../store/sessions'
 import { useConversation, type Conversation } from '../../lib/conversation'
@@ -898,7 +899,7 @@ export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody
           className="relative flex min-h-0 flex-1 flex-col"
           {...fileDrop.props}
         >
-          <StageOverlay />
+          {!IN_APP && <StageOverlay />}
           <DropOverlay show={fileDrop.over} label="Drop files to attach" />
           <PlayVeil />
           <ThreadPrimitive.Viewport
@@ -932,7 +933,10 @@ export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody
           </ThreadPrimitive.Viewport>
           <div
             ref={bottomBarRef}
-            className={cn('relative flex flex-col', isTabletop && 'pointer-events-auto z-40')}
+            className={cn(
+              'relative flex flex-col',
+              isTabletop && 'pointer-events-none z-40 [&>*:not(.card-hand)]:pointer-events-auto'
+            )}
             onMouseEnter={isTabletop ? () => setChatHovered(true) : undefined}
             onMouseLeave={isTabletop ? () => setChatHovered(false) : undefined}
             onFocusCapture={isTabletop ? () => setChatFocused(true) : undefined}
