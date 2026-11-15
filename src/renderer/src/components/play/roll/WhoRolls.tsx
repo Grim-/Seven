@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Search } from 'lucide-react'
 import { showName } from '@shared/ids'
-import { signed } from '@shared/dnd'
+import { signed } from '@shared/text'
 import { Input } from '../../ui'
 import { SheetPortrait } from '../../data/SheetPortrait'
 import { cn } from '../../../lib/cn'

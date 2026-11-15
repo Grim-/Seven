@@ -1,74 +1,16 @@
 import { useState } from 'react'
-import { Copy, FileDown } from 'lucide-react'
+import { Copy } from 'lucide-react'
 import type { CarryMode } from '@shared/carry'
 import { Button, Modal, Textarea, Toggle } from '../ui'
 import { AssetMedia } from '../pictures/AssetMedia'
-import { PictureField } from '../pictures/PictureField'
 import { engine, main } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
 import { toast } from '../../store/toasts'
-import { useVault } from '../../store/vault'
 import { openEntry } from '../../lib/library'
-import { closeCarry, nextArrived, useCarry, type Arrival, type CarryTarget } from './carryStore'
+import { nextArrived, useCarry, type Arrival } from './carryStore'
+import { SaveIntoPicture } from './save/SaveIntoPicture'
 import { placePictures } from '../../lib/dropFiles'
 import { useObjectUrl } from '../../lib/useObjectUrl'
-
-const PNG = ['image/png']
-
-function SaveIntoPicture({ target }: { target: CarryTarget | null }) {
-  const vault = useVault((s) => s.status)
-  const [picture, setPicture] = useState<string | null>(null)
-  const [lock, setLock] = useState(vault.configured)
-  const [data, setData] = useState(target ? null : '')
-  const [busy, setBusy] = useState(false)
-  const save = async () => {
-    if (!picture) return
-    const path = await main('dialog.savePath', { name: `${target && data === null ? target.title : 'data'}.png` })
-    if (!path) return
-    setBusy(true)
-    try {
-      await engine('carry.save', { entry: data === null && target ? target.entry : null, text: data, picture, lock, path })
-      toast.success('Saved the picture', path)
-      closeCarry()
-    } catch (err) {
-      failed('Could not save the picture')(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <Modal
-      open
-      title={`Save into a picture${target && data === null ? ` · ${target.title}` : ''}`}
-      onClose={closeCarry}
-      footer={
-        <>
-          {target && (
-            <Button variant="ghost" onClick={() => setData(data === null ? '' : null)}>
-              {data === null ? 'Data instead of an entry…' : `Carry ${target.title} instead`}
-            </Button>
-          )}
-          <span className="flex-1" />
-          <Button variant="ghost" onClick={closeCarry}>
-            Cancel
-          </Button>
-          <Button variant="primary" icon={<FileDown />} disabled={!picture || busy || (data !== null && !data.trim())} onClick={() => void save()}>
-            Save picture…
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <PictureField large clearable={false} value={picture} onChange={setPicture} options={{ mimes: PNG, what: 'a PNG picture' }} />
-        {data !== null && <Textarea value={data} onChange={(e) => setData(e.target.value)} rows={6} placeholder="Paste any text or JSON to carry" />}
-        <div className="flex flex-col gap-1">
-          <Toggle checked={lock} onChange={setLock} disabled={!vault.configured} label="Lock it with your vault key" />
-          <span className="text-[11.5px] text-faint">{vault.configured ? 'Only your Seven can open it. Untick to let any Seven import it.' : 'Set up the vault in Settings to lock it.'}</span>
-        </div>
-      </div>
-    </Modal>
-  )
-}
 
 function Arrived({ arrival }: { arrival: Arrival }) {
   const { found, dropped, ask } = arrival
@@ -112,7 +54,7 @@ function Arrived({ arrival }: { arrival: Arrival }) {
           </Button>
           <span className="flex-1" />
           {!about ? null : text !== null ? (
-            <Button variant="primary" icon={<Copy />} onClick={() => void main('clipboard.write', { text }).then(() => toast.success('Copied'))}>
+            <Button variant="primary" icon={<Copy />} onClick={() => void main('clipboard.write', { text }).then(() => toast.success('Copied'), failed('Could not copy'))}>
               Copy
             </Button>
           ) : about.kind ? (

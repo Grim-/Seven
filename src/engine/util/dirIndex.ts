@@ -1,3 +1,4 @@
+import { report } from './report'
 import fs from 'node:fs'
 import path from 'node:path'
 import { onStorageChange, type StorageChange } from './fs'
@@ -107,7 +108,7 @@ export class DirIndex<T> {
       } catch {
         continue
       }
-      if (JSON.stringify(fresh) !== JSON.stringify(item.value)) console.warn(`[index] ${this.name}: ${item.file} differs from what is on disk`)
+      if (JSON.stringify(fresh) !== JSON.stringify(item.value)) report('warning', 'index', `${this.name}: ${item.file} differs from what is on disk`)
     }
   }
 }

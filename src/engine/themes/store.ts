@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
@@ -35,6 +36,7 @@ class ThemeStore extends EventEmitter {
         const t = readJson<Theme | null>(path.join(DIR, name), null)
         if (t?.id && t.id !== DEFAULT_THEME_ID) out.push({ ...t, ...cleanTheme(t, t), id: t.id, builtin: false })
       } catch (err) {
+        noteFailure(err, 'themes', 'Could not read a theme file')
         if (isVaultLocked(err)) return [SEVEN_THEME]
         continue
       }

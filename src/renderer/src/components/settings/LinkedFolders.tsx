@@ -10,6 +10,7 @@ import { useAgents } from '../../store/agents'
 import { cn } from '../../lib/cn'
 import { failed } from '../../lib/notify'
 import { textLines } from '@shared/text'
+import { noteFailure } from '../../store/problems'
 
 function norm(p: string): string {
   return p.replace(/\\/g, '/').replace(/\/+$/, '')
@@ -126,7 +127,7 @@ export function LinkedFolders() {
   const [open, setOpen] = useState<string | null>(null)
 
   useEffect(() => {
-    void engine('folders.list').then(setList).catch(() => undefined)
+    void engine('folders.list').then(setList).catch(noteFailure('folders', 'Could not list the linked folders'))
     return on('folders.changed', setList)
   }, [])
 

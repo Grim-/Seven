@@ -7,4 +7,6 @@ export interface Scene {
   exit(): void
   update(dt: number): void
   render(alpha: number): void
+  active?(): boolean
+  visualActive?(): boolean
 }

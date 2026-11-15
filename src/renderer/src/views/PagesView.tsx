@@ -26,6 +26,7 @@ import { showInData } from '../lib/library'
 import { transitionView } from '../lib/viewTransition'
 import { useListPrefs } from '../lib/listPrefs'
 import { useCompactLayout } from '../lib/form'
+import { noteFailure } from '../store/problems'
 
 const ROOT = ''
 const INDEX_ID = 'all:wiki-index'
@@ -119,7 +120,7 @@ function useTagMap(): Record<string, string[]> {
     const load = () =>
       void engine('tags.map')
         .then(setMap)
-        .catch(() => undefined)
+        .catch(noteFailure('library', 'Could not load the tags'))
     load()
     const offTags = on('tags.changed', load)
     const offLibrary = onLibraryChange(load)
@@ -151,7 +152,7 @@ function useKindIcons(): Record<string, string> {
   useEffect(() => {
     void engine('library.kindInfo')
       .then((list) => setIcons(Object.fromEntries(list.map((k) => [k.kind, k.icon]))))
-      .catch(() => undefined)
+      .catch(noteFailure('library', 'Could not load the kind icons'))
   }, [])
   return icons
 }
@@ -188,7 +189,7 @@ export function showPage(id: string | null): void {
 
 export function PagesBrowser({ section, select: selectData, onBack }: { section: LibrarySection; select: (s: DataSelection | null) => void; onBack?: () => void }) {
   useEffect(() => {
-    void useData.getState().refresh().catch(() => undefined)
+    void useData.getState().refresh().catch(noteFailure('library', 'Could not refresh the library'))
   }, [])
   const pages = useData((s) => s.pages)
   const { selected, open, shut, tab, picked, anchor, select, toggle, toggleShut, reveal, setTab, setPicked } = useTree()

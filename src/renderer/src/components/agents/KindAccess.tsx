@@ -9,6 +9,7 @@ import { engine, on } from '../../lib/ipc'
 import { useAgents } from '../../store/agents'
 import { cn } from '../../lib/cn'
 import { failed } from '../../lib/notify'
+import { noteFailure } from '../../store/problems'
 
 function useKindInfo(): KindInfo[] | null {
   const [list, setList] = useState<KindInfo[] | null>(null)
@@ -19,7 +20,7 @@ function useKindInfo(): KindInfo[] | null {
           noteKindFamilies(l)
           setList(l)
         })
-        .catch(() => setList([]))
+        .catch(noteFailure('agents', 'Could not load the kinds', () => setList([])))
     load()
     const offs = [on('tools.changed', load), on('agents.changed', load)]
     return () => offs.forEach((off) => off())

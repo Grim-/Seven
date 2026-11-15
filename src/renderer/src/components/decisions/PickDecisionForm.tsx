@@ -3,22 +3,13 @@ import { MessageSquare, Signpost } from 'lucide-react'
 import { pickMadeText, type PickDecisionProps, type PickOption } from '@shared/pickDecision'
 import { DICE } from '@shared/rolledDecision'
 import { Button, Field, Input, NumberField } from '../ui'
-import { engine } from '../../lib/ipc'
 import { useCheckTargets } from '../play/useCheckTargets'
 import { closePlay, playText, showPlay, type PlayWhere } from '../play/playStore'
 import { SheetSelect } from '../data/sheet/SheetSelect'
 import { PickOptionsEditor } from './PickOptionsEditor'
 import { PlayedCard } from './PlayedCard'
 import { DecideView } from './DecideView'
-
-async function sheetTitle(id: string | null): Promise<string | null> {
-  if (!id) return null
-  try {
-    return (await engine('sheets.get', { id })).title
-  } catch {
-    return null
-  }
-}
+import { sheetTitle } from '../data/sheet/sheetTitle'
 
 export function PickDecisionForm({ character, where }: { character: string | null; where: PlayWhere }) {
   const [question, setQuestion] = useState('')

@@ -32,7 +32,7 @@ export function withoutTitle(markdown: string, title: string): string {
 }
 
 export function referencePattern(): RegExp {
-  return /(^|\s)@([a-z][\w.-]*):("[^"]+"|[^\s,;!?)#&]+)(?:#([a-z][\w-]*))?/gi
+  return /(^|\s)@([a-z][\w.-]*):("[^"]+"|[^\s,;!?)#&:]+)(?::([a-z][\w-]*))?(?:#([a-z][\w-]*))?/gi
 }
 
 export interface TextReference {
@@ -50,14 +50,19 @@ export function referencesIn(text: string): TextReference[] {
   return [...seen.values()]
 }
 
-export function linkFor(kind: string, name: string, part: string | null = null): string {
-  return `@${kind}:${toId(name) || name}${part ? `#${part}` : ''}`
+export function linkFor(kind: string, name: string, part: string | null = null, action: string | null = null): string {
+  return `@${kind}:${toId(name) || name}${action ? `:${action}` : ''}${part ? `#${part}` : ''}`
 }
 
-export function splitLink(text: string): { kind: string | null; ref: string; part: string | null } {
-  const m = /^@?([a-z][\w.-]*):("[^"]+"|[^#]+?)(?:#([a-z][\w-]*))?$/i.exec(text.trim())
-  if (!m) return { kind: null, ref: text.trim(), part: null }
-  return { kind: m[1].toLowerCase(), ref: m[2].replace(/^"|"$/g, ''), part: m[3]?.toLowerCase() ?? null }
+export function splitLink(text: string): { kind: string | null; ref: string; action: string | null; part: string | null } {
+  const m = /^@?([a-z][\w.-]*):("[^"]+"|[^#:\s]+?)(?::([a-z][\w-]*))?(?:#([a-z][\w-]*))?$/i.exec(text.trim())
+  if (!m) return { kind: null, ref: text.trim(), action: null, part: null }
+  return {
+    kind: m[1].toLowerCase(),
+    ref: m[2].replace(/^"|"$/g, ''),
+    action: m[3]?.toLowerCase() ?? null,
+    part: m[4]?.toLowerCase() ?? null
+  }
 }
 
 export function referenceHref(kind: string, ref: string): string {
@@ -69,4 +74,8 @@ export function textLines(text: string): string[] {
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
+}
+
+export function signed(n: number): string {
+  return n >= 0 ? `+${n}` : String(n)
 }

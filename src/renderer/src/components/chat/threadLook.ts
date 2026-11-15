@@ -30,11 +30,11 @@ export const THREAD_LOOKS = {
     agent: { width: 'max-w-[86%]', label: 'font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-teal', body: 'border-l-2 border-l-line pl-3.5 text-white', avatar: 20, bigAvatars: true },
     times: false,
     foldTools: false,
-    composer: { root: 'bg-black/40 p-3', field: 'border border-line bg-black/60 px-3 py-2.5 text-white inset-field glow-focus placeholder:text-dim/60', avatar: 72, round: false },
+    composer: { root: 'border-t border-line/60 bg-black/75 backdrop-blur-md p-3', field: 'border border-line bg-black/60 px-3 py-2.5 text-white inset-field glow-focus placeholder:text-dim/60', avatar: 72, round: false },
     outputs: true,
     ownsComposer: true,
-    compactBars: false,
-    divider: true
+    compactBars: true,
+    divider: false
   },
   slate: {
     viewport: 'px-3 py-3',
@@ -62,6 +62,20 @@ export const THREAD_LOOKS = {
     outputs: false,
     ownsComposer: true,
     compactBars: false,
+    divider: false
+  },
+  tabletop: {
+    viewport: 'px-6 py-5',
+    column: 'mx-auto max-w-4xl',
+    gap: 'pb-6',
+    user: { width: 'max-w-[78%]', label: 'font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-soft', box: 'notch-sm border border-line bg-black/75 backdrop-blur-md px-3.5 py-2.5 text-[14.5px] leading-relaxed whitespace-pre-wrap text-white' },
+    agent: { width: 'max-w-[86%]', label: 'font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-teal', body: 'border-l-2 border-l-line bg-black/65 backdrop-blur-md p-3.5 text-white', avatar: 20, bigAvatars: true },
+    times: false,
+    foldTools: true,
+    composer: { root: 'border-t border-line/60 bg-black/80 backdrop-blur-md p-3', field: 'border border-line bg-black/60 px-3 py-2.5 text-white inset-field glow-focus placeholder:text-dim/60', avatar: 72, round: false },
+    outputs: false,
+    ownsComposer: true,
+    compactBars: true,
     divider: false
   }
 } satisfies Record<string, ThreadLook>

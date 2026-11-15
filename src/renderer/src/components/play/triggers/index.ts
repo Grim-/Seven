@@ -6,6 +6,7 @@ import './ChangeWorldTrigger'
 import './CheckTrigger'
 import './RolledTrigger'
 import './ShopTrigger'
+import './EffectsTrigger'
 
 export { registerTriggerUi, triggerUi, type TriggerContext, type TriggerPanelProps, type TriggerEditorProps, type TriggerUi } from './registry'
 export { TriggerEditor } from './TriggerEditor'

@@ -9,6 +9,7 @@ import { useAgents } from '../../store/agents'
 import { AgentAvatar } from '../agents/look'
 import { EntryCard, Loading } from '../entries/EntryCard'
 import type { EntrySurfaceProps } from '../../registries/kinds'
+import { noteFailure } from '../../store/problems'
 
 function textOf(m: ChatMessage): string {
   return m.parts
@@ -18,7 +19,7 @@ function textOf(m: ChatMessage): string {
 }
 
 function useChat(id: string) {
-  return useLibraryData<SessionSnapshot | null>(() => engine('sessions.open', { id }).catch(() => null), id)
+  return useLibraryData<SessionSnapshot | null>(() => engine('sessions.open', { id }).catch(noteFailure('chat', 'Could not open the chat', () => null)), id)
 }
 
 function Turns({ snap, count, large = false }: { snap: SessionSnapshot; count: number; large?: boolean }) {

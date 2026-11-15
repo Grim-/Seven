@@ -4,12 +4,13 @@ import { Select, SettingRow } from '../ui'
 import { engine } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
 import { useModels } from '../../store/models'
+import { noteFailure } from '../../store/problems'
 
 export function EmbeddingSetting() {
   const models = useModels((s) => s.list)
   const [prefs, setPrefs] = useState<(MindPrefs & { loaded: boolean; error: string | null }) | null>(null)
   useEffect(() => {
-    void engine('mind.prefs.get').then(setPrefs).catch(() => undefined)
+    void engine('mind.prefs.get').then(setPrefs).catch(noteFailure('mind', 'Could not read the memory settings'))
   }, [])
   if (!prefs) return null
   const change = (id: string) =>

@@ -76,6 +76,13 @@ export class MapView {
   }
 
   destroy(): void {
+    const releaseCaches = (node: Container): void => {
+      if (node.isCachedAsTexture) node.cacheAsTexture(false)
+      for (const child of node.children) {
+        if (child instanceof Container) releaseCaches(child)
+      }
+    }
+    releaseCaches(this.root)
     this.root.destroy({ children: true })
     for (const t of this.frames.values()) t?.destroy(false)
     this.frames.clear()

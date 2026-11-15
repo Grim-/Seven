@@ -1,3 +1,4 @@
+import { notFound } from '@shared/errors'
 import type { AgentDraft, AgentLook, AgentProfile } from '@shared/types'
 import type { AgentRegistry } from './registry'
 
@@ -21,7 +22,7 @@ export const agentAccess = {
   updateLook(id: string, patch: Partial<AgentLook>): AgentProfile {
     if (!registry) throw new Error('Agents are not available')
     const agent = registry.list().find((a) => a.id === id)
-    if (!agent) throw new Error('This agent was deleted, so its look can no longer be changed. Carry on without changing it.')
+    if (!agent) throw notFound(new Error('This agent was deleted, so its look can no longer be changed. Carry on without changing it.'))
     return registry.save({ ...agent, look: { ...agent.look, ...patch } })
   }
 }

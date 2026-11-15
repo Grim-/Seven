@@ -1,4 +1,6 @@
-import { linkFor, splitLink, withoutTitle } from '@shared/text'
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
+import { linkFor, referencePattern, splitLink, withoutTitle } from '@shared/text'
 import { FOLDER_TYPE, ROOT_FOLDER, stripRef, toId } from '@shared/ids'
 import { REPO_TYPES, drawRepo, findRepo, getRepo, repoIds, repoMarkdown, rollRepo } from './repos'
 import { attachedText, isTextAsset } from '../../modules/core/files'
@@ -8,7 +10,7 @@ import { findSlideshow, getSlideshow, slideshowIds, slideshowText } from './slid
 import { SLIDESHOW_TYPE } from '@shared/slideshow'
 import { customCommands } from '../commands/custom'
 import fs from 'node:fs'
-import { DEFAULT_LIBRARY_ACCESS, pageKindOf, type KindFlags, type KindInfo, type Thought, type ChatMessage, type LibraryAccess, type LibraryHit, type LibrarySection, type Page, type PageMeta, type WebLogEntry } from '@shared/types'
+import { DEFAULT_LIBRARY_ACCESS, pageKindOf, type KindFlags, type KindInfo, type KindLinkActionInfo, type Thought, type ChatMessage, type LibraryAccess, type LibraryHit, type LibrarySection, type Page, type PageMeta, type WebLogEntry } from '@shared/types'
 import { readLines } from '../util/fs'
 import { minds } from '../mind/store'
 import { styles } from '../mind/styles'
@@ -17,6 +19,7 @@ import { WEB_LOG } from '../weblog'
 import { storyRuns, type StoryRun } from '../stories'
 import { chatExport, pageExport, type Exported } from './exporters'
 import { themes } from '../themes/store'
+import { avatarKind } from '../avatars/kind'
 import type { Theme } from '@shared/theme'
 import { PLACE_TYPE, PLACE_TYPE_KEY, plainValue, type WorldChange, type WorldType } from '@shared/world'
 import { fieldText, resolveIncludes } from './includes'
@@ -106,6 +109,27 @@ export interface KindChild extends KindChildInput {
   segment: string
 }
 
+export interface KindLinkAction {
+  name: string
+  label?: string
+  detail: string
+  mode: 'insert' | 'placeholder'
+  run(id: string, ctx: KindContext): string
+}
+
+function rollLinkActions(
+  run: (id: string, ctx: KindContext) => string,
+  {
+    rollDetail = 'put a random value from it here',
+    valueDetail = 'insert a placeholder that rolls a fresh value on submit'
+  } = {}
+): KindLinkAction[] {
+  return [
+    { name: 'roll', label: 'roll', detail: rollDetail, mode: 'insert', run },
+    { name: 'value', label: ':value', detail: valueDetail, mode: 'placeholder', run }
+  ]
+}
+
 export interface Kind {
   kind: string
   label: string
@@ -138,6 +162,7 @@ export interface Kind {
   rename?(id: string, name: string, ctx: KindContext): void
   roll?(id: string): string
   draw?(id: string, count: number): string[]
+  linkActions?: KindLinkAction[]
   linkParts?: { name: string; description: string }[]
   isGenerated?(id: string): boolean
   root?: string
@@ -145,6 +170,7 @@ export interface Kind {
   missing?(ref: string): string
   readFull?(id: string): Promise<string | null>
   asset?(id: string): AssetMeta | null
+  image?(id: string): string | null
   exportAtRoot?: boolean
   pageTypes?: string[]
   lasting?: boolean
@@ -801,7 +827,7 @@ const worldKind: Kind = {
 
 function mapOf(id: string): MapData {
   const found = maps.get(id)
-  if (!found) throw new ToolError(`No map ${id}. find with kind map lists them.`)
+  if (!found) throw notFound(new ToolError(`No map ${id}. find with kind map lists them.`))
   return found
 }
 
@@ -820,7 +846,8 @@ function placeChild(world: string, key: string, places: Record<string, Record<st
 function sheetChild(sheet: string): KindChildInput {
   try {
     return { kind: 'sheet', id: sheet, title: getSheet(sheet).title }
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'library', 'Could not read a character')
     return { kind: 'sheet', id: sheet, title: sheet }
   }
 }
@@ -906,7 +933,8 @@ const placeKind: Kind = {
     const { world, key } = placeRef(id)
     try {
       return String(worldPlaces(world)[key]?.Name || key)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read a world place')
       return key
     }
   },
@@ -977,7 +1005,8 @@ const mapKind: Kind = {
   title(id) {
     try {
       return mapOf(id).name
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read a map')
       return id
     }
   },
@@ -1037,7 +1066,7 @@ function objectOf(id: string): { map: MapData; object: ObjectLayerData } {
   const [mapId, objectId] = id.split('/')
   const map = mapOf(mapId)
   const object = mapObjects(map.layers).find((o) => o.id === objectId)
-  if (!object) throw new ToolError(`No object ${objectId} on map ${map.name}.`)
+  if (!object) throw notFound(new ToolError(`No object ${objectId} on map ${map.name}.`))
   return { map, object }
 }
 
@@ -1054,8 +1083,10 @@ function objectText(id: string): string {
 }
 
 const objectKind: Kind = {
+  presents: { chat: true, widget: ENTRY_WIDGET },
   group: 'Worlds',
   kind: 'map_object',
+  image: (id) => mapObjectsStore.list().find((o) => o.id === id)?.image ?? null,
   label: 'Map object',
   plural: 'Map objects',
   icon: 'box',
@@ -1081,7 +1112,8 @@ const objectKind: Kind = {
     if (found) return found.id
     try {
       return objectOf(ref.trim()) && ref.trim()
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not look up a map object')
       return null
     }
   },
@@ -1090,7 +1122,8 @@ const objectKind: Kind = {
       const stored = mapObjectsStore.list().find((o) => o.id === id)
       if (stored) return stored.name
       return objectOf(id).object.name
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read a map object')
       return id
     }
   },
@@ -1099,7 +1132,8 @@ const objectKind: Kind = {
       const stored = mapObjectsStore.list().find((o) => o.id === id)
       if (stored) return `${stored.collision} · ${stored.size.w}×${stored.size.h}px`
       return `object on ${objectOf(id).map.name}`
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read a map object')
       return 'map object'
     }
   },
@@ -1114,7 +1148,8 @@ const objectKind: Kind = {
       const stored = mapObjectsStore.list().find((o) => o.id === id)
       if (stored) return storedMapObjectText(stored)
       return objectText(id)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read a map object')
       return id
     }
   },
@@ -1123,14 +1158,16 @@ const objectKind: Kind = {
       const stored = mapObjectsStore.list().find((o) => o.id === id)
       if (stored) return storedMapObjectText(stored)
       return objectText(id)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read a map object')
       return id
     }
   },
   remove(id) {
     try {
       mapObjectsStore.remove(id)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not remove a stored map object')
       // not a stored object
     }
   },
@@ -1138,13 +1175,15 @@ const objectKind: Kind = {
     try {
       const o = mapObjectsStore.get(id)
       mapObjectsStore.save({ ...o, name })
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not rename a stored map object')
       // not a stored object
     }
   }
 }
 
 export const factionKind: Kind = {
+  presents: { chat: true, widget: ENTRY_WIDGET },
   group: 'Worlds',
   kind: 'faction',
   label: 'Faction',
@@ -1183,7 +1222,8 @@ export const factionKind: Kind = {
   title(id) {
     try {
       return factions.get(id).name
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read a faction')
       return id
     }
   },
@@ -1196,12 +1236,13 @@ export const factionKind: Kind = {
 }
 
 export const triggerActionKind: Kind = {
+  presents: { chat: true, widget: ENTRY_WIDGET },
   group: 'Worlds',
   kind: 'trigger_action',
   label: 'Trigger action',
   plural: 'Trigger actions',
   icon: 'play',
-  description: 'deterministic in-game action functions: teleports, items, stat modifications, creature spawns, and flag changes',
+  description: 'named lists of effects (damage, items, buffs, flags, travel, fights), reused by cards, triggers and other effects',
   parts: [],
   actions: [],
   exportable: true,
@@ -1215,7 +1256,7 @@ export const triggerActionKind: Kind = {
     const q = query.trim().toLowerCase()
     return triggerActionsStore
       .list()
-      .filter((a) => !q || a.name.toLowerCase().includes(q) || a.actionType.toLowerCase().includes(q) || a.tags.some((tg) => tg.toLowerCase().includes(q)))
+      .filter((a) => !q || a.name.toLowerCase().includes(q) || a.description.toLowerCase().includes(q) || a.tags.some((tg) => tg.toLowerCase().includes(q)))
       .slice(0, limit)
       .map((a) => ({ kind: 'trigger_action', id: a.id, title: a.name, at: a.updatedAt }))
   },
@@ -1225,7 +1266,7 @@ export const triggerActionKind: Kind = {
   line(id) {
     const a = triggerActionsStore.get(id)
     if (!a) return ''
-    return `${a.actionType}${a.tags.length ? ` · #${a.tags.join(' #')}` : ''}`
+    return `${a.description}${a.tags.length ? ` · #${a.tags.join(' #')}` : ''}`
   },
   card(id) {
     const a = triggerActionsStore.get(id)
@@ -1238,7 +1279,8 @@ export const triggerActionKind: Kind = {
   title(id) {
     try {
       return triggerActionsStore.get(id)?.name ?? id
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read a trigger action')
       return id
     }
   },
@@ -1251,7 +1293,20 @@ export const triggerActionKind: Kind = {
   }
 }
 
-export const lootTableKind: Kind = {
+export function rollLootTable(id: string): string {
+  const drop = lootTablesStore.roll(id)
+  const parts: string[] = []
+  if (drop.gold > 0) parts.push(`${drop.gold} Gold`)
+  for (const it of drop.items) {
+    const name = it.label?.trim() || data.pages.metaFor(it.itemId)?.title || it.itemId
+    parts.push(`${it.quantity > 1 ? `${it.quantity}× ` : ''}${name}`)
+  }
+  for (const rp of drop.repoPulls) parts.push(rp.text)
+  return parts.length ? parts.join(', ') : 'Nothing'
+}
+
+const lootTableKind: Kind = {
+  presents: { chat: true, widget: ENTRY_WIDGET },
   group: 'Worlds',
   kind: 'loot_table',
   label: 'Loot table',
@@ -1290,7 +1345,8 @@ export const lootTableKind: Kind = {
   title(id) {
     try {
       return lootTablesStore.get(id).name
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read a loot table')
       return id
     }
   },
@@ -1300,7 +1356,13 @@ export const lootTableKind: Kind = {
   rename(id, name) {
     const t = lootTablesStore.get(id)
     lootTablesStore.save({ ...t, name })
-  }
+  },
+  roll: (id) => rollLootTable(id),
+  draw: (id, count) => Array.from({ length: count }, () => rollLootTable(id)),
+  linkActions: rollLinkActions((id) => rollLootTable(id), {
+    rollDetail: 'put a weighted random drop from it here',
+    valueDetail: 'insert a placeholder that rolls a fresh weighted drop on submit'
+  })
 }
 
 function nexusKinds(taken: Set<string>, claimed: Set<string>): Kind[] {
@@ -1308,7 +1370,8 @@ function nexusKinds(taken: Set<string>, claimed: Set<string>): Kind[] {
   for (const w of worlds.list()) {
     try {
       for (const [tk, t] of Object.entries(worlds.schema(w.id).types)) if (!types.has(tk) && !claimed.has(tk)) types.set(tk, t)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', "Could not read a world's schema")
       continue
     }
   }
@@ -1524,6 +1587,7 @@ function thoughtText(t: Thought, agentName: string): string {
 }
 
 const thoughtKind: Kind = {
+  presents: { chat: true, widget: ENTRY_WIDGET },
   lasting: true,
   group: 'Agents',
   kind: 'thought',
@@ -1594,7 +1658,8 @@ export function referenceText(kindName: string, ref: string, part: string | null
   try {
     if (!id) return null
     return { label: k.label, title: k.title(id), text: clip(resolveIncludes(k.full(id, { part: checked }, USER))) }
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'library', 'Could not preview an entry')
     return null
   }
 }
@@ -1602,14 +1667,14 @@ export function referenceText(kindName: string, ref: string, part: string | null
 const styleLine = (st: { voices: { label: string }[]; instruction: string }) => (st.voices.length ? st.voices.map((v) => v.label).join(', ') : st.instruction.slice(0, 100))
 
 const styleKind: Kind = {
-  presents: { chat: true },
+  presents: { chat: true, widget: ENTRY_WIDGET },
   ...storePacking({ find: (id) => styles.find(id), names: () => styles.list().map((s) => s.name), save: (x) => styles.save(x as unknown as Parameters<typeof styles.save>[0]) }),
   group: 'Agents',
   kind: 'style',
   rename(id, name) {
     const st = styles.find(id)
     if (!st) throw new ToolError(`No reasoning style ${id}`)
-    styles.save({ id: st.id, name, instruction: st.instruction, voices: st.voices })
+    styles.save({ id: st.id, name, instruction: st.instruction, voices: st.voices, constraints: st.constraints })
   },
   remove: (id) => void styles.delete(id),
   label: 'Reasoning style',
@@ -1644,7 +1709,12 @@ const styleKind: Kind = {
   full(id) {
     const st = styles.find(id)
     if (!st) throw new ToolError(`No reasoning style ${id}`)
-    return [`# ${st.name}`, st.instruction, st.voices.length ? st.voices.map((v) => `- ${v.label}: ${v.line}`).join('\n') : ''].filter(Boolean).join('\n\n')
+    return [
+      `# ${st.name}`,
+      st.instruction,
+      st.voices.length ? st.voices.map((v) => `- ${v.label}: ${v.line}`).join('\n') : '',
+      st.constraints?.trim() ? `## Constraints\n${st.constraints.trim()}` : ''
+    ].filter(Boolean).join('\n\n')
   }
 }
 
@@ -2058,7 +2128,8 @@ const repoKind: Kind = {
   remove: (id) => void data.pages.delete(id),
   rename: (id, name) => void data.pages.write({ ref: id, title: name }),
   roll: (id) => rollRepo(id),
-  draw: (id, count) => drawRepo(id, count)
+  draw: (id, count) => drawRepo(id, count),
+  linkActions: rollLinkActions((id) => rollRepo(id))
 }
 
 
@@ -2066,6 +2137,7 @@ const sheetKind: Kind = {
   presents: { chat: true, widget: ENTRY_WIDGET },
   group: 'Yours',
   kind: 'sheet',
+  image: (id) => getSheet(id).image,
   ...pagePacking(),
   pageTypes: [SHEET_TYPE],
   label: 'Character',
@@ -2139,7 +2211,7 @@ const slideshowKind: Kind = {
 }
 
 const commandKind: Kind = {
-  presents: { chat: true },
+  presents: { chat: true, widget: ENTRY_WIDGET },
   ...storePacking({ find: (id) => customCommands.find(id), names: () => customCommands.list().map((c) => c.name), save: ({ id, ...rest }) => customCommands.save({ ...(rest as unknown as Parameters<typeof customCommands.save>[0]), id: id ? (customCommands.find(id)?.id ?? null) : null }), next: (name, n) => `${name}-${n}` }),
   group: 'Tools',
   kind: 'command',
@@ -2210,7 +2282,8 @@ export function entryId(kind: Kind, id: string, title: string, ctx: KindContext)
   const named = toId(title)
   try {
     return named && resolveEntry(named, kind.kind, ctx).id === id ? named : id
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'library', 'Could not resolve an entry name')
     return id
   }
 }
@@ -2226,7 +2299,8 @@ function shownEvents(events: TimelineEvent[], ctx: KindContext): ShownEvent[] {
     try {
       const id = k?.resolve(entry, ctx)
       if (k && id) found = { id, title: k.title(id) }
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not resolve a link')
       found = null
     }
     seen.set(key, found)
@@ -2329,11 +2403,11 @@ export function describeEvent(e: TimelineEvent): string {
 
 export function resolveRoutineEntry(kindName: string, link: string): string {
   const k = kindFor(kindName, USER)
-  if (!k) throw new Error(`No kind "${kindName}"`)
+  if (!k) throw notFound(new Error(`No kind "${kindName}"`))
   const raw = link.trim()
   const ref = raw.startsWith('@') ? splitLink(raw).ref : raw
   const id = k.resolve(ref, USER)
-  if (!id) throw new Error(`There is no ${k.label.toLowerCase()} called "${ref}". Use the exact name or @${k.kind} link of one that exists.`)
+  if (!id) throw notFound(new Error(`There is no ${k.label.toLowerCase()} called "${ref}". Use the exact name or @${k.kind} link of one that exists.`))
   return id
 }
 
@@ -2348,7 +2422,8 @@ function routineWhen(r: Routine): string {
   if (w.entry && k) {
     try {
       what = linkFor(k.kind, k.title(w.entry))
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', "Could not read a board widget's entry")
       what = w.entry
     }
   }
@@ -2429,7 +2504,7 @@ function addonKinds(): Kind[] {
     const kind = pageKindOf(type)
     return {
       kind,
-      presents: { chat: true },
+      presents: { chat: true, widget: ENTRY_WIDGET },
       ...pagePacking(),
       label: spec.label,
       plural: spec.plural,
@@ -2442,7 +2517,6 @@ function addonKinds(): Kind[] {
       export: (id) => pageExport(data.pages.get(id)),
       textParts: ['summary'],
       readView: (id, options, ctx) => readPageView(id, options, ctx),
-      place: (id, part, onBoard) => (!part && onBoard ? { kind: 'page', pageId: id } : null),
       icon: spec.icon || 'box',
       description: spec.description || info?.description || spec.label,
       parts: [...Object.keys(spec.parts), 'picture', 'summary'],
@@ -2466,18 +2540,22 @@ function addonKinds(): Kind[] {
       remove: (id) => void data.pages.delete(id),
       rename: (id, name) => void data.pages.write({ ref: id, title: name, body: null }),
       ...(spec.rollable
-        ? {
-            roll(id: string) {
+        ? (() => {
+            const addonRoll = (id: string) => {
               const value = modules.pageRoll(id)
               if (value === null) throw new ToolError(`"${data.pages.metaFor(id)?.title ?? id}" can't be rolled right now: its tool may be off, or it has nothing to pick from. read it to see what it holds.`)
               return value
-            },
-            draw(id: string, count: number) {
-              const values = modules.pageDraw(id, count)
-              if (values === null) throw new ToolError(`"${data.pages.metaFor(id)?.title ?? id}" can't be drawn from right now: its tool may be off, or it has nothing to pick from.`)
-              return values
             }
-          }
+            return {
+              roll: addonRoll,
+              draw(id: string, count: number) {
+                const values = modules.pageDraw(id, count)
+                if (values === null) throw new ToolError(`"${data.pages.metaFor(id)?.title ?? id}" can't be drawn from right now: its tool may be off, or it has nothing to pick from.`)
+                return values
+              },
+              linkActions: rollLinkActions(addonRoll)
+            }
+          })()
         : {})
     }
   })
@@ -2508,31 +2586,75 @@ export function previewEntry(entry: string, ctx: KindContext = USER): EntryPrevi
   const page = data.pages.metaFor(id)
   const asset = kind.asset?.(id) ?? null
   const title = kind.title(id)
+  const card = withoutTitle(kind.card(id, ctx), title)
+  const ownImage = kind.image?.(id) ?? page?.image ?? (asset && (asset.kind === 'image' || asset.kind === 'video') ? asset.id : null)
+  let fallbackImage: string | null = null
+  if (!ownImage) {
+    const m = /@file:("[^"]+"|[^\s,;!?)#]+)/i.exec(card)
+    if (m) fallbackImage = data.assets.findByName(m[1].replace(/^"|"$/g, ''))?.id ?? null
+  }
+  let line = ''
+  try {
+    line = kind.line(id, ctx)
+  } catch (err) {
+    noteFailure(err, 'library', 'Could not read entry summary line')
+  }
+  let fields: { name: string; text: string }[] = []
+  try {
+    fields = (kind.fields?.(id, ctx) ?? []).filter((f) => f.text.trim().length > 0)
+  } catch (err) {
+    noteFailure(err, 'library', 'Could not read entry fields')
+  }
   return {
     kind: kind.kind,
     label: kind.label,
     icon: kind.icon,
     id,
     title,
-    card: withoutTitle(kind.card(id, ctx), title),
-    image: page?.image ?? (asset && (asset.kind === 'image' || asset.kind === 'video') ? asset.id : null)
+    line,
+    card,
+    image: ownImage ?? fallbackImage,
+    fields
   }
 }
 
-const ROLL = /@([a-z][\w.:-]*?):("[^"]+"|[^\s,;!?)#]+)#random(?=[\s,.;!?)]|$)/gi
-
-export function rollText(text: string): { text: string; rolled: { token: string; value: string; error?: string }[] } {
+export function rollText(text: string, ctx: KindContext = USER, depth = 0): { text: string; rolled: { token: string; value: string; error?: string }[] } {
   const rolled: { token: string; value: string; error?: string }[] = []
-  const out = text.replace(ROLL, (token, kind: string, ref: string) => {
-    try {
-      const value = rollEntry(`${kind}/${ref.replace(/^"|"$/g, '')}`)
-      rolled.push({ token, value })
-      return value
-    } catch (err) {
-      rolled.push({ token, value: token, error: err instanceof Error ? err.message : String(err) })
-      return token
+  let replaced = false
+  const out = text.replace(referencePattern(), (full, lead: string, rawKind: string, rawRef: string, rawAction?: string, rawPart?: string) => {
+    const cleanRef = rawRef.replace(/^"|"$/g, '')
+    const token = full.slice(lead.length)
+    if (rawAction) {
+      try {
+        const { kind, id } = resolveEntry(`${rawKind}/${cleanRef}`, null, ctx)
+        const action = kind.linkActions?.find((a) => a.name.toLowerCase() === rawAction.toLowerCase())
+        if (!action) return full
+        const value = action.run(id, ctx)
+        rolled.push({ token, value })
+        replaced = true
+        return `${lead}${value}`
+      } catch (err) {
+        rolled.push({ token, value: token, error: err instanceof Error ? err.message : String(err) })
+        return full
+      }
     }
+    if (rawPart?.toLowerCase() === 'random') {
+      try {
+        const value = rollEntry(`${rawKind}/${cleanRef}`, ctx)
+        rolled.push({ token, value })
+        replaced = true
+        return `${lead}${value}`
+      } catch (err) {
+        rolled.push({ token, value: token, error: err instanceof Error ? err.message : String(err) })
+        return full
+      }
+    }
+    return full
   })
+  if (replaced && depth < 4) {
+    const next = rollText(out, ctx, depth + 1)
+    return { text: next.text, rolled: [...rolled, ...next.rolled] }
+  }
   return { text: out, rolled }
 }
 
@@ -2544,7 +2666,7 @@ function withNexus(list: Kind[]): Kind[] {
 }
 
 function everyKind(): Kind[] {
-  return withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, chatKind, agentKind, themeKind, memoryKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
+  return withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, chatKind, agentKind, themeKind, avatarKind, memoryKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
 }
 
 setWidgetKinds(everyKind)
@@ -2555,19 +2677,23 @@ export function kinds(ctx: KindContext = USER): Kind[] {
     if (hidden.has(k.kind)) return false
     try {
       return k.available(ctx)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not check whether a kind is available')
       return false
     }
   })
 }
 
-export function allKinds(): { kind: string; label: string; description: string; short: string; rollable: boolean; parts: { name: string; description: string }[] }[] {
-  const list = withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, agentKind, themeKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
+export function allKinds(): { kind: string; label: string; description: string; short: string; rollable: boolean; parts: { name: string; description: string }[]; linkActions: KindLinkActionInfo[] }[] {
+  const list = withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, agentKind, themeKind, avatarKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
   const shortOf = (k: Kind) => {
     const label = k.label.toLowerCase()
     return /^[a-z][\w-]*$/.test(label) && !list.some((o) => o !== k && (o.kind === label || o.label.toLowerCase() === label)) ? label : k.kind
   }
-  return list.map((k) => ({ kind: k.kind, label: k.label, description: k.description, short: shortOf(k), rollable: Boolean(k.roll), parts: k.linkParts ?? [] }))
+  const actionsOf = (k: Kind): KindLinkActionInfo[] =>
+    k.linkActions?.map((a) => ({ name: a.name, label: a.label ?? `:${a.name}`, detail: a.detail, mode: a.mode })) ??
+    (k.roll ? [{ name: 'roll', label: 'roll', detail: 'put a random value from it here', mode: 'insert' }] : [])
+  return list.map((k) => ({ kind: k.kind, label: k.label, description: k.description, short: shortOf(k), rollable: Boolean(k.roll), parts: k.linkParts ?? [], linkActions: actionsOf(k) }))
 }
 
 export function hiddenActions(agentId: string): Set<string> {
@@ -2575,7 +2701,7 @@ export function hiddenActions(agentId: string): Set<string> {
   const incognito = agentAccess.get(agentId)?.incognito === true
   const out = new Set<string>()
   if (!hidden.size && !incognito) return out
-  for (const k of withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, agentKind, themeKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind])) if (hidden.has(k.kind) || (incognito && k.lasting)) for (const a of k.actions) out.add(a)
+  for (const k of withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, agentKind, themeKind, avatarKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind])) if (hidden.has(k.kind) || (incognito && k.lasting)) for (const a of k.actions) out.add(a)
   return out
 }
 
@@ -2592,13 +2718,15 @@ export function kindInfo(): KindInfo[] {
     let count = 0
     try {
       count = k.search('', 10_000, USER).length
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not count a kind')
       count = 0
     }
     let agents = true
     try {
       agents = k.available({ agentId: '_any' })
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not check whether agents can use a kind')
       agents = false
     }
     return { kind: k.kind, label: k.label, plural: k.plural, icon: k.icon, description: k.description, count, parts: k.parts, actions: k.actions, source: k.source ?? null, agents, ...kindFlags(k) }
@@ -2658,7 +2786,8 @@ export function entriesTagged(tag: string, ctx: KindContext = USER): { kind: Kin
   for (const k of kinds(ctx)) {
     try {
       for (const h of searchKind(k, `#${word}`, 100_000, ctx)) out.push({ kind: k, id: h.id })
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not search a kind by tag')
       continue
     }
   }
@@ -2676,7 +2805,8 @@ export function clearKind(kindName: string): { removed: number; failed: number }
       tagStore.set(k.kind, h.id, [])
       timeline.forget(k.kind, h.id)
       removed += 1
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not delete a tagged entry')
       failed += 1
     }
   }
@@ -2710,7 +2840,8 @@ export function overview(query: string, perKind: number, ctx: KindContext = USER
     let all: KindHit[]
     try {
       all = searchKind(k, query, 10_000, ctx)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not search a kind')
       continue
     }
     if (query && !all.length) continue
@@ -2736,7 +2867,8 @@ export function find(query: string, kindName: string | null, limit = 15, ctx: Ki
   for (const k of list) {
     try {
       hits.push(...lined(k, searchKind(k, query, limit, ctx), ctx))
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not search a kind')
       continue
     }
   }
@@ -2749,7 +2881,8 @@ function byName(k: Kind, ref: string, ctx: KindContext): string | null {
   if (!id || k.resolveOnly) return null
   try {
     return k.search('', 100_000, ctx).find((h) => h.id === raw || toId(h.title) === id || toId(h.id) === id)?.id ?? null
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'library', 'Could not look up an entry by name')
     return null
   }
 }
@@ -2757,7 +2890,8 @@ function byName(k: Kind, ref: string, ctx: KindContext): string | null {
 function resolveIn(k: Kind, ref: string, ctx: KindContext): string | null {
   try {
     return k.resolve(ref, ctx) ?? byName(k, ref, ctx)
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'library', 'Could not resolve an entry')
     return byName(k, ref, ctx)
   }
 }
@@ -2766,7 +2900,8 @@ function childrenOf(kind: Kind, id: string, ctx: KindContext, trail: TrailStep[]
   let list: KindChildInput[] = []
   try {
     list = kind.children?.(id, ctx, trail) ?? []
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'library', 'Could not list what an entry holds')
     list = []
   }
   const used = new Set<string>()
@@ -2852,13 +2987,14 @@ export function resolveEntry(entry: string, kindName: string | null = null, ctx:
     }
   }
   const named = kindName ? kindFor(kindName, ctx) : undefined
-  if (kindName && !named) throw new ToolError(`There is no kind ${kindName}. Kinds: ${kinds(ctx).map((k) => k.kind).join(', ')}.`)
+  if (kindName && !named) throw notFound(new ToolError(`There is no kind ${kindName}. Kinds: ${kinds(ctx).map((k) => k.kind).join(', ')}.`))
   const list = named ? [named] : kinds(ctx)
   for (const k of list) {
     try {
       const id = k.resolve(raw, ctx)
       if (id) return { kind: k, id }
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not resolve an entry')
       continue
     }
   }
@@ -2873,16 +3009,17 @@ export function resolveEntry(entry: string, kindName: string | null = null, ctx:
     }
   const asked = toId(link.kind && entry.trim().startsWith('@') ? link.ref : raw) || stripRef(raw)
   const what = named?.kind ?? (link.kind && kindFor(link.kind, ctx) ? link.kind : 'entry')
-  if (named?.missing) throw new ToolError(named.missing(asked))
+  if (named?.missing) throw notFound(new ToolError(named.missing(asked)))
   let near: Hit[] = []
   try {
     near = find(asked.split(/[_/]+/).filter(Boolean).pop() ?? asked, named?.kind ?? null, 3, ctx).slice(0, 5)
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'library', 'Could not find close matches')
     near = []
   }
   const tree = data.pages.tree()
   const nearId = (h: Hit) => (tree.list.some((p) => p.id === h.id && pageKindOf(p.type) === h.kind) ? tree.pathOf(h.id) : toId(h.title) || h.id)
-  throw new ToolError(`No ${what} ${asked}.${near.length ? ` Close: ${near.map((h) => `${h.kind} ${nearId(h)}`).join(', ')}.` : ''} find searches everything.`)
+  throw notFound(new ToolError(`No ${what} ${asked}.${near.length ? ` Close: ${near.map((h) => `${h.kind} ${nearId(h)}`).join(', ')}.` : ''} find searches everything.`))
 }
 
 export function libraryGuide(toolNames: string[], agentId: string | null = null): string {

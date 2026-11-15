@@ -48,11 +48,6 @@ export function OpposedView({ p, done, open, status, onAnswer, onClose, editable
         <span className="font-mono text-[12px] text-white">
           {won.name} wins{done.forced ? ' (your call)' : ''}: {won.does}
         </span>
-        {won.action && (
-          <span className="font-mono text-[10px] text-accent">
-            In-game action: {won.action}
-          </span>
-        )}
       </DecisionCardFrame>
     )
   }

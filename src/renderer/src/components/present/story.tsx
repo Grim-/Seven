@@ -1,18 +1,30 @@
 import { useEffect, useState } from 'react'
-import type { AgentProfile, AvatarState } from '@shared/types'
+import type { AgentProfile, AvatarSize } from '@shared/types'
+import { poseOf, type AvatarPose } from '@shared/moods'
 import { registerPresentation, str, type PresentationProps } from '../../registries/presentations'
 import { AgentAvatar } from '../agents/look'
+import { CharacterAvatar } from '../chat/CharacterAvatar'
 import { Markdown } from '../chat/Markdown'
+import { PortraitSizeStepper, portraitSizeMenuItems, useSpeakerMatch } from '../chat/Roleplay'
 import { useAgents } from '../../store/agents'
+import { useApp } from '../../store/app'
 import { cn } from '../../lib/cn'
 import { AssetMedia } from '../pictures/AssetMedia'
 import { AreaMedia } from '../pictures/AreaLayer'
+import { openMenu } from '../ui'
 import { useAgentIdOf, useFocusedConversation } from '../../lib/conversation'
 
-const MOODS: AvatarState[] = ['idle', 'happy', 'laughing', 'talking', 'thinking', 'sad', 'angry']
+const MOODS: string[] = ['idle', 'happy', 'laughing', 'talking', 'thinking', 'sad', 'angry']
 const TRANSITIONS = ['fade', 'flash', 'shake', 'iris', 'slide', 'glitch', 'zoom']
 
-const moodOf = (v: unknown): AvatarState | undefined => (MOODS.includes(v as AvatarState) ? (v as AvatarState) : undefined)
+const DIALOGUE_PORTRAIT_SIZE: Record<AvatarSize, number> = {
+  small: 72,
+  medium: 108,
+  large: 148,
+  xl: 196
+}
+
+const moodOf = (v: unknown): AvatarPose | undefined => (typeof v === 'string' && MOODS.includes(v) ? poseOf(v) : undefined)
 
 function useAgent(name: unknown, fallbackToChat: boolean): AgentProfile | null {
   const agents = useAgents((s) => s.list)
@@ -22,15 +34,15 @@ function useAgent(name: unknown, fallbackToChat: boolean): AgentProfile | null {
   return fallbackToChat ? (agents.find((a) => a.id === chatAgentId) ?? null) : null
 }
 
-
 export function useTypewriter(text: string, on: boolean): [string, boolean] {
-  const [n, setN] = useState(on ? 0 : text.length)
+  const [n, setN] = useState(() => (on ? 0 : text.length))
   useEffect(() => {
-    if (!on) return setN(text.length)
+    if (!on) return
     setN(0)
     const timer = setInterval(() => setN((v) => (v >= text.length ? v : v + 2)), 22)
     return () => clearInterval(timer)
   }, [text, on])
+  if (!on) return [text, false]
   return [text.slice(0, n), n < text.length]
 }
 
@@ -46,25 +58,70 @@ export function highlightQuotes(text: string) {
   )
 }
 
-export function Portrait({ agent, image, name, mood, size }: { agent: AgentProfile | null; image: string; name: string; mood?: AvatarState; size: number }) {
-  if (agent) return <AgentAvatar agent={agent} size={size} mood={mood} />
+export function Portrait({
+  agent,
+  sheetId,
+  image,
+  name,
+  mood,
+  size
+}: {
+  agent: AgentProfile | null
+  sheetId?: string | null
+  image: string
+  name: string
+  mood?: AvatarPose
+  size: number
+}) {
+  if (agent) return <AgentAvatar agent={agent} size={size} pose={mood} />
+  if (sheetId) return <CharacterAvatar sheetId={sheetId} size={size} openOnClick />
   if (image) return <AssetMedia id={image} className="h-full w-full" />
   return <div className="flex h-full w-full items-center justify-center bg-black/60 font-mono text-[40px] font-bold text-accent/80">{name.slice(0, 1).toUpperCase() || '?'}</div>
 }
 
 function Dialogue({ fields, draft, stage }: PresentationProps) {
-  const agent = useAgent(fields.speaker, true)
-  const name = str(fields.speaker) || agent?.name || ''
+  const speakerRaw = str(fields.speaker)
+  const chatAgentId = useAgentIdOf(useFocusedConversation())
+  const chatAgent = useAgents((s) => s.list.find((a) => a.id === chatAgentId) ?? null)
+  const matchedAgent = useAgent(fields.speaker, !speakerRaw.trim())
+  const { matchedSheet, page } = useSpeakerMatch(speakerRaw, chatAgent)
+  const agent = matchedSheet ? null : matchedAgent
+  const name = speakerRaw || agent?.name || ''
+  const avatarSize = useApp((s) => s.settings?.avatarSize ?? 'medium')
   const [shown, typing] = useTypewriter(str(fields.text), stage && !draft)
-  const size = stage ? 180 : 104
+  const size = stage ? 200 : (DIALOGUE_PORTRAIT_SIZE[avatarSize] ?? DIALOGUE_PORTRAIT_SIZE.medium)
+  const image = str(fields.image) || page?.image || ''
+
   return (
-    <div className="my-2 border border-accent border-l-[3px] bg-black/80 shadow-[0_0_14px_color-mix(in_srgb,var(--color-accent)_18%,transparent)]">
+    <div
+      onContextMenu={(e) => {
+        if (stage) return
+        e.stopPropagation()
+        openMenu(e, name || 'Dialogue', portraitSizeMenuItems(avatarSize))
+      }}
+      className="group/dlg my-2 border border-accent border-l-[3px] bg-black/80 shadow-[0_0_14px_color-mix(in_srgb,var(--color-accent)_18%,transparent)]"
+    >
       <div className="flex gap-3 p-3">
-        <div className="shrink-0 overflow-hidden border border-line-strong bg-black/40" style={{ width: size, height: size }}>
-          <Portrait agent={agent} image={str(fields.image)} name={name} mood={moodOf(fields.mood)} size={size} />
+        <div className="group/portrait relative shrink-0 overflow-hidden border border-line-strong bg-black/40" style={{ width: size, height: size }}>
+          <Portrait agent={agent} sheetId={matchedSheet} image={image} name={name} mood={moodOf(fields.mood)} size={size} />
+          {!stage && (
+            <PortraitSizeStepper
+              avatarSize={avatarSize}
+              className="pointer-events-auto absolute bottom-1 right-1 z-30 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/portrait:opacity-100"
+            />
+          )}
         </div>
         <div className="min-w-0 flex-1">
-          {name && <div className={cn('mb-1.5 border-b border-line/50 pb-1 font-mono font-bold uppercase tracking-[0.18em] text-accent', stage ? 'text-[16px]' : 'text-[12px]')}>{name}</div>}
+          {(name || !stage) && (
+            <div className="mb-1.5 flex items-center justify-between gap-2 border-b border-line/50 pb-1">
+              <div className={cn('font-mono font-bold uppercase tracking-[0.18em] text-accent', stage ? 'text-[16px]' : 'text-[12px]')}>{name || 'DIALOGUE'}</div>
+              {!stage && (
+                <div className="opacity-0 transition-opacity group-hover/dlg:opacity-100">
+                  <PortraitSizeStepper avatarSize={avatarSize} />
+                </div>
+              )}
+            </div>
+          )}
           <div className={cn('whitespace-pre-wrap leading-relaxed text-white', stage ? 'text-[20px]' : 'text-[14.5px]')}>
             {highlightQuotes(shown)}
             {(draft || typing) && <span className="ml-0.5 inline-block h-[1em] w-2 animate-blink bg-accent align-middle" />}
@@ -97,7 +154,7 @@ function ComicPanel({ panel, index, stage, animate }: { panel: PanelFields; inde
         <AssetMedia id={image} className="absolute inset-0 h-full w-full" />
       ) : agent ? (
         <div className="absolute inset-0 flex items-center justify-center">
-          <AgentAvatar agent={agent} size={stage ? 220 : 120} mood={moodOf(panel.mood)} />
+          <AgentAvatar agent={agent} size={stage ? 220 : 120} pose={moodOf(panel.mood)} />
         </div>
       ) : null}
       {caption && (

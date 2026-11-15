@@ -1,4 +1,6 @@
 import { customCommands, expand } from './custom'
+import { commandVariables } from '@shared/commandArgs'
+import { USER, rollText } from '../library/kinds'
 import type { ChatRunner } from '../chat/runner'
 import type { SessionStore } from '../sessions/store'
 import type { AgentRegistry } from '../agents/registry'
@@ -131,6 +133,39 @@ export function setupCommands({ runner, sessions, agents }: Deps): void {
   })
 
   registerCommand({
+    name: 'vn',
+    summary: 'Preview a Visual Novel beat card right in chat (works with or without a model).',
+    usage: '`/vn` shows a sample VN dialogue beat, or `/vn Speaker | Mood | Line 1 | Line 2` builds one directly in chat.',
+    needsChat: true,
+    run: async (args, ctx) => {
+      const sessionId = ctx.sessionId as string
+      const raw = args.trim()
+      const parts = raw ? raw.split('|').map((s) => s.trim()).filter(Boolean) : []
+      const data =
+        parts.length >= 3
+          ? { speaker: parts[0], expression: parts[1], lines: parts.slice(2), cover: 'hide' }
+          : parts.length === 2
+            ? { speaker: parts[0], expression: null, lines: [parts[1]], cover: 'hide' }
+            : parts.length === 1
+              ? { speaker: null, expression: null, lines: [parts[0]], cover: 'hide' }
+              : {
+                  speaker: 'Vesper',
+                  title: 'Signal Runner',
+                  expression: 'smirking',
+                  scene: 'SECTOR 7 · RAIN-SLICKED OVERPASS',
+                  lines: [
+                    '*She leans against the damp railing, data-slate reflecting neon amber across her visor.*',
+                    '"You actually brought the encrypted ledger? Careful — half the syndicate is scanning this frequency."',
+                    '*A faint chime echoes from the lower walkway as she taps the next beat onto your terminal.*'
+                  ],
+                  cover: 'hide'
+                }
+      runner.postElement(sessionId, { type: 'vn_beat', data })
+      return { text: null, openSession: null }
+    }
+  })
+
+  registerCommand({
     name: 'sheet',
     summary: 'Open a chat where the agent interviews you and builds a character sheet.',
     usage: '`/sheet idea` (or `/sheet @agent:Name idea`) opens a new chat where the agent asks you about the character one question at a time and writes the answers up as a character sheet in Data as it goes. The idea can be a name, a concept or nothing; naming an existing sheet fills in its gaps.',
@@ -171,16 +206,30 @@ export function setupCommands({ runner, sessions, agents }: Deps): void {
   customCommands.setBuiltinCheck((name) => commandsFor({ sessionId: null, agentId: '' }).some((c) => c.name.toLowerCase() === name && !customCommands.find(name)))
 
   registerCommandSource(() =>
-    customCommands.list().map((c) => ({
-      name: c.name,
-      summary: c.summary || firstSentence(c.prompt),
-      usage: `\`/${c.name}${c.prompt.includes('{args}') ? ' …' : ''}\` sends this to the agent${c.prompt.includes('{args}') ? ', with what you type in place of {args}' : ''}:\n\n${c.prompt}`,
-      needsChat: true,
-      run: async (args, ctx) => {
-        await runner.send(ctx.sessionId as string, ctx.line, [], expand(c, args))
-        return { text: null, openSession: null }
+    customCommands.list().map((c) => {
+      const vars = commandVariables(c.prompt, c.args)
+      const sig = vars.length ? ` ${vars.map((v) => `{${v.name}}`).join(' ')}` : ''
+      const varsDoc = vars.length
+        ? `\n\n${vars
+            .map((v) => `- \`{${v.name}}\`${v.hint ? ` — ${v.hint}` : ''}${v.default ? ` (default: \`${v.default}\`)` : ''}`)
+            .join('\n')}`
+        : ''
+      return {
+        name: c.name,
+        summary: c.summary || firstSentence(c.prompt),
+        usage: `\`/${c.name}${sig}\` sends this to the agent${vars.length ? varsDoc : ''}:\n\n${c.prompt}`,
+        needsChat: true,
+        prompt: c.prompt,
+        args: vars,
+        run: async (args, ctx) => {
+          const kindCtx = ctx.agentId ? { agentId: ctx.agentId } : USER
+          const rolledArgs = args ? rollText(args, kindCtx).text : ''
+          const line = rolledArgs ? `/${c.name} ${rolledArgs}` : `/${c.name}`
+          await runner.send(ctx.sessionId as string, line, [], expand(c, rolledArgs))
+          return { text: null, openSession: null }
+        }
       }
-    }))
+    })
   )
 
   registerCommandSource(({ agentId }) =>

@@ -12,6 +12,7 @@ import { ShellGallery } from './ShellGallery'
 import { ShellDeck } from './ShellDeck'
 import { SliderNumber } from './SliderNumber'
 import type { ShellAdd, ShellBinding, ShellGroup, ShellItem, ShellLayout, ShellSort, ShellViewProps } from './shellTypes'
+import { readStored, writeStored } from '../../lib/stored'
 
 export type { ShellAdd, ShellGroup, ShellItem, ShellLayout, ShellSort } from './shellTypes'
 
@@ -57,12 +58,7 @@ const LAYOUTS: Record<ShellLayout, { title: string; icon: ReactNode; View: Compo
 }
 
 function read(id: string): { layout?: string; sort?: string; size?: number } | null {
-  try {
-    const raw = localStorage.getItem(`seven.shell.${id}`)
-    return raw ? (JSON.parse(raw) as { layout?: string; sort?: string; size?: number }) : null
-  } catch {
-    return null
-  }
+  return readStored<{ layout?: string; sort?: string; size?: number } | null>(`seven.shell.${id}`, null)
 }
 
 function load(ids: string[], layouts: ShellLayout[], sorts: ShellSort[]): Saved {
@@ -76,11 +72,7 @@ function load(ids: string[], layouts: ShellLayout[], sorts: ShellSort[]): Saved 
 }
 
 function store(id: string, value: Saved): void {
-  try {
-    localStorage.setItem(`seven.shell.${id}`, JSON.stringify(value))
-  } catch {
-    return
-  }
+  writeStored(`seven.shell.${id}`, value)
 }
 
 function ToolButton({

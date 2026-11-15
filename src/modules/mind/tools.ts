@@ -169,7 +169,8 @@ const reason: ToolDef = {
     const conclusion = optStr(params, 'conclusion')?.trim() ?? ''
     if (!reasoning || !conclusion) return `${styleBrief(style)}\n\nReason about "${question}" this way, then call reason again with the same question, your reasoning and your conclusion.`
     const thought = runReason({ agentId: agentOf(ctx), sessionId: ctx.sessionId, question, reasoning, conclusion, style })
-    return { text: conclusion, view: { kind: 'thought', title: 'Reasoning', data: thought } }
+    const filter = style?.constraints?.trim() ? `\n\n[Filter next output through: ${style.constraints.trim()}]` : ''
+    return { text: `${conclusion}${filter}`, view: { kind: 'thought', title: 'Reasoning', data: thought } }
   }
 }
 

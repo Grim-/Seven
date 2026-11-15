@@ -1,4 +1,5 @@
-import { registerComponent, type TooltipRow } from '../../core'
+import { CONDITIONS, type EffectGroup } from '../../effectGroups'
+import { entryLink, registerComponent, type TooltipRow } from '../../core'
 import { ActionPiece, type ActionEvent } from '../Action'
 import { Buffs } from '../Buffs'
 
@@ -9,6 +10,9 @@ export class ApplyBuff extends ActionPiece {
     ...ActionPiece.PARAMS_BASE,
     buff: { kind: 'template' as const, templateKind: 'game_buff', default: '', description: 'Which buff.' }
   }
+  static readonly SENTENCE: string = 'Apply {buff} to the {who}'
+  static readonly GROUP: EffectGroup | null = CONDITIONS
+  static readonly ICON: string = 'Sparkles'
 
   tooltipRows(): TooltipRow[] {
     const id = String(this.params.buff)
@@ -17,10 +21,15 @@ export class ApplyBuff extends ActionPiece {
   }
 
   handle(event: ActionEvent): void {
+    const name = event.target?.named ?? 'No one'
     const buffs = event.target?.comp(Buffs)
     const def = event.user.catalog.template(ApplyBuff.PARAMS.buff.templateKind, String(this.params.buff))
-    if (!buffs || !def) return
-    if (buffs.apply(def, event.user)) this.next(event)
+    if (!def) return this.report(event, {}, 'There is no such buff to apply.')
+    const label = entryLink(ApplyBuff.PARAMS.buff.templateKind, String(this.params.buff))
+    if (!buffs) return this.report(event, { buff: String(this.params.buff) }, `${name} cannot gain ${label}.`)
+    if (!buffs.apply(def, event.user)) return this.report(event, { buff: String(this.params.buff) }, `${label} did not take on ${name}.`)
+    this.report(event, { buff: String(this.params.buff) }, `${name} is now affected by ${label}.`)
+    this.next(event)
   }
 }
 

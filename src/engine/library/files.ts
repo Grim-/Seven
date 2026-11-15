@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import type { AssetMeta } from '@shared/types'
 import { ToolError } from '../tools/types'
 import { data } from '../data/hub'
@@ -11,7 +12,8 @@ export function resolveFile(ref: string, kinds: AssetMeta['kind'][] | null, what
     try {
       const hit = resolveEntry(r, 'file', USER)
       found = hit.kind.asset?.(hit.id) ?? null
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not resolve a file reference')
       found = data.assets.findByName(r)
     }
   }

@@ -8,6 +8,6 @@ The rules data the world game runs on. Everything here is yours to change; the g
 - **Clocks**: how fast game time runs and how long ticks, hours, days and battle rounds are.
 - **Checks**: rolls the game asks a character for, such as Perception. Each has its dice (`1d20`, or `max(1d20, 1d20)` to keep the higher of two) and a bonus formula reading the roller's stats as `user.<stat id>`.
 
-Everything here belongs to a **rule set**. A world picks the rule set it plays by (Rules, beside Your character in the world), so a fantasy world and a world with guns can have different rules. New rule sets start empty or as a copy of another. Seven makes the Starter rule set when there is none.
+All of it is one shared pool: every world and character uses the same definitions. The starter stats are the D&D abilities (str, dex, con, int, wis, cha) plus Health, Stamina and Mana; add your own stats and resources for other systems.
 
-A starter set is put in the first time each list of a rule set is opened. Deleting entries never brings it back.
+A starter set is put in the first time each list is opened. Deleting entries never brings it back.

@@ -8,10 +8,10 @@ import { DownloadsCard } from '../components/models/DownloadsCard'
 import { HubSearch } from '../components/models/HubSearch'
 import { HubRepo } from '../components/models/HubRepo'
 import { MTP_NOTE, modelTraits } from '../components/models/ModelTraits'
-import { modelFacets } from '../components/models/modelFacets'
-import { applyFacets, useFacetValues } from '../lib/facets'
+import { modelFilters } from '../components/models/modelFilters'
+import { applyFilters, useFilterValues } from '../lib/propertyFilters'
 import { useViewPlace } from '../lib/viewPlace'
-import { BackBar, Button, Fact, FactGrid, FacetBar, Input, KindShell, Modal, NumberField, Panel, SegmentBar, SaveState, Select, SettingCard, SettingRow, StatusBadge, ShellTabs, TraitChips, ViewHeader, openMenu, useAutosavedState, type ShellItem, type ShellSort } from '../components/ui'
+import { BackBar, Button, Fact, FactGrid, FilterBar, Input, KindShell, Modal, NumberField, Panel, SegmentBar, SaveState, Select, SettingCard, SettingRow, StatusBadge, ShellTabs, TraitChips, ViewHeader, openMenu, useAutosavedState, type ShellItem, type ShellSort } from '../components/ui'
 import { isRunnable, modelBytes, useModels } from '../store/models'
 import { engine, main } from '../lib/ipc'
 import { errorText, formatBytes } from '../lib/format'
@@ -25,6 +25,7 @@ import { ArgsBox } from '../components/models/settings/ArgsBox'
 import { useModelConfig, type ModelConfigState } from '../components/models/settings/useModelConfig'
 import { failed, copyText } from '../lib/notify'
 import { useBusy } from '../lib/useBusy'
+import { noteFailure } from '../store/problems'
 
 type Tab = 'all' | 'favourites' | 'remote' | ModelKind
 
@@ -153,7 +154,7 @@ function RemoteDetail({ model }: { model: ModelEntry }) {
       .getState()
       .getConfig(model.id)
       .then((c) => autosave.reset({ ...autosave.value, contextSize: Number(c.contextSize) || 32768 }))
-      .catch(() => undefined)
+      .catch(noteFailure('models', 'Could not read the model settings'))
   }, [model.id])
   const test = () =>
     run(async () => {
@@ -284,7 +285,7 @@ function ModelDetail({ model }: { model: ModelEntry }) {
   useEffect(() => {
     void engine('mind.prefs.get')
       .then((p) => setSearchModel(p.embeddingModelId))
-      .catch(() => undefined)
+      .catch(noteFailure('mind', 'Could not read the memory settings'))
   }, [model.id])
   const info = model.info
   const projector = useProjector(model.id)
@@ -355,15 +356,15 @@ export function ModelsView() {
   const [folders, setFolders] = useState(false)
   const [addingRemote, setAddingRemote] = useState(false)
   const [hub, setHub] = useViewPlace<'search' | { repo: string; model: HubModel | null } | null>('models.hub', null)
-  const [facetValues, setFacet] = useFacetValues('models')
-  const facets = useMemo(() => modelFacets(list, modelBytes), [list])
+  const [filterValues, setFilter] = useFilterValues('models')
+  const filters = useMemo(() => modelFilters(list, modelBytes), [list])
   const open = (id: string) => {
     setHub(null)
     setSelected(id)
   }
 
   useEffect(() => {
-    void engine('models.fillInfo').catch(() => undefined)
+    void engine('models.fillInfo').catch(noteFailure('models', 'Could not fill in the model details'))
   }, [list.length])
 
   const counts = useMemo(() => {
@@ -393,11 +394,11 @@ export function ModelsView() {
   }, [byId])
 
   const inTab = useMemo(() => list.filter((m) => (tab === 'all' ? true : tab === 'favourites' ? m.favourite : tab === 'remote' ? Boolean(m.remote) : m.info?.kind === tab)), [list, tab])
-  const faceted = useMemo(() => applyFacets(inTab, facets, facetValues), [inTab, facets, facetValues])
+  const filtered = useMemo(() => applyFilters(inTab, filters, filterValues), [inTab, filters, filterValues])
 
   const items = useMemo(
     (): ShellItem[] =>
-      faceted.shown
+      filtered.shown
         .map((m) => {
           const loaded = host.modelId === m.id && host.status === 'ready'
           const loading = host.modelId === m.id && host.status === 'loading'
@@ -414,7 +415,7 @@ export function ModelsView() {
             updatedAt: m.lastUsedAt
           }
         }),
-    [faceted, host.modelId, host.status]
+    [filtered, host.modelId, host.status]
   )
 
   useEffect(() => {
@@ -499,9 +500,9 @@ export function ModelsView() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-2.5">
-        <FacetBar facets={facets} values={facetValues} onChange={setFacet}>
-          {`${faceted.shown.length} of ${inTab.length} shown${faceted.pending.length ? ` · reading ${faceted.pending.length} headers` : ''}`}
-        </FacetBar>
+        <FilterBar filters={filters} values={filterValues} onChange={setFilter}>
+          {`${filtered.shown.length} of ${inTab.length} shown${filtered.pending.length ? ` · reading ${filtered.pending.length} headers` : ''}`}
+        </FilterBar>
         <KindShell
           id="models"
           layouts={['list', 'cards', 'deck']}

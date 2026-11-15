@@ -1,3 +1,4 @@
+import { noteFailure } from '../store/problems'
 import { useEffect, useState } from 'react'
 import type { EventName } from '@shared/protocol'
 import { on } from './ipc'
@@ -10,7 +11,7 @@ export function useLive<T>(fetch: () => Promise<T>, event: EventName, deps?: unk
     const load = () =>
       void fetch()
         .then((v) => live && setValue(v))
-        .catch(() => undefined)
+        .catch(noteFailure('app', 'Could not load live data'))
     load()
     const off = on(event, load)
     return () => {
@@ -28,7 +29,7 @@ export function useLibraryData<T>(fetch: () => Promise<T>, key: string): T | nul
     const load = () =>
       void fetch()
         .then((v) => live && setValue(v))
-        .catch(() => undefined)
+        .catch(noteFailure('app', 'Could not load live data'))
     load()
     const off = onLibraryChange(load)
     return () => {

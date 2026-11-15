@@ -11,7 +11,12 @@ export function FavouritesFlyout({ view, links = [] }: { view: string; links?: M
   return (
     <div className="absolute bottom-full left-0 z-50 hidden min-w-[14rem] max-w-[22rem] flex-col border border-line bg-black/95 py-1 group-hover:flex tablet:hidden">
       {links.map((l) => (
-        <button key={l.view} type="button" onClick={() => setView(l.view)} className="flex items-center gap-2 px-3 py-1.5 text-left text-[12.5px] text-white/90 hover:bg-accent/15 hover:text-white [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 [&>svg]:text-accent">
+        <button
+          key={l.view ?? l.label}
+          type="button"
+          onClick={() => (l.onSelect ? l.onSelect() : l.view && setView(l.view))}
+          className="flex items-center gap-2 px-3 py-1.5 text-left text-[12.5px] text-white/90 hover:bg-accent/15 hover:text-white [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 [&>svg]:text-accent"
+        >
           {l.icon}
           <span className="truncate">{l.label}</span>
         </button>

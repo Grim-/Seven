@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { AssetMeta } from '@shared/types'
@@ -52,7 +53,8 @@ export function registerOutputs(ctx: ToolContext, root: string, since: number): 
           checkpoint: (abs, previous) => ctx.checkpoints.save(abs, previous)
         })
       )
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'tools', "Could not add a command's output file")
       continue
     }
   }

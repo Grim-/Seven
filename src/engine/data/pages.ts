@@ -1,3 +1,5 @@
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
 import { matchSnippet, referencePattern } from '@shared/text'
 import { FOLDER_TYPE, idSegment, stripRef, toId } from '@shared/ids'
 import fs from 'node:fs'
@@ -39,7 +41,8 @@ const DEFAULT_ITEM_FIELDS: FieldDef[] = [
 function readFile(file: string): Buffer | null {
   try {
     return fs.readFileSync(file)
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'data', 'Could not read a page file')
     return null
   }
 }
@@ -518,7 +521,8 @@ export class PageStore {
     const out = this.index.values().map((v) => v.value.page)
     try {
       this.ensureSingles(out)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'data', 'Could not set up the single pages')
       this.ensured.clear()
     }
     return out
@@ -637,7 +641,7 @@ export class PageStore {
   resolve(ref: string, accept?: (p: PageMeta) => boolean, what = 'page'): string {
     const found = this.find(ref, accept)
     if (found) return found.id
-    throw new DataError(this.missing(ref, what))
+    throw notFound(new DataError(this.missing(ref, what)))
   }
 
   private require(ref: string): StoredPage {
@@ -659,7 +663,7 @@ export class PageStore {
   folderOf(ref: string | null): string | null {
     if (!ref || !toId(ref)) return null
     const found = this.find(ref)
-    if (!found) throw new DataError(this.missing(ref, 'folder'))
+    if (!found) throw notFound(new DataError(this.missing(ref, 'folder')))
     if (found.type !== FOLDER_TYPE) throw new DataError(`${this.pathOf(found.id)} is a ${pageKindOf(found.type)}, not a folder. Pick a folder to put it in.`)
     return found.id
   }

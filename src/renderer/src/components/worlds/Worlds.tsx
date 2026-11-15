@@ -16,7 +16,7 @@ import { setWhere } from '../maps/placeActions'
 import { SheetSelect } from '../data/sheet/SheetSelect'
 import { ShellTabs } from '../ui'
 import { failed } from '../../lib/notify'
-import { useResolvedRuleSet, useRuleSets } from '../game/ruleSet'
+import { noteFailure } from '../../store/problems'
 
 export function useWorlds(): WorldMeta[] {
   const [list, setList] = useState<WorldMeta[]>([])
@@ -24,7 +24,7 @@ export function useWorlds(): WorldMeta[] {
     const load = () =>
       void engine('worlds.list')
         .then(setList)
-        .catch(() => undefined)
+        .catch(noteFailure('worlds', 'Could not list the worlds'))
     load()
     return on('worlds.changed', load)
   }, [])
@@ -75,17 +75,6 @@ function SchemaJson({ world }: { world: WorldMeta }) {
         <SaveState status={autosave.status} error={autosave.error} blocked={check.errors[0] ?? null} />
       </div>
     </div>
-  )
-}
-
-function RulesPick({ world }: { world: WorldMeta }) {
-  const sets = useRuleSets() ?? []
-  const current = useResolvedRuleSet(world.rules) ?? ''
-  return (
-    <span className="flex items-center gap-1.5" title="The rule set everything played in this world uses">
-      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Rules</span>
-      <Select value={current} options={sets.map((s) => ({ value: s.id, label: s.name }))} onChange={(rules) => void engine('worlds.setRules', { id: world.id, rules }).catch(failed('Could not set the rules'))} className="h-7 w-36 text-[12px]" />
-    </span>
   )
 }
 
@@ -176,7 +165,6 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
                 <span className="w-56" title="Tags for this world, such as fantasy or story-world">
                   <TagInput value={world.tags} suggestions={[...new Set(list.flatMap((w) => w.tags))]} onChange={(tags) => void engine('worlds.setTags', { id: world.id, tags }).catch(failed('Could not save the tags'))} />
                 </span>
-                <RulesPick world={world} />
                 <span className="flex items-center gap-1.5" title="Rolls you make in this world are for this character unless you pick another">
                   <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Your character</span>
                   <SheetSelect value={world.player} onChange={(sheet) => void engine('worlds.setPlayer', { id: world.id, sheet }).catch(failed('Could not set your character'))} className="h-7 w-40 text-[12px]" />
@@ -245,7 +233,7 @@ export function WorldLink({ value, onChange, agentName }: { value: WorldBinding 
     if (!world || !type) return setIds([])
     void engine('worlds.records', { id: world.id, type })
       .then((r) => setIds(Object.keys(r)))
-      .catch(() => setIds([]))
+      .catch(noteFailure('worlds', 'Could not list the records', () => setIds([])))
   }, [world?.id, type, world?.updatedAt])
   const id = value?.id ?? ''
   const missing = !!world && !!id && !ids.includes(id)

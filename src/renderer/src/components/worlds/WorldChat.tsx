@@ -5,6 +5,7 @@ import { engine } from '../../lib/ipc'
 import { useLive } from '../../lib/useLive'
 import { EntryCard, Lines, Loading } from '../entries/EntryCard'
 import type { EntrySurfaceProps } from '../../registries/kinds'
+import { noteFailure } from '../../store/problems'
 
 function useWorld(id: string) {
   const list = useLive(() => engine('worlds.list'), 'worlds.changed')
@@ -14,7 +15,7 @@ function useWorld(id: string) {
     if (!world) return
     void engine('worlds.board', { id })
       .then(setPosts)
-      .catch(() => setPosts([]))
+      .catch(noteFailure('worlds', 'Could not load the board', () => setPosts([])))
   }, [id, world?.updatedAt])
   return { list, world, posts: posts.slice(-3).reverse() }
 }

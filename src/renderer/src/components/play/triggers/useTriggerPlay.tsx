@@ -16,7 +16,6 @@ import { setWhere } from '../../maps/placeActions'
 import { closePlay, showPlay } from '../playStore'
 import { triggerUi, type TriggerContext } from './registry'
 import { TriggerEditor } from './TriggerEditor'
-import { RuleSetProvider } from '../../game/ruleSet'
 
 interface Options {
   world: string
@@ -25,7 +24,6 @@ interface Options {
   uses: WorldMapUse[]
   save: GameSave | null
   catalog: Catalog | null
-  ruleSet: string | null
   tokens: MapToken[]
   onGo: (map: string) => void
 }
@@ -59,8 +57,14 @@ export function useTriggerPlay(options: Options) {
     if (target.map !== use.map) onGo(mapId)
   }
 
+  const stand = (token: string, at: Point) => {
+    const use = latest.current.use
+    const before: Standing | undefined = use.stand[token]
+    return saveUse({ ...use, stand: { ...use.stand, [token]: { actions: before?.actions ?? '', decisions: before?.decisions ?? '', at } } })
+  }
+
   const fire = (trigger: TriggerDef, sheet: string) => {
-    const { world, save, catalog, tokens } = latest.current
+    const { world, map, save, catalog, tokens } = latest.current
     const visitor = tokens.find((t) => t.visitor.sheet === sheet)?.visitor
     if (trigger.needsItem) {
       const carried = visitor?.game && catalog ? (GameEntity.fromRecord(visitor.game, catalog).comp(Inventory)?.items.some((i) => i.id === trigger.needsItem) ?? false) : false
@@ -70,15 +74,13 @@ export function useTriggerPlay(options: Options) {
     if (trigger.hiddenIfFlag && Boolean(save?.flags[trigger.hiddenIfFlag])) return
     if (save && (trigger.once || trigger.setsFlag)) void engine('saves.markUsed', { id: save.id, trigger: trigger.id, flag: trigger.setsFlag }).catch(failed('Could not save it'))
     const party = tokens.flatMap((t) => (t.visitor.game ? [t.visitor] : []))
-    const ctx: TriggerContext = { world, sheet, party, save, catalog, close: closePlay, goTo: (map, place) => void goTo(sheet, map, place).catch(failed('Could not go there')), update: (values) => saveTrigger({ ...trigger, values }) }
+    const ctx: TriggerContext = { world, map: map.id, sheet, party, save, catalog, close: closePlay, goTo: (map, place) => void goTo(sheet, map, place).catch(failed('Could not go there')), update: (values) => saveTrigger({ ...trigger, values }) }
     const ui = triggerUi(trigger.type)
     if (ui?.run) ui.run(trigger, ctx)
     else if (ui?.Panel)
       showPlay(
         trigger.name,
-        <RuleSetProvider ruleSet={latest.current.ruleSet}>
-          <ui.Panel trigger={trigger} ctx={ctx} />
-        </RuleSetProvider>,
+        <ui.Panel trigger={trigger} ctx={ctx} />,
         { wide: ui.wide }
       )
   }
@@ -86,9 +88,7 @@ export function useTriggerPlay(options: Options) {
   const edit = (trigger: TriggerDef) =>
     showPlay(
       `Trigger · ${trigger.name}`,
-      <RuleSetProvider ruleSet={latest.current.ruleSet}>
-        <TriggerEditor start={trigger} world={latest.current.world} onSave={saveTrigger} />
-      </RuleSetProvider>,
+      <TriggerEditor start={trigger} world={latest.current.world} map={latest.current.map.id} onSave={saveTrigger} />,
       { wide: true }
     )
 
@@ -118,5 +118,5 @@ export function useTriggerPlay(options: Options) {
     ]
   }
 
-  return { fire, menuItems, triggers: options.use.triggers ?? [] }
+  return { fire, menuItems, goTo, stand, triggers: options.use.triggers ?? [] }
 }

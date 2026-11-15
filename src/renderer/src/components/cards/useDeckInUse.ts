@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import type { DeckEntry, DeckRef } from '@shared/cardDecks'
 import { engine } from '../../lib/ipc'
 import { usePage } from '../../store/data'
-import { readCounts } from './model'
+import { DECK_TYPE, readCounts, useTypePages } from './model'
+import { noteFailure } from '../../store/problems'
 
 export interface DeckInUse {
   ref: DeckRef
@@ -11,21 +12,22 @@ export interface DeckInUse {
   refresh: () => void
 }
 
-export function useDeckInUse(ref: DeckRef | null, watch: unknown = null, always = false): DeckInUse | null {
-  const key = JSON.stringify([ref, watch])
-  const [found, setFound] = useState<{ deck: string | null; set: string | null } | null>(null)
+export function useDeckInUse(ref: DeckRef | null): DeckInUse | null {
+  const decks = useTypePages(DECK_TYPE).map((p) => `${p.id}:${p.updatedAt}`)
+  const key = JSON.stringify([ref, decks])
+  const [found, setFound] = useState<{ deck: string | null } | null>(null)
   const [tick, setTick] = useState(0)
   useEffect(() => {
     if (!ref) return setFound(null)
     let live = true
     void engine('decks.find', { ref })
       .then((f) => live && setFound(f))
-      .catch(() => live && setFound(null))
+      .catch(noteFailure('cards', 'Could not find the deck', () => live && setFound(null)))
     return () => {
       live = false
     }
   }, [key, tick])
-  const page = usePage(found?.deck ?? found?.set ?? null)
-  if (!ref || !found || (!always && !found.deck && !found.set)) return null
+  const page = usePage(found?.deck ?? null)
+  if (!ref || !found) return null
   return { ref, id: found.deck, entries: page ? readCounts(page.data, page.title).cards : [], refresh: () => setTick((t) => t + 1) }
 }

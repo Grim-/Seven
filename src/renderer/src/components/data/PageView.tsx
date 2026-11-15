@@ -20,6 +20,7 @@ import { failed } from '../../lib/notify'
 import { ownScreen } from '../../registries/kinds'
 import { showInData } from '../../lib/library'
 import { chooseFiles } from '../../lib/importFiles'
+import { noteFailure } from '../../store/problems'
 
 
 export async function createPage(title: string, type: string | null = null, parent: string | null = null): Promise<string | null> {
@@ -96,7 +97,7 @@ function Backlinks({ id }: { id: string }) {
     let live = true
     engine('data.pages.backlinks', { id })
       .then((l) => live && setLinks(l))
-      .catch(() => live && setLinks([]))
+      .catch(noteFailure('pages', 'Could not load the backlinks', () => live && setLinks([])))
     return () => {
       live = false
     }

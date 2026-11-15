@@ -7,6 +7,7 @@ import { resolveIncludes } from '../../engine/library/includes'
 import type { Action, ActionCheck, ActionNeeds } from '@shared/actions'
 import { cleanSwap } from '@shared/cardDecks'
 import { cleanDecision } from '@shared/decisions'
+import './cardVariation'
 
 export const SCALARS = { type: ['string', 'number', 'boolean', 'null'] } as const satisfies JsonSchema
 export const NUMBERS = { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { type: ['string', 'number', 'null'] } }] } as const satisfies JsonSchema

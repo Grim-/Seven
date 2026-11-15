@@ -11,6 +11,7 @@ import { useVault } from '../../store/vault'
 import { openChat } from '../../lib/library'
 import { cn } from '../../lib/cn'
 import { failed } from '../../lib/notify'
+import { noteFailure } from '../../store/problems'
 
 const pretty = (name: string) => name.replace(/_/g, ' ')
 
@@ -133,14 +134,14 @@ export function TitleBar() {
 
   useEffect(() => {
     if (!windowed) return
-    void main('window.isMaximized').then(setMaximized)
+    void main('window.isMaximized').then(setMaximized, noteFailure('window', 'Could not read the window state'))
     return on('window.maximized', setMaximized)
   }, [windowed])
 
   return (
     <header
       className="drag scanlines relative z-50 flex h-10 shrink-0 select-none items-center border-b border-line bg-gradient-to-r from-accent/10 via-black/60 to-black/80 pl-4 phone:pl-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.9),0_0_15px_color-mix(in_srgb,var(--color-accent)_8%,transparent)]"
-      onDoubleClick={windowed ? () => void main('window.toggleMaximize').then(setMaximized) : undefined}
+      onDoubleClick={windowed ? () => void main('window.toggleMaximize').then(setMaximized, failed('Could not resize the window')) : undefined}
     >
       <span className="relative z-[2] shrink-0 font-mono text-[19px] font-light tracking-[0.12em] text-white phone:text-[15px]">
         <span className="text-accent">//</span>SEVEN
@@ -152,16 +153,16 @@ export function TitleBar() {
         <VaultGlyph />
       </div>
       {windowed && <div className="no-drag relative z-[2] flex h-full">
-        <button className="flex h-full w-12 items-center justify-center text-dim hover:bg-white/5 hover:text-white" onClick={() => void main('window.minimize')}>
+        <button className="flex h-full w-12 items-center justify-center text-dim hover:bg-white/5 hover:text-white" onClick={() => void main('window.minimize').catch(failed('Could not minimise the window'))}>
           <Minus className="h-4 w-4" />
         </button>
         <button
           className="flex h-full w-12 items-center justify-center text-dim hover:bg-white/5 hover:text-white"
-          onClick={() => void main('window.toggleMaximize').then(setMaximized)}
+          onClick={() => void main('window.toggleMaximize').then(setMaximized, failed('Could not resize the window'))}
         >
           {maximized ? <Copy className="h-3.5 w-3.5 -scale-x-100" /> : <Square className="h-3.5 w-3.5" />}
         </button>
-        <button className="flex h-full w-12 items-center justify-center text-dim hover:bg-alert hover:text-white" onClick={() => void main('window.close')}>
+        <button className="flex h-full w-12 items-center justify-center text-dim hover:bg-alert hover:text-white" onClick={() => void main('window.close').catch(failed('Could not close the window'))}>
           <X className="h-4 w-4" />
         </button>
       </div>}

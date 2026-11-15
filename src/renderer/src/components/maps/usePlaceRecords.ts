@@ -3,13 +3,14 @@ import { PLACE_TYPE_KEY, type WorldChanges, type WorldEntity } from '@shared/wor
 import { engine } from '../../lib/ipc'
 import { useLive } from '../../lib/useLive'
 import { usePresenceData } from './usePresence'
+import { noteFailure } from '../../store/problems'
 
 export type WorldLayer = 'template' | 'play'
 
 const records = (world: string, layer: WorldLayer = 'play') =>
-  engine('worlds.records', { id: world, type: PLACE_TYPE_KEY, layer }).catch(() => ({}))
+  engine('worlds.records', { id: world, type: PLACE_TYPE_KEY, layer }).catch(noteFailure('maps', 'Could not load the places', () => ({})))
 const changes = (world: string, layer: WorldLayer = 'play') =>
-  engine('worlds.changes', { id: world, type: PLACE_TYPE_KEY, layer }).catch(() => ({}))
+  engine('worlds.changes', { id: world, type: PLACE_TYPE_KEY, layer }).catch(noteFailure('maps', 'Could not load the place changes', () => ({})))
 
 export function usePlaceRecords(world: string): Record<string, WorldEntity> {
   return useLive(() => records(world), 'worlds.changed') ?? {}

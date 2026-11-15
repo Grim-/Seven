@@ -37,7 +37,14 @@ export function commandsFor(scope: CommandScope): Command[] {
 }
 
 export function commandInfo(c: Command): CommandInfo {
-  return { name: c.name, summary: c.summary, usage: c.usage, needsChat: c.needsChat }
+  return {
+    name: c.name,
+    summary: c.summary,
+    usage: c.usage,
+    needsChat: c.needsChat,
+    ...(c.prompt !== undefined ? { prompt: c.prompt } : {}),
+    ...(c.args !== undefined ? { args: c.args } : {})
+  }
 }
 
 export function findCommand(list: Command[], name: string): Command | undefined {

@@ -1,3 +1,4 @@
+import { noteFailure } from '../../../util/report'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -97,7 +98,8 @@ registerHelper({
       const value = JSON.parse(fs.readFileSync(path.join(root, 'installed.json'), 'utf8')) as { tag?: unknown; folder?: unknown }
       const folder = typeof value.folder === 'string' && value.folder ? value.folder : typeof value.tag === 'string' ? value.tag : null
       return folder
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'install', 'Could not read the installed llama-server record')
       return null
     }
   }

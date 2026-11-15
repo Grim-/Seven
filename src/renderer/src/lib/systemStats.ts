@@ -1,3 +1,4 @@
+import { noteFailure } from '../store/problems'
 import { useEffect, useState } from 'react'
 import type { SystemStats } from '@shared/types'
 import { engine } from './ipc'
@@ -9,7 +10,7 @@ export function useSystemStats(every = 3000): SystemStats | null {
     const tick = () =>
       void engine('system.stats')
         .then((s) => live && setStats(s))
-        .catch(() => undefined)
+        .catch(noteFailure('app', 'Could not read the system stats'))
     tick()
     const timer = setInterval(tick, every)
     return () => {

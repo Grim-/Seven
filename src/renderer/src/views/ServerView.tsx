@@ -53,7 +53,7 @@ function ServerPages({ state, progress, status, network, reload }: { state: Inst
   return (
     <>
       <HelperBar state={state} onInstall={() => setInstalling(true)} />
-      <SettingsBrowser sections={pages} current={query.trim() ? null : current.id} onPick={pick} query={query} onQuery={setQuery} placeholder="Search llama-server settings">
+      <SettingsBrowser sections={pages} current={query.trim() ? null : current.id} onPick={pick} query={query} onQuery={setQuery} placeholder="Search llama-server settings" wide>
         {!query.trim() ? current.body() : found.length ? settingsCard('Matching settings', found) : <div className="text-[12.5px] text-faint">No setting matches "{query.trim()}".</div>}
       </SettingsBrowser>
       <InstallWizard state={state} progress={progress} open={installing} onClose={() => setInstalling(false)} />

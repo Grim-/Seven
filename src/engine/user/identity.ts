@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import path from 'node:path'
 import type { UserIdentity } from '@shared/types'
 import { dataRoot } from '../util/paths'
@@ -20,7 +21,8 @@ class Identity {
     try {
       const raw = readJson<Partial<UserIdentity>>(FILE, {})
       return { name: String(raw.name ?? ''), about: String(raw.about ?? '') }
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'profile', 'Could not read your profile')
       return { name: '', about: '' }
     }
   }

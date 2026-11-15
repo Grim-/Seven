@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { reportError } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -108,7 +109,7 @@ function jsBuiltins(): BuiltinSource[] {
         load: null
       })
     } catch (err) {
-      console.error(`Built-in module ${id} has a bad module.json`, err)
+      reportError('error', 'modules', err, `Built-in module ${id} has a bad module.json`)
     }
   }
   return out

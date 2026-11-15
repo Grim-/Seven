@@ -1,3 +1,4 @@
+import { noteFailure } from './util/report'
 import type { AgentProfile, ChatMessage, ChatSearchHit, MemorySearchHit, SessionMeta } from '@shared/types'
 import { isVaultLocked } from '@shared/sealed'
 import type { SessionStore } from './sessions/store'
@@ -115,6 +116,7 @@ export class ChatSearch {
         for (const h of hits) memory.push({ agentId: agent.id, source: h.source, ref: h.ref, at: h.at, snippet: snippet(h.text, terms), similarity: h.similarity, score: h.score })
       } catch (err) {
         if (isVaultLocked(err)) locked = true
+        else noteFailure(err, 'memory', `Could not search ${agent.name}'s memory`)
       }
     }
     memory.sort((a, b) => b.score - a.score || b.at - a.at)

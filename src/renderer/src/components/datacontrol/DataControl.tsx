@@ -8,6 +8,7 @@ import { toast } from '../../store/toasts'
 import { useVault } from '../../store/vault'
 import { useApp } from '../../store/app'
 import { NewVaultFields, SwitchVaultModal, folderFor } from '../vault/Vaults'
+import { noteFailure } from '../../store/problems'
 
 function FolderExport() {
   const [kinds, setKinds] = useState<{ kind: string; label: string }[]>([])
@@ -17,7 +18,7 @@ function FolderExport() {
   useEffect(() => {
     void engine('library.kinds')
       .then((list) => setKinds(list.map((k) => ({ kind: k.kind, label: k.label }))))
-      .catch(() => undefined)
+      .catch(noteFailure('library', 'Could not load the kinds'))
   }, [])
   const byTag = what === 'tag'
   const run = () => exportToFolder(byTag ? { tag: tag.trim() } : { kind: what.slice(5) }, target)

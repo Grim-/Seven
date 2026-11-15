@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bell, HelpCircle, KeyRound, ListChecks, ShieldAlert } from 'lucide-react'
+import { Bell, HelpCircle, KeyRound, ListChecks, ShieldAlert, Trash2 } from 'lucide-react'
 import type { PendingRequest, UiRequestKind } from '@shared/types'
 import type { TimelineRow } from '@shared/timeline'
 import { engine, on } from '../../lib/ipc'
@@ -8,8 +8,10 @@ import { formatRelative } from '../../lib/format'
 import { useSessions } from '../../store/sessions'
 import { useHasForm } from '../../lib/form'
 import { useSheet } from '../../lib/sheet'
-import { Sheet } from '../ui'
+import { Sheet, openMenu } from '../ui'
 import { NavButton } from './NavButton'
+import { ProblemList, clearProblemsItem } from './ProblemList'
+import { NOTIFICATIONS_SHEET, noteFailure, useProblems } from '../../store/problems'
 
 const KIND_ICON: Partial<Record<UiRequestKind, React.ReactNode>> = {
   approval: <ShieldAlert />,
@@ -22,7 +24,7 @@ function usePending(): PendingRequest[] {
   useEffect(() => {
     void engine('ui.pending')
       .then(setList)
-      .catch(() => undefined)
+      .catch(noteFailure('notifications', 'Could not load what is waiting for you'))
     return on('ui.pending', setList)
   }, [])
   return list
@@ -35,19 +37,37 @@ function useRecent(open: boolean): TimelineRow[] | null {
     const load = () =>
       void engine('timeline.recent', { limit: 30 })
         .then(setRows)
-        .catch(() => setRows([]))
+        .catch((err: unknown) => (setRows([]), noteFailure('notifications', 'Could not load recent activity')(err)))
     load()
     return onLibraryChange(load)
   }, [open])
   return rows
 }
 
-function Heading({ children, count }: { children: React.ReactNode; count?: number }) {
+function Heading({ children, count, aside, onContextMenu }: { children: React.ReactNode; count?: number; aside?: React.ReactNode; onContextMenu?: (e: React.MouseEvent) => void }) {
   return (
-    <div className="flex items-center gap-2 px-3 pb-1 pt-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-soft">
+    <div onContextMenu={onContextMenu} className="flex items-center gap-2 px-3 pb-1 pt-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-soft">
       {children}
       {count !== undefined && count > 0 && <span className="font-normal text-faint">{count}</span>}
+      {aside && <span className="ml-auto flex items-center normal-case tracking-normal">{aside}</span>}
     </div>
+  )
+}
+
+function ProblemsSection({ onGo }: { onGo: (fn: () => void) => void }) {
+  const problems = useProblems((s) => s.list)
+  const clear = problems.length ? (
+    <button onClick={clearProblemsItem.onSelect} title={clearProblemsItem.label} className="flex h-4 w-4 items-center justify-center text-dim hover:text-alert [&>svg]:h-3 [&>svg]:w-3">
+      <Trash2 />
+    </button>
+  ) : null
+  return (
+    <>
+      <Heading count={problems.length} aside={clear} onContextMenu={problems.length ? (e) => openMenu(e, 'Problems', [clearProblemsItem]) : undefined}>
+        Problems
+      </Heading>
+      <ProblemList problems={problems} go={onGo} />
+    </>
   )
 }
 
@@ -57,6 +77,7 @@ function NotificationList({ open, pending, onGo }: { open: boolean; pending: Pen
   const chatTitle = (id: string) => sessions.find((s) => s.id === id)?.title ?? 'a chat'
   return (
     <>
+      <ProblemsSection onGo={onGo} />
       <Heading count={pending.length}>Waiting for you</Heading>
       {!pending.length ? (
         <div className="px-3 pb-1 text-[12px] text-faint">Nothing waiting.</div>
@@ -94,25 +115,32 @@ function NotificationList({ open, pending, onGo }: { open: boolean; pending: Pen
 }
 
 function BellButton({ open, count, onClick }: { open: boolean; count: number; onClick: () => void }) {
+  const errors = useProblems((s) => s.list.filter((p) => p.severity === 'error').length)
+  const title = [count ? `${count} waiting for you` : '', errors ? `${errors} problem${errors > 1 ? 's' : ''}` : ''].filter(Boolean).join(', ') || 'Notifications'
   return (
-    <NavButton label="Notifications" title={count ? `${count} waiting for you` : 'Notifications'} active={open} lit={count > 0} onClick={onClick}>
+    <NavButton label="Notifications" title={title} active={open} lit={count > 0 || errors > 0} onClick={onClick}>
       <Bell />
       {count > 0 && (
         <span className="absolute right-1.5 top-2 flex h-3.5 min-w-3.5 items-center justify-center bg-accent px-0.5 font-mono text-[9px] font-bold text-black">{count}</span>
+      )}
+      {errors > 0 && (
+        <span className="absolute left-1.5 top-2 flex h-3.5 min-w-3.5 items-center justify-center bg-alert px-0.5 font-mono text-[9px] font-bold text-white shadow-[0_0_6px_var(--color-alert)]">{errors}</span>
       )}
     </NavButton>
   )
 }
 
 function DesktopNotifications() {
-  const [open, setOpen] = useState(false)
+  const sheet = useSheet(NOTIFICATIONS_SHEET)
+  const { open } = sheet
+  const setOpen = (on: boolean) => (on ? sheet.show() : sheet.close())
   const box = useRef<HTMLDivElement>(null)
   const pending = usePending()
 
   useEffect(() => {
     if (!open) return
     const close = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
+      if (!box.current?.contains(e.target as Node) && !(e.target as HTMLElement | null)?.closest('[data-seven-menu]')) setOpen(false)
     }
     const key = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
     window.addEventListener('pointerdown', close)
@@ -143,7 +171,7 @@ function DesktopNotifications() {
 }
 
 function SheetNotifications() {
-  const sheet = useSheet('notifications')
+  const sheet = useSheet(NOTIFICATIONS_SHEET)
   const pending = usePending()
   const go = (fn: () => void) => {
     sheet.close()

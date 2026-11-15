@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react'
 import { Footprints, MessageSquarePlus, Swords, UserPlus } from 'lucide-react'
-import { mapArea, placePath, type MapData, type PlaceVisitor, type WorldMapUse } from '@shared/maps'
+import { asToken, mapArea, mapInPlay, placePath, type MapData, type PlaceVisitor, type WorldMapUse } from '@shared/maps'
 import { showName } from '@shared/ids'
+import { placedKey } from '@shared/effects'
 import type { MapToken } from '../maps/TokenLayer'
 import { ActionBar, Button, EmptyState, Eyebrow, Modal, ShellTabs, openMenu, type MenuItem } from '../ui'
 import { Markdown } from '../chat/Markdown'
@@ -31,13 +32,15 @@ import {
 import { SavePicker } from '../play/SavePicker'
 import { useCurrentSave } from '../play/useSaves'
 import { useTriggerPlay } from '../play/triggers/useTriggerPlay'
+import { matchesKeybind } from '../../store/keybinds'
+import { useGameplaySettings } from '../play/settings/gameplaySettingsStore'
 import '../play/triggers'
+import { useWorldViewHost } from '../play/viewActs'
 import { CharacterRow } from '../maps/CharacterRow'
 import { SheetPortrait } from '../data/SheetPortrait'
 import { HpBar } from '../maps/HpBar'
 import { RecordBars } from '../game/ResourceBars'
 import { useGameCatalog } from '../game/useGameCatalog'
-import { RuleSetProvider, useResolvedRuleSet, useRuleSet } from '../game/ruleSet'
 import { placeName } from '../maps/placeShapes'
 import { useWorldMaps } from '../maps/useMap'
 import { usePresenceData } from '../maps/usePresence'
@@ -54,6 +57,7 @@ import { useWorldPlayer } from '../play/useWorldPlayer'
 import { sceneLink, worldWhere } from '../play/playStore'
 import { CardHand } from '../cards/CardHand'
 import { playCard } from '../cards/playCard'
+import { cardForms } from '../cards/cardForms'
 import { useDeckInUse } from '../cards/useDeckInUse'
 import { defaultDialogueTree, combatParleyDialogueTree } from '@shared/game/dialogue'
 import { useDialogue } from '../play/dialogue/dialogueStore'
@@ -107,6 +111,8 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
   const [showPickPlayer, setShowPickPlayer] = useState(false)
   const catalog = useGameCatalog()
   const save = useCurrentSave(world)
+  const flagState = JSON.stringify([save?.flags ?? {}, save?.thingFlags ?? {}])
+  const shownMap = useMemo(() => mapInPlay(map, use, save?.flags ?? {}, (id) => save?.thingFlags[placedKey({ map: map.id, id })] ?? {}), [map, use.layerGating, use.propGating, flagState])
 
   const battle = useGameState((s) => s.battle)
   const attackTarget = useGameState((s) => s.attackTarget)
@@ -144,7 +150,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
       const line = `${isHostile ? 'HOSTILE' : isNeutral ? 'NEUTRAL' : 'FRIENDLY'} · ${s.monsterId || 'Creature'}`
       return {
         at: s.at,
-        visitor: {
+        visitor: asToken({
           sheet: `spawner:${s.id}`,
           name: s.name,
           image: null,
@@ -157,7 +163,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
           },
           faction: s.faction ?? (isHostile ? 'monsters' : 'neutral'),
           agent: null
-        }
+        }, `spawner:${s.id}`, 'spawner')
       }
     })
   }, [map.spawners])
@@ -194,8 +200,8 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
     }
   }
 
-  const ruleSet = useRuleSet()
-  const triggers = useTriggerPlay({ world, map, use, uses, save, catalog, ruleSet, tokens: allTokens, onGo })
+  const triggers = useTriggerPlay({ world, map, use, uses, save, catalog, tokens: allTokens, onGo })
+  useWorldViewHost({ world, map, save, catalog, tokens: allTokens, goTo: triggers.goTo, stand: triggers.stand })
   const shown = looking && data.places[looking] ? looking : null
   const token = who ? (allTokens.find((t) => t.visitor.sheet === who) ?? null) : null
   const deck = useDeckInUse(player ? { character: player } : null)
@@ -216,7 +222,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
     return true
   }
 
-  // Fallback hotkey listener for C when character uses standard sheet rather than game defs
+  // Fallback hotkey listener for character sheet when character uses standard sheet rather than game defs
   useEffect(() => {
     if (catalog && allTokens.some((t) => t.visitor.game)) return
     const targetSheet = screenSheet ?? player
@@ -225,7 +231,8 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
       if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
       const t = e.target
       if (t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return
-      if (e.key.toLowerCase() === 'c') {
+      const sheetCode = useGameplaySettings.getState().settings.keybinds.sheet?.code ?? 'KeyC'
+      if (e.code === sheetCode) {
         e.preventDefault()
         openEntry('sheet', targetSheet)
       }
@@ -312,32 +319,33 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
     return []
   }, [inCombat, battle, allTokens, token, player, who])
 
-  // Target interaction hotkeys (Esc, T, A, C, F)
+  // Target interaction hotkeys
   useEffect(() => {
     if (!token || token.visitor.sheet === player) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.defaultPrevented || e.repeat) return
       const t = e.target
       if (t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return
 
-      const k = e.key.toLowerCase()
-      if (k === 'escape') {
+      const cancelCode = useGameplaySettings.getState().settings.keybinds.cancel?.code ?? 'Escape'
+      const sheetCode = useGameplaySettings.getState().settings.keybinds.sheet?.code ?? 'KeyC'
+      if (e.code === cancelCode && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault()
         setWho(null)
         useDialogue.getState().closeDialogue()
-      } else if (k === 't') {
+      } else if (matchesKeybind('tactical.targetTalk', e)) {
         e.preventDefault()
         const tree = inCombat
           ? combatParleyDialogueTree(token.visitor.sheet, token.visitor.name)
           : defaultDialogueTree(token.visitor.sheet, token.visitor.name)
         useDialogue.getState().startDialogue(tree, token.visitor.name)
-      } else if (k === 'a') {
+      } else if (matchesKeybind('tactical.targetApproach', e)) {
         e.preventDefault()
         if (nav) nav.walkTo(token.at)
-      } else if (k === 'c') {
+      } else if (e.code === sheetCode && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault()
         openEntry('sheet', token.visitor.sheet)
-      } else if (k === 'f') {
+      } else if (matchesKeybind('tactical.targetAttack', e)) {
         e.preventDefault()
         if (inCombat) {
           attackTarget(token.visitor.sheet)
@@ -429,7 +437,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
         onTrigger={triggers.fire}
         onTime={setTime}
         onClock={setClock}
-        map={map}
+        map={shownMap}
         shapes={use.shapes}
         places={data.places}
         here={data.here}
@@ -675,6 +683,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
         playerName={actor?.visitor.name ?? 'Alistair Finch'}
         targetSheet={token?.visitor.sheet ?? null}
         targetName={token?.visitor.name ?? null}
+        placeKey={shown}
       />
 
       {/* 8. PASSIVE UNOBTRUSIVE COMBAT LOG AT BOTTOM-RIGHT */}
@@ -695,7 +704,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
 
       {aim && <div className="pointer-events-none absolute left-1/2 top-20 z-20 -translate-x-1/2 border border-cyan/60 bg-black/90 px-3 py-1.5 font-mono text-[12px] text-cyan">{aim.label}: click a character, an object, or right-click a spot · Esc cancels</div>}
       {shown && <PlayCard world={world} placeKey={shown} data={data} player={player} />}
-      {deck && <CardHand entries={deck.entries} buttons onPlay={(card) => playCard(card, deck.ref, where)} className="!absolute inset-x-0 bottom-0" />}
+      {deck && <CardHand entries={deck.entries} buttons formsFor={(card) => cardForms(card, where)} onPlay={(card, form) => void playCard(card, deck.ref, where, form)} className="!absolute inset-x-0 bottom-0" />}
       {catalog && <GameScreens open={screen} sheet={screenSheet ?? player} tokens={allTokens} catalog={catalog} onOpen={setScreen} onSheet={setScreenSheet} onAim={setAim} />}
     </div>
   )
@@ -761,11 +770,9 @@ export function WorldPlay({ world, embedded = false }: { world: string; embedded
   const home = uses?.find((u) => at && u.shapes[at])?.map ?? uses?.[0]?.map ?? null
   const current = uses?.find((u) => u.map === picked)?.map ?? home
   const names = useLive(() => engine('maps.list'), 'maps.changed')
-  const ruleSet = useResolvedRuleSet(useLive(() => engine('worlds.list'), 'worlds.changed')?.find((w) => w.id === world)?.rules)
   if (uses && !uses.length) return <EmptyState title="Nothing to play on yet">Use a map in this world's Maps tab, draw its places, and put your character in one with Start here.</EmptyState>
   return (
-    <RuleSetProvider ruleSet={ruleSet}>
-      <div className={`flex min-h-0 flex-1 flex-col ${embedded ? 'h-full gap-0' : 'gap-2'}`}>
+    <div className={`flex min-h-0 flex-1 flex-col ${embedded ? 'h-full gap-0' : 'gap-2'}`}>
         {!embedded && (
           <div className="flex items-center gap-3">
             <You
@@ -820,7 +827,6 @@ export function WorldPlay({ world, embedded = false }: { world: string; embedded
           </WorldMapLoad>
         )}
         {!embedded && player && <JourneyStrip world={world} sheet={player} />}
-      </div>
-    </RuleSetProvider>
+    </div>
   )
 }

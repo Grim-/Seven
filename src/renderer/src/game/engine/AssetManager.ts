@@ -1,4 +1,5 @@
 import { Texture } from 'pixi.js'
+import { noteFailure } from '../../store/problems'
 
 export type ImageSource = (id: string) => Promise<ImageBitmap | null>
 
@@ -53,7 +54,7 @@ export class AssetManager {
   }
 
   private async load(id: string): Promise<Texture | null> {
-    const bitmap = await this.source(id).catch(() => null)
+    const bitmap = await this.source(id).catch(noteFailure('game', `Could not load picture ${id}`, () => null))
     if (!bitmap) return null
     const texture = Texture.from(bitmap)
     texture.source.scaleMode = 'nearest'

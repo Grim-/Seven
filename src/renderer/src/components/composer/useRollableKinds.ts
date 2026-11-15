@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { engine } from '../../lib/ipc'
+import { noteFailure } from '../../store/problems'
 
 export function useRollableKinds(): Set<string> {
   const [kinds, setKinds] = useState<Set<string>>(new Set())
@@ -7,7 +8,7 @@ export function useRollableKinds(): Set<string> {
     let live = true
     void engine('library.kinds')
       .then((list) => live && setKinds(new Set(list.filter((k) => k.rollable).map((k) => k.kind))))
-      .catch(() => undefined)
+      .catch(noteFailure('composer', 'Could not load the kinds'))
     return () => {
       live = false
     }

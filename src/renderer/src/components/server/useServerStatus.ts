@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { NetworkStatus, ServerStatus } from '@shared/types'
 import { engine, main, on } from '../../lib/ipc'
+import { noteFailure } from '../../store/problems'
 
 export function useServerStatus(everyMs: number): { status: ServerStatus | null; network: NetworkStatus | null; reload: () => void } {
   const [status, setStatus] = useState<ServerStatus | null>(null)
@@ -8,10 +9,10 @@ export function useServerStatus(everyMs: number): { status: ServerStatus | null;
   const reload = () => {
     void engine('server.status')
       .then(setStatus)
-      .catch(() => undefined)
+      .catch(noteFailure('server', 'Could not read the server status'))
     void main('network.status')
       .then(setNetwork)
-      .catch(() => undefined)
+      .catch(noteFailure('network', 'Could not read the network status'))
   }
   useEffect(() => {
     reload()

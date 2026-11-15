@@ -3,6 +3,8 @@ import type { ToolDef } from '../../engine/tools/types'
 import { registerModuleKind } from '../../engine/library/moduleKinds'
 import { gameKinds } from './kinds'
 import './tokens'
+import './blueprints'
+import './cardVariation'
 
 for (const kind of gameKinds()) registerModuleKind('game', kind)
 

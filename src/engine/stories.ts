@@ -1,3 +1,4 @@
+import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
@@ -56,7 +57,7 @@ class StoryStore extends EventEmitter {
   get(id: string): StoryRun {
     const file = this.file(id)
     const run = fs.existsSync(file) ? readJson<StoryRun | null>(file, null) : null
-    if (!run) throw new Error(`There is no story "${id}"; it may have been deleted. Look it up with find, kind story.`)
+    if (!run) throw notFound(new Error(`There is no story "${id}"; it may have been deleted. Look it up with find, kind story.`))
     return run
   }
 

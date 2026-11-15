@@ -5,6 +5,7 @@ import { Button, SaveState, SettingCard, SettingRow, Textarea, useAutosavedState
 import { engine } from '../lib/ipc'
 import { failed } from '../lib/notify'
 import { textLines } from '@shared/text'
+import { noteFailure } from '../store/problems'
 
 export function PermissionsPanel({ className }: { className?: string }) {
   type Draft = { allow: string; deny: string; protect: string }
@@ -16,7 +17,7 @@ export function PermissionsPanel({ className }: { className?: string }) {
 
   useEffect(() => {
     engine('permissions.get').then(load).catch(failed('Could not load permissions'))
-    engine('shell.info').then(setShell).catch(() => setShell(null))
+    engine('shell.info').then(setShell).catch(noteFailure('permissions', 'Could not read the shell', () => setShell(null)))
   }, [])
 
   if (!rules) return null

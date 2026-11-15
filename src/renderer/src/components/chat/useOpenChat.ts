@@ -14,16 +14,21 @@ export interface OpenChat {
   hasModel: boolean
 }
 
+export function useChatAgent(): AgentProfile | null {
+  const agentId = useAgentIdOf(useConversation())
+  const agents = useAgents((s) => s.list)
+  return agents.find((a) => a.id === agentId) ?? agents[0] ?? null
+}
+
 export function useOpenChat(): OpenChat {
   const conv = useConversation()
   useLoadConversation()
   const activeId = conv.sessionId
   const active = useSessions((s) => (activeId ? (s.list.find((x) => x.id === activeId) ?? null) : null))
   const running = useSessions((s) => (activeId ? s.running[activeId] === true : false))
-  const agents = useAgents((s) => s.list)
   const host = useModels((s) => s.host)
   const agentId = useAgentIdOf(conv)
-  const agent = agents.find((a) => a.id === agentId) ?? agents[0] ?? null
+  const agent = useChatAgent()
   return { conv, active, agent, agentId, running, loading: host.status === 'loading', hasModel: Boolean(agent?.modelId ?? host.modelId) }
 }
 

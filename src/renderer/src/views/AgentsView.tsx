@@ -28,6 +28,9 @@ import { useKindInfos } from '../lib/kinds'
 import { ThinkingSelect } from '../components/chat/ThinkingSelect'
 import { ToolChoiceSelect } from '../components/chat/ToolChoiceSelect'
 import { useViewPlace } from '../lib/viewPlace'
+import { noteFailure } from '../store/problems'
+import { readStored, writeStored } from '../lib/stored'
+import { OwnerDeck } from '../components/cards/OwnerDeck'
 
 const BLANK: AgentDraft = { name: 'New agent', description: '', modelId: null, systemPrompt: '', sampling: {}, workspace: null, modules: [...CORE_MODULES, 'ui'], permissionMode: 'ask' }
 
@@ -61,7 +64,6 @@ function toDraft(agent: AgentProfile): AgentDraft {
     maxToolRounds: agent.maxToolRounds,
     sheet: agent.sheet ?? null,
     player: agent.player ?? null,
-    cards: agent.cards ?? null,
     library: { ...DEFAULT_LIBRARY_ACCESS, ...agent.library, hidden: [...(agent.library?.hidden ?? [])] }
   }
 }
@@ -114,7 +116,7 @@ function usePromptCost(draft: AgentDraft): PromptCost | null {
     const timer = setTimeout(() => {
       engine('agents.promptCost', { draft })
         .then((c) => live && setCost(c))
-        .catch(() => live && setCost(null))
+        .catch(noteFailure('agents', 'Could not count the prompt', () => live && setCost(null)))
     }, 400)
     return () => {
       live = false
@@ -148,11 +150,7 @@ function PromptCostLine({ cost }: { cost: PromptCost | null }) {
 const SECTIONS_KEY = 'seven.agentSections'
 
 function savedSections(): Record<string, boolean> {
-  try {
-    return JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? '{}') as Record<string, boolean>
-  } catch {
-    return {}
-  }
+  return readStored<Record<string, boolean>>(SECTIONS_KEY, {})
 }
 
 function EditorSection({ id, title, summary, isNew, defaultOpen = false, children }: { id: string; title: string; summary: string; isNew: boolean; defaultOpen?: boolean; children: React.ReactNode }) {
@@ -160,11 +158,7 @@ function EditorSection({ id, title, summary, isNew, defaultOpen = false, childre
   const toggle = () => {
     const next = !open
     setOpen(next)
-    try {
-      localStorage.setItem(SECTIONS_KEY, JSON.stringify({ ...savedSections(), [id]: next }))
-    } catch {
-      return
-    }
+    writeStored(SECTIONS_KEY, { ...savedSections(), [id]: next })
   }
   return (
     <section className="border border-line/50 bg-black/30">
@@ -327,7 +321,7 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
               <Field label="Check in every N turns" hint="Seven adds a check_in to the agent's context: each turned-on module's reminder, plus how long since it remembered, looked things up or reasoned, and which tools it used. 0 turns it off.">
                 <NumberField value={draft.remindEvery ?? 5} min={0} max={100} step={1} onChange={(v) => change({ ...draft, remindEvery: v ?? 0 })} className="w-28" />
               </Field>
-              {agentGroups(draft, toolsetList, modules).includes('mind') && <StylePicker value={draft.reasoningStyle ?? null} onChange={(reasoningStyle) => change({ ...draft, reasoningStyle })} />}
+              <StylePicker value={draft.reasoningStyle ?? null} onChange={(reasoningStyle) => change({ ...draft, reasoningStyle })} />
               <ThinkingSelect value={draft.thinking ?? null} fallback="the model's setting" hint="How much this agent's model thinks before replying, unless a chat picks otherwise. Token limits for each level are set per model in Models." onChange={(thinking) => change({ ...draft, thinking })} />
               <ToolChoiceSelect value={draft.toolChoice ?? null} fallback="Auto (Model decides)" hint="Optionally enforce that this agent calls a tool (such as reason) before it is allowed to generate speech or dialogue." onChange={(toolChoice) => change({ ...draft, toolChoice })} />
             </div>
@@ -337,6 +331,14 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
               </div>
             )}
           </EditorSection>
+
+        {draft.id && (
+          <EditorSection id="cards" title="Cards" summary="Its own deck" isNew={false}>
+            <div className="flex h-[32rem] min-h-0 flex-col">
+              <OwnerDeck owner={{ agent: draft.id }} />
+            </div>
+          </EditorSection>
+        )}
 
         <EditorSection id="look" title="Look" summary="Picture, theme, colours and background" isNew={!draft.id}>
         <div className="grid grid-cols-2 gap-x-5 gap-y-4">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Play, RotateCcw, X } from 'lucide-react'
-import type { AvatarState, SceneActor, SceneBeat, SceneFields } from '@shared/types'
+import type { SceneActor, SceneBeat, SceneFields } from '@shared/types'
+import { poseOf } from '@shared/moods'
 import { registerPresentation, useStage, type PresentationProps } from '../../registries/presentations'
 import { useAgents } from '../../store/agents'
 import { speak, stopSpeaking, voicesOn } from '../../lib/speech'
@@ -19,7 +20,7 @@ function Actor({ actor, mood, size, active }: { actor: SceneActor; mood?: string
   return (
     <div className={cn('flex flex-col items-center gap-1.5 transition-all duration-500', active ? 'scale-105 opacity-100' : 'scale-95 opacity-60')} style={{ animation: 'reveal-fade 0.6s ease-out both' }}>
       <div className={cn('overflow-hidden border-2 bg-black/50', active ? 'border-accent' : 'border-white/30')} style={{ width: size, height: size }}>
-        <Portrait agent={agent} image={actor.image ?? ''} name={actor.name} mood={mood as AvatarState | undefined} size={size} />
+        <Portrait agent={agent} image={actor.image ?? ''} name={actor.name} mood={poseOf(mood)} size={size} />
       </div>
       <div className={cn('font-mono text-[11px] uppercase tracking-[0.16em]', active ? 'text-accent' : 'text-dim')}>{actor.name}</div>
     </div>

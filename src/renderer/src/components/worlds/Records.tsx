@@ -11,6 +11,7 @@ import { Button, EmptyState, Input, SearchBox, Select, askText, ListRow, confirm
 import { rowMenu } from '../../views/data/entryMenu'
 import { cn } from '../../lib/cn'
 import { MarkdownEditor } from '../data/MarkdownEditor'
+import { noteFailure } from '../../store/problems'
 
 const ACCENTS = ['#4ee1ff', '#a97bff', '#5ef2a4', '#ffb347', '#ff6b8a', '#7ea6ff']
 const FALLBACK_AS: Record<string, WorldDisplayAs> = { number: 'stat', enum: 'badge', ref: 'chips', refs: 'chips', list: 'ledger', log: 'timeline', map: 'gauge' }
@@ -390,7 +391,7 @@ export function WorldRecords({ worldId, schema, initialType, initialKey }: { wor
           setAll(Object.fromEntries(rows.map(([t, r]) => [t, r])))
           setChanges(Object.fromEntries(rows.map(([t, , c]) => [t, c])))
         })
-        .catch(() => undefined)
+        .catch(noteFailure('worlds', 'Could not load the records'))
     load()
     return on('worlds.changed', ({ id }) => id === worldId && load())
   }, [worldId, schema])

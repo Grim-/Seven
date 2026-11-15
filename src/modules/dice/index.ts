@@ -2,7 +2,9 @@ import type { ModuleFactory } from '../../engine/modules/sdk'
 import type { ToolDef } from '../../engine/tools/types'
 import { roll } from './dice'
 import { presentationTool } from '../../engine/present/define'
-import { CHANCE, actionResultText, checkNames, cleanAction } from '@shared/actions'
+import { actionResultText, cleanAction } from '@shared/actions'
+import { ANY_CHECK, LIVE_CHECKS, type CheckSchema } from '../../engine/tools/checkSchema'
+import type { JsonSchema } from '../../engine/tools/schema'
 import { rollFor } from '../../engine/actions'
 import { journalAction } from '../../engine/worlds/journeys'
 import { agentAccess } from '../../engine/agents/access'
@@ -39,31 +41,34 @@ const factory: ModuleFactory = (sdk) =>
     }
   }
 
-const CHECK = {
+const checkItem = (check: CheckSchema): JsonSchema => ({
   type: 'object',
   properties: {
-    against: { oneOf: [{ type: 'null' }, { enum: [CHANCE, ...checkNames().map((c) => c.id)] }], description: 'null or chance for plain chance' },
+    against: { oneOf: [{ type: 'null' }, check(true)], description: 'null or chance for plain chance' },
     difficulty: { type: ['number', 'null'], description: '0 easy to 1 hard; null is 0.5' },
     base: { type: ['number', 'null'], description: 'Base DC; null is 10' },
     pass: { type: ['string', 'null'], description: 'What happens if this check decides it and passes' },
     fail: { type: ['string', 'null'], description: 'What happens if this check decides it and fails' }
   }
-} as const
+})
+
+const actionFields = (check: CheckSchema): Record<string, JsonSchema> => ({
+  attempt: { type: 'string', description: 'What is being attempted' },
+  character: { type: ['string', 'null'], description: 'Whose sheet to check; null is the character you play' },
+  needs: { enum: ['any', 'all'], description: 'any: the character tries one of the checks (say which with try); all: every check is rolled and must pass' },
+  try: { type: ['integer', 'null'], description: 'With any: the number of the check the character tries, from 0; null is the first' },
+  checks: { type: 'array', minItems: 1, maxItems: 6, items: checkItem(check) },
+  pass: { type: 'string', description: 'What happens on success' },
+  fail: { type: 'string', description: 'What happens on failure' }
+})
 
 const actionCheck = presentationTool({
   type: 'action',
   group: 'dice',
   fixed: true,
   description: 'Roll an action a character attempts, against their D&D sheet. Seven rolls every check and tells you the outcome to play out. For a choice between options, ask instead; never roll a choice.',
-  fields: {
-    attempt: { type: 'string', description: 'What is being attempted' },
-    character: { type: ['string', 'null'], description: 'Whose sheet to check; null is the character you play' },
-    needs: { enum: ['any', 'all'], description: 'any: the character tries one of the checks (say which with try); all: every check is rolled and must pass' },
-    try: { type: ['integer', 'null'], description: 'With any: the number of the check the character tries, from 0; null is the first' },
-    checks: { type: 'array', minItems: 1, maxItems: 6, items: CHECK },
-    pass: { type: 'string', description: 'What happens on success' },
-    fail: { type: 'string', description: 'What happens on failure' }
-  },
+  fields: actionFields(ANY_CHECK),
+  liveFields: () => actionFields(LIVE_CHECKS),
   title: (f) => (typeof f.attempt === 'string' ? f.attempt : 'Action'),
   run: async (f, ctx) => {
     const character = typeof f.character === 'string' && f.character.trim() ? f.character : (agentAccess.get(ctx.agentId ?? '')?.sheet ?? null)

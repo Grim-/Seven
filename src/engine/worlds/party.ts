@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import { mapArea, placesIn } from '@shared/maps'
 import { PLACE_TYPE_KEY } from '@shared/world'
 import type { GameSave } from '@shared/game/save'
@@ -84,7 +85,8 @@ export function createNewWorldSave(world: string, name: string): GameSave {
   for (const sheetId of standingSheets) {
     try {
       bring(save.id, sheetId, '')
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'worlds', 'Could not bring a character into the save')
       // Ignore if sheet doesn't exist
     }
   }

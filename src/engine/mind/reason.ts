@@ -1,4 +1,6 @@
-import type { ReasoningStyle, Thought } from '@shared/types'
+import { noteFailure } from '../util/report'
+import { agentSheets, type ReasoningStyle, type Thought } from '@shared/types'
+import { characterMindFor } from '../library/sheets'
 import type { ModelHost } from '../model/host'
 import type { ModelRegistry } from '../model/registry'
 import type { AgentRegistry } from '../agents/registry'
@@ -26,10 +28,12 @@ export function styleFor(agentId: string, sessionId: string | null, asked: strin
   let chosen: string | null = null
   try {
     chosen = sessionId ? (deps.sessions.get(sessionId).reasoningStyle ?? null) : null
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'memory', "Could not read the chat's reasoning style")
     chosen = null
   }
-  const ref = chosen ?? asked ?? agent.reasoningStyle ?? null
+  const sheetStyle = characterMindFor(agentSheets(agent))?.reasoningStyle ?? null
+  const ref = chosen ?? asked ?? sheetStyle ?? agent.reasoningStyle ?? null
   const style = ref ? styles.find(ref) : (styles.list()[0] ?? null)
   if (ref && !style)
     throw new ToolError(
@@ -44,7 +48,8 @@ export function styleFor(agentId: string, sessionId: string | null, asked: strin
 
 export function styleBrief(style: ReasoningStyle | null): string {
   const voices = style?.voices.length ? `\nVoices in the room:\n${style.voices.map((v) => `- ${v.label}: ${v.line}`).join('\n')}` : ''
-  return `${style ? `Style: ${style.name}. ` : ''}${style?.instruction ?? 'Think it through step by step, then decide.'}${voices}`
+  const constraints = style?.constraints?.trim() ? `\nOutput & voice constraints (filter your conclusion and reply strictly through these):\n${style.constraints.trim()}` : ''
+  return `${style ? `Style: ${style.name}. ` : ''}${style?.instruction ?? 'Think it through step by step, then decide.'}${voices}${constraints}`
 }
 
 export function reason(input: { agentId: string; sessionId: string | null; question: string; reasoning: string; conclusion: string; style: ReasoningStyle | null }): Thought {

@@ -7,5 +7,7 @@ import './TemplateParam'
 import './ValuesParam'
 import './ListParam'
 import './ComponentsParam'
+import './StoredActionParam'
+import './EntryParam'
 
 export { paramEditor, paramLabel, paramWide, registerParamEditor, type ParamEditor, type ParamEditorProps } from './registry'

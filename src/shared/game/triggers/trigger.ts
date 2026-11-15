@@ -1,5 +1,6 @@
 import type { ShapeForm } from '@shared/shapes'
-import { resolveParams, type ParamSchema } from '../core/params'
+import { cleanComponents, resolveParams, type ParamSchema } from '../core/params'
+import type { ComponentDef } from '../core/registry'
 
 export type TriggerFires = 'enter' | 'interact'
 
@@ -15,6 +16,7 @@ export interface TriggerDef {
   hiddenIfFlag?: string
   setsFlag: string
   values: Record<string, unknown>
+  comps: ComponentDef[]
 }
 
 export interface TriggerType {
@@ -58,10 +60,11 @@ export function cleanTrigger(raw: unknown, shape: ShapeForm | null): TriggerDef 
     needsFlag: str(v.needsFlag),
     hiddenIfFlag: str(v.hiddenIfFlag),
     setsFlag: str(v.setsFlag),
-    values: resolveParams(type.params, obj(v.values))
+    values: resolveParams(type.params, obj(v.values)),
+    comps: cleanComponents(v.comps)
   }
 }
 
 export function newTrigger(type: TriggerType, shape: ShapeForm): TriggerDef {
-  return { id: crypto.randomUUID(), name: type.label, type: type.type, shape, fires: type.fires, once: false, needsItem: '', needsFlag: '', hiddenIfFlag: '', setsFlag: '', values: resolveParams(type.params, {}) }
+  return { id: crypto.randomUUID(), name: type.label, type: type.type, shape, fires: type.fires, once: false, needsItem: '', needsFlag: '', hiddenIfFlag: '', setsFlag: '', values: resolveParams(type.params, {}), comps: [] }
 }

@@ -29,6 +29,7 @@ export interface Manifest {
   panel: PanelTabInfo | null
   pages: PageTypeInfo[]
   presentations: TemplateSpec[]
+  dependencies: string[]
   mcp: McpConfig | null
 }
 
@@ -210,6 +211,7 @@ export function parseManifest(input: unknown, folderName: string, builtin: boole
     settings: settingsOf(raw.settings),
     actions: actionsOf(raw.actions),
     presentations: presentationsOf(raw.presentations),
+    dependencies: Array.isArray(raw.dependencies) ? [...new Set(raw.dependencies.filter((d): d is string => typeof d === 'string' && ID_PATTERN.test(d) && d !== id))] : [],
     panel: panelOf(raw.panel, typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : id),
     pages: pagesOf(raw.kinds ?? raw.pages, raw.view, raw.panel, id, typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : id),
     mcp: kind === 'mcp' ? mcpOf((raw.mcp && typeof raw.mcp === 'object' ? raw.mcp : raw) as Record<string, unknown>) : null

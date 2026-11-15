@@ -1,3 +1,5 @@
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
 import { normalEntity, normalValue, worldId, type WorldBinding, type WorldEntity, type WorldEntry, type WorldField, type WorldLock, type WorldMapValue, type WorldType } from '@shared/world'
 import { WorldError, nowStamp, worlds, type WorldLayer } from './store'
 import { Decision } from "@shared/decisions"
@@ -43,7 +45,8 @@ function labelOf(worldIdv: string, typeKey: string, key: string): string {
     const e = worlds.get(worldIdv, typeKey, key)
     const label = e?.[t.label]
     return typeof label === 'string' && label ? label : key
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'worlds', "Could not read a world record's label")
     return key
   }
 }
@@ -109,7 +112,7 @@ export function recall(b: WorldBinding, args: { type: string | null; id: string 
   if (!key) throw new WorldError(`Set id to the id of the ${t.noun} to read (world_search finds ids), or set type and id to null to read your own record.`)
   const e = worlds.get(b.worldId, typeKey, key, false)
   const mine = typeKey === b.type && key === b.id
-  if (!e) throw new WorldError(mine ? 'You have no record yet. world_remember creates it.' : `No ${t.noun} with id "${key}". Use world_search to find the right id.`)
+  if (!e) throw notFound(new WorldError(mine ? 'You have no record yet. world_remember creates it.' : `No ${t.noun} with id "${key}". Use world_search to find the right id.`))
   if (args.field) {
     const name = args.field.trim()
     const back = t.backrefs && Object.keys(t.backrefs).find((n) => n.toLowerCase() === name.toLowerCase())
@@ -266,7 +269,7 @@ export function editEntries(worldIdv: string, typeKey: string, id: string, field
   const t = worlds.type(worldIdv, typeKey)
   const key = worldId(id)
   const e = worlds.get(worldIdv, typeKey, key, true, 'template')
-  if (!e) throw new WorldError(`No ${t.noun} with id "${key}". Use world_search to find the right id.`)
+  if (!e) throw notFound(new WorldError(`No ${t.noun} with id "${key}". Use world_search to find the right id.`))
   const [name, f] = fieldOf(t, field)
   if (f.kind !== 'list' && f.kind !== 'log') throw new WorldError(`${name} is not a list or log, so world_entries can't change it. Use world_set instead.`)
   let list = [...(e[name] as WorldEntry[])]

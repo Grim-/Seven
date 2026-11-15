@@ -12,6 +12,7 @@ import { useGameState } from '../state/gameStateStore'
 import { useDialogue } from '../dialogue/dialogueStore'
 import { defaultDialogueTree } from '@shared/game/dialogue'
 import { cn } from '../../../lib/cn'
+import { matchesKeybind } from '../../../store/keybinds'
 
 interface TacticalCombatDockProps {
   battle: BattleState
@@ -48,7 +49,7 @@ export function TacticalCombatDock({
       const t = e.target
       if (t instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return
 
-      if (e.key === '1' || e.key.toLowerCase() === 'f') {
+      if (e.key === '1' || matchesKeybind('tactical.targetAttack', e)) {
         if (targetCombatant && !economy.actionUsed) {
           e.preventDefault()
           onAttack(targetCombatant.id, selectedAttack)
@@ -63,7 +64,7 @@ export function TacticalCombatDock({
           e.preventDefault()
           dodgeAction()
         }
-      } else if (e.key.toLowerCase() === 'p') {
+      } else if (matchesKeybind('tactical.parley', e)) {
         if (targetCombatant) {
           e.preventDefault()
           const tree = defaultDialogueTree(targetCombatant.id, targetCombatant.name)

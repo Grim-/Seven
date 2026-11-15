@@ -14,6 +14,7 @@ export interface PresentationSpec {
   group: string
   description: string
   fields: Record<string, JsonSchema>
+  liveFields?: () => Record<string, JsonSchema>
   check?: (fields: Record<string, unknown>) => void
   title?: (fields: Record<string, unknown>) => string | undefined
   result?: (fields: Record<string, unknown>, where: PresentWhere) => string
@@ -32,18 +33,15 @@ function stable(value: unknown): string {
   return JSON.stringify(value, (_k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b))) : v))
 }
 
+function paramsOf(spec: PresentationSpec, fields: Record<string, JsonSchema>): JsonObjectSchema {
+  return { type: 'object', properties: spec.fixed ? fields : { ...fields, where: WHERE_FIELD, key: KEY_FIELD } } as JsonObjectSchema
+}
+
 export function presentationTool(spec: PresentationSpec): ToolDef {
-  const params: JsonObjectSchema = {
-    type: 'object',
-    properties: spec.fixed
-      ? spec.fields
-      : {
-      ...spec.fields,
-      where: WHERE_FIELD,
-      key: KEY_FIELD
-        }
-  } as JsonObjectSchema
+  const params = paramsOf(spec, spec.fields)
+  const live = spec.liveFields
   return {
+    ...(live ? { forAgent: () => ({ params: paramsOf(spec, live()) }) } : {}),
     name: presentationToolName(spec.type),
     group: spec.group,
     needsWorkspace: false,

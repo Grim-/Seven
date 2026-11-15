@@ -18,3 +18,17 @@ export function useQueuedComposer(key: string): Queued | undefined {
 export function takeQueuedComposer(key: string): void {
   useQueue.setState((s) => ({ queued: { ...s.queued, [key]: undefined } }))
 }
+
+const useOffers = create<{ offered: Record<string, true | undefined> }>(() => ({ offered: {} }))
+
+export function offerSend(key: string): void {
+  useOffers.setState((s) => ({ offered: { ...s.offered, [key]: true } }))
+}
+
+export function dropSendOffer(key: string): void {
+  useOffers.setState((s) => ({ offered: { ...s.offered, [key]: undefined } }))
+}
+
+export function useSendOffer(key: string): boolean {
+  return useOffers((s) => s.offered[key] === true)
+}

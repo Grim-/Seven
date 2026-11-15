@@ -4,6 +4,7 @@ import { PageChat, PageStage } from './PageChat'
 import { FileChat, FileStage } from './FileChat'
 import { AddonChat } from './AddonChat'
 import { SheetCard } from './SheetCard'
+import '../entries/EntrySlate'
 import { BoardChat, BoardStage } from '../dashboards/BoardChat'
 import { WorkoutChat, ExerciseChat, WorkoutWidget } from '../workout/workoutPresent'
 import { entryWidget } from '../../registries/widgets'
@@ -11,6 +12,8 @@ import { FolderChat } from './FolderChat'
 import { WorldChat, WorldWidget } from '../worlds/WorldChat'
 import { SkillChat, SkillStage, SkillWidget } from '../skills/SkillChat'
 import { ThemeChat, ThemeStage, ThemeWidget } from '../themes/ThemeChat'
+import '../avatars/kindUi'
+import { panelScreen } from './panelScreen'
 import { RepoChat, RepoStage, RepoWidget } from './RepoChat'
 import { RoutineChat, RoutineWidget } from './RoutineChat'
 import { CommandChat } from './CommandChat'
@@ -76,6 +79,10 @@ import { addToQueue, playNow } from '../../store/player'
 import { SETUP_GROUP, registerKindUi, type KindMenuContext, type KindScreenProps, type KindUi } from '../../registries/kinds'
 import { registerStoryteller } from '../storyteller/register'
 import { registerCards } from '../cards/register'
+import './sheet/mind/facet'
+import './sheet/story/facet'
+import './sheet/dnd/status'
+import '../play/roleplayCard'
 import { registerDecisions } from '../decisions/register'
 import { AssetMedia } from '../pictures/AssetMedia'
 import { SlideshowScreen, askNewSlideshow } from '../slideshow/SlideshowScreen'
@@ -86,6 +93,7 @@ import { MapObjectScreen } from '../mapObjects/MapObjectScreen'
 import { TriggerActionScreen } from '../triggerActions/TriggerActionScreen'
 import { LootTableScreen } from '../lootTables/LootTableScreen'
 import { failed } from '../../lib/notify'
+import { sheetFacets } from './sheet/facets'
 
 
 
@@ -405,30 +413,26 @@ function ChatScreen({ id }: KindScreenProps) {
   )
 }
 
-const panel = (Component: React.ComponentType<{ initial?: string | null }>) =>
-  function Screen({ id }: KindScreenProps) {
-    return <Component key={id ?? 'all'} initial={id} />
-  }
 
 registerKindUi('workout', { present: { Screen: WorkoutEntryScreen, Chat: WorkoutChat, Stage: WorkoutChat, Widget: entryWidget(WorkoutWidget) }, home: WorkoutHome, addLabel: 'New workout', add: () => () => newWorkoutEntry('workout', 'workout', { items: [] }), importer: ({ onClose }) => <JsonImporter initial="workouts" onClose={onClose} /> })
 registerKindUi('exercise', { present: { Screen: ExerciseScreen, Chat: ExerciseChat, Stage: ExerciseChat, Widget: entryWidget(ExerciseChat) }, addLabel: 'New exercise', add: () => () => newWorkoutEntry('exercise', 'exercise', {}), importer: ({ onClose }) => <JsonImporter initial="exercises" onClose={onClose} /> })
-registerKindUi('place', { present: { Screen: panel(WorldsPanel), Chat: PlaceChat, Stage: PlaceStage, Widget: entryWidget(PlaceWidget) }, whole: true, menu: (ctx) => [deletePlaceItem(ctx.id, ctx.title)] })
+registerKindUi('place', { present: { Screen: panelScreen(WorldsPanel), Chat: PlaceChat, Stage: PlaceStage, Widget: entryWidget(PlaceWidget) }, whole: true, menu: (ctx) => [deletePlaceItem(ctx.id, ctx.title)] })
 registerKindUi('map', { present: { Screen: MapScreen, Chat: MapChat, Stage: MapStage, Widget: entryWidget(MapWidget), Thumb: MapThumb }, addLabel: 'New map', add: (_k, select) => () => askText('New map', 'Name', '', async (name) => { if (name.trim()) select({ kind: 'map', id: (await engine('maps.create', { name })).id }) }), importer: MapImporter, importLabel: 'Import a map made in Tiled' })
-registerKindUi('world', { present: { Screen: panel(WorldsPanel), Chat: WorldChat, Stage: WorldChat, Widget: entryWidget(WorldWidget) }, whole: true })
+registerKindUi('world', { present: { Screen: panelScreen(WorldsPanel), Chat: WorldChat, Stage: WorldChat, Widget: entryWidget(WorldWidget) }, whole: true })
 registerKindUi('faction', { present: { Screen: FactionScreen }, addLabel: 'New faction', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('map_object', { present: { Screen: MapObjectScreen }, addLabel: 'New map object', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('trigger_action', { present: { Screen: TriggerActionScreen }, addLabel: 'New trigger action', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('loot_table', { present: { Screen: LootTableScreen }, addLabel: 'New loot table', add: (kind, select) => () => select({ kind, id: '__new' }) })
-registerKindUi('skill', { present: { Screen: panel(SkillsPanel), Chat: SkillChat, Stage: SkillStage, Widget: entryWidget(SkillWidget) }, whole: true })
-registerKindUi('script', { present: { Screen: panel(PythonPanel), Chat: ScriptPart, Stage: ScriptPart, Widget: entryWidget(ScriptPart) }, whole: true, addLabel: 'New script', add: (_k, select) => () => select({ kind: 'script', id: '_new' }) })
-registerKindUi('theme', { railGroup: SETUP_GROUP, present: { Screen: panel(ThemesPanel), Chat: ThemeChat, Stage: ThemeStage, Widget: entryWidget(ThemeWidget) }, whole: true, addLabel: 'New theme', add: (_k, select) => () => select({ kind: 'theme', id: '_new' }) })
+registerKindUi('skill', { present: { Screen: panelScreen(SkillsPanel), Chat: SkillChat, Stage: SkillStage, Widget: entryWidget(SkillWidget) }, whole: true })
+registerKindUi('script', { present: { Screen: panelScreen(PythonPanel), Chat: ScriptPart, Stage: ScriptPart, Widget: entryWidget(ScriptPart) }, whole: true, addLabel: 'New script', add: (_k, select) => () => select({ kind: 'script', id: '_new' }) })
+registerKindUi('theme', { railGroup: SETUP_GROUP, present: { Screen: panelScreen(ThemesPanel), Chat: ThemeChat, Stage: ThemeStage, Widget: entryWidget(ThemeWidget) }, whole: true, addLabel: 'New theme', add: (_k, select) => () => select({ kind: 'theme', id: '_new' }) })
 registerKindUi('slideshow', { present: { Screen: SlideshowScreen, Chat: SlideshowPart, Stage: SlideshowPart, Widget: entryWidget(SlideshowPart), Thumb: SlideshowThumb }, addLabel: 'New slideshow', add: (_k, select) => () => askNewSlideshow(select) })
 registerKindUi('repo', { emptyText: 'No repos yet. Make one in Data.', present: { Screen: RepoScreen, Chat: RepoChat, Stage: RepoStage, Widget: entryWidget(RepoWidget) }, whole: true, addLabel: 'New repo', add: (_k, select) => () => askNewRepo(select) })
 registerKindUi('routine', { present: { Screen: RoutineScreen, Chat: RoutineChat, Stage: RoutineChat, Widget: entryWidget(RoutineWidget) }, addLabel: 'New routine', add: (_k, select) => () => select({ kind: 'routine', id: NEW_ROUTINE }) })
-registerKindUi('sheet', { present: { Screen: SheetScreen, Chat: SheetCard, Stage: SheetCard, Widget: entryWidget(SheetCard) }, whole: true, addLabel: 'New character', add: (_k, select) => () => askNewSheet(select) })
-registerKindUi('command', { railGroup: SETUP_GROUP, present: { Screen: panel(CommandsPanel), Chat: CommandChat }, whole: true, addLabel: 'New command', add: (_k, select) => () => select({ kind: 'command', id: '_new' }) })
-registerKindUi('style', { railGroup: SETUP_GROUP, present: { Screen: panel(StylesPanel), Chat: StyleChat }, whole: true, addLabel: 'New style', add: (_k, select) => () => select({ kind: 'style', id: '_new' }) })
-registerKindUi('story', { present: { Screen: panel(StoriesPanel), Chat: StoryChat, Stage: StoryStage, Widget: entryWidget(StoryWidget) }, whole: true, timed: true })
+registerKindUi('sheet', { moduleLists: [{ label: 'Sheet tab', list: sheetFacets }], present: { Screen: SheetScreen, Chat: SheetCard, Stage: SheetCard, Widget: entryWidget(SheetCard) }, whole: true, addLabel: 'New character', add: (_k, select) => () => askNewSheet(select) })
+registerKindUi('command', { railGroup: SETUP_GROUP, present: { Screen: panelScreen(CommandsPanel), Chat: CommandChat }, whole: true, addLabel: 'New command', add: (_k, select) => () => select({ kind: 'command', id: '_new' }) })
+registerKindUi('style', { railGroup: SETUP_GROUP, present: { Screen: panelScreen(StylesPanel), Chat: StyleChat }, whole: true, addLabel: 'New style', add: (_k, select) => () => select({ kind: 'style', id: '_new' }) })
+registerKindUi('story', { present: { Screen: panelScreen(StoriesPanel), Chat: StoryChat, Stage: StoryStage, Widget: entryWidget(StoryWidget) }, whole: true, timed: true })
 registerKindUi('reminder', { present: { Screen: () => <ReminderList />, Chat: ReminderChat, Stage: ReminderStage, Widget: entryWidget(ReminderWidget) }, whole: true })
 registerKindUi('weblog', { present: { Screen: () => <WebLog />, Chat: WebLogChat, Stage: WebLogChat, Widget: entryWidget(WebLogWidget) }, whole: true })
 registerKindUi('message', { present: { Screen: () => <BoardView />, Chat: MessageChat, Stage: MessageChat, Widget: entryWidget(MessageWidget) }, whole: true })

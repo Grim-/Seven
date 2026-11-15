@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { engine, on } from '../../lib/ipc'
 import { onLibraryChange } from '../../lib/library'
+import { noteFailure } from '../../store/problems'
 
 export interface Token {
   value: string
@@ -19,7 +20,7 @@ export function useRepoTokens(): Token[] {
             ...tags.map((t) => ({ value: `tag:${t}`, hint: 'any repo with this tag' }))
           ])
         })
-        .catch(() => setTokens([]))
+        .catch(noteFailure('repos', 'Could not list the repos', () => setTokens([])))
     load()
     const off = onLibraryChange(load)
     const offPage = on('page.changed', load)

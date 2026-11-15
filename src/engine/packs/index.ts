@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { ModelConfig, ModelInfo, PackListing, PackValue, PackView, ServerBuild } from '@shared/types'
@@ -43,7 +44,7 @@ export class Packs {
   constructor(private o: PacksOptions) {}
 
   async reload(): Promise<void> {
-    await readGpu().catch(() => undefined)
+    await readGpu().catch((err: unknown) => noteFailure(err, 'packs', 'Could not read the GPU'))
     this.packs = loadPacks(this.o.shippedDir(), this.o.ownDir())
   }
 
@@ -83,7 +84,8 @@ export class Packs {
     try {
       fs.mkdirSync(folder, { recursive: true })
       return folder
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'packs', 'Could not create the packs folder')
       return folder
     }
   }

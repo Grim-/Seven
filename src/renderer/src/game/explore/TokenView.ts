@@ -66,9 +66,9 @@ export class TokenView {
     this.token = token
     const v = token.visitor
     if (v.image !== this.image) void this.usePortrait(v.image)
-    this.label?.set(showName(v.name))
+    const labelChanged = this.label?.set(showName(v.name))
     if (moved && !this.dragging && !this.walking) this.engine.tweens.to(this.root.position, { x: token.at.x, y: token.at.y }, 0.35, EASE.inOut)
-    this.zoom = 0
+    if (labelChanged || !this.zoom) this.zoom = 0
   }
 
   setBars(bars: TokenBar[] | null): void {
@@ -95,6 +95,7 @@ export class TokenView {
     this.portrait.texture = this.crop ?? this.portrait.texture
     this.portrait.visible = Boolean(this.crop)
     this.zoom = 0
+    this.engine.invalidate()
   }
 
   get at(): Point {

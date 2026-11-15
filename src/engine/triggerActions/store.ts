@@ -1,3 +1,5 @@
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { toId } from '@shared/ids'
@@ -17,7 +19,8 @@ export class TriggerActionStore extends EventEmitter {
     let raw: unknown[] = []
     try {
       raw = readJson<unknown[]>(this.file, [])
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'game', 'Could not read the trigger actions, so the starter set is shown')
       return STARTER_TRIGGER_ACTIONS
     }
     const cleaned = raw
@@ -26,7 +29,8 @@ export class TriggerActionStore extends EventEmitter {
     if (cleaned.length === 0) {
       try {
         this.write(STARTER_TRIGGER_ACTIONS)
-      } catch {
+      } catch (err) {
+        noteFailure(err, 'game', 'Could not save the starter trigger actions')
         // Vault may be temporarily locked
       }
       return STARTER_TRIGGER_ACTIONS
@@ -53,7 +57,7 @@ export class TriggerActionStore extends EventEmitter {
 
   remove(id: string): void {
     const all = this.list()
-    if (!all.some((a) => a.id === id)) throw new ToolError(`No trigger action "${id}".`)
+    if (!all.some((a) => a.id === id)) throw notFound(new ToolError(`No trigger action "${id}".`))
     this.write(all.filter((a) => a.id !== id))
   }
 

@@ -6,6 +6,7 @@ import { toast } from '../../store/toasts'
 import { errorText } from '../../lib/format'
 import { Button, EmptyState, Input, askText, confirmDelete } from '../ui'
 import { failed } from '../../lib/notify'
+import { noteFailure } from '../../store/problems'
 
 export function WorldBoard({ worldId }: { worldId: string }) {
   const [posts, setPosts] = useState<WorldPost[]>([])
@@ -15,7 +16,7 @@ export function WorldBoard({ worldId }: { worldId: string }) {
     const load = () =>
       void engine('worlds.board', { id: worldId })
         .then(setPosts)
-        .catch(() => undefined)
+        .catch(noteFailure('worlds', 'Could not load the board'))
     load()
     return on('worlds.changed', ({ id }) => id === worldId && load())
   }, [worldId])

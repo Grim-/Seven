@@ -6,7 +6,7 @@ import { readJson, writeJson } from '../util/fs'
 const FILE = path.join(dataRoot, 'tools-prefs.json')
 
 function defaults(): ToolsPrefs {
-  return { toolsFolder: path.join(dataRoot, 'tools'), skillsFolder: path.join(dataRoot, 'skills') }
+  return { toolsFolder: path.join(dataRoot, 'tools'), skillsFolder: path.join(dataRoot, 'skills'), zipLimitMb: 200 }
 }
 
 let current: ToolsPrefs = { ...defaults(), ...readJson<Partial<ToolsPrefs>>(FILE, {}) }

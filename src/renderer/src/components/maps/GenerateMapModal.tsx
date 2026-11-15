@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Box, Compass, RefreshCw, RotateCcw, Sliders, Sparkles } from 'lucide-react'
 import { generateDungeon, generateMap, renderMapToCanvas } from 'agent_map_gen'
 import { Button, Field, Input, Modal, Segmented, Select, Toggle } from '../ui'
+import { noteFailure } from '../../store/problems'
 
 export interface GenerateConfig {
   type: 'dungeon' | 'overworld'
@@ -365,7 +366,8 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
             renderMapToCanvas(canvasRef.current, res, { tileSize: Math.max(1, Math.floor(340 / Math.max(width, height))) })
           }
         }
-      } catch {
+      } catch (err) {
+        noteFailure('maps', 'Could not draw the preview')(err)
       }
     }
     const timer = setTimeout(run, 150)

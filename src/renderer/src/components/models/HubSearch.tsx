@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from 'react'
 import { ArrowDownWideNarrow, Boxes, Clock, Heart } from 'lucide-react'
 import type { HubModel } from '@shared/types'
-import { AlertBox, FacetBar, KindShell, SearchBox, type ShellItem, type ShellSort } from '../ui'
+import { AlertBox, FilterBar, KindShell, SearchBox, type ShellItem, type ShellSort } from '../ui'
 import { useHub } from '../../store/hub'
 import { formatCount } from '../../lib/format'
-import { applyFacets, facetActive, useFacetValues } from '../../lib/facets'
+import { applyFilters, filterActive, useFilterValues } from '../../lib/propertyFilters'
 import { useViewPlace } from '../../lib/viewPlace'
-import { hubFacets } from './hubFacets'
+import { hubFilters } from './hubFilters'
 import { modelTraits } from './ModelTraits'
 
 export function hubSubtitle(m: HubModel): string {
@@ -16,7 +16,7 @@ export function hubSubtitle(m: HubModel): string {
 export function HubSearch({ onOpen }: { onOpen: (model: HubModel) => void }) {
   const { query, results, searching, error, search, facts, resolveFacts } = useHub()
   const [text, setText] = useViewPlace('models.hub.query', '')
-  const [values, setValue] = useFacetValues('models.hub')
+  const [values, setValue] = useFilterValues('models.hub')
   useEffect(() => {
     if (results === null && !searching) void search(text.trim())
   }, [])
@@ -29,9 +29,9 @@ export function HubSearch({ onOpen }: { onOpen: (model: HubModel) => void }) {
     const f = facts[m.id]
     return f ? f.value : undefined
   }
-  const facets = useMemo(() => hubFacets(factOf), [facts])
-  const { shown, pending } = useMemo(() => applyFacets(results ?? [], facets, values), [results, facets, values])
-  const needsFacts = facets.some((f) => (f.id === 'shape' || f.id === 'mtp') && facetActive(f, values))
+  const filters = useMemo(() => hubFilters(factOf), [facts])
+  const { shown, pending } = useMemo(() => applyFilters(results ?? [], filters, values), [results, filters, values])
+  const needsFacts = filters.some((f) => (f.id === 'shape' || f.id === 'mtp') && filterActive(f, values))
   useEffect(() => {
     if (pending.length && needsFacts) resolveFacts(pending)
   }, [pending, needsFacts])
@@ -47,9 +47,9 @@ export function HubSearch({ onOpen }: { onOpen: (model: HubModel) => void }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {error && <AlertBox>{error}</AlertBox>}
-      <FacetBar facets={facets} values={values} onChange={setValue}>
+      <FilterBar filters={filters} values={values} onChange={setValue}>
         {results && `${shown.length} of ${results.length} shown${pending.length ? ` · checking ${pending.length} file headers` : ''}`}
-      </FacetBar>
+      </FilterBar>
       <KindShell
         id="models.hub"
         layouts={['list', 'cards']}

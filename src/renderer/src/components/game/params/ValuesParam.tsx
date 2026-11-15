@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { Button, Input, NumberField, Select } from '../../ui'
+import { Button, CountStepper, Input, Select } from '../../ui'
 import { useGameDefs } from '../useGameDefs'
 import { registerParamEditor, type ParamEditorProps } from './registry'
 
@@ -15,7 +15,7 @@ function ValueRows({ values, names, onChange }: { values: Values; names?: Map<st
       <span className="min-w-0 flex-1 truncate text-[13px] text-white/90" title={key}>
         {names?.get(key) ?? key}
       </span>
-      <NumberField value={n} onChange={(v) => onChange({ ...values, [key]: v ?? 0 })} className="h-8 w-24" />
+      <CountStepper value={n} min={-999} onChange={(v) => onChange({ ...values, [key]: v })} />
       <Button size="sm" variant="ghost" icon={<X />} title="Remove" onClick={() => onChange(Object.fromEntries(Object.entries(values).filter(([k]) => k !== key)))} />
     </div>
   ))
@@ -46,6 +46,10 @@ function FreeValues({ value, onChange }: ParamEditorProps) {
   )
 }
 
+export function ValuesEdit(props: ParamEditorProps) {
+  return props.spec.templateKind ? <DefValues {...props} /> : <FreeValues {...props} />
+}
+
 function DefValues({ spec, value, onChange }: ParamEditorProps) {
   const values = valuesOf(value)
   const defs = useGameDefs(spec.templateKind ?? '')
@@ -60,4 +64,4 @@ function DefValues({ spec, value, onChange }: ParamEditorProps) {
   )
 }
 
-registerParamEditor('values', { Editor: (props) => (props.spec.templateKind ? <DefValues {...props} /> : <FreeValues {...props} />) })
+registerParamEditor('values', { Editor: ValuesEdit })

@@ -1,3 +1,5 @@
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { JournalEntry, Memory, MindHit, MindIndexing, MindOverview, MindPrefs, Thought } from '@shared/types'
@@ -240,7 +242,7 @@ export class Minds {
   forget(agentId: string, id: string, sessionId: string | null): Memory {
     const list = this.memories(agentId)
     const memory = list.find((m) => m.id === id.trim())
-    if (!memory) throw new Error(`There is no memory ${id}. recall with no query lists the memories and their ids.`)
+    if (!memory) throw notFound(new Error(`There is no memory ${id}. recall with no query lists the memories and their ids.`))
     this.saveMemories(agentId, list.filter((m) => m.id !== memory.id))
     if (sessionId && memory.pinned) for (const fn of this.listeners.pinned) fn(sessionId)
     return memory
@@ -495,7 +497,7 @@ export class Minds {
     this.backfilling ??= (async () => {
       try {
         if (!fs.existsSync(ROOT)) return
-        for (const name of fs.readdirSync(ROOT)) await this.backfill(name).catch(() => undefined)
+        for (const name of fs.readdirSync(ROOT)) await this.backfill(name).catch((err: unknown) => noteFailure(err, 'memory', "Could not index an agent's memory"))
       } finally {
         this.backfilling = null
       }

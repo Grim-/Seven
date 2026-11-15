@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { MapData, PlaceVisitor } from '@shared/maps'
 import type { Point, ShapeForm } from '@shared/shapes'
 import type { WorldEntity } from '@shared/world'
@@ -62,13 +62,31 @@ interface Props {
 
 export function PlayStage({ world, save, triggers, onTrigger, map, shapes, places, here, place, tokens, mine, selected, onPlace, onBlankMenu, tokenHandlers, objects, onTime, onClock, onNavigation, onTarget, onCamera, aiming = false, battle = null, className }: Props) {
   const catalog = useGameCatalog()
-  const data: ExploreData = { map, shapes, names: Object.fromEntries(Object.keys(shapes).map((k) => [k, placeName(places, k)])), tokens, markers: here, mine, selected, catalog, save: save ? { id: save.id, clockId: save.clockId, clock: save.clock } : null, triggers, used: save?.used ?? [], aiming, battle }
+  const names = useMemo(() => Object.fromEntries(Object.keys(shapes).map((k) => [k, placeName(places, k)])), [shapes, places])
+  const data = useMemo<ExploreData>(
+    () => ({
+      map,
+      shapes,
+      names,
+      tokens,
+      markers: here,
+      mine,
+      selected,
+      catalog,
+      save: save ? { id: save.id, clockId: save.clockId, clock: save.clock } : null,
+      triggers,
+      used: save?.used ?? [],
+      aiming,
+      battle
+    }),
+    [map, shapes, names, tokens, here, mine, selected, catalog, save?.id, save?.clockId, save?.clock, triggers, save?.used, aiming, battle]
+  )
   const latest = useLatest({ data, world, onTrigger, onPlace, onBlankMenu, tokenHandlers, objects, onTime, onClock, onNavigation, onTarget, onCamera })
   const scene = useRef<ExploreScene | null>(null)
 
   useEffect(() => {
     scene.current?.setData(data)
-  })
+  }, [data])
 
   return (
     <GameCanvas

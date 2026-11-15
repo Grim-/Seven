@@ -1,3 +1,4 @@
+import { noteFailure, reportError } from '../../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
@@ -23,7 +24,7 @@ function save(): void {
     if (live.size) writeUserFile(file(), JSON.stringify([...live]))
     else removePath(file())
   } catch (err) {
-    console.warn('[llama-server] could not record running processes:', err instanceof Error ? err.message : err)
+    reportError('warning', 'llama-server', err, 'Could not record the running llama-servers, so they may be left running after a crash')
   }
   report([...live])
 }
@@ -57,7 +58,8 @@ function recorded(at: string): number[] {
   try {
     const pids = JSON.parse(fs.readFileSync(at, 'utf8')) as unknown
     return Array.isArray(pids) ? pids.filter((p): p is number => typeof p === 'number') : []
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'llama-server', 'Could not read the list of running llama-servers')
     return []
   }
 }

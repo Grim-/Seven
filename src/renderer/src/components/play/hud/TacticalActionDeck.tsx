@@ -30,6 +30,7 @@ import { useGameState } from '../state/gameStateStore'
 import { useDialogue } from '../dialogue/dialogueStore'
 import { defaultDialogueTree, combatParleyDialogueTree } from '@shared/game/dialogue'
 import { useGameplaySettings } from '../settings/gameplaySettingsStore'
+import { matchesKeybind } from '../../../store/keybinds'
 import { useLatest } from '../../../game/react/useLatest'
 import { hideTip, showTip } from '../../ui/TooltipHost'
 import { openMenu } from '../../ui'
@@ -50,6 +51,8 @@ import {
 import { itemName, itemTip } from '../screens/itemTip'
 import { toast } from '../../../store/toasts'
 import { cn } from '../../../lib/cn'
+import { noteFailure } from '../../../store/problems'
+import { readStored, writeStored } from '../../../lib/stored'
 
 const typing = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
@@ -113,21 +116,12 @@ export function TacticalActionDeck({
   
   // Configurable row count: 2, 3, or 4 rows (default 3)
   const [rowCount, setRowCount] = useState<2 | 3 | 4>(() => {
-    try {
-      const saved = localStorage.getItem('seven:action_deck:rows')
-      if (saved === '2' || saved === '3' || saved === '4') return Number(saved) as 2 | 3 | 4
-    } catch {}
-    return 3
+    const saved = readStored<number>('seven:action_deck:rows', 3)
+    return saved === 2 || saved === 4 ? saved : 3
   })
 
   // Action bar lock state (prevents accidental drags when locked)
-  const [isLocked, setIsLocked] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('seven:action_deck:locked') === 'true'
-    } catch {
-      return true
-    }
-  })
+  const [isLocked, setIsLocked] = useState<boolean>(() => readStored<boolean>('seven:action_deck:locked', false) === true)
 
   // Combat stances / toggles
   const [nonLethal, setNonLethal] = useState(false)
@@ -138,17 +132,13 @@ export function TacticalActionDeck({
   const toggleRows = (delta: number) => {
     const next = Math.max(2, Math.min(4, rowCount + delta)) as 2 | 3 | 4
     setRowCount(next)
-    try {
-      localStorage.setItem('seven:action_deck:rows', String(next))
-    } catch {}
+    writeStored('seven:action_deck:rows', next)
   }
 
   const toggleLock = () => {
     setIsLocked((prev) => {
       const next = !prev
-      try {
-        localStorage.setItem('seven:action_deck:locked', String(next))
-      } catch {}
+      writeStored('seven:action_deck:locked', next)
       toast.info('Action Deck', next ? 'Deck locked: slot dragging disabled' : 'Deck unlocked: drag to reorder')
       return next
     })
@@ -322,30 +312,30 @@ export function TacticalActionDeck({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return
+      if (e.defaultPrevented || e.repeat || typing(e.target)) return
       const k = e.key.toLowerCase()
 
-      if (k === '1' || k === 'f') {
+      if (k === '1' || matchesKeybind('tactical.targetAttack', e)) {
         if (latestRef.current.inCombat && latestRef.current.isPlayerTurn && latestRef.current.targetCombatant) {
           e.preventDefault()
           latestRef.current.executeStrike()
         }
-      } else if (k === '2' || k === 'c') {
+      } else if (k === '2' || matchesKeybind('tactical.dash', e)) {
         if (latestRef.current.inCombat && latestRef.current.isPlayerTurn) {
           e.preventDefault()
           latestRef.current.executeDash()
         }
-      } else if (k === '3' || k === 'z') {
+      } else if (k === '3' || matchesKeybind('tactical.dodge', e)) {
         if (latestRef.current.inCombat && latestRef.current.isPlayerTurn) {
           e.preventDefault()
           latestRef.current.executeDodge()
         }
-      } else if (k === '4' || k === 'x') {
+      } else if (k === '4' || matchesKeybind('tactical.disengage', e)) {
         if (latestRef.current.inCombat && latestRef.current.isPlayerTurn) {
           e.preventDefault()
           toast.info('Maneuver', 'Disengage: Movement prevents opportunity attacks')
         }
-      } else if (k === 'p') {
+      } else if (matchesKeybind('tactical.parley', e)) {
         if (latestRef.current.targetCombatant) {
           e.preventDefault()
           latestRef.current.executeParley()
@@ -400,7 +390,9 @@ export function TacticalActionDeck({
           swapActionSlots(sheet, data.index, index, 48)
           return
         }
-      } catch {}
+      } catch (err) {
+        noteFailure('play', 'Could not read the dragged slot')(err)
+      }
     }
 
     // Drag from Spellbook or Inventory
@@ -420,7 +412,9 @@ export function TacticalActionDeck({
           48
         )
         toast.info('Action Deck', `Bound ${data.label} to Slot ${index + 1}`)
-      } catch {}
+      } catch (err) {
+        noteFailure('play', 'Could not read the dragged action')(err)
+      }
     }
   }
 

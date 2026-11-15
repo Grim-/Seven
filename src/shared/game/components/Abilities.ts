@@ -1,6 +1,6 @@
 import { Component, registerComponent, type GameEntity, type TooltipRow } from '../core'
 import { Resource } from './Resource'
-import { Action, ActionPiece, type UseContext } from './Action'
+import { Action, ActionPiece, type EffectLane, type UseContext } from './Action'
 import { Inventory, Item, Wearable } from './Inventory'
 import { ItemResource } from './item/ItemResource'
 
@@ -8,18 +8,21 @@ export { ActionPiece as AbilityPiece, type ActionEvent as AbilityEvent } from '.
 
 export class Ability extends Action {
   static readonly type: string = 'ability'
+  static readonly LABEL: string = 'Ability'
+  static readonly ICON: string = 'Wand2'
   static readonly DESCRIPTION: string = 'An ability or spell. Using it pays its cost, starts its cooldown and sends OnUse to its pieces, which chain by sending further events.'
   static readonly PARAMS = {
     id: { kind: 'text' as const, default: '', description: 'Which ability this is.' },
     label: { kind: 'text' as const, default: '', description: 'Its name.' },
-    cost: { kind: 'values' as const, templateKind: 'stat', default: {}, description: 'Resource stat id to amount spent on use.' },
-    cooldown: { kind: 'number' as const, default: 0, min: 0, description: 'Seconds before it can be used again.' },
-    range: { kind: 'number' as const, default: 5, min: 0, description: 'Reach in feet. 0 is self only.' },
-    weaponRange: { kind: 'flag' as const, default: false, description: 'Use the reach of the weapon it is inside instead of Range.' },
-    itemCost: { kind: 'values' as const, default: {}, description: 'Item resource id (charges, a magazine) to amount spent, from the item it is inside.' },
-    uses: { kind: 'values' as const, templateKind: 'game_item', default: {}, description: 'Items used up from the inventory on each use, e.g. an arrow.' },
-    action: { kind: 'choice' as const, default: 'action', choices: ['action', 'bonus', 'free'], description: 'What it takes in a battle turn.' }
+    cost: { kind: 'values' as const, templateKind: 'stat', default: {}, description: 'Resource stat id to amount spent on use.', section: 'Costs' },
+    cooldown: { kind: 'number' as const, default: 0, min: 0, description: 'Seconds before it can be used again.', section: 'Timing and reach' },
+    range: { kind: 'number' as const, default: 5, min: 0, description: 'Reach in feet. 0 is self only.', section: 'Timing and reach' },
+    weaponRange: { kind: 'flag' as const, default: false, description: 'Use the reach of the weapon it is inside instead of Range.', section: 'Timing and reach' },
+    itemCost: { kind: 'values' as const, default: {}, description: 'Item resource id (charges, a magazine) to amount spent, from the item it is inside.', section: 'Costs' },
+    uses: { kind: 'values' as const, templateKind: 'game_item', default: {}, description: 'Items used up from the inventory on each use, e.g. an arrow.', section: 'Costs' },
+    action: { kind: 'choice' as const, default: 'action', choices: ['action', 'bonus', 'free'], description: 'What it takes in a battle turn.', section: 'Timing and reach' }
   }
+  static readonly LANES: EffectLane[] = [{ event: 'OnUse', label: 'When used' }]
   cooling = 0
 
   canApply(host: Component | GameEntity): true | string {
@@ -111,6 +114,8 @@ export class Ability extends Action {
 
 export class Abilities extends Component {
   static readonly type: string = 'abilities'
+  static readonly LABEL: string = 'Abilities'
+  static readonly ICON: string = 'BookOpen'
   static readonly DESCRIPTION: string = 'The abilities and spells an entity knows: its spell book.'
   static readonly PARAMS = {}
 

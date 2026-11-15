@@ -31,7 +31,7 @@ export function GamePortrait({
         className
       )}
     >
-      <SheetPortrait image={visitor.image} className={cn('h-10 w-10 shrink-0', active && 'border-accent')} />
+      <SheetPortrait image={visitor.image} usedBy={`The portrait of ${showName(visitor.name)}`} className={cn('h-10 w-10 shrink-0', active && 'border-accent')} />
       <span className="flex min-w-0 flex-1 flex-col gap-1 pr-2">
         <span className="truncate text-[13px] font-semibold text-white">{showName(visitor.name)}</span>
         {visitor.game && catalog ? (

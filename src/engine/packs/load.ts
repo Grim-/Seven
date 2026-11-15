@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { ParamDef } from '@shared/types'
@@ -98,7 +99,8 @@ function readFolder(dir: string, shipped: boolean): Pack[] {
   let names: string[] = []
   try {
     names = fs.readdirSync(dir).filter((n) => n.toLowerCase().endsWith('.json'))
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'packs', 'Could not list a packs folder')
     return []
   }
   const seen = new Map<string, string>()

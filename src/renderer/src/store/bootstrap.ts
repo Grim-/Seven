@@ -6,8 +6,10 @@ import { useModels } from './models'
 import { useAgents } from './agents'
 import { useSessions } from './sessions'
 import { toast } from './toasts'
+import { noteFailure, startProblems } from './problems'
 import { useData } from './data'
 import { useThemes } from './themes'
+import { useAvatars } from './avatars'
 import { useDashboards } from './dashboards'
 import { useTools } from './tools'
 import { useReactions } from './reactions'
@@ -35,6 +37,7 @@ import '../components/mind/ThoughtDraft'
 import '../components/present/PresentWidget'
 import '../components/dashboards/HtmlWidget'
 import '../components/dashboards/Glances'
+import '../components/dashboards/CharacterStatsWidget'
 import { useWidgetInfo } from './widgetInfo'
 import { clearPersonal, isLockedError, useVault } from './vault'
 import { useStyleList } from './styles'
@@ -50,7 +53,7 @@ let mode: WindowMode = 'app'
 
 async function loadEngineState(retried = false): Promise<void> {
   try {
-    const results = await Promise.allSettled([useTools.getState().refresh(), useModels.getState().refresh(), useAgents.getState().refresh(), useSessions.getState().refresh(openConversations().flatMap((c) => (c.sessionId ? [c.sessionId] : []))), useData.getState().refresh(), useDashboards.getState().refresh(), useWidgetInfo.getState().refresh(), useThemes.getState().refresh(), useStyleList.getState().refresh(), usePlaces.getState().refresh(), useDownloads.getState().refresh()])
+    const results = await Promise.allSettled([useTools.getState().refresh(), useModels.getState().refresh(), useAgents.getState().refresh(), useSessions.getState().refresh(openConversations().flatMap((c) => (c.sessionId ? [c.sessionId] : []))), useData.getState().refresh(), useDashboards.getState().refresh(), useWidgetInfo.getState().refresh(), useThemes.getState().refresh(), useAvatars.getState().refresh(), useStyleList.getState().refresh(), usePlaces.getState().refresh(), useDownloads.getState().refresh()])
     const lockedFail = results.some((r) => r.status === 'rejected' && isLockedError(r.reason))
     if (lockedFail && !retried && useVault.getState().status.unlocked) {
       useVault.setState({ status: await main('vault.status') })
@@ -83,7 +86,6 @@ export async function bootstrap(windowMode: WindowMode = 'app'): Promise<void> {
     const previous = useApp.getState().engine
     useApp.setState({ engine: status })
     if (status.state === 'ready' && previous.state !== 'ready') void loadEngineState()
-    if (status.state === 'crashed') toast.error('Engine stopped unexpectedly', 'Restarting it now.')
   })
   on('settings.changed', (settings) => useApp.setState({ settings }))
   on('vault.changed', (status) => {
@@ -114,7 +116,7 @@ export async function bootstrap(windowMode: WindowMode = 'app'): Promise<void> {
   on('context.compacting', ({ sessionId, active }) => useSessions.getState().onCompacting(sessionId, active))
   on('context.compacted', ({ sessionId, trimmed, summarised }) => {
     const sessions = useSessions.getState()
-    if (openConversations().some((c) => c.sessionId === sessionId)) void sessions.load(sessionId).catch(() => undefined)
+    if (openConversations().some((c) => c.sessionId === sessionId)) void sessions.load(sessionId).catch(failed('Could not reload the chat'))
     if (summarised > 0) toast.info('Chat summarised', `The oldest ${summarised} turn${summarised > 1 ? 's were' : ' was'} replaced by a summary for the model. The chat itself is unchanged.`)
     else if (trimmed > 0 && mode === 'app') toast.info('Old tool output trimmed', `${trimmed} old tool result${trimmed > 1 ? 's were' : ' was'} removed from the model's context to save space.`)
   })
@@ -142,10 +144,11 @@ export async function bootstrap(windowMode: WindowMode = 'app'): Promise<void> {
     const data = part.status === 'done' && part.view?.kind === 'present' ? presentData(part.view.data) : null
     if (data?.where === 'stage' && focusedConversation()?.sessionId === sessionId) useStage.getState().play(data)
   })
+  on('message.element', ({ sessionId, messageId, element }) => useSessions.getState().onElement(sessionId, messageId, element))
   on('toolsets.changed', ({ list }) => useToolsets.getState().set(list))
-  void useToolsets.getState().load().catch(() => undefined)
+  void useToolsets.getState().load().catch(noteFailure('tools', 'Could not load the toolsets'))
   on('backdrop.changed', ({ sessionId, state }) => useBackdrops.getState().set(sessionId, state))
-  on('backdrop.app', ({ backdrop }) => void useApp.getState().updateSettings({ backdrop }).catch(() => undefined))
+  on('backdrop.app', ({ backdrop }) => void useApp.getState().updateSettings({ backdrop }).catch(failed('Could not set the backdrop')))
   on('turn.phase', ({ messageId, phase }) => usePhases.getState().set(messageId, phase))
   on('tool.draft', ({ messageId, callIndex, name, chunk, done }) => useDrafts.getState().chunk(messageId, callIndex, name, chunk, done))
   on('folders.changed', () => recheckOpen())
@@ -156,17 +159,21 @@ export async function bootstrap(windowMode: WindowMode = 'app'): Promise<void> {
   on('tool.output', ({ partId, chunk }) => useSessions.getState().onOutput(partId, chunk))
   on('page.changed', ({ id, meta }) => useData.getState().onPage(id, meta))
   on('asset.changed', ({ id, meta }) => useData.getState().onAsset(id, meta))
-  on('dashboard.changed', ({ id, dashboard }) => useDashboards.getState().onChanged(id, dashboard))
+  on('dashboard.changed', ({ id, dashboard }) => {
+    useDashboards.getState().onChanged(id, dashboard)
+    void usePlaces.getState().refresh()
+  })
   on('themes.changed', (list) => useThemes.setState({ list }))
+  on('avatars.changed', (list) => useAvatars.setState({ list }))
   on('ambience.changed', ({ sessionId, ambience }) => useThemes.getState().setAmbience(sessionId, ambience))
-  on('engine.error', ({ message }) => toast.error('Engine error', message))
+  startProblems(mode)
 
   const [settings, info, status, vault] = await Promise.all([main('settings.get'), main('app.info'), main('engine.status'), main('vault.status')])
   useVault.setState({ status: vault })
   useApp.setState({ settings, info, engine: status, ...(mode === 'app' ? { view: settings.lastView } : {}) })
   if (mode === 'app' && info.vaultMissing) toast.error('Vault folder not found', `${info.vaultMissing} isn't there, so Seven opened the default vault. Connect it and switch to it in Settings, Vault.`)
   if (status.state === 'ready') {
-    await engine('ping').catch(() => undefined)
+    await engine('ping').catch(noteFailure('engine', 'The engine did not answer'))
     await loadEngineState()
   }
 }

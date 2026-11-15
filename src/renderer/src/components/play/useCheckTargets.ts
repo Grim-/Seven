@@ -10,5 +10,5 @@ export function useActionSheet(action: Pick<Action, 'by'>, character: string | n
 
 export function useCheckTargets(sheetId: string | null): CheckTarget[] {
   const sheet = useLibraryData(() => (sheetId ? engine('sheets.get', { id: sheetId }) : Promise.resolve(null)), `action.sheet.${sheetId ?? ''}`)
-  return checkTargets(sheet?.dnd ?? null)
+  return checkTargets(sheet ?? null)
 }

@@ -1,5 +1,5 @@
 import { CHANCE, chanceOf, findTarget, targetOf, type Action } from '@shared/actions'
-import { signed } from '@shared/dnd'
+import { signed } from '@shared/text'
 import { useActionSheet, useCheckTargets } from './useCheckTargets'
 
 export function CheckPicker({ action, character, onPick }: { action: Action; character: string | null; onPick: (index: number) => void }) {

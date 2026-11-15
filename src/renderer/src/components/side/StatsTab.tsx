@@ -4,6 +4,7 @@ import { engine } from '../../lib/ipc'
 import { useSessions } from '../../store/sessions'
 import { formatRelative } from '../../lib/format'
 import { useConversation } from '../../lib/conversation'
+import { noteFailure } from '../../store/problems'
 
 const EMPTY: ChatMessage[] = []
 
@@ -39,7 +40,7 @@ export function StatsTab() {
     let live = true
     engine('stats.summary')
       .then((s) => live && setSummary(s))
-      .catch(() => undefined)
+      .catch(noteFailure('chat', 'Could not read the speed stats'))
     return () => {
       live = false
     }

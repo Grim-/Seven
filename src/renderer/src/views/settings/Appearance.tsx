@@ -7,7 +7,8 @@ import { saveTrayKinds, useKindList } from '../../lib/kinds'
 const AVATAR_SIZES: { value: AvatarSize; label: string }[] = [
   { value: 'small', label: 'Small' },
   { value: 'medium', label: 'Medium' },
-  { value: 'large', label: 'Large' }
+  { value: 'large', label: 'Large' },
+  { value: 'xl', label: 'Extra Large' }
 ]
 
 function SidePanelKinds() {

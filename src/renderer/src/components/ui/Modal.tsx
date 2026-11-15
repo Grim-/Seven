@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '../../lib/cn'
@@ -10,14 +11,15 @@ interface ModalProps {
   onClose: () => void
   footer?: ReactNode
   wide?: boolean
+  width?: number
   bodyClassName?: string
   children: ReactNode
 }
 
-export function Modal({ open, title, onClose, footer, wide, bodyClassName, children }: ModalProps) {
+export function Modal({ open, title, onClose, footer, wide, width, bodyClassName, children }: ModalProps) {
   const layer = useEscapeLayer(open, onClose)
 
-  return (
+  return createPortal(
     <AnimatePresence>
     {open && (
     <motion.div
@@ -31,7 +33,8 @@ export function Modal({ open, title, onClose, footer, wide, bodyClassName, child
       transition={{ duration: 0.15 }}
     >
       <motion.div
-        className={cn('record', wide ? 'flex max-h-[92vh] w-[min(1240px,96vw)] flex-col' : 'w-[min(520px,92vw)]', wide ? 'tablet:w-full' : 'tablet:w-[520px]', 'tablet:flex tablet:max-h-full tablet:max-w-full tablet:flex-col phone:h-full phone:max-h-none phone:w-full phone:pt-[env(safe-area-inset-top)]')}
+        style={width ? { width: `min(${width}px, 96vw)` } : undefined}
+        className={cn('record', wide || width ? 'flex max-h-[92vh] flex-col' : 'w-[min(520px,92vw)]', wide && 'w-[min(1240px,96vw)]', wide || width ? 'tablet:w-full' : 'tablet:w-[520px]', 'tablet:flex tablet:max-h-full tablet:max-w-full tablet:flex-col phone:h-full phone:max-h-none phone:w-full phone:pt-[env(safe-area-inset-top)]')}
         onMouseDown={(e) => e.stopPropagation()}
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -49,6 +52,7 @@ export function Modal({ open, title, onClose, footer, wide, bodyClassName, child
       </motion.div>
     </motion.div>
     )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

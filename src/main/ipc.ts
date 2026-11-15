@@ -11,14 +11,14 @@ import { hostPage } from './widgets'
 import { readImage } from './assets'
 import { clearAll, readHeader, writeBackup } from './backup'
 import { addVault, chooseVault, createVault, listVaults, removeVault, renameVault, restoreVault } from './vaults'
-import { errorCode } from '@shared/errors'
+import { UNCODED, errorCode } from '@shared/errors'
 import type { Gateway } from './network/gateway'
+import type { Problems } from './problems'
+import { cleanProblemReport } from '@shared/problems'
 import { suggestPassword } from './network/password'
 
-export function coded(err: unknown): CodedErrorWire {
-  const code = errorCode(err)
-  if (!code) throw err
-  return { [ERROR_MARKER]: { code, message: err instanceof Error ? err.message : String(err) } }
+export function coded(err: unknown, request?: string): CodedErrorWire {
+  return { [ERROR_MARKER]: { code: errorCode(err) ?? UNCODED, message: err instanceof Error ? err.message : String(err), ...(request ? { request } : {}) } }
 }
 
 type MainHandlers = {
@@ -34,6 +34,7 @@ export interface IpcContext {
   hotkey: Hotkey
   vault: Vault
   gateway: Gateway
+  problems: Problems
   showApp: (sessionId: string | null) => void
   quit: () => void
 }
@@ -152,6 +153,10 @@ export function registerIpc(ctx: IpcContext): MainDispatch {
       }
     },
     'engine.status': () => ctx.engine.status(),
+    'problems.list': () => ctx.problems.list(),
+    'problems.report': (_win, report) => void ctx.problems.add(cleanProblemReport(report)),
+    'problems.dismiss': (_win, { id }) => ctx.problems.dismiss(id),
+    'problems.clear': () => ctx.problems.clear(),
     'network.status': () => ctx.gateway.status(),
     'network.set': (_win, { on, settings }) => ctx.gateway.set(on, settings),
     'network.password.suggest': () => suggestPassword(),
@@ -184,16 +189,16 @@ export function registerIpc(ctx: IpcContext): MainDispatch {
   }
 
   ipcMain.handle(Channel.engine, (_event, name: string, params) => {
-    if (name === 'vault.setKey' || name === 'vault.migrate') throw new Error(`${name} is not available to windows`)
-    return ctx.engine.request(name as Parameters<EngineSupervisor['request']>[0], params).catch(coded)
+    if (name === 'vault.setKey' || name === 'vault.migrate') return coded(new Error(`${name} is not available to windows`), name)
+    return ctx.engine.request(name as Parameters<EngineSupervisor['request']>[0], params).catch((err: unknown) => coded(err, name))
   })
 
   ipcMain.handle(Channel.main, (event, name: MainRequestName, params) => {
     const handler = handlers[name] as ((win: BrowserWindow | null, p: unknown) => unknown) | undefined
-    if (!handler) throw new Error(`Unknown request: ${name}`)
+    if (!handler) return coded(new Error(`Unknown request: ${name}`), name)
     return Promise.resolve()
       .then(() => handler(BrowserWindow.fromWebContents(event.sender), params))
-      .catch(coded)
+      .catch((err: unknown) => coded(err, name))
   })
 
   return {

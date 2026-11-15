@@ -19,6 +19,18 @@ const STARTERS: ReasoningStyle[] = [
       { label: 'Pragmatist', line: 'Cares only about what works right now.' }
     ],
     updatedAt: 0
+  },
+  {
+    id: 'character-filter',
+    name: 'Character voice',
+    instruction: 'Weigh what is about to happen, be said, or be done from inside the character: check their immediate motive, beliefs, and speech habits before choosing a line or action.',
+    voices: [
+      { label: 'Impulse', line: 'Reacts instinctively from core beliefs, wounds, and desire.' },
+      { label: 'Guard', line: 'Checks what this character would hold back, hide, or soften.' },
+      { label: 'Voice', line: 'Turns the decision into this specific character’s cadence and phrasing.' }
+    ],
+    constraints: 'Forcefully filter every spoken line and action through this character’s speech pattern, vocabulary, and motives. Cut generic, diplomatic, or neutral phrasing before outputting text.',
+    updatedAt: 0
   }
 ]
 
@@ -45,14 +57,22 @@ class Styles extends EventEmitter {
     this.emit('changed', list)
   }
 
-  save(input: { id: string | null; name: string; instruction: string; voices: StyleVoice[] }): ReasoningStyle {
+  save(input: { id: string | null; name: string; instruction: string; voices: StyleVoice[]; constraints?: string }): ReasoningStyle {
     const name = input.name.trim().slice(0, 60)
     if (!name) throw new Error('A reasoning style needs a name')
     const instruction = input.instruction.trim().slice(0, 1200)
     if (!instruction) throw new Error('Say how this style reasons')
+    const constraints = (input.constraints ?? '').trim().slice(0, 1200)
     const list = this.list()
     if (list.some((s) => s.id !== input.id && s.name.toLowerCase() === name.toLowerCase())) throw new Error(`There is already a reasoning style called ${name}. Give this one a different name.`)
-    const style: ReasoningStyle = { id: input.id && list.some((s) => s.id === input.id) ? input.id : newId('style'), name, instruction, voices: cleanVoices(input.voices), updatedAt: Date.now() }
+    const style: ReasoningStyle = {
+      id: input.id && list.some((s) => s.id === input.id) ? input.id : newId('style'),
+      name,
+      instruction,
+      voices: cleanVoices(input.voices),
+      ...(constraints ? { constraints } : {}),
+      updatedAt: Date.now()
+    }
     this.write(list.some((s) => s.id === style.id) ? list.map((s) => (s.id === style.id ? style : s)) : [...list, style])
     return style
   }

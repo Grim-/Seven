@@ -1,16 +1,12 @@
 import { Images, ImagePlus, X } from 'lucide-react'
 import { Button } from '../ui'
 import { AssetMedia } from './AssetMedia'
-import { pickPicture, type PictureOptions } from '../data/PicturePicker'
-import { choosePictures } from '../../lib/importFiles'
+import type { PictureOptions } from '../data/PicturePicker'
+import { usePicturePick } from './usePicturePick'
 import { cn } from '../../lib/cn'
 
 export function PictureField({ value, onChange, options = {}, large = false, clearable = true }: { value: string | null; onChange: (id: string | null) => void; options?: PictureOptions; large?: boolean; clearable?: boolean }) {
-  const fromSeven = () => void pickPicture(value, options).then((r) => r && onChange(r.id))
-  const fromDisk = async () => {
-    const [added] = await choosePictures(options.kinds ?? ['image'], false, options.what ?? 'a picture', options.mimes)
-    if (added) onChange(added.id)
-  }
+  const { fromSeven, fromDisk } = usePicturePick(value, onChange, options)
   return (
     <div className={cn('flex gap-2', large ? 'flex-col' : 'items-center')}>
       {(value || large) && (
@@ -22,7 +18,7 @@ export function PictureField({ value, onChange, options = {}, large = false, cle
         <Button size="sm" variant="secondary" icon={<Images />} onClick={fromSeven}>
           Use image from Seven
         </Button>
-        <Button size="sm" variant="secondary" icon={<ImagePlus />} onClick={() => void fromDisk()}>
+        <Button size="sm" variant="secondary" icon={<ImagePlus />} onClick={fromDisk}>
           Use image from…
         </Button>
         {value && clearable && (

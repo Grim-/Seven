@@ -1,7 +1,9 @@
 import { engine } from '../../lib/ipc'
 import { errorText } from '../../lib/format'
 import { toast } from '../../store/toasts'
+import { useApp } from '../../store/app'
 import { focusedConversation } from '../../lib/conversation'
+import { openSidePanelTab } from '../../lib/listPrefs'
 
 export async function showInPanel(entry: string, part: string | null = null): Promise<void> {
   const sessionId = focusedConversation()?.sessionId
@@ -11,7 +13,10 @@ export async function showInPanel(entry: string, part: string | null = null): Pr
   }
   try {
     await engine('panel.showEntry', { sessionId, entry, part })
-    toast.success('In the side panel', 'Open the chat’s side panel to see it.')
+    openSidePanelTab('outputs')
+    if (useApp.getState().view !== 'chat') {
+      toast.success('In the side panel', 'Added to the chat’s Outputs tab.')
+    }
   } catch (err) {
     toast.error('Could not show it', errorText(err))
   }

@@ -4,6 +4,7 @@ import { Button, Modal, Segmented } from '../ui'
 import { pickPicture } from '../data/PicturePicker'
 import { choosePictures } from '../../lib/importFiles'
 import { readImage } from '../../lib/assetSource'
+import { noteFailure } from '../../store/problems'
 
 export interface TilePickResult {
   assetId: string
@@ -61,9 +62,11 @@ export function TilePicker({
       .then((bmp) => {
         if (active) setImageBitmap(bmp)
       })
-      .catch(() => {
-        if (active) setImageBitmap(null)
-      })
+      .catch(
+        noteFailure('maps', 'Could not load the tileset picture', () => {
+          if (active) setImageBitmap(null)
+        })
+      )
     return () => {
       active = false
     }

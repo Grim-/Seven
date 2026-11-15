@@ -1,3 +1,5 @@
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Dashboard, FieldDef, ViewOptions, Widget, WidgetLayout, WidgetSource } from '@shared/types'
@@ -17,7 +19,8 @@ interface StoredDashboard extends Dashboard {
 function readFile(file: string): Buffer | null {
   try {
     return fs.readFileSync(file)
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'data', 'Could not read a dashboard file')
     return null
   }
 }
@@ -76,8 +79,8 @@ export class DashboardStore {
     const list = this.list()
     const found = list.find((d) => d.id === wanted) ?? list.find((d) => d.name.toLowerCase() === wanted.toLowerCase()) ?? list.find((d) => d.id === slug(wanted))
     if (found) return found.id
-    if (!list.length) throw new DataError(`There is no dashboard named "${wanted}". There are no dashboards yet; create one with the board tool.`)
-    throw new DataError(`There is no dashboard named "${wanted}". Use one of: ${list.map((d) => d.name).join(', ')}`)
+    if (!list.length) throw notFound(new DataError(`There is no dashboard named "${wanted}". There are no dashboards yet; create one with the board tool.`))
+    throw notFound(new DataError(`There is no dashboard named "${wanted}". Use one of: ${list.map((d) => d.name).join(', ')}`))
   }
 
   private require(ref: string): StoredDashboard {
@@ -301,5 +304,9 @@ export class DashboardStore {
   byId(id: string): Dashboard | null {
     const data = this.load(id)
     return data ? this.strip(data) : null
+  }
+
+  notify(id: string): void {
+    this.changed(id, this.byId(id))
   }
 }

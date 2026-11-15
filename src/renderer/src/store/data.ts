@@ -1,3 +1,4 @@
+import { noteFailure, reportProblem } from './problems'
 import { FOLDER_TYPE, idSegment, stripRef, toId } from '@shared/ids'
 import { useEffect } from 'react'
 import { create } from 'zustand'
@@ -44,7 +45,7 @@ export const useData = create<DataState>((set, get) => ({
     if (pending.has(id)) return
     pending.add(id)
     try {
-      const page = await engine('data.pages.get', { id }).catch(() => null)
+      const page = await engine('data.pages.find', { id }).catch((err: unknown) => (noteFailure('data', 'Could not load a page')(err), null))
       set((s) => ({ full: { ...s.full, [id]: page } }))
     } finally {
       pending.delete(id)
@@ -108,19 +109,28 @@ export function entryLink(kind: string, id: string): string {
   return linkFor(kind, pages.some((p) => p.id === id) ? pagePath(pages, id) : id)
 }
 
-export function useAsset(id: string): AssetMeta | null | undefined {
+const lookingUp = new Set<string>()
+
+export function lookUpAsset(id: string, usedBy?: string): void {
+  const state = useData.getState()
+  if (!id || lookingUp.has(id) || state.missingAssets[id] || state.assets.some((a) => a.id === id)) return
+  lookingUp.add(id)
+  void engine('data.assets.find', { id })
+    .then((a) => {
+      if (a) return useData.getState().onAsset(a.id, a)
+      useData.setState((s) => ({ missingAssets: { ...s.missingAssets, [id]: true } }))
+      reportProblem({ severity: 'warning', area: 'files', message: `${usedBy ?? 'Something'} uses file ${id}, which no longer exists` })
+    })
+    .catch(noteFailure('files', `Could not look up file ${id}`))
+    .finally(() => lookingUp.delete(id))
+}
+
+export function useAsset(id: string, usedBy?: string): AssetMeta | null | undefined {
   const meta = useData((s) => s.assets.find((a) => a.id === id))
   const missing = useData((s) => s.missingAssets[id] === true)
   useEffect(() => {
-    if (!id || meta || useData.getState().missingAssets[id]) return
-    let live = true
-    engine('data.assets.get', { id })
-      .then((a) => live && useData.getState().onAsset(a.id, a))
-      .catch(() => live && useData.setState((s) => ({ missingAssets: { ...s.missingAssets, [id]: true } })))
-    return () => {
-      live = false
-    }
-  }, [id, meta])
+    if (!meta) lookUpAsset(id, usedBy)
+  }, [id, meta, usedBy])
   if (meta) return meta
   return missing ? null : undefined
 }

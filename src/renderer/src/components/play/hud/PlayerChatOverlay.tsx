@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronUp, CornerDownLeft, MessageSquare, Minus } from 'lucide-react'
 import { useDialogue } from '../dialogue/dialogueStore'
+import { sendParleyToChat } from '../parleyBridge'
 import { Button } from '../../ui/Button'
 import { cn } from '../../../lib/cn'
 
@@ -9,6 +10,7 @@ interface PlayerChatOverlayProps {
   playerName?: string
   targetSheet?: string | null
   targetName?: string | null
+  placeKey?: string | null
   onSendFreeform?: (target: string, text: string) => void
   className?: string
 }
@@ -16,8 +18,9 @@ interface PlayerChatOverlayProps {
 export function PlayerChatOverlay({
   playerSheet,
   playerName = 'Alistair Finch',
-  targetSheet: _targetSheet,
+  targetSheet,
   targetName,
+  placeKey = null,
   onSendFreeform,
   className
 }: PlayerChatOverlayProps) {
@@ -42,6 +45,17 @@ export function PlayerChatOverlay({
     } else {
       addPlayerChat(playerName, trimmed, 'pc')
     }
+
+    const activeSpeakerSheet = targetSheet ?? useDialogue.getState().speakerSheet ?? null
+    const activeSpeakerName = targetName ?? useDialogue.getState().speakerName ?? 'World Narrator'
+    sendParleyToChat({
+      npcSheet: activeSpeakerSheet,
+      npcName: activeSpeakerName,
+      playerSheet: playerSheet ?? null,
+      playerName,
+      placeKey,
+      said: trimmed
+    })
 
     onSendFreeform?.(targetName ?? 'dm', trimmed)
     setText('')

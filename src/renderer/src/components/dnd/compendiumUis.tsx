@@ -1,5 +1,6 @@
 import { COMPENDIUM } from '@shared/compendium'
 import { registerKindUi } from '../../registries/kinds'
+import '../data/sheet/dnd/facet'
 import { CompendiumImporter } from './CompendiumImporter'
 import { CompendiumScreen, NEW_ENTRY } from './CompendiumScreen'
 import { CompendiumChat, CompendiumWidget } from './CompendiumChat'

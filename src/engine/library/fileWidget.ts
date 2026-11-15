@@ -1,3 +1,4 @@
+import { notFound } from '@shared/errors'
 import type { AssetMeta, WidgetSource } from '@shared/types'
 import { ASSET_VIEWS } from '@shared/widgets'
 import { data } from '../data/hub'
@@ -21,7 +22,7 @@ export const FILE_WIDGET: KindWidget = {
     const ids = idsOf(source)
     if (!ids.length) throw new DataError('Give at least one file id. find with kind file lists them.')
     const missing = ids.filter((id) => !data.assets.exists(id))
-    if (missing.length) throw new DataError(`Unknown file ids: ${missing.join(', ')}. find with kind file lists them.`)
+    if (missing.length) throw notFound(new DataError(`Unknown file ids: ${missing.join(', ')}. find with kind file lists them.`))
     return { kind: 'file', assetIds: [...new Set(ids)] }
   },
   title: (source) => {

@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -99,7 +100,7 @@ export class McpConnection {
       return answer.action === 'accept' ? { action: 'accept', content: answer.values } : { action: answer.action }
     })
     client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
-      await this.refreshTools().catch(() => undefined)
+      await this.refreshTools().catch((err: unknown) => noteFailure(err, 'modules', "Could not refresh an MCP server's tools"))
       this.onToolsChanged()
     })
     const transport = this.transport()

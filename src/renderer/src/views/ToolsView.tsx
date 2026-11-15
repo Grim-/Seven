@@ -1,6 +1,6 @@
 import { CORE_MODULES } from '@shared/toolnames'
-import { useMemo, useState } from 'react'
-import { Boxes, FolderOpen, Import, Plus, Power, Puzzle, RefreshCw } from 'lucide-react'
+import { Fragment, useMemo, useState } from 'react'
+import { Boxes, FileArchive, FolderOpen, Import, Plus, Power, Puzzle, RefreshCw } from 'lucide-react'
 import type { ModuleInfo, ModuleState } from '@shared/types'
 import { BackBar, Button, Field, Input, KindShell, Modal, Panel, SettingCard, SaveState, Select, StatusBadge, Textarea, Toggle, ViewHeader, useDraft, type ShellItem, type Tone } from '../components/ui'
 import { engine, main } from '../lib/ipc'
@@ -11,6 +11,9 @@ import { ToolsetEditor } from '../components/tools/Toolsets'
 import { useToolsets } from '../store/toolsets'
 import { ToolFolders } from '../components/tools/ToolFolders'
 import { useViewPlace } from '../lib/viewPlace'
+import { installZip } from '../components/tools/installZip'
+import { pickFolder } from '../components/ui/FileField'
+import { kindModuleLists } from '../registries/kinds'
 
 const STATE: Record<ModuleState, { label: string; tone: Tone }> = {
   on: { label: 'On', tone: 'ok' },
@@ -18,7 +21,8 @@ const STATE: Record<ModuleState, { label: string; tone: Tone }> = {
   'needs-enabling': { label: 'Not enabled', tone: 'warn' },
   changed: { label: 'Changed', tone: 'warn' },
   error: { label: 'Error', tone: 'error' },
-  loading: { label: 'Starting', tone: 'busy' }
+  loading: { label: 'Starting', tone: 'busy' },
+  'missing-dependency': { label: 'Needs another module', tone: 'warn' }
 }
 
 const PERMISSION_LABEL: Record<string, string> = { none: 'never asks', ask: 'asks unless Trusted', always: 'always asks', custom: 'asks when needed' }
@@ -47,9 +51,7 @@ function SettingsForm({ module }: { module: ModuleInfo }) {
                 size="sm"
                 variant="secondary"
                 onClick={() =>
-                  void main('dialog.openFolder').then((folder) => {
-                    if (folder) setValues({ ...values, [s.name]: folder })
-                  })
+                  pickFolder((folder) => setValues({ ...values, [s.name]: folder }))
                 }
               >
                 Choose…
@@ -72,6 +74,13 @@ function SettingsForm({ module }: { module: ModuleInfo }) {
 
 function Detail({ module }: { module: ModuleInfo }) {
   const state = STATE[module.state]
+  const adds = [
+    ...module.adds,
+    ...kindModuleLists().flatMap((g) => {
+      const items = g.list.ofModule(module.id)
+      return items.length ? [{ label: g.label, items }] : []
+    })
+  ]
   const enable = () => void run('Could not switch on', engine('tools.enable', { id: module.id }))
   return (
     <Panel
@@ -105,6 +114,37 @@ function Detail({ module }: { module: ModuleInfo }) {
       }
     >
       {module.description && <p className="text-[13px] text-white/85">{module.description}</p>}
+      {module.dependencies.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 font-mono text-[11.5px]">
+          <span className="uppercase tracking-[0.14em] text-faint">Requires</span>
+          {module.dependencies.map((dep) => (
+            <span key={dep} className={module.missingDependencies.includes(dep) ? 'border border-accent/60 px-1.5 text-accent' : 'border border-line/50 px-1.5 text-white/85'}>
+              {dep}
+            </span>
+          ))}
+        </div>
+      )}
+      {adds.length > 0 && (
+        <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-[11.5px]">
+          <span className="col-span-2 uppercase tracking-[0.14em] text-faint">Adds</span>
+          {adds.map((a) => (
+            <Fragment key={a.label}>
+              <span className="text-accent-soft">{a.label}</span>
+              <span className="text-white/85">{a.items.join(' · ')}</span>
+            </Fragment>
+          ))}
+        </div>
+      )}
+      {module.state === 'missing-dependency' && (
+        <div className="flex flex-wrap items-center gap-2 border border-accent/40 bg-accent/[0.06] px-3 py-2 text-[12.5px] text-white/90">
+          <span>Inactive until these are on: {module.missingDependencies.join(', ')}.</span>
+          {module.missingDependencies.map((dep) => (
+            <Button key={dep} size="sm" variant="primary" icon={<Power />} onClick={() => void run('Could not switch on', engine('tools.enable', { id: dep }))}>
+              Switch on {dep}
+            </Button>
+          ))}
+        </div>
+      )}
       {module.error && <div className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3 py-2 font-mono text-[12px] text-alert">{module.error}</div>}
       {module.state === 'needs-enabling' && (
         <div className="border border-accent/40 bg-accent/[0.06] px-3 py-2 text-[12.5px] text-white/90">
@@ -302,6 +342,9 @@ export function ToolsView() {
         subtitle="Every tool comes from a module folder. Drop a folder into your tools folder, or add an MCP server, then switch it on and pick it for an agent."
         actions={
           <>
+            <Button variant="secondary" icon={<FileArchive />} onClick={() => void installZip(setSelected)}>
+              Install from zip
+            </Button>
             <Button variant="secondary" icon={<Import />} onClick={() => setDialog('import')}>
               Import mcp.json
             </Button>

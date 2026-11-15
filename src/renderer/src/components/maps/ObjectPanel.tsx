@@ -4,6 +4,7 @@ import {
   ArrowDownToLine,
   ArrowUp,
   ArrowUpToLine,
+  Boxes,
   Check,
   Copy,
   Flag,
@@ -21,13 +22,13 @@ import {
   X
 } from 'lucide-react'
 import type { ObjectLayerData, ObjectStateRule, PropCollision } from '@shared/maps'
-import { ActionBar, Button, Eyebrow, Input, Segmented, Select, SliderNumber, type MenuItem } from '../ui'
+import { ActionBar, Button, Eyebrow, Input, Segmented, Select, ShellTabs, SliderNumber, type MenuItem } from '../ui'
 import { PictureFields } from './PictureFields'
 import { ObjectPlayManager } from './ObjectPlayManager'
 import { FlagSelect } from '../game/FlagSelect'
+import { EntityPieces } from '../game/EntityPieces'
 import { pickMapPicture } from './addImageLayer'
 import { assetUrl, useAsset } from '../../store/data'
-import { cn } from '../../lib/cn'
 
 interface Props {
   object: ObjectLayerData
@@ -48,7 +49,7 @@ const COLLISION_OPTIONS: { value: PropCollision; label: string; hint: string }[]
   { value: 'water', label: 'Water', hint: 'Blocks walking, requires flight/swim' }
 ]
 
-type ObjectTab = 'attributes' | 'behaviors' | 'logic'
+type ObjectTab = 'attributes' | 'behaviors' | 'logic' | 'pieces'
 
 function StateSpritePreview({ imageId }: { imageId?: string }) {
   const isDataUri = imageId?.startsWith('data:')
@@ -166,44 +167,16 @@ export function ObjectPanel({
       </div>
 
       {/* SUB-TABS */}
-      <div className="flex border-b border-line/60 bg-panel/30 p-1 gap-1">
-        <button
-          type="button"
-          onClick={() => setActiveTab('attributes')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors border',
-            activeTab === 'attributes'
-              ? 'border-cyan/60 bg-cyan/15 text-cyan'
-              : 'border-transparent text-dim hover:text-white hover:bg-white/5'
-          )}
-        >
-          <Sliders className="h-3 w-3" /> Attributes
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('behaviors')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors border',
-            activeTab === 'behaviors'
-              ? 'border-cyan/60 bg-cyan/15 text-cyan'
-              : 'border-transparent text-dim hover:text-white hover:bg-white/5'
-          )}
-        >
-          <Sparkles className="h-3 w-3" /> States ({states.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('logic')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors border',
-            activeTab === 'logic'
-              ? 'border-cyan/60 bg-cyan/15 text-cyan'
-              : 'border-transparent text-dim hover:text-white hover:bg-white/5'
-          )}
-        >
-          <Swords className="h-3 w-3" /> Actions & Decisions
-        </button>
-      </div>
+      <ShellTabs
+        value={activeTab}
+        options={[
+          { value: 'attributes' as const, label: 'Attributes', icon: <Sliders className="h-3 w-3" /> },
+          { value: 'behaviors', label: 'States', icon: <Sparkles className="h-3 w-3" />, count: states.length },
+          { value: 'logic', label: 'Actions & Decisions', icon: <Swords className="h-3 w-3" /> },
+          { value: 'pieces', label: 'Pieces', icon: <Boxes className="h-3 w-3" />, count: (object.comps ?? []).length }
+        ]}
+        onChange={setActiveTab}
+      />
 
       {/* BODY SCROLL CONTAINER */}
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
@@ -456,6 +429,8 @@ export function ObjectPanel({
             />
           </div>
         )}
+
+        {activeTab === 'pieces' && <EntityPieces value={object.comps ?? []} onChange={(comps) => onChange({ ...object, comps })} />}
       </div>
 
       {/* FOOTER ACTIONS */}

@@ -1,4 +1,5 @@
 import { toId } from '@shared/ids'
+import { cleanElements } from '@shared/chatElements'
 import { allRepos, getRepo, saveRepo } from './library/repos'
 import { guideModules, guideText } from './chat/context'
 import { identity } from './user/identity'
@@ -34,6 +35,7 @@ import { buildExport, describeExport } from './exporting/registry'
 import { registerEntryExports } from './exporting/entry'
 import { scripts } from './python/scripts'
 import { themes } from './themes/store'
+import { avatars } from './avatars/store'
 import { storyRuns } from './stories'
 import { piperSpeak, piperVoices } from './tts'
 import './sources/builtin'
@@ -47,6 +49,7 @@ import { change as changeInstall } from './install/store'
 import { setupCommands } from './commands/builtin'
 import { commandInfo, commandsFor, runCommand } from './commands/registry'
 import type { Ambience, AmbienceCue, Theme } from '@shared/theme'
+import type { Avatar } from '@shared/avatars'
 import { tags as tagStore } from './library/tags'
 import { setGuideSource, specialPages, USER, allKinds, clearKind, kindInfo, removeEntry, renameEntry, rollText, drawEntry, drawableEntries, previewEntry, find as libraryFind, overview as libraryOverview, resolveEntry, partView, timelineRows, describeEvent, resolveRoutineEntry, entryInside } from './library/kinds'
 import { contextPrefs } from './chat/prefs'
@@ -85,8 +88,8 @@ import { mapListing, mapWithPlace } from './maps/usage'
 import { rollDecision, rollFor } from './actions'
 import { cleanAction } from '@shared/actions'
 import { cleanDecision } from '@shared/decisions'
-import { addCard, addSet, deckOf, swapCards, takeCard } from './cards/decks'
-import { cleanSwap, hasSwap } from '@shared/cardDecks'
+import { addCard, addSet, deckOf, setDeckOwner, swapCards, takeCard } from './cards/decks'
+import { cleanDeckOwner, cleanSwap, hasSwap } from '@shared/cardDecks'
 import { entryField, entryFields, resolveIncludes } from './library/includes'
 import { mapReaders } from './maps/mapReaders'
 import { visitorsOf, whoIsHere } from './worlds/presence'
@@ -100,30 +103,33 @@ import os from 'node:os'
 import path from 'node:path'
 import { board } from './board/store'
 import { errorCode } from '@shared/errors'
-import { carryOpen, carryPeek, carrySave } from './carry'
+import { carryDescribe, carryOpen, carryPeek, carrySave } from './carry'
 import { agentFolders, liveFolder, removeFolderTree } from './agents/folders'
 import { currentActor } from './timeline/actor'
 import { compendium } from '../modules/dnd/compendium'
 import { gameDefs } from '../modules/game/store'
-import { characterMisfits, giveItem, joinCharacter, leaveCharacter, saveCharacter, tickCharacters, useAbility } from '../modules/game/characters'
-import { removeRuleSet } from '../modules/game/worldRules'
+import { changeCreatureHealth, changeHealth as changeGameHealth, characterMisfits, giveItem, takeItem, joinCharacter, leaveCharacter, saveCharacter, tickCharacters, useAbility } from '../modules/game/characters'
 import { saves } from './worlds/saves'
 import './worlds/sheetTokens'
 import { resolveTokens } from './worlds/tokenSources'
 import { spawnCreature, updateCreature } from './worlds/creatures'
+import { blueprintSources, searchBlueprints, spawnBlueprint } from './worlds/blueprints'
 import { saveInPlay } from './worlds/playLayer'
 import { adoptOldPlay, bring, createNewWorldSave, removeSave, removeWorldSaves, takeOut, travel } from './worlds/party'
 import { decisions, storyActions } from '../modules/decisions/store'
 import { factions } from './factions/store'
 import { mapObjectsStore } from './mapObjects/store'
 import { triggerActionsStore } from './triggerActions/store'
+import { runEffects } from './effects/run'
 import { lootTablesStore } from './lootTables/store'
 import { widgetInfo } from './data/widgetSources'
 import { resolveThings } from '../modules/core/things'
 import './data/glances'
 import './data/htmlWidget'
+import './data/characterStatsWidget'
 import './present/widget'
 import './library/partWidget'
+import { ifMissing, noteFailure, report, reportError, setProblemSink } from './util/report'
 
 let lastCpu: { idle: number; total: number } | null = null
 
@@ -150,6 +156,13 @@ function emit<K extends keyof Events>(event: K, payload: Events[K]): void {
   port.postMessage({ event, payload })
 }
 
+setProblemSink((problem) => emit('engine.problem', problem))
+process.on('unhandledRejection', (err) => reportError('error', 'engine', err))
+process.on('uncaughtException', (err) => {
+  reportError('error', 'engine', err, 'The engine hit an error it could not recover from and is restarting')
+  setTimeout(() => process.exit(1), 100)
+})
+
 data.setEmitter(emit)
 modules.on('changed', (list: ModuleInfo[]) => emit('tools.changed', list))
 registerWorkoutExport()
@@ -171,7 +184,7 @@ const afterModelChange = <T>(id: string, result: T): T => {
 reportChildren((pids) => emit('engine.children', { pids }))
 const packs = new Packs({ shippedDir: () => path.join(appFolder(), 'packs'), ownDir: () => path.join(machineRoot(), 'packs'), models, build: serverBuild, devices: serverDevices })
 models.setOverlay((id, own) => packs.overlay(id, own))
-void packs.reload().catch(() => undefined)
+void packs.reload().catch((err: unknown) => noteFailure(err, 'packs', 'Could not load the optimization packs'))
 installEvents.on('changed', (helper: string) => emit('install.changed', { helper }))
 const packsChanged = (): void => {
   emit('packs.changed', {})
@@ -184,7 +197,9 @@ onActivated(LLAMA_SERVER, async () => {
   await host.restartOnActive()
   await minds.embedder.restartOnActive()
 })
-void endLeftovers().then((n) => n && console.warn(`[llama-server] ended ${n} left over from an earlier run`)).catch(() => undefined)
+void endLeftovers()
+  .then((n) => n && report('warning', 'llama-server', `Ended ${n} llama-server${n > 1 ? 's' : ''} left running by an earlier run`))
+  .catch((err: unknown) => noteFailure(err, 'llama-server', 'Could not end llama-servers left by an earlier run'))
 const agents = new AgentRegistry()
 agents.useFolders(agentFolders)
 const agentFolder = (): string | null => {
@@ -232,7 +247,7 @@ setChatNudge((sessionId, text) => {
       if (n < 60) setTimeout(() => attempt(n + 1), 2000)
       return
     }
-    runner.send(sessionId, text).catch(() => n < 60 && setTimeout(() => attempt(n + 1), 2000))
+    runner.send(sessionId, text).catch((err: unknown) => (n < 60 ? setTimeout(() => attempt(n + 1), 2000) : noteFailure(err, 'chat', 'Could not nudge the chat')))
   }
   attempt(0)
 })
@@ -253,6 +268,7 @@ board.setNames((id) => agents.list().find((a) => a.id === id)?.name ?? 'an agent
 scripts.onChange(() => emit('python.changed', {}))
 storyRuns.on('changed', () => emit('stories.changed', {}))
 themes.on('changed', (list: Theme[]) => emit('themes.changed', list))
+avatars.on('changed', (list: Avatar[]) => emit('avatars.changed', list))
 themes.on('ambience', (sessionId: string, ambience: Ambience) => emit('ambience.changed', { sessionId, ambience }))
 themes.on('cue', (cue: AmbienceCue) => emit('ambience.cue', cue))
 data.setToolCheck((id) => modules.list().some((m) => m.id === id && m.state === 'on'))
@@ -274,7 +290,7 @@ reminders.on('fired', (payload) => {
 })
 timeline.on('changed', () => emit('timeline.changed', null))
 routines.on('changed', (list) => emit('routines.changed', list))
-reminders.on('failed', ({ id, message }: { id: string; message: string }) => emit('engine.error', { sessionId: null, message: `Scheduled task ${id} could not run: ${message}` }))
+reminders.on('failed', ({ id, message }: { id: string; message: string }) => report('error', 'reminders', `Scheduled task ${id} could not run: ${message}`))
 reminders.start({
   run: async (r) => {
     let sessionId = r.sessionId && sessions.list().some((s) => s.id === r.sessionId) ? r.sessionId : null
@@ -328,7 +344,8 @@ function warmIndexes(): void {
   try {
     data.pages.list()
     data.assets.list()
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'engine', 'Could not warm the indexes')
     return
   }
 }
@@ -448,7 +465,6 @@ const handlers: Handlers = {
   'worlds.create': ({ name, schema }) => worlds.create(name, schema ?? undefined),
   'worlds.rename': ({ id, name }) => worlds.rename(id, name),
   'worlds.setPlayer': ({ id, sheet }) => worlds.setPlayer(id, sheet),
-  'worlds.setRules': ({ id, rules }) => worlds.setRules(id, gameDefs.ruleSet(rules).id),
   'worlds.setTags': ({ id, tags }) => worlds.setTags(id, tags),
   'actions.roll': ({ action, character, pick, world, deck }) => {
     const result = rollFor(cleanAction(action), character, pick ?? null)
@@ -462,6 +478,7 @@ const handlers: Handlers = {
   'decks.add': ({ ref, card, by }) => ({ deck: addCard(ref, card, by) }),
   'decks.swap': ({ ref, swap }) => ({ deck: swapCards(ref, cleanSwap(swap)) }),
   'decks.addSet': ({ ref, set }) => ({ deck: addSet(ref, set) }),
+  'decks.setOwner': ({ deck, owner }) => setDeckOwner(deck, owner ? cleanDeckOwner(owner) : null),
   'worlds.journey': ({ id, sheet }) => worlds.journeys(id)[sheet] ?? [],
   'worlds.addJourney': ({ id, sheet, kind, text }) => worlds.addJourney(id, sheet, kind, text),
   'places.visitors': ({ sheets }) => visitorsOf(sheets),
@@ -576,6 +593,9 @@ const handlers: Handlers = {
   'themes.list': () => themes.list(),
   'themes.save': (input) => themes.save(input),
   'themes.delete': ({ id }) => (themes.delete(id), true),
+  'avatars.list': () => avatars.list(),
+  'avatars.save': (input) => avatars.save(input),
+  'avatars.delete': ({ id }) => (avatars.delete(id), true),
   'ambience.get': ({ sessionId }) => themes.ambience(sessionId),
   'ambience.set': ({ sessionId, ambience, minutes }) => themes.setAmbience(sessionId, ambience, minutes),
   'backdrop.set': ({ sessionId, scope, backdrop, minutes }) => backdrops.set(sessionId, scope, backdrop, minutes),
@@ -609,6 +629,7 @@ const handlers: Handlers = {
   'tools.settings': ({ id, values }) => modules.setSettings(id, values),
   'tools.create': (input) => modules.create(input),
   'tools.importMcp': ({ json }) => modules.importMcp(json),
+  'tools.installZip': ({ path: file, replace }) => modules.installZip(file, replace),
   'tools.action': ({ id, name }) => modules.runAction(id, name),
   'tools.prefs.get': () => modules.getPrefs(),
   'tools.prefs.set': (patch) => modules.setPrefs(patch),
@@ -619,7 +640,7 @@ const handlers: Handlers = {
   'agents.contextUsage': ({ agentId }) => runner.draftUsage(agentId),
   'sessions.prompt': ({ id, agentId }) => runner.promptView(id, agentId),
   'agents.promptCost': ({ draft }) => runner.promptCost(draft),
-  'sessions.send': ({ id, text, attachments }) => runner.send(id, text, attachments ?? []),
+  'sessions.send': ({ id, text, attachments, elements }) => runner.send(id, text, attachments ?? [], undefined, cleanElements(elements)),
   'sessions.abort': ({ id }) => runner.abort(id),
   'sessions.rename': ({ id, title }) => sessions.update(id, { title: title.trim() || 'Untitled' }),
   'sessions.delete': ({ id }) => {
@@ -651,15 +672,12 @@ const handlers: Handlers = {
   },
   'dnd.save': ({ kind, entry, previousId }) => compendium.save(kind, entry, previousId),
   'dnd.remove': ({ kind, id }) => compendium.remove(kind, id),
-  'game.ruleSets': () => gameDefs.ruleSets(),
-  'game.saveRuleSet': ({ id, name, notes, copy }) => gameDefs.saveRuleSet(id, name, notes, copy),
-  'game.removeRuleSet': ({ id }) => removeRuleSet(id),
-  'game.list': ({ ruleSet, type }) => gameDefs.list(ruleSet, type),
-  'game.get': ({ ruleSet, type, id }) => gameDefs.get(ruleSet, type, id),
-  'game.save': ({ ruleSet, type, def, previousId }) => gameDefs.save(ruleSet, type, def, previousId),
-  'game.remove': ({ ruleSet, type, id }) => gameDefs.remove(ruleSet, type, id),
-  'game.catalog': ({ ruleSet }) => gameDefs.catalog(ruleSet),
-  'game.joinCharacter': ({ sheet, ruleSet, template }) => joinCharacter(sheet, ruleSet, template),
+  'game.list': ({ type }) => gameDefs.list(type),
+  'game.get': ({ type, id }) => gameDefs.get(type, id),
+  'game.save': ({ type, def, previousId }) => gameDefs.save(type, def, previousId),
+  'game.remove': ({ type, id }) => gameDefs.remove(type, id),
+  'game.catalog': () => gameDefs.catalog(),
+  'game.joinCharacter': ({ sheet, template }) => joinCharacter(sheet, template),
   'game.saveCharacter': ({ sheet, record }) => saveCharacter(sheet, record),
   'game.leaveCharacter': ({ sheet }) => leaveCharacter(sheet),
   'game.tickCharacters': ({ sheets, seconds }) => tickCharacters(sheets, seconds),
@@ -677,8 +695,15 @@ const handlers: Handlers = {
   'saves.travel': ({ sheet, id, map, place }) => travel(sheet, id, map, place),
   'saves.spawnCreature': ({ world, map, creature, faction, at }) => spawnCreature(world, map, creature, faction, at),
   'saves.updateCreature': ({ world, creature, faction }) => updateCreature(world, creature, faction),
+  'saves.spawnBlueprint': ({ world, map, source, id, name, faction, at }) => spawnBlueprint(world, map, source, id, name, faction, at),
+  'blueprints.sources': () => blueprintSources(),
+  'blueprints.search': ({ source, query, limit }) => searchBlueprints(source, query, limit),
   'game.misfits': ({ sheet }) => characterMisfits(sheet),
   'game.giveItem': ({ sheet, item, count, gold }) => giveItem(sheet, item, count, gold),
+  'game.takeItem': ({ sheet, item, count }) => takeItem(sheet, item, count),
+  'game.changeHealth': ({ sheet, delta }) => changeGameHealth(sheet, delta),
+  'game.changeCreatureHealth': ({ world, uid, delta }) => changeCreatureHealth(world, uid, delta),
+  'effects.run': (req) => runEffects(req),
   'game.useAbility': ({ sheet, ability, target, at, distance }) => useAbility(sheet, ability, target, at, distance),
   'saves.markUsed': ({ id, trigger, flag }) => saves.markUsed(id, trigger, flag),
   'saves.setFlag': ({ id, flag }) => saves.setFlag(id, flag),
@@ -743,6 +768,7 @@ const handlers: Handlers = {
   'library.rollText': ({ text }) => rollText(text),
   'slideshows.save': ({ id, title, data: value }) => (id ? saveSlideshow(id, value) : createSlideshow(title, value)),
   'carry.save': (input) => carrySave(input),
+  'carry.describe': ({ entry }) => carryDescribe(entry),
   'carry.peek': ({ sources }) => carryPeek(sources),
   'carry.open': ({ source, mode }) => carryOpen(source, mode),
   'sheets.list': () => sheetIds().map((s) => getSheet(s.id)),
@@ -780,6 +806,7 @@ const handlers: Handlers = {
   'library.field': ({ entry, field }) => entryField(entry, field),
   'data.pages.list': () => data.pages.list(),
   'data.pages.get': ({ id }) => data.pages.get(id),
+  'data.pages.find': ({ id }) => ifMissing(() => data.pages.get(id), null),
   'data.pages.create': ({ title, body, fields, type, parent }) => data.pages.create({ title, body, fields, type, parent: parent ?? null }),
   'data.pages.write': ({ id, title, body }) => data.pages.write({ ref: id, title, body }),
   'data.pages.append': ({ ref, text }) => data.pages.write({ ref, title: ref, body: text, mode: 'append' }),
@@ -799,6 +826,7 @@ const handlers: Handlers = {
   'data.records.delete': ({ pageId, recordIds }) => data.pages.deleteRecords(pageId, recordIds),
   'data.assets.list': () => data.assets.list(),
   'data.assets.get': ({ id }) => data.assets.get(id),
+  'data.assets.find': ({ id }) => (data.assets.exists(id) ? data.assets.get(id) : null),
   'data.assets.import': ({ paths: files, parent }) => {
     const folder = data.pages.folderOf(parent ?? null)
     return files.map((f) => {
@@ -886,12 +914,12 @@ const shutdown = async (): Promise<void> => {
   try {
     timeline.flush()
   } catch (err) {
-    console.warn('[timeline] could not save on exit', err)
+    reportError('warning', 'timeline', err, 'Could not save the timeline on exit')
   }
-  await modules.dispose().catch(() => undefined)
-  await modelRoutes.close().catch(() => undefined)
-  await host.dispose().catch(() => undefined)
-  await minds.embedder.unload().catch(() => undefined)
+  await modules.dispose().catch((err: unknown) => noteFailure(err, 'engine', 'Could not shut the modules down'))
+  await modelRoutes.close().catch((err: unknown) => noteFailure(err, 'engine', 'Could not close the model routes'))
+  await host.dispose().catch((err: unknown) => noteFailure(err, 'engine', 'Could not stop the model server'))
+  await minds.embedder.unload().catch((err: unknown) => noteFailure(err, 'engine', 'Could not stop the embedding server'))
   process.exit(0)
 }
 

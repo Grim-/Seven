@@ -1,3 +1,5 @@
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { isVaultLocked } from '@shared/sealed'
@@ -126,7 +128,7 @@ class Routines extends EventEmitter {
     if (value.output.page && /[\n#]/.test(value.output.page)) throw new Error('Give the page by its name alone, without # or line breaks.')
     const list = this.read()
     const existing = draft.id ? list.find((r) => r.id === draft.id) : undefined
-    if (draft.id && !existing) throw new Error('That routine no longer exists')
+    if (draft.id && !existing) throw notFound(new Error('That routine no longer exists'))
     const clash = list.find((r) => r.id !== existing?.id && r.name.toLowerCase() === value.name.toLowerCase())
     if (clash) throw new Error(`There is already a routine called ${clash.name}. Give this one a different name.`)
     if (!existing && list.length >= MAX) throw new Error(`There are already ${MAX} routines. Delete one before adding another.`)
@@ -150,13 +152,13 @@ class Routines extends EventEmitter {
 
   rename(id: string, name: string): void {
     const r = this.read().find((x) => x.id === id)
-    if (!r) throw new Error('That routine no longer exists')
+    if (!r) throw notFound(new Error('That routine no longer exists'))
     this.save({ ...r, name, id })
   }
 
   delete(id: string): void {
     const list = this.read()
-    if (!list.some((r) => r.id === id)) throw new Error('That routine no longer exists')
+    if (!list.some((r) => r.id === id)) throw notFound(new Error('That routine no longer exists'))
     const pending = this.settle.get(id)
     if (pending) clearTimeout(pending.timer)
     this.settle.delete(id)
@@ -167,7 +169,7 @@ class Routines extends EventEmitter {
 
   setEnabled(id: string, enabled: boolean): Routine[] {
     const r = this.read().find((x) => x.id === id)
-    if (!r) throw new Error('That routine no longer exists')
+    if (!r) throw notFound(new Error('That routine no longer exists'))
     const next = r.when.type === 'schedule' ? (r.next && r.next > Date.now() ? r.next : firstRun(r.when)) : null
     if (enabled && r.when.type === 'schedule' && next === null) throw new Error('Its time has passed. Pick a new time first')
     this.patch(id, { enabled, next })
@@ -175,7 +177,7 @@ class Routines extends EventEmitter {
   }
 
   runNow(id: string): void {
-    if (!this.read().some((r) => r.id === id)) throw new Error('That routine no longer exists')
+    if (!this.read().some((r) => r.id === id)) throw notFound(new Error('That routine no longer exists'))
     if (this.runningId === id || this.queue.some((q) => q.id === id)) throw new Error('It is already running or waiting to run. Wait for that run to finish first.')
     this.enqueue(id, null, true)
   }
@@ -188,7 +190,8 @@ class Routines extends EventEmitter {
       due = this.read()
         .filter((r) => r.enabled && r.when.type === 'schedule' && r.next !== null && r.id !== this.runningId && !this.queue.some((q) => q.id === r.id))
         .map((r) => r.next as number)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'routines', 'Could not read the routines to schedule them')
       return
     }
     if (!due.length) return
@@ -200,7 +203,8 @@ class Routines extends EventEmitter {
     const now = Date.now()
     try {
       for (const r of this.read()) if (r.enabled && r.when.type === 'schedule' && r.next !== null && r.next <= now && r.id !== this.runningId && !this.queue.some((q) => q.id === r.id)) this.enqueue(r.id, null, false)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'routines', 'Could not read the routines to run due ones')
       return
     }
     this.schedule()
@@ -211,7 +215,8 @@ class Routines extends EventEmitter {
     let list: Stored[]
     try {
       list = this.read()
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'routines', 'Could not read the routines')
       return
     }
     for (const r of list) {
@@ -281,7 +286,8 @@ class Routines extends EventEmitter {
     let r: Stored | undefined
     try {
       r = this.read().find((x) => x.id === id)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'routines', 'Could not read the routine to run')
       return
     }
     if (!r || (!r.enabled && !manual)) return

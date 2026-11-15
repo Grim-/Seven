@@ -1,11 +1,13 @@
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
 import { isAssetId } from '@shared/ids'
 import { CORE_MODULES } from '@shared/toolnames'
 import type { WorldBinding } from '@shared/world'
-import { cleanCardSource } from '@shared/cardDecks'
+import { cleanAvatarRef } from '@shared/avatars'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
-import { cleanVoice, DEFAULT_CONTEXT, DEFAULT_LIBRARY_ACCESS, DEFAULT_LOOK, type LibraryAccess, type AgentLook, type AvatarRef, PERMISSION_MODES, SAMPLING_KEYS, THINKING_LEVELS, type ThinkingLevel, TOOL_CHOICE_MODES, type ToolChoiceMode, type AgentDraft, type ContextSettings, type AgentProfile, type PermissionMode, type SamplingOverrides } from '@shared/types'
+import { cleanVoice, DEFAULT_CONTEXT, DEFAULT_LIBRARY_ACCESS, DEFAULT_LOOK, type LibraryAccess, type AgentLook, PERMISSION_MODES, SAMPLING_KEYS, THINKING_LEVELS, type ThinkingLevel, TOOL_CHOICE_MODES, type ToolChoiceMode, type AgentDraft, type ContextSettings, type AgentProfile, type PermissionMode, type SamplingOverrides } from '@shared/types'
 import { paths } from '../util/paths'
 import { newId, readJson, removePath, writeJson } from '../util/fs'
 import { secure, vaultEvents } from '../util/secure'
@@ -87,13 +89,7 @@ function cleanAsset(value: unknown): string | null {
 
 export function cleanLook(input: unknown): AgentLook {
   const v = (input ?? {}) as Partial<AgentLook> & Record<string, unknown>
-  const a = v.avatar as AvatarRef | null | undefined
-  const avatar: AvatarRef | null =
-    a && a.kind === 'file' && cleanAsset(a.assetId)
-      ? { kind: 'file', assetId: a.assetId }
-      : a && a.kind === 'coded' && typeof a.type === 'string' && /^[a-z][a-z0-9_-]{0,40}$/.test(a.type)
-        ? { kind: 'coded', type: a.type }
-        : null
+  const avatar = cleanAvatarRef(v.avatar)
   return {
     avatar,
     accent: cleanColor(v.accent),
@@ -201,7 +197,8 @@ export class AgentRegistry extends EventEmitter {
         const agent = readJson<AgentProfile | null>(path.join(PRIVATE_DIR, file), null)
         if (agent?.id) this.agents.set(agent.id, cleanLoaded(agent, true))
       }
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'agents', 'Could not read the private agents')
       return
     }
     this.emit('changed', this.list())
@@ -257,7 +254,7 @@ export class AgentRegistry extends EventEmitter {
 
   get(id: string): AgentProfile {
     const agent = this.agents.get(id)
-    if (!agent) throw new Error('That agent no longer exists. Pick another one in Agents.')
+    if (!agent) throw notFound(new Error('That agent no longer exists. Pick another one in Agents.'))
     return agent
   }
 
@@ -299,7 +296,6 @@ export class AgentRegistry extends EventEmitter {
         ? (draft.sheets ?? [])
         : existing?.sheets ?? (draft.sheet ? [draft.sheet] : existing?.sheet ? [existing.sheet] : []),
       player: (draft.player === undefined ? existing?.player : draft.player) || null,
-      cards: cleanCardSource(draft.cards === undefined ? existing?.cards : draft.cards),
       mindAuto: cleanMindAuto(draft.mindAuto === undefined ? existing?.mindAuto : draft.mindAuto),
       remindEvery: cleanRemindEvery(draft.remindEvery === undefined ? existing?.remindEvery : draft.remindEvery),
       maxToolRounds: cleanMaxToolRounds(draft.maxToolRounds === undefined ? existing?.maxToolRounds : draft.maxToolRounds),

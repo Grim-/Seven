@@ -1,7 +1,9 @@
 import { createElement, type ComponentType, type ReactNode } from 'react'
-import { Blocks, Bot, Cpu, Database, FolderOpen, Gamepad2, Gauge, LayoutDashboard, MessageSquare, NotebookPen, Server, Settings, Wrench } from 'lucide-react'
+import { Blocks, Bot, Clapperboard, Cpu, Database, FolderOpen, Gamepad2, Gauge, LayoutDashboard, MessageSquare, NotebookPen, Server, Settings, Wrench } from 'lucide-react'
 import type { ViewId } from '@shared/types'
 import type { WindowApp } from '../store/windows'
+import { useApp } from '../store/app'
+import { setChatViewMode } from '../lib/chatViewMode'
 import { ChatView } from './ChatView'
 import { PlayView } from './PlayView'
 import { AgentsView } from './AgentsView'
@@ -16,6 +18,13 @@ import { ComposerView } from '../components/composer/ComposerView'
 import { SpeedView } from './SpeedView'
 import { ServerView } from './ServerView'
 
+export interface MainViewMenuItem {
+  label: string
+  icon: ReactNode
+  view?: ViewId
+  onSelect?: () => void
+}
+
 export interface MainView {
   id: ViewId
   label: string
@@ -23,13 +32,46 @@ export interface MainView {
   Component: ComponentType
   nav: 'tabs' | 'settings' | null
   app?: WindowApp
-  menu?: { label: string; icon: ReactNode; view: ViewId }[]
+  menu?: MainViewMenuItem[]
 }
 
 const icon = (Icon: ComponentType) => createElement(Icon)
 
 export const MAIN_VIEWS: MainView[] = [
-  { id: 'chat', label: 'Chat', icon: icon(MessageSquare), Component: ChatView, nav: 'tabs', app: 'chats' },
+  {
+    id: 'chat',
+    label: 'Chat',
+    icon: icon(MessageSquare),
+    Component: ChatView,
+    nav: 'tabs',
+    app: 'chats',
+    menu: [
+      {
+        label: 'Default',
+        icon: icon(MessageSquare),
+        onSelect: () => {
+          useApp.getState().setView('chat')
+          setChatViewMode('default')
+        }
+      },
+      {
+        label: 'Tabletop',
+        icon: icon(LayoutDashboard),
+        onSelect: () => {
+          useApp.getState().setView('chat')
+          setChatViewMode('tabletop')
+        }
+      },
+      {
+        label: 'Cinema',
+        icon: icon(Clapperboard),
+        onSelect: () => {
+          useApp.getState().setView('chat')
+          setChatViewMode('cinema')
+        }
+      }
+    ]
+  },
   { id: 'play', label: 'Play', icon: icon(Gamepad2), Component: PlayView, nav: 'tabs' },
   { id: 'dashboards', label: 'Dashboards', icon: icon(LayoutDashboard), Component: DashboardsView, nav: 'tabs' },
   { id: 'data', label: 'Data', icon: icon(Database), Component: DataView, nav: 'tabs', app: 'data' },

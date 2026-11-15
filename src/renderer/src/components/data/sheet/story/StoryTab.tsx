@@ -20,7 +20,9 @@ export function StoryTab({ story, onChange }: { story: Story; onChange: (story: 
   const start = () => onChange({ ...story, sessions: [...sessions, newSession()] })
   const q = query.trim().toLowerCase()
   const numbered = sessions.map((s, i) => ({ s, n: i + 1 }))
-  const pool = q ? numbered.filter(({ s }) => `${s.title}\n${s.notes}`.toLowerCase().includes(q)) : numbered.slice(0, -1)
+  const pool = q
+    ? numbered.filter(({ s }) => [s.title, s.summary ?? '', s.where ?? '', s.phase ?? '', ...(s.who ?? []), ...(s.tags ?? []), s.notes].join('\n').toLowerCase().includes(q))
+    : numbered.slice(0, -1)
   const ordered = order === 'newest' ? [...pool].reverse() : pool
   const shown = q || all || order === 'oldest' ? ordered : ordered.slice(0, RECENT)
   return (

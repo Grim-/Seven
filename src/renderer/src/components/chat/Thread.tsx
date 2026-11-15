@@ -21,7 +21,7 @@ import { cn } from '../../lib/cn'
 import { LinkTextarea } from '../data/LinkTextarea'
 import { Markdown } from './Markdown'
 import { speak, stopSpeaking, useSpeech } from '../../lib/speech'
-import { parseRoleplay, RoleplayText } from './Roleplay'
+import { firstSpeakerIn, portraitSizeMenuItems, RoleplayText } from './Roleplay'
 import { CharacterAvatar } from './CharacterAvatar'
 import { PlayerCharacterDock } from './PlayerCharacterDock'
 import { useEntryPreview } from '../entries/entryPreview'
@@ -33,7 +33,9 @@ import { DraftPart } from './DraftPart'
 import { StatusLine } from './StatusLine'
 import { StageOverlay } from '../../registries/presentations'
 import { SummaryCard } from './ContextMeter'
-import { ActiveCommand, CommandOutputCard, ComposerHints, useComposerHints } from './Commands'
+import { ActiveCommand, CommandOutputCard, ComposerHints, handleComposerCommandTab, useCommandBar, useComposerHints } from './Commands'
+import { useCommands } from '../../store/commands'
+import { matchesKeybind, useKeybindLabel } from '../../store/keybinds'
 import { ComposerReferences, UserTextPart } from './References'
 import { AlertBox, Button, EmptyState, Modal, VirtualList, openMenu, DropOverlay } from '../ui'
 import { engine, main } from '../../lib/ipc'
@@ -41,10 +43,18 @@ import { useData } from '../../store/data'
 import { draftOf, useSessions } from '../../store/sessions'
 import { useConversation, type Conversation } from '../../lib/conversation'
 import { ChatHand } from '../cards/ChatHand'
+import { PlayVeil } from '../cards/PlayVeil'
+import { useTabletopInsets, useTabletopMode } from './tabletopStore'
+import { UserBoardBar } from './ChatTabletop'
+import { MessageElements, useTextCover } from './MessageElements'
+import { DraftElements } from './DraftElements'
+import { SendOffer } from './SendOffer'
+import { Fold } from '../ui/Fold'
 import { toast } from '../../store/toasts'
 import { ChatPictures, useChatPictures } from '../pictures/chatPictures'
 import { Picture } from '../pictures/Picture'
 import { useApp } from '../../store/app'
+import { useActiveTheme } from '../../store/themes'
 import { failed } from '../../lib/notify'
 import { copyText } from '../../lib/notify'
 import { useFileDrop } from '../../lib/useFileDrop'
@@ -63,7 +73,7 @@ import { ChatComposer, ChatPad } from '../composer/ChatComposer'
 import { AreaAction } from '../pictures/areaAction'
 import { errorText, formatClock } from '../../lib/format'
 
-const BIG_AVATAR: Record<string, number> = { small: 0, medium: 48, large: 96 }
+const BIG_AVATAR: Record<string, number> = { small: 0, medium: 56, large: 96, xl: 144 }
 
 const AgentLabel = createContext('SEVEN')
 const RewindRequest = createContext<((messageId: string) => void) | null>(null)
@@ -298,6 +308,7 @@ function UserMessage({ messageId }: { messageId: string }) {
   const fork = useContext(ForkRequest)
   const canRewind = rewind && !messageId.startsWith('__')
   const entrance = useEntrance(messageId)
+  const cover = useTextCover(messageId)
   const text = useAuiState((s) => s.message.content.map((p) => (p.type === 'text' ? p.text : '')).join(''))
   const worldPlayer = useWorldPlayer(agent?.world?.worldId ?? null)
   const player = worldPlayer || agent?.player || null
@@ -345,10 +356,21 @@ function UserMessage({ messageId }: { messageId: string }) {
           </span>
         </div>
         <MessageFiles messageId={messageId} />
-        <div className={look.user.box}>
-          <MessagePrimitive.Parts components={{ Text: UserTextPart }} />
-        </div>
-        <LinkFaces text={text} />
+        <MessageElements messageId={messageId} />
+        {cover === 'hide' ? null : cover === 'fold' ? (
+          <Fold label="Sent">
+            <div className={look.user.box}>
+              <MessagePrimitive.Parts components={{ Text: UserTextPart }} />
+            </div>
+          </Fold>
+        ) : (
+          <>
+            <div className={look.user.box}>
+              <MessagePrimitive.Parts components={{ Text: UserTextPart }} />
+            </div>
+            <LinkFaces text={text} />
+          </>
+        )}
       </div>
       </motion.div>
     </MessagePrimitive.Root>
@@ -390,10 +412,9 @@ function AssistantMessage({
     if (!sheets.length) return null
     if (sheets.length === 1) return sheets[0]
     if (rawText) {
-      const blocks = parseRoleplay(rawText)
-      const firstSay = blocks.find((b) => b.kind === 'say')
-      if (firstSay) {
-        const spk = firstSay.speaker.toLowerCase()
+      const firstSpk = firstSpeakerIn(rawText)
+      if (firstSpk) {
+        const spk = firstSpk.toLowerCase()
         const match = sheets.find((s) => {
           const sLower = s.toLowerCase()
           const sName = showName(s).toLowerCase()
@@ -408,6 +429,8 @@ function AssistantMessage({
   const sheetPreview = useEntryPreview(speakerSheet ? `@sheet:${speakerSheet}` : '')
   const validSheet = sheetPreview && !('missing' in sheetPreview) ? sheetPreview : null
   const speakerName = validSheet ? showName(validSheet.title) : speakerSheet ? showName(speakerSheet) : null
+  const cover = useTextCover(messageId ?? '')
+  const isRoleplayScene = Boolean(agent?.roleplay) || cover === 'hide'
 
   return (
     <MessagePrimitive.Root
@@ -421,39 +444,46 @@ function AssistantMessage({
           { label: 'Fork from here', icon: <GitFork />, disabled: !fork || statusType === 'running' || messageId.startsWith('__'), onSelect: () => fork?.(messageId) },
           useSpeech.getState().speaking === messageId
             ? { label: 'Stop reading', icon: <Square />, onSelect: stopSpeaking }
-            : { label: 'Read aloud', icon: <Volume2 />, disabled: !text, onSelect: () => void speak(text, agent?.voice ?? null, messageId) }
+            : { label: 'Read aloud', icon: <Volume2 />, disabled: !text, onSelect: () => void speak(text, agent?.voice ?? null, messageId) },
+          { label: '', separator: true },
+          ...portraitSizeMenuItems(avatarSize)
         ])
       }}
     >
       <motion.div className="flex" initial={entrance} animate={{ opacity: 1, y: 0 }} transition={ENTER}>
-      {speakerSheet && big > 0 ? (
+      {!isRoleplayScene && speakerSheet && big > 0 ? (
         <div className="mr-3 shrink-0 pt-0.5">
           <CharacterAvatar sheetId={speakerSheet} size={big} openOnClick />
         </div>
-      ) : agent && big > 0 ? (
+      ) : !isRoleplayScene && agent && big > 0 ? (
         <div className="mr-3 shrink-0 pt-0.5">
           <AgentAvatar agent={agent} size={big} sessionId={liveSession} />
         </div>
       ) : null}
-      <div className={cn('w-full min-w-0', look.agent.width)}>
-        <div className={cn('mb-1 flex items-center gap-1.5', look.agent.label)}>
-          {speakerSheet && big === 0 && look.agent.avatar > 0 ? (
-            <CharacterAvatar sheetId={speakerSheet} size={look.agent.avatar} openOnClick />
-          ) : agent && big === 0 && look.agent.avatar > 0 ? (
-            <AgentAvatar agent={agent} size={look.agent.avatar} sessionId={liveSession} />
-          ) : null}
-          {speakerSheet && speakerName ? (
-            <span className="inline-flex items-center gap-1">
-              <span className="font-semibold text-accent">{speakerName}</span>
-              <span className="text-[10px] text-faint">({label})</span>
-            </span>
-          ) : (
-            label
+      <div className={cn('w-full min-w-0', isRoleplayScene ? 'max-w-full' : look.agent.width)}>
+        {!isRoleplayScene && (
+          <div className={cn('mb-1 flex items-center gap-1.5', look.agent.label)}>
+            {speakerSheet && big === 0 && look.agent.avatar > 0 ? (
+              <CharacterAvatar sheetId={speakerSheet} size={look.agent.avatar} openOnClick />
+            ) : agent && big === 0 && look.agent.avatar > 0 ? (
+              <AgentAvatar agent={agent} size={look.agent.avatar} sessionId={liveSession} />
+            ) : null}
+            {speakerSheet && speakerName ? (
+              <span className="inline-flex items-center gap-1">
+                <span className="font-semibold text-accent">{speakerName}</span>
+                <span className="text-[10px] text-faint">({label})</span>
+              </span>
+            ) : (
+              label
+            )}
+            <MessageTime />
+          </div>
+        )}
+        <div className={isRoleplayScene ? 'w-full' : look.agent.body}>
+          {cover !== 'hide' && (
+            <MessagePrimitive.Parts components={{ Text: AssistantTextPart, Reasoning: ThoughtPart, Empty: EmptyPart, tools: { Fallback: ToolCard } }} />
           )}
-          <MessageTime />
-        </div>
-        <div className={look.agent.body}>
-          <MessagePrimitive.Parts components={{ Text: AssistantTextPart, Reasoning: ThoughtPart, Empty: EmptyPart, tools: { Fallback: ToolCard } }} />
+          {messageId && <MessageElements messageId={messageId} />}
           {messageId && <DraftPart messageId={messageId} />}
           {messageId && statusType === 'running' && <StatusLine messageId={messageId} />}
           {statusType === 'incomplete' && reason === 'cancelled' && (
@@ -479,7 +509,21 @@ function Composer({ running, placeholder }: { running: boolean; placeholder: str
   const owns = useThreadLook().ownsComposer
   const stopping = useSessions((s) => (conv.sessionId ? s.stopping[conv.sessionId] === true : false))
   const all = useComposerHints()
+  const commandList = useCommands((s) => s.list)
+  const stopShortcut = useKeybindLabel('chat.stop')
+  const composerInputRef = useRef<HTMLTextAreaElement>(null)
   const typed = useAuiState((s) => (s.composer.isEditing ? s.composer.text : ''))
+  useEffect(() => {
+    const focusFn = () => {
+      const el = composerInputRef.current
+      if (!el) return
+      el.focus()
+      const end = el.value.length
+      el.setSelectionRange(end, end)
+    }
+    useCommandBar.getState().setFocusComposer(focusFn)
+    return () => useCommandBar.getState().setFocusComposer(null)
+  }, [])
   const keys = all.map((h) => h.key).join('|')
   const [hidden, setHidden] = useState<string | null>(null)
   const [selected, setSelected] = useState(0)
@@ -494,8 +538,20 @@ function Composer({ running, placeholder }: { running: boolean; placeholder: str
   const player = worldPlayer || agent?.player || null
   const append = (text: string) => aui.composer.setText(current.trim() ? `${current.trimEnd()} ${text}` : text)
   const request = usePlayRequests((s) => s.byChat[conv.key])
+  useEffect(() => {
+    if (!owns || !running || !conv.sessionId) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (matchesKeybind('chat.stop', e)) {
+        e.preventDefault()
+        e.stopPropagation()
+        void useSessions.getState().abort(conv.sessionId!)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [owns, running, conv.sessionId])
   return (
-    <ComposerPrimitive.Root className={cn('relative flex items-end gap-2', look.root)}>
+    <ComposerPrimitive.Root className={cn('relative z-40 flex items-end gap-2', look.root)}>
       {hints.length ? <ComposerHints hints={hints} selected={pick} onSelect={setSelected} /> : <ActiveCommand />}
       {tool === 'draw' && (
         <DrawPanel
@@ -519,51 +575,81 @@ function Composer({ running, placeholder }: { running: boolean; placeholder: str
       {look.avatar > 0 && (
         <PlayerCharacterDock agent={agent} size={look.avatar} className="mr-1" />
       )}
-      <ComposerTool title="Attach files" onClick={() => void main('dialog.openFiles').then((paths) => attachPaths(conv.key, paths))}>
-        <Paperclip />
-      </ComposerTool>
-      <ComposerTool title="Draw from a repo or deck" active={tool === 'draw'} onClick={() => setTool(tool === 'draw' ? null : 'draw')}>
-        <Shuffle />
-      </ComposerTool>
-      <ChatComposer conv={conv} running={running} />
-      <ComposerTool title="An action or a decision" active={tool === 'play'} onClick={() => setTool(tool === 'play' ? null : 'play')}>
-        <Dices />
-      </ComposerTool>
-      <ComposerPrimitive.Input
-        data-seven-composer={owns ? '' : undefined}
-        autoFocus
-        rows={1}
-        maxRows={10}
-        submitMode="enter"
-        placeholder={placeholder}
-        onKeyDown={(e) => {
-          if (!hints.length) return
-          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-            e.preventDefault()
-            setSelected((pick + (e.key === 'ArrowDown' ? 1 : hints.length - 1)) % hints.length)
-          } else if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey && hints[pick].key !== typed.trim())) {
-            e.preventDefault()
-            hints[pick].apply()
-          } else if (e.key === 'Escape') {
-            e.preventDefault()
-            setHidden(keys)
-          }
-        }}
-        className={cn('min-h-10 flex-1 resize-none', look.field)}
-      />
-      {running && stopping ? (
-        <div title="Stopping" className={cn('flex h-10 items-center justify-center gap-2 border border-alert/30 font-mono text-[11px] font-semibold uppercase tracking-wider text-alert/70', look.round ? 'w-10' : 'px-3.5')}>
-          <Square className="h-3.5 w-3.5 animate-pulse" /> {!look.round && 'Stopping…'}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        {owns && <UserBoardBar />}
+        <div className="flex items-end gap-2">
+          <ComposerTool title="Attach files" onClick={() => void main('dialog.openFiles').then((paths) => attachPaths(conv.key, paths), failed('Could not open the file picker'))}>
+            <Paperclip />
+          </ComposerTool>
+          <ComposerTool title="Draw from a repo or deck" active={tool === 'draw'} onClick={() => setTool(tool === 'draw' ? null : 'draw')}>
+            <Shuffle />
+          </ComposerTool>
+          <ChatComposer conv={conv} running={running} />
+          <ComposerTool title="An action or a decision" active={tool === 'play'} onClick={() => setTool(tool === 'play' ? null : 'play')}>
+            <Dices />
+          </ComposerTool>
+          <ComposerPrimitive.Input
+            ref={composerInputRef}
+            data-seven-composer={owns ? '' : undefined}
+            autoFocus
+            rows={1}
+            maxRows={10}
+            submitMode="enter"
+            placeholder={placeholder}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && !e.shiftKey) {
+                if (hints.length) {
+                  e.preventDefault()
+                  setHidden(keys)
+                }
+                e.stopPropagation()
+                return
+              }
+              if (!hints.length) {
+                if (
+                  e.key === 'Tab' &&
+                  handleComposerCommandTab(
+                    e,
+                    current,
+                    (next) => {
+                      aui.composer.setText(next)
+                      requestAnimationFrame(() => {
+                        const el = composerInputRef.current
+                        if (el) el.setSelectionRange(next.length, next.length)
+                      })
+                    },
+                    commandList
+                  )
+                ) {
+                  return
+                }
+                return
+              }
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                setSelected((pick + (e.key === 'ArrowDown' ? 1 : hints.length - 1)) % hints.length)
+              } else if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey && hints[pick].key !== typed.trim())) {
+                e.preventDefault()
+                hints[pick].apply()
+              }
+            }}
+            className={cn('min-h-10 flex-1 resize-none', look.field)}
+          />
+          {running && stopping ? (
+            <div title="Stopping" className={cn('flex h-10 items-center justify-center gap-2 border border-alert/30 font-mono text-[11px] font-semibold uppercase tracking-wider text-alert/70', look.round ? 'w-10' : 'px-3.5')}>
+              <Square className="h-3.5 w-3.5 animate-pulse" /> {!look.round && 'Stopping…'}
+            </div>
+          ) : running ? (
+            <ComposerPrimitive.Cancel title={`Stop (${stopShortcut})`} className={cn('notch-sm flex h-10 items-center justify-center gap-2 border border-alert/60 bg-alert/5 font-mono text-[11px] font-semibold uppercase tracking-wider text-alert hover:bg-alert/15', look.round ? 'w-10' : 'px-3.5')}>
+              <Square className="h-3.5 w-3.5" /> {!look.round && 'Stop'}
+            </ComposerPrimitive.Cancel>
+          ) : (
+            <ComposerPrimitive.Send title="Send" className={cn('notch-sm flex h-10 items-center justify-center gap-2 border border-accent bg-gradient-to-b from-accent/20 to-accent/5 font-mono text-[11px] font-semibold uppercase tracking-wider text-accent shadow-[0_0_14px_color-mix(in_srgb,var(--color-accent)_20%,transparent)] hover:text-white disabled:opacity-40', look.round ? 'w-10' : 'px-4')}>
+              {!look.round && 'Send'} <CornerDownLeft className="h-3.5 w-3.5" />
+            </ComposerPrimitive.Send>
+          )}
         </div>
-      ) : running ? (
-        <ComposerPrimitive.Cancel title="Stop" className={cn('notch-sm flex h-10 items-center justify-center gap-2 border border-alert/60 bg-alert/5 font-mono text-[11px] font-semibold uppercase tracking-wider text-alert hover:bg-alert/15', look.round ? 'w-10' : 'px-3.5')}>
-          <Square className="h-3.5 w-3.5" /> {!look.round && 'Stop'}
-        </ComposerPrimitive.Cancel>
-      ) : (
-        <ComposerPrimitive.Send title="Send" className={cn('notch-sm flex h-10 items-center justify-center gap-2 border border-accent bg-gradient-to-b from-accent/20 to-accent/5 font-mono text-[11px] font-semibold uppercase tracking-wider text-accent shadow-[0_0_14px_color-mix(in_srgb,var(--color-accent)_20%,transparent)] hover:text-white disabled:opacity-40', look.round ? 'w-10' : 'px-4')}>
-          {!look.round && 'Send'} <CornerDownLeft className="h-3.5 w-3.5" />
-        </ComposerPrimitive.Send>
-      )}
+      </div>
     </ComposerPrimitive.Root>
   )
 }
@@ -724,6 +810,16 @@ function RewindModal({ messageId, onClose, onDone }: { messageId: string; onClos
 
 export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody, placeholder, look: lookId = 'panel' }: ThreadProps) {
   const look = THREAD_LOOKS[lookId]
+  const [tabletopMode] = useTabletopMode()
+  const isTabletop = lookId === 'tabletop'
+  const [chatHovered, setChatHovered] = useState(false)
+  const [chatFocused, setChatFocused] = useState(false)
+  const chatForeground =
+    !isTabletop ||
+    tabletopMode.layoutMode === 'creator' ||
+    (!tabletopMode.peekTable && (tabletopMode.pinnedChat || chatFocused || chatHovered))
+  const { theme } = useActiveTheme()
+  const chatFadeOpacity = theme.chatFadeOpacity ?? 0.55
   const runtime = useSevenRuntime()
   const [rewindTarget, setRewindTarget] = useState<string | null>(null)
   const [editTarget, setEditTarget] = useState<string | null>(null)
@@ -734,6 +830,34 @@ export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody
   const pictureHeight = useApp((s) => s.settings?.chatPictureHeight ?? 480)
   const pictures = useMemo(() => ({ height: pictureHeight }), [pictureHeight])
   const viewport = useRef<HTMLDivElement>(null)
+  const bottomBarRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!isTabletop) {
+      useTabletopInsets.getState().setBottom(0)
+      return
+    }
+    const el = bottomBarRef.current
+    if (!el) return
+    let raf = 0
+    const apply = () => {
+      raf = 0
+      const next = el.offsetHeight
+      if (useTabletopInsets.getState().bottom !== next) {
+        useTabletopInsets.getState().setBottom(next)
+      }
+    }
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(apply)
+    }
+    apply()
+    const observer = new ResizeObserver(schedule)
+    observer.observe(el)
+    return () => {
+      if (raf) cancelAnimationFrame(raf)
+      observer.disconnect()
+      useTabletopInsets.getState().setBottom(0)
+    }
+  }, [isTabletop])
   const queued = useQueuedComposer(conv.key)
   const lookAt = useMemo(() => (area: PictureArea) => queueComposer(conv.key, `I look at the ${area.name}`), [conv.key])
   useEffect(() => {
@@ -776,27 +900,63 @@ export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody
         >
           <StageOverlay />
           <DropOverlay show={fileDrop.over} label="Drop files to attach" />
-          <ThreadPrimitive.Viewport ref={viewport} className={cn('relative min-h-0 flex-1 overflow-y-auto', look.viewport)}>
+          <PlayVeil />
+          <ThreadPrimitive.Viewport
+            ref={viewport}
+            style={
+              isTabletop
+                ? {
+                    opacity: tabletopMode.peekTable ? 0 : chatForeground ? 1 : chatFadeOpacity
+                  }
+                : undefined
+            }
+            className={cn(
+              'relative min-h-0 flex-1 overflow-y-auto transition-opacity duration-300',
+              look.viewport,
+              isTabletop && 'z-20 pointer-events-none'
+            )}
+          >
             <ThreadPrimitive.Empty>
               <EmptyState title={emptyTitle}>{emptyBody}</EmptyState>
             </ThreadPrimitive.Empty>
-            <div className={look.column}>
+            <div
+              className={cn(look.column, isTabletop && !tabletopMode.peekTable && 'pointer-events-auto')}
+              onMouseEnter={isTabletop ? () => setChatHovered(true) : undefined}
+              onMouseLeave={isTabletop ? () => setChatHovered(false) : undefined}
+            >
               <VirtualMessages viewport={viewport} />
             </div>
-            <ThreadPrimitive.ScrollToBottom className="sticky bottom-2 left-full flex h-8 w-8 items-center justify-center border border-line bg-black/80 text-accent hover:border-accent disabled:invisible">
+            <ThreadPrimitive.ScrollToBottom className="pointer-events-auto sticky bottom-2 left-full flex h-8 w-8 items-center justify-center border border-line bg-black/80 text-accent hover:border-accent disabled:invisible">
               <ArrowDown className="h-4 w-4" />
             </ThreadPrimitive.ScrollToBottom>
           </ThreadPrimitive.Viewport>
-          <SummaryCard />
-          <CommandOutputCard />
-          <TodoBar compact={look.compactBars} />
-          {look.divider && <div className="border-t border-line/60" />}
-          <DraftFiles />
-          <ComposerReferences />
-          {look.outputs && <OutputTray />}
-          <ChatPad conv={conv} running={running} />
-          <ChatHand conv={conv} agent={agent} running={running} />
-          <Composer running={running} placeholder={placeholder} />
+          <div
+            ref={bottomBarRef}
+            className={cn('relative flex flex-col', isTabletop && 'pointer-events-auto z-40')}
+            onMouseEnter={isTabletop ? () => setChatHovered(true) : undefined}
+            onMouseLeave={isTabletop ? () => setChatHovered(false) : undefined}
+            onFocusCapture={isTabletop ? () => setChatFocused(true) : undefined}
+            onBlurCapture={
+              isTabletop
+                ? (e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setChatFocused(false)
+                  }
+                : undefined
+            }
+          >
+            <SummaryCard />
+            <CommandOutputCard />
+            <TodoBar compact={look.compactBars} />
+            {look.divider && <div className="border-t border-line/60" />}
+            <DraftFiles />
+            <DraftElements />
+            <SendOffer agent={agent} onSend={() => runtime.thread.composer.send()} />
+            <ComposerReferences />
+            <ChatPad conv={conv} running={running} />
+            <ChatHand conv={conv} agent={agent} running={running} />
+            {look.outputs && <OutputTray />}
+            <Composer running={running} placeholder={placeholder} />
+          </div>
         </ThreadPrimitive.Root>
       </AgentLabel.Provider>
       </AgentRef.Provider>

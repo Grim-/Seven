@@ -1,8 +1,11 @@
-import { AVATAR_STATES, CODED_AVATARS, REACTIONS, type AgentLook, type AvatarState } from '@shared/types'
+import { REACTIONS, type AgentLook } from '@shared/types'
+import { MOOD_NAMES, isMood } from '@shared/moods'
+import { avatars } from '../../engine/avatars/store'
 import { ToolError, optInt, optStr, type ToolDef } from '../../engine/tools/types'
 import { data } from '../../engine/data/hub'
 import { agentAccess } from '../../engine/agents/access'
 import { presentationTool } from '../../engine/present/define'
+import { AVATAR_TOOLS } from './avatarTools'
 
 const HEX = /^#[0-9a-f]{6}$/i
 
@@ -23,19 +26,20 @@ const react: ToolDef = {
   group: 'look',
   needsWorkspace: false,
   maxRepeats: 3,
-  description: `Show a mood on your avatar and/or a quick effect. Moods: ${AVATAR_STATES.join(', ')}. Effects: ${Object.keys(REACTIONS).join(', ')}.`,
+  description: `Show a mood on your avatar and/or a quick effect. Moods: ${MOOD_NAMES.join(', ')}. Effects: ${Object.keys(REACTIONS).join(', ')}.`,
   params: {
     type: 'object',
     properties: {
-      mood: { oneOf: [{ type: 'null' }, { enum: AVATAR_STATES }], description: 'A mood to show, or null' },
+      mood: { oneOf: [{ type: 'null' }, { enum: MOOD_NAMES }], description: 'A mood to show, or null' },
       effect: { oneOf: [{ type: 'null' }, { enum: Object.keys(REACTIONS) }], description: 'A quick effect, or null' },
       seconds: { type: ['integer', 'null'], description: 'How long the mood lasts (default 6)' }
     }
   },
   async execute(params, ctx) {
-    const mood = (optStr(params, 'mood') as AvatarState | null) ?? null
+    const asked = optStr(params, 'mood')
+    const mood = isMood(asked) ? asked : null
     const effect = optStr(params, 'effect')
-    if (!mood && !effect) throw new ToolError(`Set mood to one of: ${AVATAR_STATES.join(', ')}, or effect to one of: ${Object.keys(REACTIONS).join(', ')}, or both.`)
+    if (!mood && !effect) throw new ToolError(`Set mood to one of: ${MOOD_NAMES.join(', ')}, or effect to one of: ${Object.keys(REACTIONS).join(', ')}, or both.`)
     const seconds = Math.min(60, Math.max(2, optInt(params, 'seconds') ?? 6))
     ctx.react(mood, effect, seconds)
     return `Shown${mood ? ` ${mood}` : ''}${mood && effect ? ' with' : ''}${effect ? ` ${effect}` : ''}.`
@@ -46,20 +50,22 @@ const setAvatar: ToolDef = {
   name: 'set_avatar',
   group: 'look',
   needsWorkspace: false,
-  description: `Change your avatar to a picture, GIF or short video (file id from attachments or show), or to an animated avatar: ${CODED_AVATARS.map((c) => c.id).join(', ')}.`,
+  description: 'Change your avatar to a picture, GIF or short video (file id from attachments or show), or to an avatar by name (find with kind avatar lists them).',
   params: {
     type: 'object',
     properties: {
       file_id: { type: ['string', 'null'], description: 'A file id, or null' },
-      animated: { oneOf: [{ type: 'null' }, { enum: CODED_AVATARS.map((c) => c.id) }], description: 'An animated avatar, or null' }
+      avatar: { type: ['string', 'null'], description: 'An avatar name, or null' }
     }
   },
   async execute(params, ctx) {
     const id = agentOf(ctx.agentId)
     const file = optStr(params, 'file_id')
-    const coded = optStr(params, 'animated')
-    if (!file && !coded) throw new ToolError(`Set file_id to the id of a picture, GIF or video, or animated to one of: ${CODED_AVATARS.map((c) => c.id).join(', ')}.`)
-    const avatar: AgentLook['avatar'] = file ? { kind: 'file', assetId: mediaFile(file) } : { kind: 'coded', type: coded! }
+    const named = optStr(params, 'avatar')
+    if (!file && !named) throw new ToolError(`Set file_id to the id of a picture, GIF or video, or avatar to one of: ${avatars.list().map((a) => a.name).join(', ')}.`)
+    const found = named ? avatars.find(named) : null
+    if (!file && !found) throw new ToolError(`There is no avatar "${named}". Use one of: ${avatars.list().map((a) => a.name).join(', ')}.`)
+    const avatar: AgentLook['avatar'] = file ? { kind: 'file', assetId: mediaFile(file) } : { kind: 'avatar', id: found!.id }
     const agent = agentAccess.updateLook(id, { avatar })
     return `Avatar changed for ${agent.name}.`
   }
@@ -113,4 +119,4 @@ const aside = presentationTool({
   result: () => 'Shown beside your reply. Carry on with your answer.'
 })
 
-export const LOOK_TOOLS: ToolDef[] = [react, setAvatar, setTheme, aside]
+export const LOOK_TOOLS: ToolDef[] = [react, setAvatar, setTheme, aside, ...AVATAR_TOOLS]

@@ -12,15 +12,7 @@ import { SheetSelect } from '../data/sheet/SheetSelect'
 import { PickOptionsEditor } from './PickOptionsEditor'
 import { PlayedCard } from './PlayedCard'
 import { DecideView } from './DecideView'
-
-async function sheetTitle(id: string | null): Promise<string | null> {
-  if (!id) return null
-  try {
-    return (await engine('sheets.get', { id })).title
-  } catch {
-    return null
-  }
-}
+import { sheetTitle } from '../data/sheet/sheetTitle'
 
 export function storeDecision(start: StoredDecision | null, next: Partial<StoredDecision>, onSaved: (id: string) => void): void {
   const write = (name: string, id: string | null) =>

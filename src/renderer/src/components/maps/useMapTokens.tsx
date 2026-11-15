@@ -4,8 +4,7 @@ import { smallestAt, type Point } from '@shared/shapes'
 import type { WorldEntity } from '@shared/world'
 import { showName } from '@shared/ids'
 import { openMenu, type MenuEvent, type MenuItem } from '../ui'
-import { EntryPicker } from '../library/EntryPicker'
-import { QuickCreatureSpawner } from './QuickCreatureSpawner'
+import { SpawnTokenModal, type SpawnTab } from './SpawnTokenModal'
 import { engine } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
 import { useLibraryData } from '../../lib/useLive'
@@ -87,52 +86,19 @@ export function useMapTokens({ world, use, places, player, editing, save, onSele
       if (t) tokenSourceUi(t.visitor.source)?.moved?.(context(t), at)
     }
   }
-  const putHere = (at: Point): MenuItem => ({
-    label: 'Put a character here',
-    icon: <UserPlus />,
-    onSelect: () =>
-      showPlay(
-        'Put a character here',
-        <EntryPicker
-          kind="sheet"
-          title="Put a character here"
-          inline
-          onClose={closePlay}
-          onPick={(hit) => {
-            closePlay()
-            if (editing) {
-              setStanding(hit.id, { ...(use.stand[hit.id] ?? NONE), at })
-              settle(hit.id, at)
-            } else {
-              void bringHere(world, hit.id)
-                .then((ok) => {
-                  if (!ok) return
-                  setStanding(hit.id, { ...(use.stand[hit.id] ?? NONE), at })
-                  settle(hit.id, at)
-                })
-                .catch(failed('Could not put them here'))
-            }
-          }}
-        />
-      )
-  })
-  const spawnCreatureHere = (at: Point): MenuItem => ({
-    label: 'Spawn creature template here',
-    icon: <Skull className="h-4 w-4 text-alert" />,
-    onSelect: () =>
-      showPlay(
-        'Spawn creature template here',
-        <QuickCreatureSpawner
-          worldId={world}
-          at={at}
-          onSpawn={(sheetId) => {
-            closePlay()
-            setStanding(sheetId, { ...(use.stand[sheetId] ?? NONE), at })
-            settle(sheetId, at)
-          }}
-          onClose={closePlay}
-        />
-      )
-  })
+  const placeSheet = (sheet: string, at: Point) => {
+    closePlay()
+    const place = () => {
+      setStanding(sheet, { ...(use.stand[sheet] ?? NONE), at })
+      settle(sheet, at)
+    }
+    if (editing) return place()
+    void bringHere(world, sheet)
+      .then((ok) => ok && place())
+      .catch(failed('Could not put them here'))
+  }
+  const spawner = (at: Point, start: SpawnTab, title: string) => () => showPlay(title, <SpawnTokenModal world={world} map={use.map} at={at} start={start} onPickSheet={(sheet) => placeSheet(sheet, at)} onClose={closePlay} />)
+  const putHere = (at: Point): MenuItem => ({ label: 'Place character…', icon: <UserPlus />, onSelect: spawner(at, 'cast', 'Place character') })
+  const spawnCreatureHere = (at: Point): MenuItem => ({ label: 'Spawn creature…', icon: <Skull className="h-4 w-4 text-alert" />, onSelect: spawner(at, 'bestiary', 'Spawn creature') })
   return { tokens, handlers, putHere, spawnCreatureHere, holder, items }
 }

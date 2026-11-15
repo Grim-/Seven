@@ -35,16 +35,25 @@ function Row({ value, index, duplicate, render, mono, drag, dragOver, onCommit, 
           className={cn('h-7 min-w-0 flex-1 border border-accent/60 bg-black px-2 text-[13px] text-white outline-none', mono && 'font-mono text-[12.5px]')}
         />
       ) : (
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => {
             setDraft(value)
             setEditing(true)
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setDraft(value)
+              setEditing(true)
+            }
+          }}
           title={duplicate ? 'This value is in the list more than once' : 'Click to edit'}
-          className={cn('min-w-0 flex-1 truncate py-1 text-left text-[13px] text-white/90 hover:text-white', mono && 'font-mono text-[12.5px]')}
+          className={cn('min-w-0 flex-1 truncate py-1 text-left text-[13px] text-white/90 hover:text-white cursor-text', mono && 'font-mono text-[12.5px]')}
         >
           {render ? render(value) : value}
-        </button>
+        </div>
       )}
       <button title="Remove" onClick={onRemove} className="flex h-6 w-6 shrink-0 items-center justify-center text-dim opacity-0 hover:text-alert group-hover:opacity-100">
         <X className="h-3.5 w-3.5" />
@@ -53,7 +62,25 @@ function Row({ value, index, duplicate, render, mono, drag, dragOver, onCommit, 
   )
 }
 
-export function ListEditor({ values, onChange, placeholder = 'Add a value', render, mono = false, label = 'values' }: { values: string[]; onChange: (next: string[]) => void; placeholder?: string; render?: (value: string) => ReactNode; mono?: boolean; label?: string }) {
+export function ListEditor({
+  values,
+  onChange,
+  placeholder = 'Add a value',
+  render,
+  mono = false,
+  label = 'values',
+  toolbar,
+  addActions
+}: {
+  values: string[]
+  onChange: (next: string[]) => void
+  placeholder?: string
+  render?: (value: string) => ReactNode
+  mono?: boolean
+  label?: string
+  toolbar?: ReactNode
+  addActions?: ReactNode
+}) {
   const [adding, setAdding] = useState('')
   const [filter, setFilter] = useState('')
   const [asText, setAsText] = useState(false)
@@ -100,6 +127,7 @@ export function ListEditor({ values, onChange, placeholder = 'Add a value', rend
             <ArrowDownAZ className="h-3.5 w-3.5" /> Sort
           </button>
         )}
+        {!asText && toolbar}
         <button
           className={cn(tool, asText && 'text-accent')}
           onClick={() => {
@@ -162,6 +190,7 @@ export function ListEditor({ values, onChange, placeholder = 'Add a value', rend
               placeholder={`${placeholder} (Enter adds; pasting several lines adds each)`}
               className={cn('h-7 min-w-0 flex-1 bg-transparent px-1 text-[13px] text-white outline-none placeholder:text-dim/60', mono && 'font-mono text-[12.5px]')}
             />
+            {addActions}
           </div>
         </>
       )}

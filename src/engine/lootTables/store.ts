@@ -1,3 +1,5 @@
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { toId } from '@shared/ids'
@@ -57,7 +59,7 @@ export class LootTableStore extends EventEmitter {
 
   get(id: string): StoredLootTable {
     const hit = this.find(id)
-    if (!hit) throw new ToolError(`No loot table "${id}".`)
+    if (!hit) throw notFound(new ToolError(`No loot table "${id}".`))
     return hit
   }
 
@@ -85,7 +87,7 @@ export class LootTableStore extends EventEmitter {
 
   remove(id: string): void {
     const target = this.find(id)
-    if (!target) throw new ToolError(`No loot table "${id}".`)
+    if (!target) throw notFound(new ToolError(`No loot table "${id}".`))
     const all = this.list()
     this.write(all.filter((t) => t.id !== target.id))
   }
@@ -162,7 +164,8 @@ export class LootTableStore extends EventEmitter {
           try {
             const text = rollRepo(chosen.repoId)
             repoPulls.push({ repoId: chosen.repoId, text })
-          } catch {
+          } catch (err) {
+            noteFailure(err, 'game', 'Could not roll a repository in a loot table')
             // Ignore missing or empty repo
           }
         }
@@ -179,7 +182,8 @@ export class LootTableStore extends EventEmitter {
             }
             repoPulls.push(...subResult.repoPulls)
             subTablesRolled.push(...subResult.subTablesRolled)
-          } catch {
+          } catch (err) {
+            noteFailure(err, 'game', 'Could not roll a sub-table in a loot table')
             // Ignore missing sub-table
           }
         }

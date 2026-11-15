@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, Save, Signpost, X } from 'lucide-react'
-import { decisionText, type Decision, type DecisionOption } from '@shared/decisions'
+import { OPTION_LANES, decisionText, optionEffects, type Decision, type DecisionOption } from '@shared/decisions'
 import { NO_SWAP } from '@shared/cardDecks'
 import { Button, Eyebrow, Input, Segmented, Toggle } from '../ui'
 import { AgentSelect } from '../agents/AgentSelect'
@@ -8,9 +8,10 @@ import { useAgents } from '../../store/agents'
 import { decide } from './play'
 import type { PlayWhere } from './playStore'
 import { CardSwapField } from './CardSwapField'
-import { TriggerActionSelect } from '../game/TriggerActionSelect'
+import { EffectsEditor } from '../game/effects/EffectsEditor'
+import { Effects } from '@shared/game/components'
 
-const BLANK_OPTION: DecisionOption = { text: '', cards: NO_SWAP, action: null }
+const BLANK_OPTION: DecisionOption = { text: '', cards: NO_SWAP, action: null, effects: [] }
 export const BLANK_DECISION: Decision = { question: '', options: [BLANK_OPTION, BLANK_OPTION], own: true, decider: null }
 const WHO = [
   { value: 'you', label: 'You' },
@@ -40,7 +41,7 @@ export function DecisionForm({ initial, where, onKeep, onChange, keepLabel }: Pr
   const getReadyDecision = (): Decision => ({
     ...clean,
     question: clean.question.trim() || 'Choice',
-    options: clean.options.length ? clean.options : [{ text: 'Continue', cards: NO_SWAP, action: null }]
+    options: clean.options.length ? clean.options : [{ text: 'Continue', cards: NO_SWAP, action: null, effects: [] }]
   })
 
   const handleDecide = () => {
@@ -84,12 +85,7 @@ export function DecisionForm({ initial, where, onKeep, onChange, keepLabel }: Pr
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
-          <TriggerActionSelect
-            value={o.action}
-            onChange={(action) => setOption(i, { action })}
-            placeholder="No in-game trigger action for this option"
-            className="h-7 text-[11px]"
-          />
+          <EffectsEditor host={Effects.type} lanes={OPTION_LANES} aside={false} value={optionEffects(o)} onChange={(effects) => setOption(i, { effects, action: null })} />
         </div>
       ))}
       <div className="flex items-center gap-3">

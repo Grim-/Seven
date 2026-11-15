@@ -8,6 +8,7 @@ import { Markdown } from '../chat/Markdown'
 import { cn } from '../../lib/cn'
 import { rowMenu } from '../../views/data/entryMenu'
 import { failed } from '../../lib/notify'
+import { noteFailure } from '../../store/problems'
 
 const STATUS_STYLE: Record<StorySummary['status'], string> = {
   active: 'text-teal',
@@ -23,7 +24,7 @@ export function StoriesPanel({ initial = null }: { initial?: string | null }) {
   const load = () =>
     void engine('stories.list')
       .then(setList)
-      .catch(() => setList([]))
+      .catch(noteFailure('stories', 'Could not list the stories', () => setList([])))
   useEffect(() => {
     load()
     const offs = [on('stories.changed', load), on('turn.finish', load)]

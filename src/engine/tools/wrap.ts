@@ -1,7 +1,9 @@
+import { noteFailure } from '../util/report'
 import type { JsonObjectSchema } from './schema'
 import { panel } from '../panel/store'
 import { modules } from '../modules/registry'
 import type { AvatarState, FormProps, ApprovalAnswer, ApprovalProps, ConfirmProps, QuestionAnswer, QuestionProps, ToolPart, UiRequestKind, UnlockProps, GatherProps, LinkedFolder } from '@shared/types'
+import type { ChatElement } from '@shared/chatElements'
 import { isVaultLocked } from '@shared/sealed'
 import { secure } from '../util/secure'
 import type { ToolDef, ToolOutput, UiAccess } from './types'
@@ -51,6 +53,7 @@ export interface WrapHooks {
   permissions: Omit<PermissionContext, 'ask'>
   addPart: (part: ToolPart) => void
   updatePart: (part: ToolPart) => void
+  addElement?: (element: ChatElement) => void
   output: (part: ToolPart, chunk: string) => void
   checkpoint: (absPath: string, previous: Buffer | null) => void
   onBlocking: () => void
@@ -160,6 +163,7 @@ export async function runTool(tool: ToolDef, args: Record<string, unknown>, hook
         budget: hooks.budget ?? null,
         agentId: hooks.agentId ?? null,
         react: (state, reaction, seconds) => hooks.react?.(state, reaction, seconds),
+        addElement: hooks.addElement,
         panel: panel.access(hooks.sessionId, tool.group, modules.panelTab(tool.group))
       }))
     const stoppable = (work: Promise<string | ToolOutput>): Promise<string | ToolOutput> => {
@@ -194,7 +198,8 @@ export async function runTool(tool: ToolDef, args: Record<string, unknown>, hook
         const fitted = fitToBudget(part.id, out.text, hooks.budget)
         modelText = fitted.text
         if (fitted.saved) part.cut = true
-      } catch {
+      } catch (err) {
+        noteFailure(err, 'tools', 'Could not fit tool output into the context budget')
         modelText = clip(out.text, MAX_MODEL_CHARS)
       }
     }

@@ -4,6 +4,7 @@ import type { Scene } from './Scene'
 
 export class SceneManager {
   private stack: Scene[] = []
+  onWake?: () => void
 
   constructor(
     private engine: GameEngine,
@@ -20,6 +21,7 @@ export class SceneManager {
     this.stack.push(scene)
     this.layer.addChild(scene.root)
     scene.enter(this.engine)
+    this.onWake?.()
   }
 
   pop(): void {
@@ -30,6 +32,7 @@ export class SceneManager {
     scene.root.destroy({ children: true })
     const below = this.top
     if (below) below.root.visible = true
+    this.onWake?.()
   }
 
   replace(scene: Scene): void {

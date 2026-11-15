@@ -28,12 +28,17 @@ export interface WidgetUi {
 }
 
 const uis = new Map<string, WidgetUi>()
+let defaultEntryWidgetUi: WidgetUi | null = null
 
 function Unknown({ widget }: WidgetBodyProps) {
   return <EmptyState title="Can't show this">Seven has nothing that shows a {widget.source.kind} widget.</EmptyState>
 }
 
 const UNKNOWN: WidgetUi = { Body: Unknown }
+
+export function setDefaultEntryWidgetUi(ui: WidgetUi): void {
+  defaultEntryWidgetUi = ui
+}
 
 export function registerWidgetUi(kind: string, ui: WidgetUi): void {
   uis.set(kind, ui)
@@ -44,7 +49,10 @@ export function widgetUiOf(kind: string): WidgetUi | undefined {
 }
 
 export function widgetUi(source: WidgetSource): WidgetUi {
-  return uis.get(source.kind) ?? UNKNOWN
+  const found = uis.get(source.kind)
+  if (found) return found
+  if (defaultEntryWidgetUi && typeof source.id === 'string') return defaultEntryWidgetUi
+  return UNKNOWN
 }
 
 export function MissingWidget({ what }: { what: string }) {

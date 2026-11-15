@@ -64,20 +64,34 @@ function picture(id: string): Buffer {
   return bytes
 }
 
-export function carrySave(input: { entry: string | null; text: string | null; picture: string; lock: boolean; path: string }): void {
-  const png = picture(input.picture)
+function framedPicture(base64: string): Buffer {
+  const bytes = Buffer.from(base64, 'base64')
+  if (!isPng(bytes)) throw new Error('The framed picture is not a PNG picture')
+  return bytes
+}
+
+function aboutOf(entries: Body['entries'], text: string | null): CarryAbout {
+  const main = entries.at(-1)
+  return {
+    kind: main?.kind ?? null,
+    label: main ? kind(main.kind).label : 'Data',
+    title: main?.title ?? (text ?? '').trim().split('\n')[0].slice(0, 60),
+    also: entries.slice(0, -1).map((e) => `${kind(e.kind).label}: ${e.title}`)
+  }
+}
+
+export function carryDescribe(entry: string): CarryAbout {
+  return aboutOf(collect(entry), null)
+}
+
+export function carrySave(input: { entry: string | null; text: string | null; picture: string; lock: boolean; path: string; framed?: string | null }): void {
+  const png = input.framed ? framedPicture(input.framed) : picture(input.picture)
   if (input.lock && !secure.keys) throw new Error('Set up the vault in Settings first, or untick Lock it')
   const entries = input.entry ? collect(input.entry) : []
   if (!input.entry && !input.text?.trim()) throw new Error('Give an entry or some text to carry')
   const files = assetsIn(entries.map((e) => e.value)).map((id) => data.assets.get(id))
   const body: Body = { entries, text: input.entry ? null : (input.text ?? ''), files: files.map((f) => ({ id: f.id, name: f.name, size: f.size })) }
-  const main = entries.at(-1)
-  const about: CarryAbout = {
-    kind: main?.kind ?? null,
-    label: main ? kind(main.kind).label : 'Data',
-    title: main?.title ?? (input.text ?? '').trim().split('\n')[0].slice(0, 60),
-    also: entries.slice(0, -1).map((e) => `${kind(e.kind).label}: ${e.title}`)
-  }
+  const about = aboutOf(entries, input.text)
   const plain = zlib.deflateSync(Buffer.concat([sized(about), sized(body), ...files.map((f) => data.assets.readBytes(f))]))
   const front: Front = { v: 2, locked: input.lock, savedAt: Date.now(), ...(input.lock ? {} : { about }) }
   const payload = input.lock && secure.keys ? seal(secure.keys, plain) : plain

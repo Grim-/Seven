@@ -12,6 +12,7 @@ import {
   type EventMessage
 } from '@shared/protocol'
 import type { EngineState, EngineStatus } from '@shared/types'
+import type { ProblemReport } from '@shared/problems'
 import { dataDir } from './paths'
 
 const REQUEST_TIMEOUT_MS = 30000
@@ -41,6 +42,11 @@ export class EngineSupervisor extends EventEmitter {
   private state: EngineState = 'starting'
   private servers: number[] = []
   private routes: { port: number; secret: string } | null = null
+  private tail: string[] = []
+
+  constructor(private tailLines: () => number) {
+    super()
+  }
 
   status(): EngineStatus {
     return { state: this.state, restarts: this.restarts }
@@ -62,10 +68,16 @@ export class EngineSupervisor extends EventEmitter {
 
     const child = utilityProcess.fork(enginePath, [], {
       serviceName: 'seven-engine',
-      stdio: 'inherit',
+      stdio: 'pipe',
       env: { ...process.env, SEVEN_HOME: dataDir, SEVEN_DEV: app.isPackaged ? '0' : '1', SEVEN_RESOURCES: app.isPackaged ? path.join(process.resourcesPath, 'app.asar.unpacked', 'resources') : path.join(app.getAppPath(), 'resources'), SEVEN_APP: app.isPackaged ? path.dirname(process.execPath) : app.getAppPath(), SEVEN_MACHINE: app.getPath('userData') }
     })
     this.child = child
+    this.tail = []
+    child.stdout?.on('data', (chunk: Buffer) => process.stdout.write(chunk))
+    child.stderr?.on('data', (chunk: Buffer) => {
+      process.stderr.write(chunk)
+      this.keepTail(chunk.toString('utf8'))
+    })
 
     child.on('spawn', () => this.setState('ready'))
 
@@ -87,6 +99,10 @@ export class EngineSupervisor extends EventEmitter {
         this.servers = (message.payload as { pids: number[] }).pids
         return
       }
+      if (message.event === 'engine.problem') {
+        this.emit('problem', message.payload as ProblemReport)
+        return
+      }
       if (message.event === 'engine.modelRoutes') {
         this.routes = message.payload as { port: number; secret: string }
         return
@@ -103,12 +119,24 @@ export class EngineSupervisor extends EventEmitter {
       this.rejectAll(new Error(`Engine exited with code ${code}`))
       if (this.stopping) return
       this.restarts += 1
+      const problem: ProblemReport = { severity: 'error', area: 'engine', message: `The engine stopped unexpectedly (exit code ${code}). Restarting it now.`, ...(this.tail.length ? { detail: this.tail.join('\n') } : {}) }
+      this.emit('problem', problem)
       this.setState('crashed')
       const delay = Math.min(250 * 2 ** (this.restarts - 1), MAX_BACKOFF_MS)
       setTimeout(() => {
         if (!this.stopping && !this.child) this.start()
       }, delay)
     })
+  }
+
+  private keepTail(text: string): void {
+    const max = this.tailLines()
+    if (max <= 0) {
+      this.tail = []
+      return
+    }
+    const lines = text.split(/\r?\n/).filter((line) => line.trim())
+    this.tail = [...this.tail, ...lines].slice(-max)
   }
 
   request<K extends EngineRequestName>(name: K, params: EngineParams<K>): Promise<EngineResult<K>> {

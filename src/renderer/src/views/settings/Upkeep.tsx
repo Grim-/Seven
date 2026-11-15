@@ -8,6 +8,7 @@ import { toast } from '../../store/toasts'
 import { rebuildIndex } from '../../store/data'
 import { useBusy } from '../../lib/useBusy'
 import { DataControlPanel } from '../../components/datacontrol/DataControl'
+import { ProblemLog } from './ProblemLog'
 
 function FileCheck() {
   const [result, setResult] = useState<EngineResult<'data.check'> | null>(null)
@@ -68,6 +69,7 @@ export function Upkeep() {
         <RebuildIndex />
         <FileCheck />
       </SettingCard>
+      <ProblemLog />
     </>
   )
 }

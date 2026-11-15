@@ -19,6 +19,7 @@ export class GameEngine {
   private loop: Loop
   private observer: ResizeObserver | null = null
   private alive = true
+  private dirty = true
 
   private constructor(
     private host: HTMLElement,
@@ -26,21 +27,33 @@ export class GameEngine {
   ) {
     this.assets = new AssetManager(source)
     this.scenes = new SceneManager(this, this.camera.world)
+    const wake = () => this.invalidate()
+    this.tweens.onWake = wake
+    this.camera.onWake = wake
+    this.scenes.onWake = wake
     this.loop = new Loop(
       (dt) => this.update(dt),
-      (alpha) => this.render(alpha)
+      (alpha) => this.render(alpha),
+      () => this.alive && !document.hidden && (this.dirty || this.tweens.active || this.camera.animating || Boolean(this.scenes.top?.active?.()))
     )
   }
 
   static async create(host: HTMLElement, source: ImageSource): Promise<GameEngine> {
     const engine = new GameEngine(host, source)
-    await engine.app.init({ backgroundAlpha: 0, antialias: false, autoStart: false, autoDensity: true, resolution: window.devicePixelRatio || 1, preference: 'webgl', width: Math.max(1, host.clientWidth), height: Math.max(1, host.clientHeight) })
+    const resolution = Math.min(window.devicePixelRatio || 1, 1.5)
+    await engine.app.init({ backgroundAlpha: 0, antialias: false, autoStart: false, autoDensity: true, resolution, preference: 'webgl', width: Math.max(1, host.clientWidth), height: Math.max(1, host.clientHeight) })
     host.appendChild(engine.app.canvas)
     engine.app.canvas.style.display = 'block'
     engine.app.stage.addChild(engine.camera.world, engine.overlay)
-    engine.input = new Input(engine.app, engine.camera)
+    engine.input = new Input(engine.app, engine.camera, () => engine.invalidate())
     engine.watch()
     return engine
+  }
+
+  invalidate(): void {
+    if (!this.alive) return
+    this.dirty = true
+    if (!document.hidden && this.host.clientWidth && this.host.clientHeight) this.loop.start()
   }
 
   private watch(): void {
@@ -50,7 +63,7 @@ export class GameEngine {
       if (!w || !h) return this.loop.stop()
       this.app.renderer.resize(w, h)
       this.camera.setScreen({ w, h })
-      if (!document.hidden) this.loop.start()
+      this.invalidate()
     }
     this.observer = new ResizeObserver(resize)
     this.observer.observe(this.host)
@@ -60,7 +73,7 @@ export class GameEngine {
 
   private visibility = (): void => {
     if (document.hidden) this.loop.stop()
-    else if (this.host.clientWidth && this.host.clientHeight) this.loop.start()
+    else this.invalidate()
   }
 
   private update(dt: number): void {
@@ -70,6 +83,8 @@ export class GameEngine {
   }
 
   private render(alpha: number): void {
+    if (!this.dirty && !this.tweens.active && !this.camera.animating && !this.scenes.top?.visualActive?.()) return
+    this.dirty = false
     this.scenes.render(alpha)
     Culler.shared.cull(this.camera.world, this.app.screen, false)
     this.app.render()

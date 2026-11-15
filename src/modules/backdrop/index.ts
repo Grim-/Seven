@@ -3,7 +3,7 @@ import { ToolError, optStr, type ToolDef } from '../../engine/tools/types'
 import { backdrops } from '../../engine/backdrops'
 import { themes } from '../../engine/themes/store'
 import { SKY_MODES, isHex, type Ambience, type SkyMode, type Theme } from '@shared/theme'
-import { BACKGROUNDS, BACKGROUND_MODULE, CORE_EFFECTS, backgroundInfo, reactionsText } from '@shared/backgrounds'
+import { BACKGROUND_MODULE, CORE_EFFECTS, backgroundInfo, backgroundList, reactionsText } from '@shared/backgrounds'
 import { linkFor } from '@shared/text'
 import { modules } from '../../engine/modules/registry'
 import type { AssetMeta, Backdrop } from '@shared/types'
@@ -33,7 +33,7 @@ function hexOrNone(value: unknown, what: string): string | null | undefined {
   return v
 }
 
-const EFFECT_IDS = [...CORE_EFFECTS.map((e) => e.id), ...BACKGROUNDS.map((b) => b.id)]
+const EFFECT_IDS = [...CORE_EFFECTS.map((e) => e.id), ...backgroundList().map((b) => b.id)]
 
 function backgroundsOn(): boolean {
   return modules.list().some((m) => m.id === BACKGROUND_MODULE && m.state === 'on')
@@ -41,7 +41,7 @@ function backgroundsOn(): boolean {
 
 function effect(ref: string): string {
   const r = ref.trim().toLowerCase()
-  const id = EFFECT_IDS.find((e) => e === r) ?? BACKGROUNDS.find((b) => b.name.toLowerCase() === r)?.id
+  const id = EFFECT_IDS.find((e) => e === r) ?? backgroundList().find((b) => b.name.toLowerCase() === r)?.id
   if (!id) throw new ToolError(`There is no animated background "${ref}". Use one of: ${EFFECT_IDS.join(', ')}.`)
   if (backgroundInfo(id) && !backgroundsOn()) throw new ToolError(`${backgroundInfo(id)!.name} needs the Backgrounds add-on, which is off. Use one of: ${CORE_EFFECTS.map((e) => e.id).join(', ')}, or ask the user to turn Backgrounds on in Tools.`)
   return id
@@ -168,7 +168,7 @@ const cue: ToolDef = {
     const reaction = optStr(params, 'reaction')?.trim().toLowerCase() || null
     if (reaction) {
       if (!backgroundsOn()) throw new ToolError('Background reactions need the Backgrounds add-on, which is off. Set reaction to null, and use sound, flash or shake instead.')
-      if (!BACKGROUNDS.some((b) => b.reactions.some((r) => r.name === reaction))) throw new ToolError(`There is no reaction "${reaction}". Set reaction to one of these, or null: ${reactionsText()}. Each works only on the animated background listed with it.`)
+      if (!backgroundList().some((b) => b.reactions.some((r) => r.name === reaction))) throw new ToolError(`There is no reaction "${reaction}". Set reaction to one of these, or null: ${reactionsText()}. Each works only on the animated background listed with it.`)
     }
     if (!s && !flash && params.shake !== true && !reaction) throw new ToolError('Nothing to play. Set at least one of: sound (a sound file), flash (a hex colour like "#ffffff"), shake true, or reaction.')
     themes.cue({ sessionId: ctx.sessionId, sound: s ? sound(s) : null, flash, shake: params.shake === true, reaction })

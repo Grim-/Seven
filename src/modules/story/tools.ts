@@ -1,5 +1,5 @@
 import { MOODS, presentationTool } from '../../engine/present/define'
-import { ToolError } from '../../engine/tools/types'
+import { ToolError, type ToolDef } from '../../engine/tools/types'
 import { data } from '../../engine/data/hub'
 import { agentAccess } from '../../engine/agents/access'
 import { HANDOUT_STYLES } from '@shared/handouts'
@@ -30,7 +30,65 @@ function checkCharacter(value: unknown): void {
 
 const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 
-export const STORY_TOOLS = [
+const vnBeatTool: ToolDef = {
+  name: 'vn_beat',
+  group: 'story',
+  needsWorkspace: false,
+  description:
+    'Show a Visual Novel dialogue beat card inline in chat with speaker portrait, expression badge, optional scene banner/CG image, and step-by-step typewriter lines.',
+  params: {
+    type: 'object',
+    properties: {
+      speaker: { type: ['string', 'null'], description: 'Who speaks (character sheet name, agent name, or NPC), or null for narration' },
+      title: { type: ['string', 'null'], description: 'Short speaker role or epithet shown next to the nameplate, or null' },
+      expression: { type: ['string', 'null'], description: 'Mood or expression badge, e.g. calm, smirking, curious, whisper, alarmed, angry' },
+      lines: {
+        type: ['array', 'null'],
+        items: { type: 'string' },
+        description: 'Dialogue/action lines stepped through inside the VN box (spoken quotes and *stage directions*)'
+      },
+      text: { type: ['string', 'null'], description: 'Single block of text if lines is not passed' },
+      scene: { type: ['string', 'null'], description: 'Optional scene heading or @place:name link above the beat' },
+      image: imageField('Optional portrait/sprite image file id or name'),
+      cg: imageField('Optional wide scene/CG illustration file id or name'),
+      side: { enum: ['left', 'right'], description: 'Which side the speaker portrait sits on' },
+      tone: { enum: ['accent', 'cyan', 'purple', 'teal', 'alert'], description: 'Border and accent tint' },
+      hide_reply: { type: ['boolean', 'null'], description: 'Set true if this VN beat replaces your plain reply text' }
+    }
+  },
+  async execute(params, ctx) {
+    const rawLines = Array.isArray(params.lines)
+      ? params.lines.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((s) => s.trim())
+      : []
+    const body = text(params.text)
+    if (!rawLines.length && !body) {
+      throw new ToolError('vn_beat needs lines or text. Call it again with what is spoken or shown.')
+    }
+    const fields: Record<string, unknown> = { ...params }
+    checkImage(fields, 'image')
+    checkImage(fields, 'cg')
+    ctx.addElement?.({
+      type: 'vn_beat',
+      data: {
+        speaker: text(fields.speaker) || null,
+        title: text(fields.title) || null,
+        expression: text(fields.expression) || null,
+        lines: rawLines.length ? rawLines : undefined,
+        text: body || undefined,
+        scene: text(fields.scene) || null,
+        image: typeof fields.image === 'string' && fields.image ? fields.image : null,
+        cg: typeof fields.cg === 'string' && fields.cg ? fields.cg : null,
+        side: fields.side === 'right' ? 'right' : 'left',
+        tone: typeof fields.tone === 'string' ? fields.tone : 'accent',
+        cover: fields.hide_reply === true ? 'hide' : null
+      }
+    })
+    return 'Shown inline as a VN beat in chat. Carry on with the scene.'
+  }
+}
+
+export const STORY_TOOLS: ToolDef[] = [
+  vnBeatTool,
   presentationTool({
     type: 'dialogue',
     group: 'story',

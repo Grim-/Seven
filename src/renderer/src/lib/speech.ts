@@ -1,3 +1,4 @@
+import { noteFailure } from '../store/problems'
 import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import type { VoiceRef } from '@shared/types'
@@ -61,7 +62,7 @@ export function usePiperVoices(): { name: string; file: string }[] {
     if (!folder) return setList([])
     void engine('tts.piperVoices', { folder })
       .then(setList)
-      .catch(() => setList([]))
+      .catch((err: unknown) => (setList([]), noteFailure('voice', 'Could not list the Piper voices')(err)))
   }, [folder])
   return list
 }

@@ -7,6 +7,7 @@ import { useApp } from '../../store/app'
 import { useTools } from '../../store/tools'
 import { registerSideTab } from '../../registries/side'
 import { cn } from '../../lib/cn'
+import { noteFailure } from '../../store/problems'
 
 const HOME = 'https://duckduckgo.com/'
 const PARTITION = 'persist:seven-browser'
@@ -92,7 +93,7 @@ function BrowserTab() {
     if (!request || request.n === seen.current) return
     seen.current = request.n
     setAddress(request.url)
-    if (ready.current) void view.current?.loadURL(request.url).catch(() => undefined)
+    if (ready.current) void view.current?.loadURL(request.url).catch(noteFailure('browser', `Could not load ${request.url}`))
     else view.current?.setAttribute('src', request.url)
   }, [request])
 
@@ -112,7 +113,7 @@ function BrowserTab() {
   const go = (input: string) => {
     const url = target(input)
     setAddress(url)
-    if (ready.current) void view.current?.loadURL(url).catch(() => undefined)
+    if (ready.current) void view.current?.loadURL(url).catch(noteFailure('browser', `Could not load ${url}`))
   }
   const button = 'flex h-6 w-6 shrink-0 items-center justify-center text-dim hover:text-accent disabled:opacity-30 disabled:hover:text-dim'
 

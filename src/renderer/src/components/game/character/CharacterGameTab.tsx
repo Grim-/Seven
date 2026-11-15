@@ -11,15 +11,11 @@ import { failed } from '../../../lib/notify'
 import { cn } from '../../../lib/cn'
 import { useGameDefs } from '../useGameDefs'
 import { useGameCatalog } from '../useGameCatalog'
-import { RuleSetProvider, useResolvedRuleSet, useRuleSets } from '../ruleSet'
 import { GenericPanel } from './GenericPanel'
 import { panelFor } from './panels'
 
-function Join({ sheet, onJoined }: { sheet: CharacterSheet; onJoined: (record: EntityRecord, ruleSet: string) => void }) {
-  const sets = useRuleSets() ?? []
-  const [chosen, setChosen] = useState('')
-  const ruleSet = sheet.save ? (sheet.gameRules ?? '') || sets[0]?.id || '' : chosen || sets[0]?.id || ''
-  const templates = useGameDefs(CHARACTER_TEMPLATES, ruleSet || null).list ?? []
+function Join({ sheet, onJoined }: { sheet: CharacterSheet; onJoined: (record: EntityRecord) => void }) {
+  const templates = useGameDefs(CHARACTER_TEMPLATES).list ?? []
   const [picked, setPicked] = useState('')
   const [busy, run] = useBusy()
   const template = templates.some((t) => t.id === picked) ? picked : (templates[0]?.id ?? '')
@@ -27,9 +23,8 @@ function Join({ sheet, onJoined }: { sheet: CharacterSheet; onJoined: (record: E
     <div className="flex flex-col items-start gap-3 p-5">
       <div className="text-[13px] text-dim">This character isn't in the game yet. Joining gives them the stats, Health, Stamina, Mana, buffs, spell book, inventory and equipment of a character template.</div>
       <div className="flex items-center gap-2">
-        {!sheet.save && <Select value={ruleSet} options={sets.map((s) => ({ value: s.id, label: s.name }))} onChange={setChosen} className="w-48" />}
         <Select value={template} options={templates.map((t) => ({ value: t.id, label: t.name }))} onChange={setPicked} className="w-56" />
-        <Button variant="primary" icon={<LogIn />} disabled={!template || busy} onClick={() => void run(async () => onJoined(await engine('game.joinCharacter', { sheet: sheet.id, ruleSet, template }), ruleSet), 'Could not add them to the game')}>
+        <Button variant="primary" icon={<LogIn />} disabled={!template || busy} onClick={() => void run(async () => onJoined(await engine('game.joinCharacter', { sheet: sheet.id, template })), 'Could not add them to the game')}>
           Join the game
         </Button>
       </div>
@@ -38,18 +33,12 @@ function Join({ sheet, onJoined }: { sheet: CharacterSheet; onJoined: (record: E
 }
 
 export function CharacterGameTab({ sheet }: { sheet: CharacterSheet }) {
-  const [rules, setRules] = useState(sheet.gameRules ?? '')
-  const ruleSet = useResolvedRuleSet(rules)
   const [record, setRecord] = useState<EntityRecord | null>(sheet.game ?? null)
-  const joined = (next: EntityRecord, set: string) => {
-    setRules(set)
-    setRecord(next)
-  }
   return (
-    <RuleSetProvider ruleSet={ruleSet}>
+    <>
       {sheet.save && <InSave sheet={sheet} />}
-      {record ? <InGame sheet={sheet} record={record} setRecord={setRecord} /> : <Join sheet={sheet} onJoined={joined} />}
-    </RuleSetProvider>
+      {record ? <InGame sheet={sheet} record={record} setRecord={setRecord} /> : <Join sheet={sheet} onJoined={setRecord} />}
+    </>
   )
 }
 

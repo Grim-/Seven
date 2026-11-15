@@ -1,3 +1,4 @@
+import { reportError } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
@@ -123,7 +124,7 @@ class Timeline extends EventEmitter {
       this.changed()
       this.emit('recorded', event)
     } catch (err) {
-      console.warn('[timeline] could not record', err)
+      reportError('warning', 'timeline', err, 'Could not record an event')
     }
   }
 
@@ -153,7 +154,7 @@ class Timeline extends EventEmitter {
     try {
       this.dropWhere((e) => e.entry === entry && kind(e.kind))
     } catch (err) {
-      console.warn('[timeline] could not forget', err)
+      reportError('warning', 'timeline', err, 'Could not forget an entry')
     }
   }
 
@@ -172,7 +173,7 @@ class Timeline extends EventEmitter {
       }
       this.flush()
     } catch (err) {
-      console.warn('[timeline] could not clear the chat from its events', err)
+      reportError('warning', 'timeline', err, "Could not clear the chat from its events")
     }
   }
 

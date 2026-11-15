@@ -21,6 +21,7 @@ import { openMenu } from '../../ui'
 import { RowList } from '../../../game/ui'
 import { gameTime } from '../../game/character/panels/time'
 import { useGameAct } from '../screens/useGameAct'
+import { useGameplaySettings } from '../settings/gameplaySettingsStore'
 import {
   ACTION_DRAG_MIME,
   ACTION_SLOT_SWAP_MIME,
@@ -34,6 +35,7 @@ import {
 } from './actionSlots'
 import { itemName, itemTip } from '../screens/itemTip'
 import { toast } from '../../../store/toasts'
+import { noteFailure } from '../../../store/problems'
 
 const typing = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
@@ -120,12 +122,16 @@ function ActiveBar({
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return
-      const n = Number(e.key)
-      if (n >= 1 && n <= 9) {
-        const slot = latest.current.slots[n - 1]
-        if (slot) {
-          e.preventDefault()
-          latest.current.useSlot(slot)
+      const kb = useGameplaySettings.getState().settings.keybinds
+      for (let i = 1; i <= 9; i += 1) {
+        const code = kb[`slot${i}`]?.code ?? `Digit${i}`
+        if (e.code === code) {
+          const slot = latest.current.slots[i - 1]
+          if (slot) {
+            e.preventDefault()
+            latest.current.useSlot(slot)
+          }
+          break
         }
       }
     }
@@ -173,7 +179,9 @@ function ActiveBar({
           swapActionSlots(visitor.sheet, data.index, index)
           return
         }
-      } catch {}
+      } catch (err) {
+        noteFailure('play', 'Could not read the dragged slot')(err)
+      }
     }
 
     // 2. Drag-and-drop from Spellbook or Inventory
@@ -188,7 +196,9 @@ function ActiveBar({
           label: data.label
         })
         toast.info('Action Bar', `Bound ${data.label} to Slot ${index + 1}`)
-      } catch {}
+      } catch (err) {
+        noteFailure('play', 'Could not read the dragged action')(err)
+      }
     }
   }
 

@@ -1,3 +1,4 @@
+import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
@@ -22,7 +23,7 @@ function slug(name: string): string {
 
 class MapStore extends EventEmitter {
   private file(id: string): string {
-    if (!/^[a-z0-9_-]+$/.test(id)) throw new MapError(`There is no map "${id}"`)
+    if (!/^[a-z0-9_-]+$/.test(id)) throw notFound(new MapError(`There is no map "${id}"`))
     return path.join(ROOT, `${id}.json`)
   }
 

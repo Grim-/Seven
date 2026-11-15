@@ -12,6 +12,7 @@ import { entryMenuAt } from '../../views/data/entryMenu'
 import { failed } from '../../lib/notify'
 import { openChat } from '../../lib/conversation'
 import { useReminderList } from '../../lib/reminders'
+import { noteFailure } from '../../store/problems'
 
 export const REPEAT_LABEL: Record<Reminder['repeat'], string> = { none: 'once', hourly: 'every hour', daily: 'every day', weekdays: 'weekdays', weekly: 'every week' }
 
@@ -33,9 +34,9 @@ function chime(): void {
       o.start(ctx.currentTime + i * 0.25)
       o.stop(ctx.currentTime + i * 0.25 + 0.25)
     }
-    setTimeout(() => void ctx.close(), 1500)
-  } catch {
-    return
+    setTimeout(() => void ctx.close().catch(noteFailure('reminders', 'Could not close the chime')), 1500)
+  } catch (err) {
+    noteFailure('reminders', 'Could not play the chime')(err)
   }
 }
 

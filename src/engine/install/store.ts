@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import { resolveParams } from '@shared/game/core/params'
@@ -100,7 +101,8 @@ function checkFile(id: string, version: string): string {
 export function readCheck(id: string, version: string): StoredCheck | null {
   try {
     return JSON.parse(fs.readFileSync(checkFile(id, version), 'utf8')) as StoredCheck
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'install', 'Could not read a version check')
     return null
   }
 }

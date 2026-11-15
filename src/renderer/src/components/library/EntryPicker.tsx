@@ -6,6 +6,7 @@ import { engine } from '../../lib/ipc'
 import { cn } from '../../lib/cn'
 import { kindUi } from '../../registries/kinds'
 import { useEscapeLayer } from '../../lib/escape'
+import { noteFailure } from '../../store/problems'
 
 export function EntryPicker({ kind, title, onPick, onClose, inline = false }: { kind: string | null; title: string; onPick: (hit: LibraryHit) => void; onClose: () => void; inline?: boolean }) {
   const [query, setQuery] = useState('')
@@ -16,7 +17,7 @@ export function EntryPicker({ kind, title, onPick, onClose, inline = false }: { 
     const timer = setTimeout(() => {
       void engine('library.find', { query, kind })
         .then((h) => live && (setHits(h.slice(0, 12)), setPick(0)))
-        .catch(() => live && setHits([]))
+        .catch(noteFailure('library', 'Could not search', () => live && setHits([])))
     }, 120)
     return () => {
       live = false

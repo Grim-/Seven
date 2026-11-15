@@ -1,13 +1,19 @@
-import { Component, createComponent, registerComponent, type ComponentDef, type GameEntity, type TooltipRow } from '../core'
+import type { EffectGroup } from '../effectGroups'
+import type { EffectBranch, EffectLane } from './Action'
+import { Component, createComponent, registerComponent, restoreComponent, type ComponentDef, type ComponentRecord, type GameEntity, type TooltipRow } from '../core'
 
 export class Buff extends Component {
   static readonly type: string = 'buff'
+  static readonly LABEL: string = 'Buff'
+  static readonly ICON: string = 'Sparkle'
+  static readonly LANES: EffectLane[] = [{ event: 'OnUse', label: 'While it lasts' }]
   static readonly DESCRIPTION: string = 'A buff or debuff: lasts its duration and holds the pieces that do its work. The same buff from the same source adds stacks.'
   static readonly PARAMS = {
     id: { kind: 'text' as const, default: '', description: 'Which buff this is; with the source, decides when two applications stack.' },
-    duration: { kind: 'number' as const, default: 0, min: 0, description: 'Seconds it lasts. 0 lasts until removed.' },
-    potency: { kind: 'number' as const, default: 1, min: 0, description: 'Strength per stack, read by its pieces.' },
-    maxStacks: { kind: 'number' as const, default: 1, min: 1, description: 'Most stacks it can reach.' }
+    duration: { kind: 'number' as const, default: 0, min: 0, description: 'Seconds it lasts. 0 lasts until removed.', section: 'Duration and stacking' },
+    potency: { kind: 'number' as const, default: 1, min: 0, description: 'Strength per stack, read by its pieces.', section: 'Duration and stacking' },
+    maxStacks: { kind: 'number' as const, default: 1, min: 1, description: 'Most stacks it can reach.', section: 'Duration and stacking' },
+    tags: { kind: 'list' as const, default: [], of: { kind: 'text' as const, default: '', description: 'A tag, such as debuff or curable.' }, description: 'Tags that effects can find it by, such as debuff or poison.', section: 'Tags' }
   }
   source: string | null = null
   key: string | null = null
@@ -25,6 +31,14 @@ export class Buff extends Component {
 
   get strength(): number {
     return Number(this.params.potency) * this.stacks
+  }
+
+  get tags(): string[] {
+    return Array.isArray(this.params.tags) ? this.params.tags.map(String) : []
+  }
+
+  matches(id: string, tag: string): boolean {
+    return (!id || this.id === id) && (!tag || this.tags.includes(tag)) && Boolean(id || tag)
   }
 
   identity(): string {
@@ -64,6 +78,11 @@ export class Buff extends Component {
 }
 
 export abstract class BuffPiece extends Component {
+  static readonly SENTENCE: string = ''
+  static readonly GROUP: EffectGroup | null = null
+  static readonly ICON: string = 'Sparkles'
+  static readonly BRANCHES: EffectBranch[] = []
+  static readonly AIMS: boolean = false
   readonly finite: boolean = false
 
   canApply(host: Component | GameEntity): true | string {
@@ -87,6 +106,8 @@ export abstract class BuffPiece extends Component {
 
 export class Buffs extends Component {
   static readonly type: string = 'buffs'
+  static readonly LABEL: string = 'Buffs'
+  static readonly ICON: string = 'Sparkles'
   static readonly DESCRIPTION: string = 'The buffs and debuffs on an entity. Ticks them, stacks repeats, and removes them when they end.'
   static readonly PARAMS = {}
 
@@ -107,6 +128,32 @@ export class Buffs extends Component {
     if (same) {
       same.stacks = Math.min(Number(same.params.maxStacks), same.stacks + 1)
       if (Number(same.params.duration) > 0) same.remaining = Number(same.params.duration)
+      this.entity?.emit('OnBuffStacked', { buff: same.id, stacks: same.stacks })
+      return same
+    }
+    if (!this.add(made)) return null
+    this.entity?.emit('OnBuffApplied', { buff: made.id, source: made.source })
+    return made
+  }
+
+  matching(id: string, tag: string): Buff[] {
+    return this.held.filter((b) => b.matches(id, tag))
+  }
+
+  take(buff: Buff): ComponentRecord | null {
+    const record = buff.toJSON()
+    if (!this.remove(buff)) return null
+    this.entity?.emit('OnBuffRemoved', { buff: buff.id })
+    return record
+  }
+
+  receive(record: ComponentRecord): Buff | null {
+    const made = restoreComponent(record)
+    if (!(made instanceof Buff)) return null
+    const same = this.held.find((b) => b.identity() === made.identity())
+    if (same) {
+      same.stacks = Math.min(Number(same.params.maxStacks), same.stacks + made.stacks)
+      same.remaining = Math.max(same.remaining, made.remaining)
       this.entity?.emit('OnBuffStacked', { buff: same.id, stacks: same.stacks })
       return same
     }

@@ -12,6 +12,7 @@ import { openMenu, type MenuItem } from '../ui'
 import { KindBrowser } from '../data/KindBrowser'
 import { failed } from '../../lib/notify'
 import { showInData } from '../../lib/library'
+import { noteFailure } from '../../store/problems'
 
 const PER_KIND = 12
 
@@ -92,7 +93,7 @@ function EntryList({ kind, onPick }: { kind: string; onPick: (id: string) => voi
   useEffect(() => {
     void engine('library.find', { query: '', kind })
       .then(setList)
-      .catch(() => setList([]))
+      .catch(noteFailure('library', 'Could not list them', () => setList([])))
   }, [kind])
   if (list === null) return <div className="p-3 font-mono text-[11px] text-dim">Loading…</div>
   if (!list.length) return <div className="p-3 text-[12.5px] text-faint">Nothing here yet.</div>

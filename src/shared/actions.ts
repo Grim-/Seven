@@ -1,7 +1,9 @@
 import { showName, toId } from './ids'
 import { NO_SWAP, cleanSwap, hasSwap, parseSwap, swapSentence, swapText, type CardSwap } from './cardDecks'
-import { DND_SKILLS, DND_STATS, DND_STAT_NAMES, mod, saveBonus, skillBonus, spellAttack, type DndStats } from './dnd'
+import { activeCheckSources, type CheckName } from './checkSources'
 import type { RollerChoice } from './storedDecision'
+import { cleanComponents, type ComponentDef } from './game/core'
+import { storedPiece } from './game/components/action/storedPiece'
 
 export type ActionNeeds = 'any' | 'all'
 
@@ -15,6 +17,7 @@ export interface ActionCheck {
   failCards: CardSwap
   passAction?: string | null
   failAction?: string | null
+  effects?: ComponentDef[]
 }
 
 export interface Action {
@@ -29,6 +32,19 @@ export interface Action {
   failCards: CardSwap
   passAction?: string | null
   failAction?: string | null
+  effects?: ComponentDef[]
+}
+
+export const PASS_EVENT = 'OnPass'
+export const FAIL_EVENT = 'OnFail'
+
+export const ACTION_LANES = [
+  { event: PASS_EVENT, label: 'On a pass' },
+  { event: FAIL_EVENT, label: 'On a fail' }
+]
+
+export function actionEffects(o: { passAction?: string | null; failAction?: string | null; effects?: ComponentDef[] }): ComponentDef[] {
+  return [...storedPiece(o.passAction ?? null, PASS_EVENT), ...storedPiece(o.failAction ?? null, FAIL_EVENT), ...(o.effects ?? [])]
 }
 
 export interface CheckTarget {
@@ -57,6 +73,8 @@ export interface ActionResult {
   outcome: string
   cards: CardSwap
   triggerAction: string | null
+  event: string
+  effects: ComponentDef[]
 }
 
 export const BASE = 10
@@ -64,23 +82,21 @@ export const MIDDLE = 0.5
 export const CHANCE = 'chance'
 export const NEEDS_LABEL: Record<ActionNeeds, string> = { any: 'one check, picked', all: 'every check passes' }
 
-const CHECKS: { id: string; label: string; bonus: (d: DndStats) => number | null }[] = [
-  ...DND_STATS.map((s) => ({ id: toId(DND_STAT_NAMES[s]), label: DND_STAT_NAMES[s], bonus: (d: DndStats) => mod(d.stats[s]) })),
-  ...DND_STATS.map((s) => ({ id: `${toId(DND_STAT_NAMES[s])}_save`, label: `${DND_STAT_NAMES[s]} save`, bonus: (d: DndStats) => saveBonus(d, s) })),
-  ...DND_SKILLS.map((s) => ({ id: toId(s.name), label: s.name, bonus: (d: DndStats) => skillBonus(d, s.id) })),
-  { id: 'spell_attack', label: 'Spell attack', bonus: spellAttack }
-]
-
-export function checkNames(): { id: string; label: string }[] {
-  return CHECKS.map(({ id, label }) => ({ id, label }))
+export function checkNames(): CheckName[] {
+  return activeCheckSources().flatMap((s) => s.names())
 }
 
-export function checkTargets(d: DndStats | null): CheckTarget[] {
-  if (!d) return []
-  return CHECKS.flatMap((c) => {
-    const bonus = c.bonus(d)
-    return bonus === null ? [] : [{ id: c.id, label: c.label, bonus }]
-  })
+export function defenceNames(): CheckName[] {
+  return activeCheckSources().flatMap((s) => s.defences())
+}
+
+export function checkTargets(sheet: object | null): CheckTarget[] {
+  return sheet ? activeCheckSources().flatMap((s) => s.checks(sheet)) : []
+}
+
+export function checkDefence(sheet: object | null, id: string | null): number | null {
+  if (!sheet || !id) return null
+  return activeCheckSources().map((s) => s.defence(sheet, id)).find((v) => v !== null) ?? null
 }
 
 export function findTarget(targets: CheckTarget[], against: string | null): CheckTarget | null {
@@ -99,14 +115,14 @@ export function chanceOf(bonus: number, target: number): number {
 }
 
 const d20 = () => 1 + Math.floor(Math.random() * 20)
-export const BLANK_CHECK: ActionCheck = { against: null, difficulty: null, base: null, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null }
+export const BLANK_CHECK: ActionCheck = { against: null, difficulty: null, base: null, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null, effects: [] }
 
 export function picksCheck(action: Action): boolean {
   return action.needs === 'any' && action.checks.length > 1
 }
 
-export function rollAction(action: Action, d: DndStats | null, character: ActionResult['character'], pick: number | null = null, die: () => number = d20): ActionResult {
-  const targets = checkTargets(d)
+export function rollAction(action: Action, sheet: object | null, character: ActionResult['character'], pick: number | null = null, die: () => number = d20): ActionResult {
+  const targets = checkTargets(sheet)
   const all = action.checks.length ? action.checks : [BLANK_CHECK]
   const checks = picksCheck(action) ? [all[Math.min(Math.max(0, pick ?? 0), all.length - 1)]] : all
   const rolls = checks.map((c) => {
@@ -125,25 +141,31 @@ export function rollAction(action: Action, d: DndStats | null, character: Action
   const cards = ownCards && hasSwap(ownCards) ? ownCards : passed ? action.passCards : action.failCards
   const ownAction = deciding === null ? null : passed ? checks[deciding].passAction : checks[deciding].failAction
   const triggerAction = (ownAction ?? (passed ? action.passAction : action.failAction)) ?? null
-  return { attempt: action.attempt, needs: action.needs, character, rolls, passed, deciding: deciding === null ? null : rolls[deciding].label, outcome: own || (passed ? action.pass : action.fail), cards, triggerAction }
+  const event = passed ? PASS_EVENT : FAIL_EVENT
+  const ownEffects = deciding === null ? [] : actionEffects(checks[deciding]).filter((d) => d.on === event)
+  const effects = ownEffects.length ? ownEffects : actionEffects(action).filter((d) => d.on === event)
+  return { attempt: action.attempt, needs: action.needs, character, rolls, passed, deciding: deciding === null ? null : rolls[deciding].label, outcome: own || (passed ? action.pass : action.fail), cards, triggerAction, event, effects }
 }
 
-const signedSum = (r: CheckRoll) => `${r.roll} ${r.bonus < 0 ? '-' : '+'} ${Math.abs(r.bonus)} = ${r.total} against ${r.target}`
+const against = (r: CheckRoll) => (toId(r.label) === CHANCE ? `(chance: ${Math.round(r.chance * 100)}%)` : `dc: ${r.target}`)
+const rollLine = (r: CheckRoll) => `${r.label} check: rolled ${r.roll} ${r.bonus < 0 ? '-' : '+'} ${Math.abs(r.bonus)} = ${r.total} ${against(r)}. ${r.passed ? 'Passed' : 'Failed'}.`
 const sentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`)
+const NEEDED: Record<ActionNeeds, string> = { any: 'one check had to pass', all: 'every check had to pass' }
 
-export function actionResultText(r: ActionResult): string {
-  const decided = r.deciding === null ? null : r.rolls.find((x) => x.label === r.deciding)
-  const how = decided ? `${decided.label} ${r.passed ? 'passed' : 'failed'} (rolled ${signedSum(decided)}).` : r.passed ? 'Every check passed.' : 'Every check failed.'
+export function actionResultText(r: ActionResult, effects: string[] = []): string {
+  const who = r.character ? `${showName(r.character.name)} (@sheet:${r.character.sheet})` : 'The user [no character assigned]'
   return [
     'ACTION RESULT (rolled, not a choice)',
-    `${r.character ? `${showName(r.character.name)} (@sheet:${r.character.sheet})` : 'Someone'} attempted: "${r.attempt}".`,
-    how,
-    ...(r.outcome.trim() ? [`Outcome: ${sentence(r.outcome)}`] : []),
+    `Who: ${who}.`,
+    `Attempt: "${r.attempt}"`,
+    ...r.rolls.map(rollLine),
+    `Result: ${r.passed ? 'SUCCEEDED' : 'FAILED'}${r.rolls.length > 1 ? ` (${NEEDED[r.needs]})` : ''}.`,
+    r.outcome.trim() ? `Outcome: ${sentence(r.outcome)}` : `Outcome: not written on the card. Describe how the attempt ${r.passed ? 'succeeds' : 'fails'}, in line with the attempt.`,
     ...(hasSwap(r.cards) ? [swapSentence(r.cards)] : []),
-    'Play out this outcome.'
+    ...effects,
+    'Play this out.'
   ].join('\n')
 }
-
 
 export function actionText(a: Action): string {
   const check = (c: ActionCheck) => {
@@ -222,7 +244,8 @@ function parseCheck(line: string): ActionCheck {
     passCards: cards(PASS_WORDS),
     failCards: cards(FAIL_WORDS),
     passAction: actionRef(PASS_WORDS),
-    failAction: actionRef(FAIL_WORDS)
+    failAction: actionRef(FAIL_WORDS),
+    effects: []
   }
 }
 
@@ -250,7 +273,8 @@ export function parseActions(text: string): Action[] {
         passCards: parseSwap(value(PASS_WORDS.map((w) => `${w} cards`))),
         failCards: parseSwap(value(FAIL_WORDS.map((w) => `${w} cards`))),
         passAction: value(PASS_WORDS.map((w) => `${w} action`)) || null,
-        failAction: value(FAIL_WORDS.map((w) => `${w} action`)) || null
+        failAction: value(FAIL_WORDS.map((w) => `${w} action`)) || null,
+        effects: []
       }
     })
 }
@@ -269,7 +293,8 @@ export function cleanAction(raw: unknown): Action {
         passCards: cleanSwap(c?.passCards),
         failCards: cleanSwap(c?.failCards),
         passAction: text(c?.passAction),
-        failAction: text(c?.failAction)
+        failAction: text(c?.failAction),
+        effects: cleanComponents(c?.effects)
       }))
     : []
   const roller: RollerChoice = v.roller === 'agent' ? 'agent' : 'player'
@@ -284,6 +309,7 @@ export function cleanAction(raw: unknown): Action {
     passCards: cleanSwap(v.passCards),
     failCards: cleanSwap(v.failCards),
     passAction: text(v.passAction),
-    failAction: text(v.failAction)
+    failAction: text(v.failAction),
+    effects: cleanComponents(v.effects)
   }
 }

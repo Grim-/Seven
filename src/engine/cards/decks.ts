@@ -1,4 +1,4 @@
-import { addCards, cleanEntries, countOf, type CardSwap, type DeckEntry, type DeckRef } from '@shared/cardDecks'
+import { addCards, cleanDeckOwner, cleanEntries, countOf, sameOwner, type CardSwap, type DeckEntry, type DeckOwner, type DeckRef } from '@shared/cardDecks'
 import { data } from '../data/hub'
 import { ToolError } from '../tools/types'
 import { agentAccess } from '../agents/access'
@@ -11,8 +11,9 @@ export const DECK_TYPE = 'cards:deck'
 export interface CardDeckData {
   name: string
   cards: DeckEntry[]
-  character: string | null
+  owner: DeckOwner | null
   session: string | null
+  from: string | null
 }
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {})
@@ -21,7 +22,8 @@ const idOrNull = (v: unknown) => (typeof v === 'string' && v ? v : null)
 
 export function readDeckData(raw: unknown, title: string): CardDeckData {
   const d = obj(raw)
-  return { name: textOr(d.name, title), cards: cleanEntries(d.cards), character: idOrNull(d.character), session: idOrNull(d.session) }
+  const legacy = idOrNull(d.character)
+  return { name: textOr(d.name, title), cards: cleanEntries(d.cards), owner: cleanDeckOwner(d.owner) ?? (legacy ? { character: legacy } : null), session: idOrNull(d.session), from: idOrNull(d.from) }
 }
 
 function setEntries(id: string): DeckEntry[] {
@@ -51,30 +53,37 @@ export function cardName(ref: string): string {
   return page.title
 }
 
-function characterDeck(sheet: string, make: boolean): string | null {
-  const hit = allDecks().find((d) => d.deck.character === sheet)
-  if (hit || !make) return hit?.id ?? null
-  const title = getSheet(sheet).title
-  return newDeck(`${title} cards`, { name: '', cards: [], character: sheet, session: null })
+function ownerTitle(owner: DeckOwner): string {
+  if ('user' in owner) return 'Your cards'
+  if ('agent' in owner) return `${agentAccess.get(owner.agent)?.name ?? 'Agent'} cards`
+  return `${getSheet(owner.character).title} cards`
 }
 
-export function deckOf(ref: DeckRef, make: boolean): { deck: string | null; set: string | null } {
-  if ('deck' in ref) return { deck: data.pages.metaFor(ref.deck)?.type === DECK_TYPE ? ref.deck : null, set: null }
-  if ('character' in ref) return { deck: characterDeck(ref.character, make), set: null }
-  const agent = agentAccess.get(ref.agent)
-  const source = agent?.cards ?? null
-  if (!source) return { deck: null, set: null }
-  if (source.from === 'deck') return { deck: data.pages.metaFor(source.id)?.type === DECK_TYPE ? source.id : null, set: null }
-  if (source.from === 'character') return { deck: agent?.player ? characterDeck(agent.player, make) : null, set: null }
-  const held = allDecks().find((d) => d.deck.session === ref.chat)
-  if (held || !make) return { deck: held?.id ?? null, set: source.id }
-  const setTitle = data.pages.metaFor(source.id)?.title ?? 'Cards'
-  return { deck: newDeck(`${setTitle} for ${agent?.name ?? 'a chat'}`, { name: '', cards: setEntries(source.id), character: null, session: ref.chat }), set: source.id }
+function ownerDeck(owner: DeckOwner, make: boolean): string | null {
+  const hit = allDecks().find((d) => sameOwner(d.deck.owner, owner))
+  if (hit || !make) return hit?.id ?? null
+  return newDeck(ownerTitle(owner), { name: '', cards: [], owner, session: null, from: null })
+}
+
+export function deckOf(ref: DeckRef, make: boolean): { deck: string | null } {
+  if ('deck' in ref) return { deck: data.pages.metaFor(ref.deck)?.type === DECK_TYPE ? ref.deck : null }
+  return { deck: ownerDeck(ref, make) }
+}
+
+export function setDeckOwner(deck: string, owner: DeckOwner | null): boolean {
+  for (const d of allDecks()) {
+    if (d.id === deck) continue
+    if (owner && sameOwner(d.deck.owner, owner)) data.pages.setData(d.id, { ...d.deck, owner: null })
+  }
+  const page = data.pages.get(deck)
+  if (page.type !== DECK_TYPE) throw new ToolError(`"${page.title}" is not a card deck.`)
+  data.pages.setData(deck, { ...readDeckData(page.data, page.title), owner })
+  return true
 }
 
 function change(ref: DeckRef, fn: (cards: DeckEntry[]) => DeckEntry[]): string {
   const { deck } = deckOf(ref, true)
-  if (!deck) throw new ToolError('No card deck is in use here. Set one in the agent\'s Cards setting, or pick your character.')
+  if (!deck) throw new ToolError('There is no card deck here.')
   const page = data.pages.get(deck)
   const d = readDeckData(page.data, page.title)
   data.pages.setData(deck, { ...d, cards: fn(d.cards) })

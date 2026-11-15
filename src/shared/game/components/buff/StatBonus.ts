@@ -1,3 +1,4 @@
+import { CONDITIONS, type EffectGroup } from '../../effectGroups'
 import { registerComponent } from '../../core'
 import { BuffPiece } from '../Buffs'
 
@@ -8,6 +9,9 @@ export class StatBonus extends BuffPiece {
     stat: { kind: 'template' as const, templateKind: 'stat', default: '', description: 'Which stat or resist.' },
     amount: { kind: 'number' as const, default: 1, description: 'Change per point of buff strength. Negative lowers it.' }
   }
+  static readonly SENTENCE: string = 'Change {stat} by {amount} per point of strength'
+  static readonly GROUP: EffectGroup | null = CONDITIONS
+  static readonly ICON: string = 'TrendingUp'
 
   modifyStat(_domain: string, key: string, value: number): number {
     if (key !== this.params.stat) return value

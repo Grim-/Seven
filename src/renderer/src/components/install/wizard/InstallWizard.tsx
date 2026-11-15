@@ -7,6 +7,7 @@ import { ReleaseStep } from './ReleaseStep'
 import { FolderStep } from './FolderStep'
 import { ReviewStep } from './ReviewStep'
 import { ProgressStep } from './ProgressStep'
+import { noteFailure } from '../../../store/problems'
 
 const STEPS = ['About', 'Version', 'Folder', 'Review', 'Install']
 
@@ -31,7 +32,7 @@ export function InstallWizard({ state, progress, open, onClose }: { state: Insta
     setChoice(null)
     if (!tag || !build) return
     let live = true
-    void engine('install.choices', { helper: state.id, tag }).then((list) => live && setChoice(list.find((c) => c.build === build) ?? null))
+    void engine('install.choices', { helper: state.id, tag }).then((list) => live && setChoice(list.find((c) => c.build === build) ?? null), noteFailure('install', 'Could not load the builds'))
     return () => {
       live = false
     }
@@ -44,14 +45,14 @@ export function InstallWizard({ state, progress, open, onClose }: { state: Insta
   const start = () => {
     setStarted(true)
     setStep(STEPS.length - 1)
-    void engine('install.start', { helper: state.id, tag, build, root }).catch(() => undefined)
+    void engine('install.start', { helper: state.id, tag, build, root }).catch(noteFailure('install', 'The install stopped'))
   }
   const canNext = [true, Boolean(choice && !choice.unavailable), Boolean(root), true][step] ?? false
   const footer = (
     <>
       {step === STEPS.length - 1 ? (
         running ? (
-          <Button variant="danger" onClick={() => void engine('install.cancel', { helper: state.id })}>
+          <Button variant="danger" onClick={() => void engine('install.cancel', { helper: state.id }).catch(failed('Could not cancel the install'))}>
             Cancel install
           </Button>
         ) : (

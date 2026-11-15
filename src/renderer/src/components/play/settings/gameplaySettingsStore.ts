@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { forgetStored, readStored, writeStored } from '../../../lib/stored'
 
 export interface KeybindDef {
   id: string
@@ -61,21 +62,16 @@ const DEFAULT_SETTINGS: GameplaySettings = {
   keybinds: DEFAULT_KEYBINDS
 }
 
+const STORAGE_KEY = 'seven.gameplaySettings'
+
 function loadPersistedSettings(): GameplaySettings {
-  try {
-    const raw = localStorage.getItem('seven.gameplaySettings')
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      return {
-        ...DEFAULT_SETTINGS,
-        ...parsed,
-        keybinds: { ...DEFAULT_KEYBINDS, ...(parsed.keybinds ?? {}) }
-      }
-    }
-  } catch {
-    // fallback to defaults
+  const parsed = readStored<Partial<GameplaySettings> | null>(STORAGE_KEY, null)
+  if (!parsed) return DEFAULT_SETTINGS
+  return {
+    ...DEFAULT_SETTINGS,
+    ...parsed,
+    keybinds: { ...DEFAULT_KEYBINDS, ...(parsed.keybinds ?? {}) }
   }
-  return DEFAULT_SETTINGS
 }
 
 interface GameplaySettingsStore {
@@ -90,11 +86,7 @@ export const useGameplaySettings = create<GameplaySettingsStore>((set) => ({
   update: (patch) =>
     set((state) => {
       const next = { ...state.settings, ...patch }
-      try {
-        localStorage.setItem('seven.gameplaySettings', JSON.stringify(next))
-      } catch {
-        // ignore
-      }
+      writeStored(STORAGE_KEY, next)
       return { settings: next }
     }),
   rebindKey: (actionId, code, display) =>
@@ -104,20 +96,12 @@ export const useGameplaySettings = create<GameplaySettingsStore>((set) => ({
         [actionId]: { code, display }
       }
       const next = { ...state.settings, keybinds: nextKeybinds }
-      try {
-        localStorage.setItem('seven.gameplaySettings', JSON.stringify(next))
-      } catch {
-        // ignore
-      }
+      writeStored(STORAGE_KEY, next)
       return { settings: next }
     }),
   resetDefaults: () =>
     set(() => {
-      try {
-        localStorage.removeItem('seven.gameplaySettings')
-      } catch {
-        // ignore
-      }
+      forgetStored(STORAGE_KEY)
       return { settings: DEFAULT_SETTINGS }
     })
 }))

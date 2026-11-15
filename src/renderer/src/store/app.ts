@@ -1,3 +1,4 @@
+import { noteFailure } from './problems'
 import { create } from 'zustand'
 import type { AppInfo, EngineStatus, Settings, ViewId } from '@shared/types'
 import { main } from '../lib/ipc'
@@ -19,7 +20,7 @@ export const useApp = create<AppState>((set, get) => ({
   engine: { state: 'starting', restarts: 0 },
   setView: (view) => {
     set({ view })
-    if (allowedRequest('main', 'settings.set')) void main('settings.set', { lastView: view })
+    if (allowedRequest('main', 'settings.set')) void main('settings.set', { lastView: view }).catch(noteFailure('app', 'Could not remember the open view'))
   },
   updateSettings: async (patch) => {
     const current = get().settings

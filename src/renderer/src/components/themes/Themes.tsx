@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Copy, Play, Plus, Star, Trash2, X } from 'lucide-react'
 import { SEVEN_THEME, SKY_MODES, cleanTheme, type SkyMode, type Theme, type ThemeSoundEvent } from '@shared/theme'
-import { BACKGROUNDS, BACKGROUND_MODULE, CORE_EFFECTS, backgroundInfo, effectSettingsFor } from '@shared/backgrounds'
+import { BACKGROUND_MODULE, CORE_EFFECTS, backgroundInfo, backgroundList, effectSettingsFor } from '@shared/backgrounds'
+import { SettingControls } from '../settingSpec/SettingControls'
 import { useTools } from '../../store/tools'
 import { runCue } from '../shell/ThemeStage'
 import { engine } from '../../lib/ipc'
@@ -14,6 +15,7 @@ import { useThemes } from '../../store/themes'
 import { Button, EmptyState, Field, Input, Panel, Select, Slider, Toggle, askText, MakeOrSaved, useAutosavedState, ListRow, confirmDelete } from '../ui'
 import { rowMenu } from '../../views/data/entryMenu'
 import { failed } from '../../lib/notify'
+import { noteFailure } from '../../store/problems'
 
 const NEW = '_new'
 
@@ -60,7 +62,7 @@ export function Swatches({ theme }: { theme: Pick<Theme, 'accent' | 'accentSoft'
 export function ThemesPanel({ initial = null }: { initial?: string | null }) {
   const list = useThemes((s) => s.list)
   useEffect(() => {
-    void useThemes.getState().refresh().catch(() => undefined)
+    void useThemes.getState().refresh().catch(noteFailure('themes', 'Could not list the themes'))
   }, [])
   const settings = useApp((s) => s.settings)
   const updateSettings = useApp((s) => s.updateSettings)
@@ -243,7 +245,7 @@ export function ThemesPanel({ initial = null }: { initial?: string | null }) {
                           <button
                             onClick={() => {
                               const colors = draft.backdrop!.colors.filter((_, j) => j !== i)
-                              set({ backdrop: colors.length || draft.backdrop!.image ? { ...draft.backdrop!, colors } : null })
+                              set({ backdrop: colors.length || draft.backdrop!.image || draft.backdrop!.slideshow ? { ...draft.backdrop!, colors } : null })
                             }}
                             className="text-faint hover:text-alert"
                           >
@@ -261,9 +263,31 @@ export function ThemesPanel({ initial = null }: { initial?: string | null }) {
                 </Field>
                 {draft.backdrop && (
                   <Field label={`Darken ${Math.round(draft.backdrop.dim * 100)}%`}>
-                    <Slider value={Math.round(draft.backdrop.dim * 100)} min={0} max={90} onChange={(v) => set({ backdrop: { ...draft.backdrop!, dim: v / 100 } })} />
+                    <div className="flex items-center gap-3">
+                      <Slider value={Math.round(draft.backdrop.dim * 100)} min={0} max={90} onChange={(v) => set({ backdrop: { ...draft.backdrop!, dim: v / 100 } })} />
+                      {!readOnly && (
+                        <Button size="sm" variant="ghost" icon={<X />} onClick={() => set({ backdrop: null })}>
+                          Clear
+                        </Button>
+                      )}
+                    </div>
                   </Field>
                 )}
+              </div>
+            </Section>
+            <Section title="Tabletop chat">
+              <div className="grid grid-cols-2 gap-x-5 gap-y-3">
+                <Field
+                  label={`Unpinned chat fade ${Math.round((draft.chatFadeOpacity ?? SEVEN_THEME.chatFadeOpacity) * 100)}%`}
+                  hint="Opacity of the chat stream in Tabletop mode when unpinned and not hovered or focused."
+                >
+                  <Slider
+                    value={Math.round((draft.chatFadeOpacity ?? SEVEN_THEME.chatFadeOpacity) * 100)}
+                    min={0}
+                    max={100}
+                    onChange={(v) => set({ chatFadeOpacity: v / 100 })}
+                  />
+                </Field>
               </div>
             </Section>
             <Section title="Music and sounds">
@@ -308,7 +332,7 @@ export function ThemesPanel({ initial = null }: { initial?: string | null }) {
 function AnimatedSection({ draft, readOnly, onChange }: { draft: Draft; readOnly: boolean; onChange: (patch: Partial<Draft>) => void }) {
   const addonOn = useTools((s) => s.list.some((m) => m.id === BACKGROUND_MODULE && m.state === 'on'))
   const info = backgroundInfo(draft.effect)
-  const options = [...CORE_EFFECTS.map((e) => ({ value: e.id, label: e.name })), ...(addonOn || info ? BACKGROUNDS.map((b) => ({ value: b.id, label: b.name })) : [])]
+  const options = [...CORE_EFFECTS.map((e) => ({ value: e.id, label: e.name })), ...(addonOn || info ? backgroundList().map((b) => ({ value: b.id, label: b.name })) : [])]
   const values = info ? effectSettingsFor(info, draft.effectSettings) : {}
   const setValue = (name: string, value: number | string) => onChange({ effectSettings: { ...draft.effectSettings, [name]: value } })
   const hint = info ? (addonOn ? info.description : 'The Backgrounds add-on is off, so this shows nothing until it is on.') : addonOn ? 'Off everywhere if animated backgrounds are off in Settings.' : 'Turn on the Backgrounds add-on in Tools for more.'
@@ -329,17 +353,7 @@ function AnimatedSection({ draft, readOnly, onChange }: { draft: Draft; readOnly
             </div>
           </Field>
         )}
-        {info?.settings.map((st) =>
-          st.type === 'color' ? (
-            <Field key={st.name} label={st.label}>
-              <input type="color" value={String(values[st.name])} disabled={readOnly} onChange={(e) => setValue(st.name, e.target.value)} className="h-8 w-10 cursor-pointer border border-line/50 bg-transparent" />
-            </Field>
-          ) : (
-            <Field key={st.name} label={`${st.label} ${values[st.name]}`}>
-              <Slider value={Number(values[st.name])} min={st.min ?? 0} max={st.max ?? 100} step={st.step ?? 1} onChange={(v) => !readOnly && setValue(st.name, v)} />
-            </Field>
-          )
-        )}
+        {info && <SettingControls specs={info.settings} values={values} readOnly={readOnly} onChange={(name, value) => setValue(name, value as number | string)} />}
       </div>
     </Section>
   )

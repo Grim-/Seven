@@ -1,3 +1,4 @@
+import { noteMainFailure } from './problems'
 import fs from 'node:fs'
 import os from 'node:os'
 import crypto from 'node:crypto'
@@ -28,7 +29,7 @@ function unlocked(): void {
     try {
       watch()
     } catch (err) {
-      console.warn('[vault] a reload after unlocking failed', err)
+      noteMainFailure(err, 'vault', 'A reload after unlocking failed')
     }
   }
 }
@@ -62,7 +63,7 @@ export class Vault {
   async check(): Promise<VaultStatus> {
     if (this.key) {
       const engine = await this.engine.request('vault.status', undefined).catch(() => null)
-      if (engine && !engine.unlocked) await this.sendKey().catch((err) => console.warn('[vault] could not hand the key to the engine again', err))
+      if (engine && !engine.unlocked) await this.sendKey().catch((err: unknown) => noteMainFailure(err, 'vault', 'Could not hand the key to the engine again', 'error'))
     }
     return this.status()
   }
@@ -129,7 +130,7 @@ export class Vault {
     this.key?.fill(0)
     this.key = null
     mainSecure.keys = publicKeys(this.file)
-    await this.sendKey().catch(() => undefined)
+    await this.sendKey().catch((err: unknown) => noteMainFailure(err, 'vault', 'Could not tell the engine the vault is locked', 'error'))
     return this.changed()
   }
 }

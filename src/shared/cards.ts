@@ -17,10 +17,6 @@ export const PLACE_LABELS: Record<Place, string> = {
   none: 'Not on the card'
 }
 
-export const FRAMES = ['notched', 'rounded', 'playing'] as const
-export type Frame = (typeof FRAMES)[number]
-export const FRAME_LABELS: Record<Frame, string> = { notched: 'Seven notched', rounded: 'Rounded', playing: 'Playing card' }
-
 export interface CardField {
   id: string
   label: string
@@ -31,7 +27,6 @@ export interface CardField {
 
 export interface CardLayout {
   name: string
-  frame: Frame
   color: string
   fields: CardField[]
 }
@@ -74,7 +69,7 @@ export function readLayout(data: unknown, name: string): CardLayout {
       }
     ]
   })
-  return { name: str(d.name) || name, frame: FRAMES.includes(d.frame as Frame) ? (d.frame as Frame) : 'notched', color: isCardColor(d.color) ? d.color : DEFAULT_CARD_COLOR, fields }
+  return { name: str(d.name) || name, color: isCardColor(d.color) ? d.color : DEFAULT_CARD_COLOR, fields }
 }
 
 export function readValues(data: unknown): Record<string, CardValue> {

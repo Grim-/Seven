@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { create } from 'zustand'
 import type { DeckRef } from '@shared/cardDecks'
+import type { PlayTarget } from '../../game/targets'
 
 export interface PlayWhere {
   link: string | null
@@ -11,7 +12,28 @@ export interface PlayWhere {
   deck?: DeckRef | null
   lead?: string
   onText?: (text: string) => void
+  surface?: PlaySurface
+  target?: PlayTarget
 }
+
+export type PlayTone = 'ok' | 'alert' | 'purple' | 'cyan'
+
+export interface PlayOutcome {
+  tone: PlayTone
+  label: string
+  detail: string
+  effects?: string[]
+}
+
+export interface PlaySurface {
+  show: (title: string, node: ReactNode) => void
+  clear: () => void
+  close: () => void
+  roll: (face: number | null) => void
+  settle: (outcome: PlayOutcome) => void
+}
+
+export const PLAYED: PlayOutcome = { tone: 'cyan', label: 'Played', detail: '' }
 
 export function sceneLink(link: string | null, player: string | null): string | null {
   return player ? `${link ? `${link}\n` : ''}The user plays @sheet:${player}.` : link
@@ -39,4 +61,16 @@ export function showPlay(title: string, node: ReactNode, options: { wide?: boole
 
 export function closePlay(): void {
   usePlay.setState({ view: null })
+}
+
+const panelSurface: PlaySurface = {
+  show: (title, node) => showPlay(title, node),
+  clear: closePlay,
+  close: closePlay,
+  roll: () => undefined,
+  settle: () => undefined
+}
+
+export function surfaceOf(where: PlayWhere): PlaySurface {
+  return where.surface ?? panelSurface
 }

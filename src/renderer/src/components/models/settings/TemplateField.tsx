@@ -3,6 +3,7 @@ import type { ChatTemplate, ModelEntry } from '@shared/types'
 import { Select, SaveState, SettingRow, Textarea, useAutosavedState } from '../../ui'
 import { engine } from '../../../lib/ipc'
 import { failed } from '../../../lib/notify'
+import { noteFailure } from '../../../store/problems'
 
 export function TemplateField({ model }: { model: ModelEntry }) {
   const [choice, setChoice] = useState<ChatTemplate | null>(null)
@@ -14,7 +15,7 @@ export function TemplateField({ model }: { model: ModelEntry }) {
         setChoice(r)
         setText(r.type === 'jinja' ? r.template : '')
       })
-      .catch(() => undefined)
+      .catch(noteFailure('models', 'Could not read the chat template'))
   }, [model.id])
   if (!choice) return null
   const options = [

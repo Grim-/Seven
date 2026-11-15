@@ -37,6 +37,10 @@ export class WorldClock {
     return this.clock.calendar().daylight
   }
 
+  get paused(): boolean {
+    return this.clock.paused
+  }
+
   update(dt: number): void {
     if (this.clock.advance(dt) > 0) this.save()
     this.show()

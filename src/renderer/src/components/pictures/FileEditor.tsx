@@ -21,6 +21,7 @@ import { engine } from '../../lib/ipc'
 import { cn } from '../../lib/cn'
 import { formatBytes } from '../../lib/format'
 import { useViewPlace } from '../../lib/viewPlace'
+import { noteFailure } from '../../store/problems'
 
 export const VIEWABLE_MEDIA_KINDS: AssetMeta['kind'][] = ['image', 'video']
 
@@ -33,7 +34,7 @@ function AgentReads({ asset }: { asset: AssetMeta }) {
     let live = true
     engine('library.read', { entry: `@file:${asset.id}` })
       .then((t) => live && setText(t))
-      .catch(() => live && setText(''))
+      .catch(noteFailure('files', 'Could not read the agent notes', () => live && setText('')))
     return () => {
       live = false
     }

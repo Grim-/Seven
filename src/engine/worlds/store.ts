@@ -1,3 +1,4 @@
+import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
@@ -41,7 +42,7 @@ export const nowStamp = (): string => new Date().toISOString().replace(/\.\d{3}Z
 
 class WorldStore extends EventEmitter {
   private dir(id: string): string {
-    if (!/^[a-z0-9_-]+$/.test(id)) throw new WorldError(`There is no world "${id}"`)
+    if (!/^[a-z0-9_-]+$/.test(id)) throw notFound(new WorldError(`There is no world "${id}"`))
     return path.join(ROOT, id)
   }
 
@@ -81,13 +82,6 @@ class WorldStore extends EventEmitter {
     return this.meta(id)
   }
 
-  setRules(id: string, rules: string): WorldMeta {
-    const m = this.manifest(id)
-    writeJson(path.join(this.dir(id), 'manifest.json'), { ...m, rules, updatedAt: Date.now() })
-    this.emit('changed', id)
-    return this.meta(id)
-  }
-
   setTags(id: string, tags: string[]): WorldMeta {
     const m = this.manifest(id)
     const clean = [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))]
@@ -103,7 +97,7 @@ class WorldStore extends EventEmitter {
   }
 
   folder(id: string): string {
-    if (!this.exists(id)) throw new WorldError(`There is no world "${id}"`)
+    if (!this.exists(id)) throw notFound(new WorldError(`There is no world "${id}"`))
     return this.dir(id)
   }
 
@@ -169,7 +163,7 @@ class WorldStore extends EventEmitter {
   }
 
   schema(id: string): WorldSchema {
-    if (!this.exists(id)) throw new WorldError(`There is no world "${id}"`)
+    if (!this.exists(id)) throw notFound(new WorldError(`There is no world "${id}"`))
     const schema = readJson<WorldSchema>(path.join(this.dir(id), 'schema.json'), STARTER_SCHEMA)
     const place = schema.types[PLACE_TYPE_KEY]
     return place && !('Actions' in place.fields) ? this.splitPlaceActions(id, schema, place) : schema
@@ -324,7 +318,7 @@ class WorldStore extends EventEmitter {
 
   useMap(id: string, mapId: string): WorldMapUse[] {
     const targetMap = maps.get(mapId)
-    if (!targetMap) throw new WorldError(`There is no map "${mapId}". find with kind map lists them.`)
+    if (!targetMap) throw notFound(new WorldError(`There is no map "${mapId}". find with kind map lists them.`))
     const schema = this.schema(id)
     const placed = withPlaces(schema)
     if (placed !== schema) this.saveSchema(id, placed)

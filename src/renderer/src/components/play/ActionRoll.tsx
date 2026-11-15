@@ -8,38 +8,36 @@ import { showName } from '@shared/ids'
 import { ActionOutcome } from './ActionResultCard'
 import { Die } from './Die'
 import { RollVerdict } from './roll/RollVerdict'
-import { closePlay, type PlayWhere } from './playStore'
+import { surfaceOf, type PlayWhere } from './playStore'
 import { playOutItem } from './playOut'
-import { dispatchOutcome } from '../../game/triggerActions/runner'
-import { createGameExecutionContext } from '../../game/triggerActions/buildContext'
+import { targetLines } from './cardEffects'
 
 const STEP_MS = 700
 
-export function ActionRoll({ result, where, onAgain }: { result: ActionResult; where: PlayWhere; onAgain: () => void }) {
+function rollDetail(result: ActionResult): string {
+  if (result.rolls.length !== 1) return `${result.rolls.filter((r) => r.passed).length} of ${result.rolls.length} checks`
+  const [r] = result.rolls
+  return `${r.total} vs ${r.target}`
+}
+
+export function ActionRoll({ result, effects, where, onAgain }: { result: ActionResult; effects: string[]; where: PlayWhere; onAgain: () => void }) {
   const [landed, setLanded] = useState(0)
-  const [executed, setExecuted] = useState(false)
 
   useEffect(() => {
     setLanded(0)
-    setExecuted(false)
     const timers = result.rolls.map((_, i) => window.setTimeout(() => setLanded(i + 1), STEP_MS * (i + 1)))
     return () => timers.forEach((t) => window.clearTimeout(t))
   }, [result])
 
   const done = landed >= result.rolls.length
+  const surface = surfaceOf(where)
 
   useEffect(() => {
-    if (done && !executed && result.triggerAction && where.world) {
-      setExecuted(true)
-      const ctx = createGameExecutionContext({
-        world: where.world,
-        map: where.map ?? '',
-        sheet: result.character?.sheet ?? where.sheet ?? ''
-      })
-      void dispatchOutcome({ triggerActionId: result.triggerAction }, ctx)
-    }
-  }, [done, executed, result.triggerAction, where.world, where.map, where.sheet, result.character])
-  const actions: MenuItem[] = [...(where.onText ? [] : [playOutItem(actionResultText(result), where)]), ...(where.lead ? [] : [{ label: 'Roll again', icon: <Dices />, onSelect: onAgain }]), { label: 'Close', icon: <X />, onSelect: closePlay }]
+    surface.roll(landed === 0 ? null : result.rolls[landed - 1].roll)
+    if (done) surface.settle({ tone: result.passed ? 'ok' : 'alert', label: result.passed ? 'Success' : 'Failure', detail: rollDetail(result), effects })
+  }, [landed, done, result, surface, effects])
+
+  const actions: MenuItem[] = [...(where.onText ? [] : [playOutItem(actionResultText(result, [...targetLines(where), ...effects]), where)]), ...(where.lead ? [] : [{ label: 'Roll again', icon: <Dices />, onSelect: onAgain }]), { label: 'Close', icon: <X />, onSelect: surface.close }]
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">

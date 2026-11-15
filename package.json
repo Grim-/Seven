@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
+    "yauzl": "^3.2.0",
     "@assistant-ui/react": "^0.15.23",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
@@ -84,6 +85,7 @@
     "agent_map_gen": "file:./agent_map_gen"
   },
   "devDependencies": {
+    "@types/yauzl": "^2.10.3",
     "@electron-toolkit/eslint-config": "^2.1.0",
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
     "@electron-toolkit/tsconfig": "^2.0.0",

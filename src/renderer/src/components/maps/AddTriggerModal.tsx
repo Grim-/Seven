@@ -194,9 +194,11 @@ export function AddTriggerModal({ world = '', at, onClose, onPlaced }: Props) {
                             needsFlag,
                             hiddenIfFlag,
                             setsFlag,
-                            needsItem
+                            needsItem,
+                            comps: []
                           }}
                           world={world}
+                          map=""
                           onValues={setParams}
                         />
                       )

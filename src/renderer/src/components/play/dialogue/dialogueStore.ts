@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { DialogueTree, DialogueNode, DialogueChoice } from '@shared/game/dialogue'
 import { rollDie } from '@shared/storyRolls'
+import { sendParleyToChat } from '../parleyBridge'
 
 export interface ActiveSpeechBubble {
   id: string
@@ -160,6 +161,18 @@ export const useDialogue = create<DialogueState>((set, get) => ({
 
       const rollResultText = `[${choice.check.stat.toUpperCase()} CHECK] Rolled ${roll} + ${playerMod} = ${total} vs DC ${dc} : ${success ? 'SUCCESS' : 'FAILURE'}`
       get().addNarration('check', 'SYSTEM', rollResultText)
+
+      sendParleyToChat({
+        npcSheet: tree.sheetId,
+        npcName: state.speakerName ?? tree.title,
+        said: choice.label,
+        checkLine: rollResultText,
+        outcome: {
+          tone: success ? 'ok' : 'alert',
+          label: success ? 'Success' : 'Failure',
+          detail: `${total} vs DC ${dc}`
+        }
+      })
 
       const nextNode = tree.nodes[nextId]
       if (nextNode) {

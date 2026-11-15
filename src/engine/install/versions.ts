@@ -1,3 +1,5 @@
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import { partOf } from '../net/resumable'
@@ -59,7 +61,8 @@ export function adopt(id: string): HelperRecord {
       .readdirSync(root, { withFileTypes: true })
       .filter((d) => d.isDirectory() && !d.name.endsWith(partOf('')) && hasProgram(id, path.join(root, d.name)))
       .map((d) => path.join(root, d.name))
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'install', 'Could not list the installed versions')
     found = []
   }
   const fresh = found.filter((f) => !r.versions.some((v) => samePath(v.folder, f)))
@@ -75,7 +78,7 @@ export function adopt(id: string): HelperRecord {
 
 export function versionOf(id: string, version: string): StoredVersion {
   const found = record(id).versions.find((v) => v.id === version)
-  if (!found) throw new Error(`That version of ${helperOf(id).title} is no longer listed.`)
+  if (!found) throw notFound(new Error(`That version of ${helperOf(id).title} is no longer listed.`))
   return found
 }
 
@@ -98,7 +101,7 @@ export function checkOnce(id: string, version: string): void {
   if (checking.has(key)) return
   checking.add(key)
   void verifyVersion(id, version)
-    .catch(() => undefined)
+    .catch((err: unknown) => noteFailure(err, 'install', 'Could not check an installed version'))
     .finally(() => checking.delete(key))
 }
 

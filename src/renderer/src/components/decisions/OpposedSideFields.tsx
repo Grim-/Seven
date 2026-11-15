@@ -1,11 +1,12 @@
 import type { CheckTarget } from '@shared/actions'
-import type { OpposedSide } from '@shared/opposedCheck'
+import { Effects } from '@shared/game/components'
+import { SIDE_LANES, sideEffects, type OpposedSide } from '@shared/opposedCheck'
 import { Input, NumberField } from '../ui'
 import { SheetSelect } from '../data/sheet/SheetSelect'
+import { EffectsEditor } from '../game/effects/EffectsEditor'
 import { SkillSelect } from './SkillSelect'
-import { TriggerActionSelect } from '../game/TriggerActionSelect'
 
-export function OpposedSideFields({ title, side, targets, onChange, editable = false }: { title: string; side: OpposedSide; targets: CheckTarget[]; onChange: (next: OpposedSide) => void; editable?: boolean }) {
+export function OpposedSideFields({ title, side, targets, onChange, editable = false, who = true }: { title: string; side: OpposedSide; targets: CheckTarget[]; onChange: (next: OpposedSide) => void; editable?: boolean; who?: boolean }) {
   return (
     <div className="flex min-w-0 flex-col gap-2 border border-line/60 bg-white/[0.02] p-3">
       <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-dim">{title}</span>
@@ -14,17 +15,10 @@ export function OpposedSideFields({ title, side, targets, onChange, editable = f
           {side.name} <span className="font-normal text-dim">{side.does}</span>
         </span>
       )}
-      <SheetSelect value={side.sheet} noneLabel="Someone without a sheet" onChange={(sheet, name) => onChange({ ...side, sheet, name: name ?? (side.sheet ? '' : side.name) })} />
-      {editable && !side.sheet && <Input value={side.name} onChange={(e) => onChange({ ...side, name: e.target.value })} placeholder="Who (the gate guard)" />}
+      {who && <SheetSelect value={side.sheet} noneLabel="Someone without a sheet" onChange={(sheet, name) => onChange({ ...side, sheet, name: name ?? (side.sheet ? '' : side.name) })} />}
+      {who && editable && !side.sheet && <Input value={side.name} onChange={(e) => onChange({ ...side, name: e.target.value })} placeholder="Who (the gate guard)" />}
       {editable && <Input value={side.does} onChange={(e) => onChange({ ...side, does: e.target.value })} placeholder="Winning means… (spots the lie)" />}
-      {editable && (
-        <TriggerActionSelect
-          value={side.action}
-          onChange={(action) => onChange({ ...side, action })}
-          placeholder="No in-game trigger on win"
-          className="h-7 text-[11px]"
-        />
-      )}
+      {editable && <Input value={side.loses ?? ''} onChange={(e) => onChange({ ...side, loses: e.target.value })} placeholder="Losing means… (believes it, still unsure)" />}
       <div className="flex items-center gap-2">
         <SkillSelect targets={targets} value={side.against} onChange={(against) => onChange({ ...side, against })} className="min-w-0 flex-1" />
         {!side.sheet && (
@@ -34,6 +28,7 @@ export function OpposedSideFields({ title, side, targets, onChange, editable = f
           </label>
         )}
       </div>
+      {editable && <EffectsEditor host={Effects.type} lanes={SIDE_LANES} aside={false} value={sideEffects(side)} onChange={(effects) => onChange({ ...side, effects, action: null })} />}
     </div>
   )
 }

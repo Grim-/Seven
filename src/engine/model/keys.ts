@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import path from 'node:path'
 import { VaultLocked, isVaultLocked } from '@shared/sealed'
 import { readJson, writeJson } from '../util/fs'
@@ -18,7 +19,8 @@ function keyStore(fileName: string, lockedMessage: string) {
     has(id: string): boolean {
       try {
         return Boolean(all()[id])
-      } catch {
+      } catch (err) {
+        noteFailure(err, 'models', 'Could not read the saved keys')
         return false
       }
     },

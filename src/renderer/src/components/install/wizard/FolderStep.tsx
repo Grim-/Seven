@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, Field, FileField } from '../../ui'
 import { engine } from '../../../lib/ipc'
 import { formatBytes } from '../../../lib/format'
+import { noteFailure } from '../../../store/problems'
 
 export function FolderStep({ root, defaultRoot, onRoot }: { root: string; defaultRoot: string; onRoot: (root: string) => void }) {
   const [free, setFree] = useState<number | null>(null)
@@ -9,7 +10,7 @@ export function FolderStep({ root, defaultRoot, onRoot }: { root: string; defaul
     let live = true
     engine('install.space', { folder: root })
       .then((r) => live && setFree(r.free))
-      .catch(() => live && setFree(null))
+      .catch(noteFailure('install', 'Could not check the free space', () => live && setFree(null)))
     return () => {
       live = false
     }

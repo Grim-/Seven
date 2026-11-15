@@ -1,11 +1,13 @@
 import type { Kind, KindContext } from './kinds'
 import { modules } from '../modules/registry'
 import { agentAccess } from '../agents/access'
+import { contribute } from '../modules/contributions'
 
 const registered = new Map<string, { module: string; kind: Kind }>()
 
 export function registerModuleKind(module: string, kind: Kind): void {
   registered.set(kind.kind, { module, kind })
+  contribute(module, 'Kind', kind.plural)
 }
 
 function moduleOn(module: string, ctx: KindContext): boolean {

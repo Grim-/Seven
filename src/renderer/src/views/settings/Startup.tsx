@@ -4,6 +4,7 @@ import { main } from '../../lib/ipc'
 import { toast } from '../../store/toasts'
 import { useApp } from '../../store/app'
 import { cn } from '../../lib/cn'
+import { failed } from '../../lib/notify'
 
 const KEY_NAMES: Record<string, string> = {
   Space: 'Space',
@@ -46,7 +47,7 @@ export function acceleratorFrom(e: { code: string; ctrlKey: boolean; metaKey: bo
   return [...mods, key].join('+')
 }
 
-function HotkeyField({ current }: { current: string }) {
+export function HotkeyField({ current }: { current: string }) {
   const [value, setValue] = useState(current)
   const [error, setError] = useState<string | null>(null)
   const [recording, setRecording] = useState(false)
@@ -118,7 +119,7 @@ export function Startup() {
         </SettingRow>
         <HotkeyField current={settings?.hotkey ?? ''} />
         <SettingRow label="Button position" hint="Moves the overlay button back to the bottom-right corner of the main screen, for when it ends up somewhere you can't reach.">
-          <Button variant="secondary" onClick={() => void main('overlay.resetPosition').then(() => toast.success('Overlay moved back'))}>
+          <Button variant="secondary" onClick={() => void main('overlay.resetPosition').then(() => toast.success('Overlay moved back'), failed('Could not move the overlay'))}>
             Reset position
           </Button>
         </SettingRow>

@@ -1,9 +1,10 @@
+import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { CharacterSheet } from '@shared/types'
+import type { CharacterMind, CharacterSheet } from '@shared/types'
 import type { EntityRecord } from '@shared/game/core/GameEntity'
 import { cleanDnd, dndLine, dndRoleplay, dndText, type DndStats } from '@shared/dnd'
-import { cleanStory, storyText, type Story } from '@shared/story'
+import { cleanMemories, cleanStory, mindMemoriesText, storyText, type Story } from '@shared/story'
 import { data } from '../data/hub'
 import { dataRoot } from '../util/paths'
 import { copyPath } from '../util/fs'
@@ -21,6 +22,7 @@ interface SheetData {
   faction?: string | null
   save: string
   story: Story
+  mind: CharacterMind | null
 }
 
 function gameRecord(raw: unknown): EntityRecord | null {
@@ -29,13 +31,35 @@ function gameRecord(raw: unknown): EntityRecord | null {
   return typeof r.uid === 'string' && r.template && typeof r.template === 'object' && Array.isArray(r.comps) ? (r as EntityRecord) : null
 }
 
+function cleanMind(raw: unknown, legacyStory?: unknown): CharacterMind | null {
+  const m = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  const reasoningStyle = typeof m.reasoningStyle === 'string' && m.reasoningStyle.trim() ? m.reasoningStyle.trim() : null
+  const howItThinks = typeof m.howItThinks === 'string' ? m.howItThinks.trim() : ''
+  const voiceConstraints = typeof m.voiceConstraints === 'string' ? m.voiceConstraints.trim() : ''
+  const forceReason = m.forceReason === true
+  const rawMemories = Array.isArray(m.memories)
+    ? m.memories
+    : legacyStory && typeof legacyStory === 'object' && Array.isArray((legacyStory as Record<string, unknown>).memories)
+      ? (legacyStory as Record<string, unknown>).memories
+      : []
+  const memories = cleanMemories(rawMemories)
+  if (!reasoningStyle && !howItThinks && !voiceConstraints && !forceReason && !memories.length) return null
+  return {
+    ...(reasoningStyle ? { reasoningStyle } : {}),
+    ...(howItThinks ? { howItThinks } : {}),
+    ...(voiceConstraints ? { voiceConstraints } : {}),
+    ...(forceReason ? { forceReason: true } : {}),
+    ...(memories.length ? { memories } : {})
+  }
+}
+
 function clean(raw: unknown): SheetData {
-  const d = (raw && typeof raw === 'object' ? raw : {}) as { fields?: unknown; values?: unknown; dnd?: unknown; game?: unknown; gameRules?: unknown; faction?: unknown; save?: unknown; story?: unknown }
+  const d = (raw && typeof raw === 'object' ? raw : {}) as { fields?: unknown; values?: unknown; dnd?: unknown; game?: unknown; gameRules?: unknown; faction?: unknown; save?: unknown; story?: unknown; mind?: unknown }
   const fields = Array.isArray(d.fields) ? [...new Set(d.fields.map((f) => String(f).trim()).filter(Boolean))] : [...SHEET_FIELDS]
   const values: Record<string, string> = {}
   if (d.values && typeof d.values === 'object') for (const [k, v] of Object.entries(d.values as Record<string, unknown>)) if (typeof v === 'string') values[k] = v
   const faction = typeof d.faction === 'string' ? d.faction.trim() || null : null
-  return { fields, values, dnd: d.dnd ? cleanDnd(d.dnd) : null, game: gameRecord(d.game), gameRules: typeof d.gameRules === 'string' ? d.gameRules : '', faction, save: typeof d.save === 'string' ? d.save : '', story: cleanStory(d.story, d.dnd) }
+  return { fields, values, dnd: d.dnd ? cleanDnd(d.dnd) : null, game: gameRecord(d.game), gameRules: typeof d.gameRules === 'string' ? d.gameRules : '', faction, save: typeof d.save === 'string' ? d.save : '', story: cleanStory(d.story, d.dnd), mind: cleanMind(d.mind, d.story) }
 }
 
 function adoptDnd(): void {
@@ -82,7 +106,7 @@ export function setSheetLayer(next: SheetLayer): void {
 function stored(ref: string): { page: ReturnType<typeof data.pages.get>; value: SheetData } {
   adoptDnd()
   const page = data.pages.get(ref)
-  if (page.type !== SHEET_TYPE) throw new Error(`${page.title} is not a character. find('sheet', null) lists characters.`)
+  if (page.type !== SHEET_TYPE) throw notFound(new Error(`${page.title} is not a character. find('sheet', null) lists characters.`))
   return { page, value: clean(page.data) }
 }
 
@@ -118,7 +142,7 @@ export function onWhereChange(fn: (sheet: string, where: string) => void): void 
   whereWatchers.push(fn)
 }
 
-export function saveSheet(input: { id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story }): CharacterSheet {
+export function saveSheet(input: { id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story; mind?: CharacterMind | null }): CharacterSheet {
   const title = input.title.trim()
   if (!title) throw new Error('Give the character a name, e.g. Mira.')
   if (input.id) {
@@ -141,7 +165,8 @@ export function saveSheet(input: { id: string | null; title: string; fields: str
       gameRules: live ? current.gameRules : (input.gameRules ?? current.gameRules),
       faction: input.faction === undefined ? current.faction : input.faction,
       save: current.save,
-      story
+      story,
+      mind: input.mind === undefined ? current.mind : input.mind
     })
     if (title !== page.title) data.pages.write({ ref: page.id, title })
     data.pages.setData(page.id, value)
@@ -155,7 +180,8 @@ export function saveSheet(input: { id: string | null; title: string; fields: str
     game: input.game ?? null,
     gameRules: input.gameRules ?? '',
     faction: input.faction ?? null,
-    story: input.story
+    story: input.story,
+    mind: input.mind ?? null
   })
   const page = data.pages.create({ title, type: SHEET_TYPE, data: value })
   return getSheet(page.id)
@@ -176,6 +202,11 @@ export function setStory(ref: string, story: Story): CharacterSheet {
   return saveSheet({ id: s.id, title: s.title, fields: s.fields, values: s.values, story })
 }
 
+export function setMind(ref: string, mind: CharacterMind | null): CharacterSheet {
+  const s = getSheet(ref)
+  return saveSheet({ id: s.id, title: s.title, fields: s.fields, values: s.values, mind })
+}
+
 export function setSheetFaction(ref: string, faction: string | null): CharacterSheet {
   const s = getSheet(ref)
   return saveSheet({ id: s.id, title: s.title, fields: s.fields, values: s.values, dnd: s.dnd, game: s.game, gameRules: s.gameRules, faction, story: s.story })
@@ -185,6 +216,30 @@ const sections: ((sheet: CharacterSheet) => string | null)[] = []
 
 export function registerSheetSection(section: (sheet: CharacterSheet) => string | null): void {
   sections.push(section)
+}
+
+export function characterMindFor(refs: string[]): CharacterMind | null {
+  let reasoningStyle: string | null = null
+  const thinks: string[] = []
+  const constraints: string[] = []
+  let forceReason = false
+  for (const ref of refs) {
+    const id = findSheet(ref)
+    if (!id) continue
+    const m = getSheet(id).mind
+    if (!m) continue
+    if (!reasoningStyle && m.reasoningStyle) reasoningStyle = m.reasoningStyle
+    if (m.howItThinks?.trim()) thinks.push(m.howItThinks.trim())
+    if (m.voiceConstraints?.trim()) constraints.push(m.voiceConstraints.trim())
+    if (m.forceReason) forceReason = true
+  }
+  if (!reasoningStyle && !thinks.length && !constraints.length && !forceReason) return null
+  return {
+    ...(reasoningStyle ? { reasoningStyle } : {}),
+    ...(thinks.length ? { howItThinks: thinks.join('\n') } : {}),
+    ...(constraints.length ? { voiceConstraints: constraints.join('\n') } : {}),
+    ...(forceReason ? { forceReason: true } : {})
+  }
 }
 
 export function sheetMarkdown(ref: string, roleplay = false): string {
@@ -199,6 +254,10 @@ export function sheetMarkdown(ref: string, roleplay = false): string {
   for (const section of sections) {
     const text = section(s)
     if (text) parts.push(text)
+  }
+  if (s.mind?.memories?.length) {
+    const memText = mindMemoriesText(s.mind.memories)
+    if (memText) parts.push(`## Mind\n${memText}`)
   }
   if (s.story.where || s.story.threads.length || s.story.sessions.length) parts.push(`## Story\n${storyText(s.story, roleplay)}`)
   return parts.join('\n\n')

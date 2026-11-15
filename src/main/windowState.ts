@@ -1,3 +1,4 @@
+import { noteMainFailure } from './problems'
 import fs from 'node:fs'
 import path from 'node:path'
 import { screen, type BrowserWindow, type Rectangle } from 'electron'
@@ -48,7 +49,7 @@ export function loadWindowState(): WindowState | null {
   try {
     raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<WindowState>
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') console.error(`Could not read ${WINDOW_STATE_FILE}; the window opens at its default place`, err)
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') noteMainFailure(err, 'window', `Could not read ${WINDOW_STATE_FILE}; the window opens at its default place`)
     return null
   }
   if (!isRect(raw?.bounds)) return null

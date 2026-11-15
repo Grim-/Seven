@@ -1,3 +1,4 @@
+import { noteFailure } from './problems'
 import { create } from 'zustand'
 import type { CommandInfo } from '@shared/types'
 import { engine } from '../lib/ipc'
@@ -27,7 +28,7 @@ export const useCommands = create<CommandsState>((set, get) => ({
 
   load: async (conv) => {
     const agentId = draftOf(useSessions.getState(), conv?.key ?? '').agentId
-    const list = await engine('commands.list', { sessionId: conv?.sessionId ?? null, agentId }).catch(() => null)
+    const list = await engine('commands.list', { sessionId: conv?.sessionId ?? null, agentId }).catch((err: unknown) => (noteFailure('commands', 'Could not list the commands')(err), null))
     if (list) set({ list })
   },
 

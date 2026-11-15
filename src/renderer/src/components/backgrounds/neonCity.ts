@@ -1,3 +1,4 @@
+import { registerBackgroundDrawer } from './drawers'
 import { BaseBackground } from './base'
 
 type Rgb = [number, number, number]
@@ -248,3 +249,5 @@ export class NeonCityBackground extends BaseBackground {
     })
   }
 }
+
+registerBackgroundDrawer('neon-city', NeonCityBackground)

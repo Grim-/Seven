@@ -7,6 +7,7 @@ import { addToSlideshowMenu } from '../slideshow/slideshowActions'
 import { closePictures, usePictureViewer, type PictureRequest } from './pictureStore'
 import { useStepper } from './useStepper'
 import { useEscapeLayer } from '../../lib/escape'
+import { matchesKeybind } from '../../store/keybinds'
 
 export function PictureViewerHost() {
   const request = usePictureViewer((s) => s.request)
@@ -23,9 +24,9 @@ function PictureViewer({ request }: { request: PictureRequest }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') step(-1)
-      else if (e.key === 'ArrowRight') step(1)
-      else if (e.key === ' ' && request.seconds !== null) {
+      if (matchesKeybind('viewer.prev', e)) step(-1)
+      else if (matchesKeybind('viewer.next', e)) step(1)
+      else if (matchesKeybind('viewer.playPause', e) && request.seconds !== null) {
         e.preventDefault()
         setPlaying((p) => !p)
       }

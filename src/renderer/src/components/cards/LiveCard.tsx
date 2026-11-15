@@ -1,12 +1,16 @@
 import type { CardLayout } from '@shared/cards'
+import type { FaceEdit } from '../ui'
 import { usePage } from '../../store/data'
 import { CardFace } from './CardFace'
-import { cardLabel, legacyLayout, readCard, useLayoutNamed, type Card } from './model'
+import { CardSections } from './CardSections'
+import { cardLabel, legacyLayout, playText, readCard, useLayoutNamed, type Card } from './model'
 
-export function CardOf({ card, layout, className }: { card: Card; layout: CardLayout | null; className?: string }) {
-  if (layout) return <CardFace name={card.name} label={cardLabel(card)} layout={layout} values={card.values} color={card.color} className={className} />
+export function CardOf({ card, layout, edit, form, className }: { card: Card; layout: CardLayout | null; edit?: FaceEdit; form?: string | null; className?: string }) {
+  const prompt = playText(card)
+  const sections = <CardSections card={card} only={form} />
+  if (layout) return <CardFace name={card.name} label={cardLabel(card)} layout={layout} values={card.values} color={card.color} prompt={prompt} sections={sections} edit={edit} className={className} />
   const legacy = legacyLayout(card.raw)
-  return <CardFace name={card.name} label={cardLabel(card)} layout={legacy.layout} values={legacy.values} art={typeof card.raw.art === 'string' && card.raw.art ? card.raw.art : null} className={className} />
+  return <CardFace name={card.name} label={cardLabel(card)} layout={legacy.layout} values={legacy.values} art={typeof card.raw.art === 'string' && card.raw.art ? card.raw.art : null} prompt={prompt} sections={sections} edit={edit} className={className} />
 }
 
 export function LiveCard({ id, className }: { id: string; className?: string }) {

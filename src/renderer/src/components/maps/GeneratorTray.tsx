@@ -3,6 +3,7 @@ import { Sparkles, X, ChevronRight, ChevronLeft, RefreshCw, Sliders, RotateCcw }
 import { generateDungeon, generateMap, renderMapToCanvas } from 'agent_map_gen'
 import type { GenerateConfig } from './GenerateMapModal'
 import { Button, Field, Input, MinMaxSlider, Segmented, Select, Toggle } from '../ui'
+import { noteFailure } from '../../store/problems'
 
 const DUNGEON_KINDS = [
   { value: 'standard', label: 'Standard (Balanced)' },
@@ -367,8 +368,8 @@ export function GeneratorTray({ open, onClose, onGenerate }: GeneratorTrayProps)
             ])
           }
         }
-      } catch {
-        // silent fail on fast scrub
+      } catch (err) {
+        noteFailure('maps', 'Could not draw the preview')(err)
       } finally {
         if (!cancelled) setGeneratingPreview(false)
       }

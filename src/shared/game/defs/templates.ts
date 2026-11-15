@@ -13,11 +13,9 @@ interface TemplateSpec {
 
 const NAMED = new Set(['id', 'label'])
 
-export const CHARACTER_TEMPLATES = 'game_character'
-export const BUFF_TEMPLATES = 'game_buff'
-export const ABILITY_TEMPLATES = 'game_ability'
-export const ITEM_TEMPLATES = 'game_item'
-export const CREATURE_TEMPLATES = 'game_creature'
+import { ABILITY_TEMPLATES, BUFF_TEMPLATES, CHARACTER_TEMPLATES, CREATURE_TEMPLATES, ITEM_TEMPLATES } from '../templateKinds'
+
+export { ABILITY_TEMPLATES, BUFF_TEMPLATES, CHARACTER_TEMPLATES, CREATURE_TEMPLATES, ITEM_TEMPLATES }
 
 const pieces = (list: unknown): number => (Array.isArray(list) ? list.length : 0)
 
@@ -34,7 +32,7 @@ function componentTemplate(spec: TemplateSpec & { root: string; pieces: string }
   roots.set(spec.root, spec.type)
   registerDefType({
     ...spec,
-    params: { ...own, comps: { label: 'Pieces', kind: 'components', host: spec.root, default: [], description: spec.pieces } },
+    params: { ...own, comps: { label: 'Pieces', kind: 'components', host: spec.root, default: [], description: spec.pieces, section: 'Pieces' } },
     line: (def) => `${pieces(def.values.comps)} piece${pieces(def.values.comps) === 1 ? '' : 's'}`,
     addTo: (data, def) => {
       const { comps, ...values } = def.values
@@ -47,7 +45,7 @@ function componentTemplate(spec: TemplateSpec & { root: string; pieces: string }
 function entityTemplate(spec: TemplateSpec & { components: string }): void {
   registerDefType({
     ...spec,
-    params: { components: { label: 'Components', kind: 'components', host: ENTITY_HOST, default: [], description: spec.components } },
+    params: { components: { label: 'Components', kind: 'components', host: ENTITY_HOST, default: [], description: spec.components, section: 'Components' } },
     line: (def) => `${pieces(def.values.components)} components`,
     addTo: (data, def) => {
       ;(data.entities[spec.type] ??= {})[def.id] = { ref: { kind: spec.type, id: def.id }, name: def.name, components: def.values.components as ComponentDef[] }

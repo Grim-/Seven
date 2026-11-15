@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { cleanBackdrop, cleanVoice, type AudioPrefs, type DropPrefs, type VoicePrefs, type ChatListPrefs, type ScreenPoint, type Settings, type SidePanelPrefs, type TrayPin } from '@shared/types'
+import { cleanProblemPrefs } from '@shared/problems'
 import { dataDir } from './paths'
 
 
@@ -31,7 +32,8 @@ const DEFAULTS: Settings = {
   hotkey: DEFAULT_HOTKEY,
   overlayPosition: null,
   startWithWindows: false,
-  droppedPictures: { ask: true, folder: '' }
+  droppedPictures: { ask: true, folder: '' },
+  problems: cleanProblemPrefs(null)
 }
 
 const REMOTE_SETTINGS: Record<keyof Settings, boolean> = {
@@ -58,7 +60,8 @@ const REMOTE_SETTINGS: Record<keyof Settings, boolean> = {
   hotkey: false,
   overlayPosition: false,
   startWithWindows: false,
-  droppedPictures: false
+  droppedPictures: false,
+  problems: false
 }
 
 export function remoteSettingsOut(value: Settings): Settings {
@@ -162,7 +165,7 @@ function sanitize(input: Partial<Settings>): Settings {
     defaultTheme: typeof input.defaultTheme === 'string' && /^[\p{L}\p{N}-]{1,48}$/u.test(input.defaultTheme) ? input.defaultTheme : DEFAULTS.defaultTheme,
     audio: audio(input.audio),
     voice: voice(input.voice),
-    avatarSize: input.avatarSize === 'medium' || input.avatarSize === 'large' ? input.avatarSize : 'small',
+    avatarSize: input.avatarSize === 'medium' || input.avatarSize === 'large' || input.avatarSize === 'xl' ? input.avatarSize : 'small',
     sidePanel: sidePanel(input.sidePanel),
     modelFolders: Array.isArray(input.modelFolders)
       ? [...new Set(input.modelFolders.filter((f) => typeof f === 'string' && f.trim()))]
@@ -173,20 +176,23 @@ function sanitize(input: Partial<Settings>): Settings {
     hotkey: typeof input.hotkey === 'string' ? input.hotkey.trim() : DEFAULTS.hotkey,
     overlayPosition: point(input.overlayPosition),
     startWithWindows: typeof input.startWithWindows === 'boolean' ? input.startWithWindows : DEFAULTS.startWithWindows,
-    droppedPictures: droppedPictures(input.droppedPictures)
+    droppedPictures: droppedPictures(input.droppedPictures),
+    problems: cleanProblemPrefs(input.problems)
   }
 }
 
 class SettingsStore extends EventEmitter {
   private file = path.join(dataDir, 'settings.json')
   private value: Settings
+  readonly loadError: unknown = null
 
   constructor() {
     super()
     let raw: Partial<Settings> = {}
     try {
       raw = JSON.parse(fs.readFileSync(this.file, 'utf8'))
-    } catch {
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') this.loadError = err
       raw = {}
     }
     this.value = sanitize(raw)

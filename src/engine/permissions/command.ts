@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 const META = /[;&|<>$`(){}\r\n\\!^%@]/
 
 export function isSimpleCommand(command: string): boolean {
@@ -74,7 +75,8 @@ export function matchesDenyRule(command: string, rules: string[]): string | null
       let re: RegExp
       try {
         re = new RegExp(rule.slice(3), 'i')
-      } catch {
+      } catch (err) {
+        noteFailure(err, 'permissions', 'A command rule is not a valid regular expression')
         continue
       }
       if (variants.some((v) => re.test(v))) return rule

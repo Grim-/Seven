@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import { placesIn, type PlaceVisitor } from '@shared/maps'
 import { PLACE_TYPE_KEY } from '@shared/world'
 import { getSheet, sheetLine } from '../library/sheets'
@@ -25,7 +26,8 @@ export function visitorsOf(ids: string[]): PlaceVisitor[] {
   return ids.flatMap((id) => {
     try {
       return [visitorOf(getSheet(id), agents)]
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'worlds', "Could not read a character's place")
       return []
     }
   })
@@ -40,7 +42,8 @@ export function whoIsHere(world: string): Record<string, PlaceVisitor[]> {
     let s: CharacterSheet
     try {
       s = getSheet(id)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'worlds', "Could not read a character's place")
       continue
     }
     for (const key of placesIn(s.story.where, world, places)) out[key] = [...(out[key] ?? []), visitorOf(s, agents)]

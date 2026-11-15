@@ -7,6 +7,7 @@ import { Markdown } from '../components/chat/Markdown'
 import { useApp } from '../store/app'
 import { useDashboards } from '../store/dashboards'
 import { cn } from '../lib/cn'
+import { openSidePanelTab } from '../lib/listPrefs'
 import { copyText } from '../lib/notify'
 import { AlertBox } from '../components/ui'
 
@@ -118,12 +119,7 @@ export function PresentationPart({ part }: { part: ToolPart }) {
     return <AlertBox className="my-2">{part.error ?? 'Could not present this'}</AlertBox>
   }
   if (data.where === 'panel' && !draft) {
-    const openPanel = () => {
-      const app = useApp.getState()
-      const prefs = app.settings?.sidePanel
-      if (prefs) void app.updateSettings({ sidePanel: { ...prefs, open: true, tab: 'outputs' } })
-    }
-    return <Stub icon={<PanelRight className="h-3.5 w-3.5" />} text={`${part.view?.title ?? data.type} · in the side panel`} action="Open" onClick={openPanel} />
+    return <Stub icon={<PanelRight className="h-3.5 w-3.5" />} text={`${part.view?.title ?? data.type} · in the side panel`} action="Open" onClick={() => openSidePanelTab('outputs')} />
   }
   if (data.where === 'board' && !draft) {
     const openBoard = () => {

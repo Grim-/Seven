@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
@@ -145,7 +146,8 @@ export function runCode(code: string, hooks: RunHooks = {}): Promise<RunResult> 
       for (const file of findNewMedia(dir, started)) {
         try {
           files.push(data.assets.register(file, { tool: 'run_python', sessionId: hooks.sessionId ?? null, original: path.basename(file) }, { checkpoint: hooks.checkpoint }))
-        } catch {
+        } catch (err) {
+          noteFailure(err, 'python', "Could not add a script's output file")
           continue
         }
       }

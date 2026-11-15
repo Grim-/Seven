@@ -8,6 +8,8 @@ import { GamePortrait, HudButton } from '../../../game/ui'
 import { useLive } from '../../../lib/useLive'
 import { engine } from '../../../lib/ipc'
 import { cn } from '../../../lib/cn'
+import { matchesKeybind } from '../../../store/keybinds'
+import { useGameplaySettings } from '../settings/gameplaySettingsStore'
 
 interface TargetHudProps {
   target: MapToken
@@ -49,21 +51,22 @@ export function TargetHud({
   // Hotkeys: Esc (Clear Target), T (Talk), A (Approach), C (Inspect), F (Attack/Engage)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return
-      const k = e.key.toLowerCase()
-      if (k === 'escape') {
+      if (e.defaultPrevented || e.repeat || typing(e.target)) return
+      const cancelCode = useGameplaySettings.getState().settings.keybinds.cancel?.code ?? 'Escape'
+      const inspectCode = useGameplaySettings.getState().settings.keybinds.sheet?.code ?? 'KeyC'
+      if (e.code === cancelCode && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault()
         onClear()
-      } else if (k === 't' && onTalk) {
+      } else if (matchesKeybind('tactical.targetTalk', e) && onTalk) {
         e.preventDefault()
         onTalk()
-      } else if (k === 'a' && onApproach) {
+      } else if (matchesKeybind('tactical.targetApproach', e) && onApproach) {
         e.preventDefault()
         onApproach()
-      } else if (k === 'c' && onInspect) {
+      } else if (e.code === inspectCode && !e.ctrlKey && !e.metaKey && !e.altKey && onInspect) {
         e.preventDefault()
         onInspect()
-      } else if (k === 'f') {
+      } else if (matchesKeybind('tactical.targetAttack', e)) {
         e.preventDefault()
         if (inCombat && onAttack) onAttack()
         else if (!inCombat && onEngageCombat) onEngageCombat()

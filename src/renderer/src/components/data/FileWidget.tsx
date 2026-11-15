@@ -5,6 +5,7 @@ import { PageFrame, isPage } from './PageFrame'
 import { Field } from '../ui'
 import { useData } from '../../store/data'
 import { MissingWidget, type WidgetBodyProps, type WidgetEditorProps, type WidgetUi } from '../../registries/widgets'
+import { noteFailure } from '../../store/problems'
 
 const idsOf = (source: WidgetSource): string[] => (Array.isArray(source.assetIds) ? source.assetIds.map(String) : [])
 
@@ -18,7 +19,7 @@ function Player({ assets }: { assets: AssetMeta[] }) {
   const current = assets[Math.min(index, assets.length - 1)]
   const play = (i: number) => {
     setIndex(i)
-    setTimeout(() => void audio.current?.play().catch(() => undefined), 0)
+    setTimeout(() => void audio.current?.play().catch(noteFailure('files', 'Could not play the audio')), 0)
   }
   return (
     <div className="flex h-full flex-col gap-2">
@@ -51,12 +52,22 @@ function FileWidgetBody({ widget }: WidgetBodyProps) {
     const only = (k: string) => assets.every((a) => a.kind === k)
     if (only('image') && assets.length > 1) return <Gallery assets={images} />
     if (only('audio')) return <Player assets={assets} />
-    if (assets.length === 1 && assets[0].kind === 'video') return <video src={urlOf(assets[0])} controls className="h-full w-full bg-black object-contain" />
-    if (assets.length === 1 && isPage(assets[0])) return <PageFrame asset={assets[0]} className="h-full" />
-    if (assets.length === 1 && assets[0].kind === 'pdf') return <iframe src={urlOf(assets[0])} title={assets[0].name} className="h-full w-full border-0 bg-white" />
+    if (assets.length === 1 && assets[0].kind === 'video')
+      return <video src={urlOf(assets[0])} controls className="min-h-0 flex-1 h-full w-full bg-black object-contain" />
+    if (assets.length === 1 && isPage(assets[0])) return <PageFrame asset={assets[0]} className="min-h-0 flex-1 h-full w-full" />
+    if (assets.length === 1 && assets[0].kind === 'pdf')
+      return <iframe src={urlOf(assets[0])} title={assets[0].name} className="min-h-0 flex-1 h-full w-full border-0 bg-white" />
   }
   if (assets.length === 1 && assets[0].kind === 'image')
-    return <img src={`seven-asset://${assets[0].id}/${encodeURIComponent(assets[0].file)}`} alt={assets[0].name} className="h-full w-full object-contain" />
+    return (
+      <div className="flex min-h-0 flex-1 h-full w-full items-center justify-center overflow-hidden">
+        <img
+          src={`seven-asset://${assets[0].id}/${encodeURIComponent(assets[0].file)}`}
+          alt={assets[0].name}
+          className="max-h-full max-w-full h-full w-full object-contain"
+        />
+      </div>
+    )
   return (
     <div className="flex flex-col gap-3">
       {assets.map((a) => (

@@ -17,6 +17,7 @@ import { entryMenuAt } from '../../views/data/entryMenu'
 import { failed } from '../../lib/notify'
 import { useBusy } from '../../lib/useBusy'
 import { useKindInfos } from '../../lib/kinds'
+import { noteFailure } from '../../store/problems'
 
 export const NEW_ROUTINE = '_new'
 
@@ -26,7 +27,7 @@ export function useRoutines(): Routine[] | null {
   useEffect(() => {
     void engine('routines.list')
       .then(setList)
-      .catch(() => setList([]))
+      .catch(noteFailure('routines', 'Could not list the routines', () => setList([])))
     return on('routines.changed', setList)
   }, [])
   return list

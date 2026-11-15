@@ -39,7 +39,8 @@ export class Input {
 
   constructor(
     private app: Application,
-    private camera: Camera
+    private camera: Camera,
+    private onWake?: () => void
   ) {
     const el = app.canvas
     el.addEventListener('pointerdown', this.down)
@@ -88,6 +89,7 @@ export class Input {
   }
 
   private down = (e: PointerEvent): void => {
+    this.onWake?.()
     if (e.button === 2) return
     const at = this.screenOf(e)
     const bound = e.button === 0 ? this.boundAt(at) : null
@@ -96,6 +98,7 @@ export class Input {
   }
 
   private move = (e: PointerEvent): void => {
+    this.onWake?.()
     const at = this.screenOf(e)
     const p = this.press
     if (!p || p.id !== e.pointerId) {
@@ -109,6 +112,7 @@ export class Input {
   }
 
   private up = (e: PointerEvent): void => {
+    this.onWake?.()
     const p = this.press
     if (!p || p.id !== e.pointerId) return
     this.press = null
@@ -121,21 +125,25 @@ export class Input {
   }
 
   private cancel = (): void => {
+    this.onWake?.()
     this.press?.bound?.drag?.cancel()
     this.press = null
   }
 
   private leave = (): void => {
+    this.onWake?.()
     if (!this.press) this.blank.hover?.(null)
   }
 
   private wheel = (e: WheelEvent): void => {
     e.preventDefault()
+    this.onWake?.()
     this.camera.zoomAt(e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, this.screenOf(e))
   }
 
   private menu = (e: MouseEvent): void => {
     e.preventDefault()
+    this.onWake?.()
     const at = this.screenOf(e)
     const hit = { world: this.camera.toWorld(at), native: e }
     const bound = this.boundAt(at)

@@ -1,7 +1,7 @@
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { agentSheets, type AgentProfile } from '@shared/types'
-import { Popover, StatusBadge } from '../ui'
+import { agentSheets, type AgentProfile, type AvatarSize } from '@shared/types'
+import { Field, Popover, Segmented, StatusBadge } from '../ui'
 import { ReasoningStylePicker } from './ReasoningStylePicker'
 import { ThinkingPicker } from './ThinkingPicker'
 import { ToolChoicePicker } from './ToolChoicePicker'
@@ -9,7 +9,15 @@ import { PermissionModePicker } from './PermissionModePicker'
 import { ToolsetPicker } from './ToolsetPicker'
 import { CharacterPicker } from './CharacterPicker'
 import { AgentAvatar } from '../agents/look'
+import { useApp } from '../../store/app'
 import type { NearAlign, NearSide } from '../../lib/fitNear'
+
+const PORTRAIT_SIZE_OPTIONS: { value: AvatarSize; label: string }[] = [
+  { value: 'small', label: 'Small' },
+  { value: 'medium', label: 'Med' },
+  { value: 'large', label: 'Large' },
+  { value: 'xl', label: 'XL' }
+]
 
 export function ChatSettings({
   agent,
@@ -22,13 +30,15 @@ export function ChatSettings({
   side?: NearSide
   align?: NearAlign
 }) {
+  const avatarSize = useApp((s) => s.settings?.avatarSize ?? 'medium')
+  const updateSettings = useApp((s) => s.updateSettings)
   if (!agent) return null
   const sheets = agentSheets(agent)
   const count = sheets.length
 
   return (
     <Popover
-      title="Agent chat settings (thinking, reasoning style, permissions, toolset, character)"
+      title="Agent chat settings (thinking, reasoning style, permissions, toolset, character, portrait size)"
       className="w-80 gap-3 p-3 font-mono"
       side={side}
       align={align}
@@ -54,6 +64,9 @@ export function ChatSettings({
           </div>
         </div>
       </div>
+      <Field label="Portrait size">
+        <Segmented value={avatarSize} options={PORTRAIT_SIZE_OPTIONS} onChange={(v) => void updateSettings({ avatarSize: v })} />
+      </Field>
       <ThinkingPicker />
       <ReasoningStylePicker />
       <ToolChoicePicker />

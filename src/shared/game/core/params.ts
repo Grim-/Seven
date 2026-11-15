@@ -1,6 +1,6 @@
 import { componentClass, type ComponentDef } from './registry'
 
-export type ParamKind = 'number' | 'text' | 'choice' | 'formula' | 'template' | 'list' | 'flag' | 'values' | 'components'
+export type ParamKind = 'number' | 'text' | 'choice' | 'formula' | 'template' | 'list' | 'flag' | 'values' | 'components' | 'storedAction' | 'entry'
 
 export interface ParamSpec {
   kind: ParamKind
@@ -10,7 +10,9 @@ export interface ParamSpec {
   min?: number
   max?: number
   choices?: string[]
+  labels?: Record<string, string>
   templateKind?: string
+  entryKind?: string
   host?: string
   long?: boolean
   of?: ParamSpec
@@ -28,12 +30,15 @@ function clean(spec: ParamSpec, raw: unknown): unknown {
     return Math.min(spec.max ?? Infinity, Math.max(spec.min ?? -Infinity, n))
   }
   if (spec.kind === 'flag') return raw === true
+  if (spec.kind === 'formula' && typeof raw === 'number' && Number.isFinite(raw)) return String(raw)
   if (spec.kind === 'components') return cleanComponents(raw)
   if (spec.kind === 'values') return raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.fromEntries(Object.entries(raw).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))) : spec.default
   if (spec.kind === 'choice') return typeof raw === 'string' && spec.choices?.includes(raw) ? raw : spec.default
   if (spec.kind === 'list') return Array.isArray(raw) ? raw.map((item) => (spec.of ? clean(spec.of, item) : item)) : spec.default
   return typeof raw === 'string' ? raw : spec.default
 }
+
+export const choiceLabel = (spec: ParamSpec, value: string): string => spec.labels?.[value] ?? value
 
 export function cleanComponents(raw: unknown): ComponentDef[] {
   if (!Array.isArray(raw)) return []

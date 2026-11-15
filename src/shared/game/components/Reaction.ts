@@ -1,5 +1,5 @@
 import { registerComponent, test, type Component, type ConditionDef, type GameEntity } from '../core'
-import { Action } from './Action'
+import { Action, type EffectLane } from './Action'
 import { Stats } from './Stats'
 
 export class Reaction extends Action {
@@ -11,6 +11,7 @@ export class Reaction extends Action {
     when: { kind: 'list' as const, default: [], description: 'Conditions that must all hold. Fields of the signal are checked with `is`.' },
     target: { kind: 'choice' as const, default: 'self', choices: ['self', 'source'], description: 'Who its pieces act on.' }
   }
+  static readonly LANES: EffectLane[] = [{ event: 'OnUse', label: 'When it reacts' }]
 
   canApply(host: GameEntity | Component): true | string {
     return 'catalog' in host ? true : 'a reaction belongs on an entity'

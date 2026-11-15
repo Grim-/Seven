@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import type { MemoryServerStatus } from '@shared/types'
 import { LlamaServer } from '../model/server/process'
 import { llamaLimits, serverExe, serverLease, serverVersion } from '../model/server/install'
@@ -53,7 +54,7 @@ export class Embedder {
     const exe = serverExe()
     const version = serverVersion()
     if (!exe || !version) throw new Error('llama-server is not set up yet. Install or pick a version in Models > llama-server.')
-    const info = await readHeader(modelPath, { size: false }).catch(() => null)
+    const info = await readHeader(modelPath, { size: false }).catch((err: unknown) => (noteFailure(err, 'memory', "Could not read the embedding model's file header"), null))
     const size = String(Math.min(MAX_CONTEXT, info?.contextLength ?? MAX_CONTEXT))
     this.server = await LlamaServer.start({
       exe,
@@ -113,7 +114,8 @@ export class Embedder {
     this.queue = run.catch(() => undefined)
     try {
       return await run
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'memory', 'Could not embed text')
       return null
     }
   }
@@ -125,6 +127,6 @@ export class Embedder {
   async unload(): Promise<void> {
     const server = this.server
     this.server = null
-    await server?.stop().catch(() => undefined)
+    await server?.stop().catch((err: unknown) => noteFailure(err, 'memory', 'Could not stop the embedding server'))
   }
 }

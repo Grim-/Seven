@@ -1,4 +1,6 @@
 import { toId } from './ids'
+import { linkFor } from './text'
+import { agentSheets } from './types'
 
 export interface CardSwap {
   gain: string[]
@@ -10,17 +12,18 @@ export interface DeckEntry {
   count: number
 }
 
-export type CardUse = 'generic' | 'action' | 'decision'
+export type CardUse = 'generic' | 'action' | 'decision' | 'opposed'
 
 export const CARD_USES: { value: CardUse; label: string }[] = [
   { value: 'generic', label: 'Generic' },
   { value: 'action', label: 'Action' },
-  { value: 'decision', label: 'Decision' }
+  { value: 'decision', label: 'Decision' },
+  { value: 'opposed', label: 'Opposed check' }
 ]
 
-export type CardSource = { from: 'deck'; id: string } | { from: 'set'; id: string } | { from: 'character' }
+export type DeckOwner = { user: true } | { agent: string } | { character: string }
 
-export type DeckRef = { deck: string } | { chat: string; agent: string } | { character: string }
+export type DeckRef = { deck: string } | DeckOwner
 
 export const NO_SWAP: CardSwap = { gain: [], lose: [] }
 
@@ -32,11 +35,28 @@ export function cleanSwap(raw: unknown): CardSwap {
   return { gain: names(v.gain), lose: names(v.lose) }
 }
 
-export function cleanCardSource(raw: unknown): CardSource | null {
+export function cleanDeckOwner(raw: unknown): DeckOwner | null {
   const v = obj(raw)
-  if (v.from === 'character') return { from: 'character' }
-  if ((v.from === 'deck' || v.from === 'set') && typeof v.id === 'string' && v.id) return { from: v.from, id: v.id }
+  if (v.user === true) return { user: true }
+  if (typeof v.agent === 'string' && v.agent) return { agent: v.agent }
+  if (typeof v.character === 'string' && v.character) return { character: v.character }
   return null
+}
+
+export function sameOwner(a: DeckOwner | null, b: DeckOwner | null): boolean {
+  if (!a || !b) return false
+  if ('user' in a) return 'user' in b
+  if ('agent' in a) return 'agent' in b && a.agent === b.agent
+  return 'character' in b && a.character === b.character
+}
+
+export function userSide(player: string | null | undefined): DeckOwner {
+  return player ? { character: player } : { user: true }
+}
+
+export function agentSide(agent: { id: string; sheet?: string | null; sheets?: string[] | null }): DeckOwner {
+  const own = agentSheets(agent)[0]
+  return own ? { character: own } : { agent: agent.id }
 }
 
 export function hasSwap(s: CardSwap): boolean {
@@ -87,6 +107,7 @@ export function addCards(entries: DeckEntry[], card: string, by: number): DeckEn
   return next.filter((e) => e.count > 0)
 }
 
-export function cardPlayed(name: string): string {
-  return `CARD PLAYED: [${name}]`
+export function cardPlayed(name: string, sheet: string | null, said = ''): string {
+  const line = `${sheet ? linkFor('sheet', sheet) : 'The user'} played the card ${linkFor('card', name)}`
+  return said.trim() ? `${line}\nWhat they do: "${said.trim()}"` : line
 }

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { AtSign, Dices, GripVertical, Trash2 } from 'lucide-react'
+import { AtSign, Dices, GripVertical, Sparkles, Trash2 } from 'lucide-react'
 import type { LibraryHit } from '@shared/types'
 import { linkFor } from '@shared/text'
 import { InlineTitle, type ReorderProps } from '../../ui'
@@ -19,7 +19,27 @@ function ToolButton({ active, title, onClick, children }: { active: boolean; tit
   )
 }
 
-export function FieldCard({ name, value, drag, dragOver, onValue, onRename, onRemove, onDone }: { name: string; value: string; drag: ReorderProps; dragOver: boolean; onValue: (text: string) => void; onRename: (to: string) => void; onRemove: () => void; onDone: () => void }) {
+export function FieldCard({
+  name,
+  value,
+  drag,
+  dragOver,
+  highlighted = false,
+  onValue,
+  onRename,
+  onRemove,
+  onDone
+}: {
+  name: string
+  value: string
+  drag: ReorderProps
+  dragOver: boolean
+  highlighted?: boolean
+  onValue: (text: string) => void
+  onRename: (to: string) => void
+  onRemove: () => void
+  onDone: () => void
+}) {
   const [editing, setEditing] = useState(false)
   const [picker, setPicker] = useState<'roll' | 'link' | null>(null)
   const editor = useRef<MarkdownEditorHandle>(null)
@@ -37,10 +57,25 @@ export function FieldCard({ name, value, drag, dragOver, onValue, onRename, onRe
   }
 
   return (
-    <section {...(editing ? {} : drag)} className={cn('group/field flex min-w-0 flex-col border border-line/50 bg-black/60 transition-colors focus-within:border-accent/70 hover:border-line', dragOver && 'border-l-4 border-l-accent')}>
+    <section
+      {...(editing ? {} : drag)}
+      className={cn(
+        'group/field flex min-w-0 flex-col border transition-all focus-within:border-accent/70',
+        highlighted
+          ? 'border-accent bg-accent/[0.08] shadow-[0_0_18px_color-mix(in_srgb,var(--color-accent)_25%,transparent)]'
+          : 'border-line/50 bg-black/45 hover:border-line',
+        dragOver && 'border-l-4 border-l-accent'
+      )}
+    >
       <header className="relative flex items-center gap-1 border-b border-line/30 px-2 py-1.5">
         <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-faint opacity-0 group-hover/field:opacity-100" />
         <InlineTitle value={name} onSave={onRename} className="min-w-0 flex-1 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-accent-soft" />
+        {highlighted && (
+          <span className="flex shrink-0 items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-mono text-[8.5px] font-bold uppercase tracking-[0.14em] text-accent animate-pulse">
+            <Sparkles className="h-2.5 w-2.5" />
+            UPDATED
+          </span>
+        )}
         <ToolButton title="Roll a random value from a repo" active={picker === 'roll'} onClick={() => setPicker(picker === 'roll' ? null : 'roll')}>
           <Dices className="h-3.5 w-3.5" /> Roll
         </ToolButton>

@@ -1,3 +1,4 @@
+import { noteFailure } from './util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { VaultStatus } from '@shared/types'
@@ -14,7 +15,8 @@ function walk(dir: string, out: string[]): void {
   let entries: fs.Dirent[]
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true })
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'vault', 'Could not list a data folder')
     return
   }
   for (const e of entries) {
@@ -45,7 +47,8 @@ function migrateAssets(root: string): number {
   let dirs: string[] = []
   try {
     dirs = fs.readdirSync(root)
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'vault', 'Could not list the data folders')
     return 0
   }
   for (const id of dirs) {

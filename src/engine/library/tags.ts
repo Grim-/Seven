@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { dataRoot } from '../util/paths'
@@ -43,7 +44,8 @@ class Tags extends EventEmitter {
   of(kind: string, id: string): string[] {
     try {
       return this.all()[`${kind}/${id}`] ?? []
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read the tags')
       return []
     }
   }
@@ -67,7 +69,8 @@ class Tags extends EventEmitter {
   map(): Record<string, string[]> {
     try {
       return { ...this.all() }
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read the tags')
       return {}
     }
   }
@@ -77,7 +80,8 @@ class Tags extends EventEmitter {
     let all: Record<string, string[]> = {}
     try {
       all = this.all()
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read the tags')
       return []
     }
     for (const [ref, list] of Object.entries(all)) {

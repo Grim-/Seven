@@ -7,6 +7,7 @@ import { useAgents } from '../../store/agents'
 import { useVault } from '../../store/vault'
 import { AgentAvatar } from '../agents/look'
 import { showInData } from '../../lib/library'
+import { noteFailure } from '../../store/problems'
 
 function highlight(text: string, query: string): ReactNode {
   const terms = query
@@ -39,7 +40,7 @@ export function SearchResults({ query, onOpenChat }: { query: string; onOpenChat
         .catch((err) => !cancelled && setError(errorText(err)))
       engine('search.memory', { query: q })
         .then((r) => !cancelled && setMemory(r))
-        .catch(() => !cancelled && setMemory({ memory: [], locked: false }))
+        .catch(noteFailure('search', 'Could not search memory', () => !cancelled && setMemory({ memory: [], locked: false })))
     }, 250)
     return () => {
       cancelled = true

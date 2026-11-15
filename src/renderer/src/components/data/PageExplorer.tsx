@@ -14,6 +14,7 @@ import { FolderPath } from './FolderPath'
 import { chooseFiles } from '../../lib/importFiles'
 import { CopyLinkButton } from './CopyLinkButton'
 import { VIEWABLE_MEDIA_KINDS } from '../pictures/FileEditor'
+import { matchesKeybind } from '../../store/keybinds'
 
 const VIEWABLE = VIEWABLE_MEDIA_KINDS
 const INDEX_ID = 'all:wiki-index'
@@ -48,10 +49,8 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMe
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (
-        (e.altKey && e.key === 'ArrowUp') ||
-        (e.key === 'Backspace' && (e.target as HTMLElement)?.tagName !== 'INPUT' && (e.target as HTMLElement)?.tagName !== 'TEXTAREA')
-      ) {
+      const typing = (e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA'
+      if (matchesKeybind('files.parentFolder', e) && (!typing || e.altKey || e.ctrlKey || e.metaKey)) {
         if (folder !== null) {
           e.preventDefault()
           onOpen(parent)

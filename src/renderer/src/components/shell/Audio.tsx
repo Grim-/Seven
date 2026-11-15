@@ -12,6 +12,8 @@ import { speak, stopSpeaking, voicesOn } from '../../lib/speech'
 import { DEFAULT_AUDIO, audioPrefs as prefs, useAudio, volumeNow } from '../../store/audio'
 import { usePlayer } from '../../store/player'
 import { focusedConversation } from '../../lib/conversation'
+import { noteFailure } from '../../store/problems'
+import { failed } from '../../lib/notify'
 
 export function playSound(assetId: string): void {
   if (!prefs().sounds) return
@@ -19,7 +21,7 @@ export function playSound(assetId: string): void {
   if (!asset) return
   const audio = new Audio(assetUrl(asset))
   audio.volume = Math.min(1, volumeNow())
-  void audio.play().catch(() => undefined)
+  void audio.play().catch(noteFailure('audio', 'Could not play the sound'))
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -27,7 +29,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 function setVolume(v: number): void {
   useAudio.setState({ volume: v })
   if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => void useApp.getState().updateSettings({ audio: { ...prefs(), volume: v } }).catch(() => undefined), 400)
+  saveTimer = setTimeout(() => void useApp.getState().updateSettings({ audio: { ...prefs(), volume: v } }).catch(failed('Could not save the volume')), 400)
 }
 
 function fade(audio: HTMLAudioElement, to: number, ms: number): Promise<void> {
@@ -66,6 +68,7 @@ export function AudioHost() {
     el.current ??= new Audio()
     const audio = el.current
     let cancelled = false
+    let plays = 0
     const playAt = async (i: number) => {
       if (!tracks.length) return
       index.current = ((i % tracks.length) + tracks.length) % tracks.length
@@ -73,9 +76,11 @@ export function AudioHost() {
       audio.src = assetUrl(track)
       audio.volume = 0
       useAudio.setState({ playing: track.name })
+      const ticket = ++plays
       try {
         await audio.play()
-      } catch {
+      } catch (err) {
+        if (ticket === plays && !cancelled) noteFailure('audio', `Could not play ${track.name}`)(err)
         return
       }
       if (!cancelled) await fade(audio, targetRef.current, 1200)
@@ -147,12 +152,12 @@ export function SoundControl() {
   const live = useAudio((s) => s.volume)
   const playing = useAudio((s) => s.playing)
   const volume = live ?? audio.volume
-  const toggle = () => void useApp.getState().updateSettings({ audio: { ...audio, music: !audio.music } }).catch(() => undefined)
+  const toggle = () => void useApp.getState().updateSettings({ audio: { ...audio, music: !audio.music } }).catch(failed('Could not change the music'))
   const voice = useApp((s) => s.settings?.voice)
   const toggleVoice = () => {
     if (!voice) return
     if (voice.on) stopSpeaking()
-    void useApp.getState().updateSettings({ voice: { ...voice, on: !voice.on } }).catch(() => undefined)
+    void useApp.getState().updateSettings({ voice: { ...voice, on: !voice.on } }).catch(failed('Could not change the voice'))
   }
   return (
     <div className="flex items-center gap-1.5 normal-case" title={audio.music ? (playing ? `Playing ${playing}` : 'Music on, nothing playing') : 'Music off'}>

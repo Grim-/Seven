@@ -11,7 +11,7 @@ import { useRememberedLocation } from '../../lib/window'
 import type { DataSelection } from '../../store/data'
 
 
-export function KindRail({ sections, current: selected, closed, onPick, onToggle }: { sections: LibrarySection[]; current: string | null; closed: Set<string>; onPick: (kind: string | null) => void; onToggle: (group: string) => void }) {
+export function KindRail({ sections, current: selected, closed, onPick, onPickEntry, onToggle }: { sections: LibrarySection[]; current: string | null; closed: Set<string>; onPick: (kind: string | null) => void; onPickEntry?: (kind: string, id: string) => void; onToggle: (group: string) => void }) {
   const current = railKind(selected)
   const [picked, select] = useRememberedLocation<DataSelection | null>(null)
   const favourites = useFavourites().filter((p) => p.id && !kindUi(p.kind).ownView)
@@ -25,7 +25,7 @@ export function KindRail({ sections, current: selected, closed, onPick, onToggle
             Favourites
           </div>
           {favourites.map((p) => (
-            <ListRow key={`${p.kind}/${p.id}`} active={picked?.kind === p.kind && picked.id === p.id} onClick={() => select({ kind: p.kind, id: p.id as string })} onMenu={(e) => entryMenuAt(e, p.kind, p.id as string, p.label)} icon={<KindIcon name={p.icon} className="h-3.5 w-3.5" />} title={p.label} />
+            <ListRow key={`${p.kind}/${p.id}`} active={picked?.kind === p.kind && picked.id === p.id} onClick={() => (onPickEntry ? onPickEntry(p.kind, p.id as string) : select({ kind: p.kind, id: p.id as string }))} onMenu={(e) => entryMenuAt(e, p.kind, p.id as string, p.label)} icon={<KindIcon name={p.icon} className="h-3.5 w-3.5" />} title={p.label} />
           ))}
         </div>
       )}

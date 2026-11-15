@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { FolderOpen } from 'lucide-react'
-import { Button, PathRow } from '../ui'
+import { Button, Field, NumberField, PathRow } from '../ui'
 import { engine, main } from '../../lib/ipc'
 import { errorText } from '../../lib/format'
 import { toast } from '../../store/toasts'
 import { useTools } from '../../store/tools'
 import { failed } from '../../lib/notify'
+import { noteFailure } from '../../store/problems'
 
 const LABEL = { toolsFolder: 'Tools', skillsFolder: 'Skills' } as const
 
@@ -15,7 +16,7 @@ export function ToolFolders() {
   useEffect(() => {
     engine('tools.prefs.get')
       .then((p) => useTools.setState({ prefs: p }))
-      .catch(() => undefined)
+      .catch(noteFailure('tools', 'Could not read the tool folders'))
   }, [])
 
   const pick = async (key: keyof typeof LABEL) => {
@@ -40,6 +41,9 @@ export function ToolFolders() {
           </Button>
         </PathRow>
       ))}
+      <Field label="Zip install limit (MB)" hint="A zip that unpacks to more than this is refused." className="max-w-xs">
+        <NumberField value={prefs?.zipLimitMb} min={1} onChange={(v) => typeof v === 'number' && void engine('tools.prefs.set', { zipLimitMb: v }).then((p) => useTools.setState({ prefs: p })).catch(failed('Could not save the limit'))} />
+      </Field>
     </>
   )
 }

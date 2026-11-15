@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import { referencePattern } from '@shared/text'
@@ -149,7 +150,8 @@ class Writer {
       const { kind, id } = resolveEntry(`${kindName}/${ref}`, null, USER)
       const asset = kind.asset?.(id) ?? undefined
       return { item: this.find(kind.kind, id), title: kind.title(id), asset }
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'export', 'Could not read an entry to export')
       return null
     }
   }

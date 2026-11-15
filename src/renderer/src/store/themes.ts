@@ -1,3 +1,4 @@
+import { noteFailure } from './problems'
 import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import { DEFAULT_THEME_ID, NO_AMBIENCE, SEVEN_THEME, type Ambience, type Theme } from '@shared/theme'
@@ -41,7 +42,7 @@ export function useActiveTheme(): { theme: Theme; ambience: Ambience; sessionId:
   const stored = useThemes((s) => (sessionId ? s.ambience[sessionId] : undefined))
   const [, tick] = useState(0)
   useEffect(() => {
-    if (sessionId && !stored) void useThemes.getState().loadAmbience(sessionId).catch(() => undefined)
+    if (sessionId && !stored) void useThemes.getState().loadAmbience(sessionId).catch(noteFailure('themes', 'Could not load the chat ambience'))
   }, [sessionId, stored])
   const until = stored?.until ?? 0
   useEffect(() => {

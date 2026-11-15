@@ -17,15 +17,19 @@ export function samePath(a: string, b: string): boolean {
   return process.platform === 'win32' ? x.toLowerCase() === y.toLowerCase() : x === y
 }
 
+export let vaultsReadError: unknown = null
+
 export function readVaults(): VaultsFile {
   let file: VaultsFile = { current: defaultDataDir, list: [] }
+  vaultsReadError = null
   try {
     const raw = JSON.parse(fs.readFileSync(vaultsFile, 'utf8')) as Partial<VaultsFile>
     const list = (Array.isArray(raw.list) ? raw.list : [])
       .filter((v) => v && typeof v.path === 'string' && v.path.trim() && typeof v.name === 'string')
       .map((v) => ({ name: v.name.trim() || path.basename(v.path), path: path.resolve(v.path) }))
     file = { current: typeof raw.current === 'string' && raw.current.trim() ? path.resolve(raw.current) : defaultDataDir, list }
-  } catch {
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') vaultsReadError = err
     file = { current: defaultDataDir, list: [] }
   }
   if (!file.list.length) file.list.push({ name: 'Default', path: defaultDataDir })

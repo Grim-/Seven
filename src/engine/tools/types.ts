@@ -5,6 +5,7 @@ import type { PermissionContext } from '../permissions/gate'
 import type { PickDecisionProps } from '@shared/pickDecision'
 import type { RolledDecisionProps } from '@shared/rolledDecision'
 import type { OpposedProps } from '@shared/opposedCheck'
+import type { ChatElement } from '@shared/chatElements'
 
 export interface UiAccess {
   ask(kind: 'question', props: QuestionProps): Promise<unknown>
@@ -34,6 +35,7 @@ export interface ToolContext {
   budget: { maxTokens: number; count: (text: string) => number; dir: string; room?: () => number | null } | null
   agentId: string | null
   react: (state: AvatarState | null, reaction: string | null, seconds: number) => void
+  addElement?: (element: ChatElement) => void
   panel: PanelAccess
 }
 

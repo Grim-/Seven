@@ -1,7 +1,9 @@
 import { fieldId, readLayout, readValues, type CardLayout, type CardValue } from '@shared/cards'
 import { cleanAction, type Action } from '@shared/actions'
 import { cleanDecision, type Decision } from '@shared/decisions'
-import { cleanEntries, type CardUse, type DeckEntry } from '@shared/cardDecks'
+import { cleanOpposed, type OpposedProps } from '@shared/opposedCheck'
+import { cleanGameplay, type GameplayCard } from '@shared/gameplayCard'
+import { CARD_USES, cleanEntries, type CardUse, type DeckEntry } from '@shared/cardDecks'
 import { readDeckData, type CardDeckData } from '../../engine/cards/decks'
 
 export class CardError extends Error {}
@@ -14,9 +16,16 @@ export interface CardData {
   layout: string | null
   values: Record<string, CardValue>
   use: CardUse
+  ask: boolean
+  askHint: string
   prompt: string
+  happens: string
+  instructions: string
+  hideInstructions: boolean
   action: Action | null
   decision: Decision | null
+  opposed: OpposedProps | null
+  gameplay: GameplayCard | null
 }
 
 export interface CardSetData {
@@ -27,13 +36,12 @@ export interface CardSetData {
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {})
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
 const text = (v: unknown, max: number): string => (typeof v === 'string' ? v.trim().slice(0, max) : '')
-const USES: CardUse[] = ['generic', 'action', 'decision']
 
 export function cleanCard(v: unknown): CardData {
   const c = obj(v)
   const name = text(c.name, 60)
   if (!name) throw new CardError('A card needs a name: set name, e.g. "Fireball".')
-  const use = USES.find((u) => u === c.use) ?? 'generic'
+  const use = CARD_USES.find((u) => u.value === c.use)?.value ?? 'generic'
   return {
     name,
     text: text(c.text, 600),
@@ -42,9 +50,16 @@ export function cleanCard(v: unknown): CardData {
     layout: text(c.layout, 120) || null,
     values: readValues(c.values),
     use,
+    ask: c.ask === true,
+    askHint: text(c.askHint, 400),
     prompt: text(c.prompt, 4000),
+    happens: text(c.happens, 4000),
+    instructions: text(c.instructions, 4000),
+    hideInstructions: c.hideInstructions === true,
     action: c.action ? cleanAction(c.action) : null,
-    decision: c.decision ? cleanDecision(c.decision) : null
+    decision: c.decision ? cleanDecision(c.decision) : null,
+    opposed: c.opposed ? cleanOpposed(c.opposed) : null,
+    gameplay: c.gameplay ? cleanGameplay(c.gameplay) : null
   }
 }
 

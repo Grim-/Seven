@@ -2,6 +2,7 @@ import type { ModuleFactory } from '../../engine/modules/sdk'
 import type { ToolDef } from '../../engine/tools/types'
 import { registerModuleKind } from '../../engine/library/moduleKinds'
 import { compendiumKinds } from './kinds'
+import './blueprints'
 
 for (const kind of compendiumKinds()) registerModuleKind('dnd', kind)
 

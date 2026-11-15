@@ -1,3 +1,5 @@
+import { noteFailure } from '../util/report'
+import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
@@ -26,7 +28,7 @@ export type ConfigOverlay = (id: string, own: ModelConfig) => ModelConfig
 
 const INFO_VERSION = 5
 function readInfo(filePath: string): Promise<ModelInfo | null> {
-  return readHeader(filePath, { size: true }).catch(() => null)
+  return readHeader(filePath, { size: true }).catch((err: unknown) => (noteFailure(err, 'models', "Could not read a model file's header"), null))
 }
 
 
@@ -46,7 +48,8 @@ function describe(filePath: string, folder: string | null): ModelEntry {
   let sizeBytes = 0
   try {
     sizeBytes = fs.statSync(filePath).size
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'models', "Could not read a model file's size")
     sizeBytes = 0
   }
   return { id: modelId(filePath), name, path: path.resolve(filePath), sizeBytes, quant: null, folder }
@@ -61,7 +64,8 @@ function walk(dir: string, depth: number, out: string[]): void {
   let entries: fs.Dirent[]
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true })
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'models', 'Could not scan a model folder')
     return
   }
   for (const entry of entries) {
@@ -158,7 +162,7 @@ export class ModelRegistry extends EventEmitter {
 
   setProjector(id: string, projector: string | null): { choice: string | null; auto: boolean } {
     this.get(id)
-    if (projector && !this.projectors().some((p) => p.id === projector)) throw new Error('That vision adapter is no longer in Models. Pick another, or none.')
+    if (projector && !this.projectors().some((p) => p.id === projector)) throw notFound(new Error('That vision adapter is no longer in Models. Pick another, or none.'))
     this.data.projectors = { ...this.data.projectors, [id]: projector }
     this.save()
     return this.projectorFor(id)
@@ -224,7 +228,7 @@ export class ModelRegistry extends EventEmitter {
 
   get(id: string): ModelEntry {
     const found = this.data.models.find((m) => m.id === id)
-    if (!found) throw new Error('That model is no longer in Models. Add its file again, or pick another model.')
+    if (!found) throw notFound(new Error('That model is no longer in Models. Add its file again, or pick another model.'))
     return found
   }
 

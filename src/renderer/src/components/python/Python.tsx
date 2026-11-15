@@ -9,6 +9,7 @@ import { cn } from '../../lib/cn'
 import { rowMenu } from '../../views/data/entryMenu'
 import { failed } from '../../lib/notify'
 import { useBusy } from '../../lib/useBusy'
+import { noteFailure } from '../../store/problems'
 
 const NEW = '_new'
 
@@ -19,7 +20,7 @@ export function usePythonScripts(): PythonScript[] | null {
     const load = () =>
       void engine('python.scripts')
         .then((l) => live && setList(l))
-        .catch(() => live && setList([]))
+        .catch(noteFailure('python', 'Could not list the scripts', () => live && setList([])))
     load()
     const off = on('python.changed', load)
     return () => {

@@ -1,36 +1,156 @@
-import { useMemo, useState, type ReactNode } from 'react'
-import { Plus } from 'lucide-react'
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Eye, ImagePlus, Plus, Sparkles, UserRound } from 'lucide-react'
 import type { CharacterSheet } from '@shared/types'
 import { showName } from '@shared/ids'
-import { Segmented, moved, useReorder, useAutosavedState } from '../../ui'
-import { DndTab } from './dnd/DndTab'
-import { StoryTab } from './story/StoryTab'
-import { engine } from '../../../lib/ipc'
+import { Button, InlineTitle, SaveState, Segmented, Select, moved, useReorder, useAutosavedState } from '../../ui'
+import { engine, on } from '../../../lib/ipc'
 import { toast } from '../../../store/toasts'
 import { useAgents } from '../../../store/agents'
 import { Markdown } from '../../chat/Markdown'
+import { AssetMedia } from '../../pictures/AssetMedia'
+import { InsideSlateContext } from '../../entries/EntryCard'
 import { pickPicture } from '../PicturePicker'
 import { rollAll } from '../useRolls'
 import { AddFieldBar } from './AddFieldBar'
 import { FieldCard } from './FieldCard'
 import { SheetHeader } from './SheetHeader'
 import { failed } from '../../../lib/notify'
-import { CharacterCards } from '../../cards/CharacterCards'
-import { withPersona } from '@shared/dnd'
-import { CharacterGameTab } from '../../game/character/CharacterGameTab'
+import { cn } from '../../../lib/cn'
+import { sheetFacets, type SheetDraft, type SheetFacet } from './facets'
+import { useModuleList } from '../../../registries/useModuleList'
 
-type Draft = Pick<CharacterSheet, 'title' | 'fields' | 'values' | 'dnd' | 'story'>
-type Tab = 'sheet' | 'dnd' | 'story' | 'cards' | 'game'
+type Draft = SheetDraft
+const CORE = 'sheet'
 
-export function SheetEditor({ start }: { start: CharacterSheet }) {
-  const saver = useAutosavedState<Draft>({ title: start.title, fields: start.fields, values: start.values, dnd: start.dnd, story: start.story }, (d) => engine('sheets.save', { id: start.id, title: d.title, fields: d.fields.filter((x) => x.trim()), values: d.values, dnd: d.dnd, story: d.story }))
+export function SheetEditor({ start, compact: compactProp }: { start: CharacterSheet; compact?: boolean }) {
+  const insideSlate = useContext(InsideSlateContext)
+  const compact = compactProp ?? insideSlate
+  const [liveSheet, setLiveSheet] = useState<CharacterSheet>(start)
+  const saver = useAutosavedState<Draft>(
+    {
+      title: start.title,
+      fields: start.fields,
+      values: start.values,
+      dnd: start.dnd,
+      story: start.story,
+      mind: start.mind ?? null
+    },
+    (d) =>
+      engine('sheets.save', {
+        id: start.id,
+        title: d.title,
+        fields: d.fields.filter((x) => x.trim()),
+        values: d.values,
+        dnd: d.dnd,
+        story: d.story,
+        mind: d.mind ?? null
+      })
+  )
   const sheet = saver.value
-  const [tab, setTab] = useState<Tab>(start.dnd && !start.fields.some((f) => start.values[f]?.trim()) ? 'dnd' : 'sheet')
+  const latestDraftRef = useRef(sheet)
+  latestDraftRef.current = sheet
+  const latestLiveRef = useRef(liveSheet)
+  latestLiveRef.current = liveSheet
+  const statusRef = useRef(saver.status)
+  statusRef.current = saver.status
+
+  const facets = useModuleList(sheetFacets)
+  const [picked, setTab] = useState<string | null>(null)
+  const [opened, setOpened] = useState<string[]>([])
   const [image, setImage] = useState(start.image)
   const [adding, setAdding] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
+  const [changedFields, setChangedFields] = useState<string[]>([])
+  const [changedTabs, setChangedTabs] = useState<string[]>([])
   const agents = useAgents((s) => s.list)
   const wornBy = useMemo(() => agents.filter((a) => a.sheet === start.id).map((a) => a.name), [agents, start.id])
+
+  // Live reactive sync when an agent tool call or external action edits this character sheet
+  useEffect(() => {
+    let highlightTimer: ReturnType<typeof setTimeout> | null = null
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    let alive = true
+
+    const syncFromBackend = () => {
+      if (statusRef.current === 'saving') return
+      void engine('sheets.get', { id: start.id })
+        .then((fresh) => {
+          if (!alive || !fresh || statusRef.current === 'saving') return
+          const prev = latestDraftRef.current
+          const prevLive = latestLiveRef.current
+
+          const diffFields: string[] = []
+          const allKeys = new Set([...prev.fields, ...fresh.fields, ...Object.keys(prev.values), ...Object.keys(fresh.values)])
+          for (const k of allKeys) {
+            if ((prev.values[k] ?? '') !== (fresh.values[k] ?? '') || prev.fields.includes(k) !== fresh.fields.includes(k)) {
+              diffFields.push(k)
+            }
+          }
+
+          const diffTabs: string[] = []
+          if (diffFields.length > 0 || prev.title !== fresh.title) diffTabs.push(CORE)
+          if (JSON.stringify(prev.dnd ?? null) !== JSON.stringify(fresh.dnd ?? null)) diffTabs.push('dnd')
+          if (JSON.stringify(prevLive.game ?? null) !== JSON.stringify(fresh.game ?? null)) diffTabs.push('game')
+          if (JSON.stringify(prev.story ?? null) !== JSON.stringify(fresh.story ?? null)) diffTabs.push('story')
+          if (JSON.stringify(prev.mind ?? null) !== JSON.stringify(fresh.mind ?? null)) diffTabs.push('mind')
+          const imageChanged = prevLive.image !== fresh.image
+
+          if (diffTabs.length === 0 && !imageChanged) return
+
+          setLiveSheet(fresh)
+          setImage(fresh.image)
+          saver.reset({
+            title: fresh.title,
+            fields: fresh.fields,
+            values: fresh.values,
+            dnd: fresh.dnd,
+            story: fresh.story,
+            mind: fresh.mind ?? null
+          })
+
+          if (diffFields.length > 0 || diffTabs.length > 0) {
+            setChangedFields(diffFields)
+            setChangedTabs(diffTabs)
+            if (highlightTimer) clearTimeout(highlightTimer)
+            highlightTimer = setTimeout(() => {
+              if (!alive) return
+              setChangedFields([])
+              setChangedTabs([])
+            }, 2800)
+          }
+        })
+        .catch(() => undefined)
+    }
+
+    const scheduleSync = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(syncFromBackend, 90)
+    }
+
+    const offs = [
+      on('page.changed', ({ id: changedId }) => {
+        if (
+          changedId === start.id ||
+          changedId === `sheet/${start.id}` ||
+          changedId === `sheets/${start.id}` ||
+          changedId.endsWith(`/${start.id}`)
+        ) {
+          scheduleSync()
+        }
+      }),
+      on('dnd.changed', scheduleSync),
+      on('game.changed', scheduleSync),
+      on('stories.changed', scheduleSync)
+    ]
+
+    return () => {
+      alive = false
+      if (highlightTimer) clearTimeout(highlightTimer)
+      if (debounceTimer) clearTimeout(debounceTimer)
+      offs.forEach((off) => off())
+    }
+  }, [start.id])
+
   const change = (next: Draft) => saver.set(next)
   const reorder = useReorder((from, to) => change({ ...sheet, fields: moved(sheet.fields, from, to) }))
 
@@ -66,12 +186,20 @@ export function SheetEditor({ start }: { start: CharacterSheet }) {
   const sheetTab = (
     <>
       {adding && <AddFieldBar fields={sheet.fields} kept={kept} onAdd={add} onClose={() => setAdding(false)} />}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(28rem,1fr))] gap-3 p-4">
+      <div
+        className={cn(
+          'grid gap-2.5',
+          compact
+            ? 'grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] pt-2'
+            : 'grid-cols-[repeat(auto-fill,minmax(28rem,1fr))] gap-3 p-4'
+        )}
+      >
         {sheet.fields.map((field, i) => (
           <FieldCard
             key={field}
             name={field}
             value={sheet.values[field] ?? ''}
+            highlighted={changedFields.includes(field)}
             drag={reorder.props(i)}
             dragOver={reorder.isOver(i)}
             onValue={(t) => setValue(field, t)}
@@ -80,15 +208,22 @@ export function SheetEditor({ start }: { start: CharacterSheet }) {
             onDone={() => finish(field)}
           />
         ))}
-        <button onClick={() => setAdding(true)} className="flex min-h-24 items-center justify-center gap-2 border border-dashed border-line/50 font-mono text-[11px] uppercase tracking-[0.14em] text-faint hover:border-accent hover:text-accent">
+        <button
+          onClick={() => setAdding(true)}
+          className="flex min-h-20 items-center justify-center gap-2 border border-dashed border-line/50 font-mono text-[11px] uppercase tracking-[0.14em] text-faint hover:border-accent hover:text-accent cursor-pointer"
+        >
           <Plus className="h-4 w-4" /> Add field
         </button>
       </div>
       {kept.length > 0 && !adding && (
-        <div className="flex flex-wrap items-center gap-2 px-5 pb-4 text-[12px] text-dim">
+        <div className={cn('flex flex-wrap items-center gap-2 text-[12px] text-dim', compact ? 'pt-2' : 'px-5 pb-4')}>
           Off the sheet, text kept:
           {kept.map((h) => (
-            <button key={h} onClick={() => add(h)} className="border border-teal/50 px-2 py-0.5 font-mono text-[11px] text-teal hover:border-teal hover:text-white">
+            <button
+              key={h}
+              onClick={() => add(h)}
+              className="border border-teal/50 px-2 py-0.5 font-mono text-[11px] text-teal hover:border-teal hover:text-white cursor-pointer"
+            >
               ↩ {h}
             </button>
           ))}
@@ -96,27 +231,141 @@ export function SheetEditor({ start }: { start: CharacterSheet }) {
       )}
     </>
   )
-  const tabs: { value: Tab; label: string; body: ReactNode }[] = [
-    { value: 'sheet', label: 'Sheet', body: sheetTab },
-    { value: 'dnd', label: sheet.dnd ? 'D&D' : 'D&D (none yet)', body: <DndTab dnd={sheet.dnd} onChange={(dnd) => change({ ...sheet, dnd, fields: dnd && !sheet.dnd ? withPersona(sheet.fields) : sheet.fields })} story={sheet.story} onStory={(story) => change({ ...sheet, story })} onOpenStory={() => setTab('story')} /> },
-    { value: 'game', label: 'Game', body: <CharacterGameTab sheet={start} /> },
-    { value: 'story', label: 'Story', body: <StoryTab story={sheet.story} onChange={(story) => change({ ...sheet, story })} /> },
-    { value: 'cards', label: 'Cards', body: <CharacterCards sheet={start.id} /> }
+  const shows = (f: SheetFacet) => !f.has || f.has(liveSheet, sheet) || opened.includes(f.id)
+  const shown = (facets ?? []).filter(shows)
+  const addable = (facets ?? []).filter((f) => f.system && !shows(f))
+  const addSystem = (id: string) => {
+    const facet = addable.find((f) => f.id === id)
+    if (!facet) return
+    if (facet.attach) change(facet.attach(sheet))
+    setOpened((list) => [...list, id])
+    setTab(id)
+  }
+  const tabs: { value: string; label: string; body: ReactNode }[] = [
+    { value: CORE, label: 'Sheet', body: sheetTab },
+    ...shown.map((f) => ({
+      value: f.id,
+      label: f.label(sheet),
+      body: <f.Tab sheet={liveSheet} draft={sheet} change={change} open={setTab} />
+    }))
   ]
+  const systems = shown.filter((f) => f.system).map((f) => f.label(sheet))
+  const wanted = picked ?? facets?.find((f) => f.opensFirst?.(sheet))?.id ?? CORE
+  const tab = tabs.some((t) => t.value === wanted) ? wanted : CORE
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border border-line/60 bg-black/70">
-      <SheetHeader id={start.id} title={showName(sheet.title)} image={image} fields={sheet.fields.length} wornBy={wornBy} status={saver.status} error={saver.error} previewing={preview !== null} onRename={(title) => change({ ...sheet, title })} onPortrait={() => void pickPicture(image).then((r) => r && setPicture(r.id))} onAddField={() => {
-          setTab('sheet')
-          setAdding(true)
-        }} onPreview={togglePreview} />
+    <div
+      className={cn(
+        'flex min-h-0 flex-1 flex-col',
+        compact ? 'gap-2.5' : 'overflow-y-auto border border-line/60 bg-black/70'
+      )}
+    >
+      {compact ? (
+        <div className="flex flex-wrap items-center gap-3.5 border-b border-line/40 pb-3">
+          <button
+            type="button"
+            title={image ? 'Change portrait' : 'Add a portrait'}
+            onClick={() => void pickPicture(image).then((r) => r && setPicture(r.id))}
+            className="group/portrait relative h-16 w-16 shrink-0 overflow-hidden border border-line-strong bg-black/60 cursor-pointer"
+          >
+            {image ? (
+              <AssetMedia id={image} className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-faint group-hover/portrait:text-accent">
+                <UserRound className="h-6 w-6" />
+              </span>
+            )}
+            <span className="absolute inset-x-0 bottom-0 flex items-center justify-center bg-black/75 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-accent opacity-0 group-hover/portrait:opacity-100">
+              <ImagePlus className="h-2.5 w-2.5" />
+            </span>
+          </button>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-accent-soft">Character</span>
+              {changedTabs.length > 0 && (
+                <span className="flex items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-mono text-[8.5px] font-bold uppercase tracking-[0.14em] text-accent animate-pulse">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  LIVE EDIT
+                </span>
+              )}
+              <SaveState status={saver.status} error={saver.error} />
+            </div>
+            <InlineTitle
+              value={showName(sheet.title)}
+              onSave={(title) => change({ ...sheet, title })}
+              className="text-[19px] font-bold leading-tight tracking-wide text-white"
+            />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[10px] text-dim">
+              <span>{sheet.fields.length} fields</span>
+              {wornBy.length > 0 && <span>Worn by {wornBy.join(', ')}</span>}
+              {systems.length > 0 && <span className="text-teal">{systems.join(' + ')}</span>}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<Plus />}
+              onClick={() => {
+                setTab('sheet')
+                setAdding(true)
+              }}
+            >
+              Field
+            </Button>
+            <Button size="sm" variant="ghost" icon={<Eye />} onClick={togglePreview} title="View as an agent reads it">
+              {preview !== null ? 'Sheet' : 'Read'}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <SheetHeader
+          id={start.id}
+          title={showName(sheet.title)}
+          image={image}
+          fields={sheet.fields.length}
+          wornBy={wornBy}
+          status={saver.status}
+          error={saver.error}
+          previewing={preview !== null}
+          onRename={(title) => change({ ...sheet, title })}
+          onPortrait={() => void pickPicture(image).then((r) => r && setPicture(r.id))}
+          onAddField={() => {
+            setTab('sheet')
+            setAdding(true)
+          }}
+          onPreview={togglePreview}
+        />
+      )}
+
       {preview === null && (
-        <div className="px-4 pt-3">
-          <Segmented value={tab} onChange={setTab} options={tabs.map(({ value, label }) => ({ value, label }))} />
+        <div className={cn('flex flex-wrap items-center gap-2.5', !compact && 'px-4 pt-3')}>
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            options={tabs.map(({ value, label }) => ({
+              value,
+              label: changedTabs.includes(value) ? `${label} ●` : label
+            }))}
+          />
+          {!compact && (
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+              System: {systems.length ? systems.join(' + ') : 'narrative'}
+            </span>
+          )}
+          {addable.length > 0 && (
+            <Select
+              value=""
+              options={[{ value: '', label: '+ Add system' }, ...addable.map((f) => ({ value: f.id, label: f.label(sheet) }))]}
+              onChange={addSystem}
+              className="h-7 w-36 text-[11px]"
+            />
+          )}
         </div>
       )}
+
       {preview !== null ? (
-        <div className="p-5 text-[13.5px]">
+        <div className={cn('text-[13px]', compact ? 'py-2' : 'p-5')}>
           <Markdown text={preview} />
         </div>
       ) : (

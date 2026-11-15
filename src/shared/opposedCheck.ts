@@ -1,5 +1,7 @@
 import { chanceOf, findTarget, type CheckTarget } from './actions'
 import { rollDie } from './storyRolls'
+import { cleanComponents, type ComponentDef } from './game/core'
+import { storedPiece } from './game/components/action/storedPiece'
 
 export interface OpposedSide {
   name: string
@@ -8,6 +10,20 @@ export interface OpposedSide {
   against: string
   bonus: number
   action?: string | null
+  loses?: string
+  effects?: ComponentDef[]
+}
+
+export const WIN_EVENT = 'OnWin'
+export const LOSE_EVENT = 'OnLose'
+
+export const SIDE_LANES = [
+  { event: WIN_EVENT, label: 'On a win' },
+  { event: LOSE_EVENT, label: 'On a loss' }
+]
+
+export function sideEffects(side: OpposedSide): ComponentDef[] {
+  return [...storedPiece(side.action ?? null, WIN_EVENT), ...(side.effects ?? [])]
 }
 
 export interface OpposedProps {
@@ -58,10 +74,25 @@ export function rollOpposed(p: OpposedProps, a: { label: string; bonus: number }
   return { ...p, aRoll, bRoll, winner: aRoll.total > bRoll.total ? 'a' : 'b', forced: false }
 }
 
+const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {})
+const str = (v: unknown, max: number): string => (typeof v === 'string' ? v.trim().slice(0, max) : '')
+const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : 0)
+
+function cleanSide(v: unknown): OpposedSide {
+  const s = obj(v)
+  return { name: str(s.name, 80), sheet: str(s.sheet, 120) || null, does: str(s.does, 400), against: str(s.against, 60), bonus: num(s.bonus), action: str(s.action, 120) || null, loses: str(s.loses, 400), effects: cleanComponents(s.effects) }
+}
+
+export function cleanOpposed(v: unknown): OpposedProps {
+  const p = obj(v)
+  return { question: str(p.question, 400), a: cleanSide(p.a), b: cleanSide(p.b), dc: typeof p.dc === 'number' && Number.isFinite(p.dc) ? Math.round(p.dc) : null }
+}
+
 const rollLine = (side: OpposedSide, r: OpposedRoll) => `${side.name} ${r.label} ${r.roll} ${r.bonus < 0 ? '-' : '+'} ${Math.abs(r.bonus)} = ${r.total}`
 
-export function opposedText(r: OpposedAnswer): string {
+export function opposedText(r: OpposedAnswer, effects: string[] = []): string {
   const won = r.winner === 'a' ? r.a : r.b
+  const lost = r.winner === 'a' ? r.b : r.a
   const how = r.forced ? 'The user decided it.' : `${r.aRoll ? rollLine(r.a, r.aRoll) : ''} against ${r.bRoll ? rollLine(r.b, r.bRoll) : `DC ${r.dc}`}.`
-  return ['OPPOSED CHECK', `"${r.question}" ${how}`, `${won.name} wins: ${won.does}.`, 'Play this out.'].join('\n')
+  return ['OPPOSED CHECK', `"${r.question}" ${how}`, `${won.name} wins: ${won.does}.`, ...(lost.loses ? [`${lost.name} loses: ${lost.loses}.`] : []), ...effects, 'Play this out.'].join('\n')
 }

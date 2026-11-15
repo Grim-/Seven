@@ -1,9 +1,12 @@
+import { noteFailure, reportError } from '../util/report'
+import { notFound } from '@shared/errors'
 import { EventEmitter } from 'node:events'
 import crypto from 'node:crypto'
 import type { ChatHistoryItem } from './items'
 import path from 'node:path'
-import type { AgentDraft, AgentProfile, ModelConfig, ThinkingLevel, ToolChoiceMode, ChatMessage, ChatPart, ContextSummary, ContextUsage, PermissionMode, PromptCost, PromptView, TurnPhaseKind, RewindPreview, SessionMeta, ToolPart } from '@shared/types'
+import { agentSheets, type AgentDraft, type AgentProfile, type ModelConfig, type ThinkingLevel, type ToolChoiceMode, type ChatMessage, type ChatPart, type ContextSummary, type ContextUsage, type PermissionMode, type PromptCost, type PromptView, type TurnPhaseKind, type RewindPreview, type SessionMeta, type ToolPart } from '@shared/types'
 import type { Events } from '@shared/protocol'
+import type { ChatElement } from '@shared/chatElements'
 import type { ModelHost } from '../model/host'
 import { checkFits } from './fit'
 import { buildInstructions, withState } from './context'
@@ -25,7 +28,7 @@ import { newGrants, type SessionGrants } from '../permissions/gate'
 import { detectShell } from '../tools/shell'
 import { promptOptions, serverSampling, thinkingLevel, withThinking } from '../model/params'
 import { findTool, toolsFor } from '../tools/registry'
-import { USER, referenceText, resolveEntry } from '../library/kinds'
+import { USER, referenceText, resolveEntry, rollText } from '../library/kinds'
 import { referencePattern } from '@shared/text'
 
 const ACTIVITY_KEYS = ['command', 'path', 'pattern', 'query', 'url', 'title', 'collection', 'name', 'board']
@@ -35,7 +38,8 @@ function activityOf(name: string, args: Record<string, unknown>): string | null 
   if (custom) {
     try {
       return custom(args)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'tools', 'A tool could not describe what it is doing')
       return null
     }
   }
@@ -46,7 +50,8 @@ import { buildFunctions, runTool, type WrapHooks } from '../tools/wrap'
 import { newId, readText, writeText } from '../util/fs'
 import { secure } from '../util/secure'
 import { minds } from '../mind/store'
-import { mindAuto, recallBlock } from '../mind/auto'
+import { characterMindFor } from '../library/sheets'
+import { characterRecallBlock, mindAuto, recallBlock } from '../mind/auto'
 import { CHECK_IN, checkInText } from './checkin'
 import { probeBrief, probeInstructions, probePageTitle, probeState, probeTools } from '../probe/probe'
 import { DEFAULT_REMIND_EVERY } from '../agents/registry'
@@ -134,7 +139,8 @@ function linkImages(prompt: string): string[] {
       const hit = resolveEntry(m[3].replace(/^"|"$/g, ''), m[2], USER)
       const asset = hit.kind.asset?.(hit.id) ?? null
       if (asset?.kind === 'image' && !out.includes(asset.id)) out.push(asset.id)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'chat', 'Could not resolve a picture in the message')
       continue
     }
   }
@@ -152,8 +158,9 @@ function referenceBlock(prompt: string): string {
   const parts: string[] = []
   for (const m of prompt.matchAll(referencePattern())) {
     const ref = m[3].replace(/^"|"$/g, '')
-    const part = m[4]?.toLowerCase() ?? null
-    if (part === 'random') continue
+    const action = m[4]?.toLowerCase() ?? null
+    const part = m[5]?.toLowerCase() ?? null
+    if (part === 'random' || action) continue
     const key = `${m[2].toLowerCase()}:${ref}#${part ?? ''}`
     if (seen.has(key) || seen.size >= 8) continue
     seen.add(key)
@@ -219,7 +226,8 @@ export class ChatRunner extends EventEmitter {
     return (part, text) => {
       try {
         return fitToBudget(part.id, text, budget).text
-      } catch {
+      } catch (err) {
+        noteFailure(err, 'chat', 'Could not fit tool output into the context budget')
         return text
       }
     }
@@ -228,7 +236,7 @@ export class ChatRunner extends EventEmitter {
   editReply(sessionId: string, messageId: string, edits: { index: number; text: string }[]): ChatMessage {
     this.assertIdle(sessionId)
     const message = this.sessions.messages(sessionId).find((m) => m.id === messageId)
-    if (!message || message.role !== 'assistant') throw new Error('That reply is no longer in this chat')
+    if (!message || message.role !== 'assistant') throw notFound(new Error('That reply is no longer in this chat'))
     if (message.status === 'running') throw new ChatBusy('A reply is still being written in this chat. Wait for it to finish or stop it, then try again.')
     const drop = new Set<number>()
     for (const { index, text } of edits) {
@@ -258,7 +266,7 @@ export class ChatRunner extends EventEmitter {
     this.assertIdle(sessionId)
     const message = this.sessions.messages(sessionId).find((m) => m.id === messageId)
     const part = message?.parts.find((p): p is ToolPart => p.type === 'tool' && p.id === partId)
-    if (!message || !part) throw new Error('That tool call is no longer in this chat')
+    if (!message || !part) throw notFound(new Error('That tool call is no longer in this chat'))
     if (part.status !== 'done') throw new Error('This tool call did not finish, so it has no result to edit. Only finished tool calls can be edited.')
     part.result = text
     part.edited = true
@@ -325,7 +333,7 @@ export class ChatRunner extends EventEmitter {
     this.turn?.controller.abort()
     this.closeActive()
     this.grants.clear()
-    if (this.host.loadedId) void this.host.clearContext().catch(() => undefined)
+    if (this.host.loadedId) void this.host.clearContext().catch((err: unknown) => noteFailure(err, 'chat', "Could not clear the model's context"))
   }
 
   forget(sessionId: string): void {
@@ -366,7 +374,7 @@ export class ChatRunner extends EventEmitter {
       writeText(`${file}.json`, JSON.stringify({ key: this.stateKey(active.modelId), history: this.hashHistory(active.chat.getChatHistory()), savedAt: Date.now() }))
       this.sessions.pruneStates(3)
     } catch (err) {
-      this.emitEvent('engine.error', { sessionId: active.sessionId, message: `Could not save the chat's model state: ${err instanceof Error ? err.message : String(err)}` })
+      this.emitEvent('engine.problem', { severity: 'error', area: 'chat', sessionId: active.sessionId, message: `Could not save the chat's model state: ${err instanceof Error ? err.message : String(err)}` })
     }
   }
 
@@ -379,7 +387,7 @@ export class ChatRunner extends EventEmitter {
       if (meta.key !== this.stateKey(modelId) || meta.history !== this.hashHistory(history)) return
       await this.host.loadState(file)
     } catch {
-      await this.host.clearContext().catch(() => undefined)
+      await this.host.clearContext().catch((err: unknown) => noteFailure(err, 'chat', "Could not clear the model's context"))
     }
   }
 
@@ -388,7 +396,8 @@ export class ChatRunner extends EventEmitter {
     if (sessionId) {
       try {
         chosen = this.sessions.get(sessionId).thinking ?? null
-      } catch {
+      } catch (err) {
+        noteFailure(err, 'chat', "Could not read the chat's thinking setting")
         chosen = null
       }
     }
@@ -422,7 +431,8 @@ export class ChatRunner extends EventEmitter {
   private probeOf(sessionId: string): { subject: string; pageId: string } | null {
     try {
       return this.sessions.get(sessionId).probe ?? null
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'chat', "Could not read the chat's probe setting")
       return null
     }
   }
@@ -435,12 +445,21 @@ export class ChatRunner extends EventEmitter {
     const probe = this.probeOf(sessionId)
     if (!probe) {
       let chosenToolChoice: ToolChoiceMode | null = null
+      let chosenStyle: string | null = null
       try {
-        chosenToolChoice = this.sessions.get(sessionId).toolChoice ?? null
-      } catch {
+        const meta = this.sessions.get(sessionId)
+        chosenToolChoice = meta.toolChoice ?? null
+        chosenStyle = meta.reasoningStyle ?? null
+      } catch (err) {
+        noteFailure(err, 'chat', "Could not read the chat's reasoning settings")
         chosenToolChoice = null
+        chosenStyle = null
       }
-      const effectiveAgent = chosenToolChoice !== null ? { ...agent, toolChoice: chosenToolChoice } : agent
+      const effectiveAgent = {
+        ...agent,
+        ...(chosenToolChoice !== null ? { toolChoice: chosenToolChoice } : {}),
+        ...(chosenStyle !== null ? { reasoningStyle: chosenStyle } : {})
+      }
       return buildInstructions(effectiveAgent, tools, memoryText)
     }
     return probeInstructions(agent, probe.subject, data.pages.find(probe.pageId)?.title ?? probePageTitle(probe.subject), tools.some((t) => t.name === 'ask_user'))
@@ -564,7 +583,20 @@ export class ChatRunner extends EventEmitter {
     return meta.permissionMode ?? this.agents.getOrDefault(meta.agentId).permissionMode
   }
 
-  private begin(sessionId: string, prompt: string, agent: AgentProfile, controller: AbortController, historyIndex?: number, attachments: string[] = []): Turn {
+  postElement(sessionId: string, element: ChatElement, text = ''): void {
+    this.sessions.get(sessionId)
+    this.sessions.appendMessage(sessionId, {
+      id: newId('m'),
+      role: 'assistant',
+      parts: text ? [{ type: 'text', text }] : [],
+      elements: [element],
+      createdAt: Date.now(),
+      status: 'complete'
+    })
+    this.emitEvent('session.rewritten', { sessionId })
+  }
+
+  private begin(sessionId: string, prompt: string, agent: AgentProfile, controller: AbortController, historyIndex?: number, attachments: string[] = [], elements: ChatElement[] = []): Turn {
     const meta = this.sessions.get(sessionId)
     const now = Date.now()
     const userMessage: ChatMessage = {
@@ -574,7 +606,8 @@ export class ChatRunner extends EventEmitter {
       createdAt: now,
       status: 'complete',
       ...(historyIndex !== undefined ? { historyIndex } : {}),
-      ...(attachments.length ? { attachments } : {})
+      ...(attachments.length ? { attachments } : {}),
+      ...(elements.length ? { elements } : {})
     }
     const message: ChatMessage = { id: newId('m'), role: 'assistant', parts: [], createdAt: now + 1, status: 'running' }
     const turn: Turn = { sessionId, prompt, modelPrompt: prompt, agent, controller, message, userMessageId: userMessage.id, blocks: 0, stopReason: null, lastCall: null, historyIndex }
@@ -642,6 +675,10 @@ export class ChatRunner extends EventEmitter {
         emitPart(part)
         this.phase(turn, 'tool', part.name, activityOf(part.name, part.args))
       },
+      addElement: (element) => {
+        message.elements = [...(message.elements ?? []), element]
+        this.emitEvent('message.element', { sessionId, messageId: message.id, element })
+      },
       updatePart: (part) => {
         emitPart(part)
         if (part.ui?.status === 'pending') this.phase(turn, 'waiting', part.name)
@@ -696,7 +733,7 @@ export class ChatRunner extends EventEmitter {
       timeline.record({ kind: 'chat', entry: sessionId, action: 'talked', by: turn.agent.id, chat: sessionId })
     } catch (err) {
       const text = err instanceof Error ? err.message : String(err)
-      this.emitEvent('engine.error', { sessionId, message: `Could not save the session: ${text}` })
+      this.emitEvent('engine.problem', { severity: 'error', area: 'chat', sessionId, message: `Could not save the session: ${text}` })
     }
     this.emitEvent('turn.finish', { sessionId, message: copy(message) })
     this.emit('finished', sessionId, copy(message))
@@ -712,12 +749,13 @@ export class ChatRunner extends EventEmitter {
     let title = 'Chat'
     try {
       title = this.sessions.get(turn.sessionId).title
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'chat', "Could not read the chat's title")
       title = 'Chat'
     }
     minds
       .recordTurn(turn.agent.id, { at: message.createdAt, sessionId: turn.sessionId, sessionTitle: title, user: turn.prompt, reply, thoughts, tools, status: message.status })
-      .catch((err) => this.emitEvent('engine.error', { sessionId: turn.sessionId, message: `Could not save this turn to the agent's journal: ${err instanceof Error ? err.message : String(err)}` }))
+      .catch((err) => this.emitEvent('engine.problem', { severity: 'error', area: 'chat', sessionId: turn.sessionId, message: `Could not save this turn to the agent's journal: ${err instanceof Error ? err.message : String(err)}` }))
   }
 
   private fail(turn: Turn, err: unknown): void {
@@ -729,20 +767,22 @@ export class ChatRunner extends EventEmitter {
     } else {
       turn.message.status = 'error'
       turn.message.error = err instanceof Error ? err.message : String(err)
-      this.emitEvent('engine.error', { sessionId: turn.sessionId, message: turn.message.error })
+      this.emitEvent('engine.problem', { severity: 'error', area: 'chat', sessionId: turn.sessionId, message: turn.message.error, ...(err instanceof Error && err.stack ? { detail: err.stack } : {}) })
     }
   }
 
-  async send(sessionId: string, text: string, attachments: string[] = [], modelText?: string): Promise<{ userMessageId: string; assistantMessageId: string }> {
-    const prompt = text.trim()
+  async send(sessionId: string, text: string, attachments: string[] = [], modelText?: string, elements: ChatElement[] = []): Promise<{ userMessageId: string; assistantMessageId: string }> {
+    const rawPrompt = text.trim()
     const files = [...new Set(attachments)].map((id) => {
       const meta = data.assets.metaFor(id)
-      if (!meta) throw new Error('One of the attached files was deleted. Remove it from the message, attach the file again, and send.')
+      if (!meta) throw notFound(new Error('One of the attached files was deleted. Remove it from the message, attach the file again, and send.'))
       return meta
     })
-    if (!prompt && !files.length) throw new Error('Type a message or attach a file before sending.')
+    if (!rawPrompt && !files.length) throw new Error('Type a message or attach a file before sending.')
     this.assertIdle(sessionId)
     const agent = this.agents.getOrDefault(this.sessions.get(sessionId).agentId)
+    const prompt = rollText(rawPrompt, { agentId: agent.id }).text
+    const resolvedModelText = modelText !== undefined ? rollText(modelText, { agentId: agent.id }).text : undefined
     const { systemPrompt, tools } = this.instructionsFor(sessionId, agent)
     const ctx = this.sessions.loadContext(sessionId)
     const pending = ctx.summaries.find((s) => s.upTo === NEXT_TURN) ?? null
@@ -760,7 +800,7 @@ export class ChatRunner extends EventEmitter {
     if (todos?.editedByUser) this.sessions.clearTodoEdit(sessionId)
     const probe = this.probeOf(sessionId)
     const boardBlock = tools.some((t) => t.name === 'read_messages') ? board.unseen(sessionId, 3) : ''
-    const stated = withState(modelText ?? prompt) + referenceBlock(prompt) + fileBlock + todoBlock + boardBlock + (probe ? probeState(probe.pageId, this.sessions.messages(sessionId)) : '')
+    const stated = withState(resolvedModelText ?? prompt) + referenceBlock(resolvedModelText ?? prompt) + fileBlock + todoBlock + boardBlock + (probe ? probeState(probe.pageId, this.sessions.messages(sessionId)) : '')
     let modelPrompt = pending ? `${summaryBlock(pending)}\n\n${stated}` : stated
 
     const placeholder: Turn = {
@@ -781,10 +821,18 @@ export class ChatRunner extends EventEmitter {
     let checkIn: string | null = null
     this.preparing = true
     try {
-      if (mindAuto(agent).recall && tools.some((t) => t.name === 'recall')) {
-        const recalled = await recallBlock(agent.id, prompt).catch(() => '')
+      const auto = mindAuto(agent)
+      if (auto.recall && tools.some((t) => t.name === 'recall')) {
+        const recalled = await recallBlock(agent.id, prompt).catch((err: unknown) => (noteFailure(err, 'memory', 'Could not recall memories for this turn'), ''))
         if (recalled) {
           modelPrompt += recalled
+          placeholder.modelPrompt = modelPrompt
+        }
+      }
+      if (auto.recall && agentSheets(agent).length > 0) {
+        const sheetRecall = characterRecallBlock(agent, prompt)
+        if (sheetRecall) {
+          modelPrompt += sheetRecall
           placeholder.modelPrompt = modelPrompt
         }
       }
@@ -802,7 +850,7 @@ export class ChatRunner extends EventEmitter {
     }
     this.turn = null
 
-    const turn = this.begin(sessionId, prompt, agent, placeholder.controller, chat.getChatHistory().length, files.map((f) => f.id))
+    const turn = this.begin(sessionId, prompt, agent, placeholder.controller, chat.getChatHistory().length, files.map((f) => f.id), elements)
     if (pending) this.sessions.saveContext(sessionId, { summaries: ctx.summaries.map((s) => (s.id === pending.id ? { ...s, upTo: turn.userMessageId } : s)) })
     turn.modelPrompt = modelPrompt
     turn.systemPrompt = systemPrompt
@@ -851,10 +899,13 @@ export class ChatRunner extends EventEmitter {
     let chosenToolChoice: ToolChoiceMode | null = null
     try {
       chosenToolChoice = this.sessions.get(sessionId).toolChoice ?? null
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'chat', "Could not read the chat's tool choice")
       chosenToolChoice = null
     }
-    const effectiveToolChoice = chosenToolChoice ?? turn.agent.toolChoice ?? 'auto'
+    const charMind = characterMindFor(agentSheets(turn.agent))
+    const baseChoice = chosenToolChoice ?? turn.agent.toolChoice ?? 'auto'
+    const effectiveToolChoice: ToolChoiceMode = baseChoice === 'auto' && charMind?.forceReason ? 'force_reason' : baseChoice
     try {
       await chat.prompt(turn.modelPrompt, {
         ...sampling,
@@ -922,14 +973,15 @@ export class ChatRunner extends EventEmitter {
               contextUsed: st.contextUsed
             })
           } catch (err) {
-            console.warn('Could not record turn stats:', err instanceof Error ? err.message : err)
+            reportError('warning', 'chat', err, 'Could not record turn stats', sessionId)
           }
         if (history && turn.usageBase) {
           const usage = usageOf(chat.used || turn.usageBase.before, turn.usageBase.fixed, turn.usageBase.before, turn.usageBase.size)
           this.sessions.saveContext(sessionId, { usage })
           this.emitEvent('context.usage', { sessionId, usage })
         }
-      } catch {
+      } catch (err) {
+        noteFailure(err, 'chat', "Could not work out this turn's stats")
         message.stats = undefined
       }
     }
@@ -970,7 +1022,7 @@ export class ChatRunner extends EventEmitter {
         }
       }
     } catch (err) {
-      this.emitEvent('engine.error', { sessionId, message: `Could not tidy the chat's context: ${err instanceof Error ? err.message : String(err)}` })
+      this.emitEvent('engine.problem', { severity: 'error', area: 'chat', sessionId, message: `Could not tidy the chat's context: ${err instanceof Error ? err.message : String(err)}` })
     }
   }
 
@@ -1067,7 +1119,7 @@ export class ChatRunner extends EventEmitter {
     } catch (err) {
       if (chat && full && !done && !chat.disposed) chat.setChatHistory(full)
       if (!controller.signal.aborted) {
-        this.emitEvent('engine.error', { sessionId, message: `Could not summarise the chat: ${err instanceof Error ? err.message : String(err)}` })
+        this.emitEvent('engine.problem', { severity: 'error', area: 'chat', sessionId, message: `Could not summarise the chat: ${err instanceof Error ? err.message : String(err)}` })
       }
     } finally {
       this.compacting = null

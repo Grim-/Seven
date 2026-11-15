@@ -6,6 +6,7 @@ import type { PlaceVisitor } from '@shared/maps'
 
 export interface TriggerContext {
   world: string
+  map: string
   sheet: string
   party: PlaceVisitor[]
   save: GameSave | null
@@ -23,6 +24,7 @@ export interface TriggerPanelProps {
 export interface TriggerEditorProps {
   trigger: TriggerDef
   world: string
+  map: string
   onValues: (values: Record<string, unknown>) => void
 }
 

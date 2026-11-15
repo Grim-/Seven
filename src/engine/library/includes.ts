@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import { toId } from '@shared/ids'
 import { referencePattern } from '@shared/text'
 import { USER, resolveEntry, type Kind, type KindContext } from './kinds'
@@ -11,7 +12,8 @@ export function entryField(entry: string, part: string, ctx: KindContext = USER)
   try {
     const { kind, id } = resolveEntry(entry, null, ctx)
     return fieldText(kind, id, part, ctx)
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'library', 'Could not include an entry')
     return null
   }
 }
@@ -20,7 +22,8 @@ export function entryFields(entry: string, ctx: KindContext = USER): string[] {
   try {
     const { kind, id } = resolveEntry(entry, null, ctx)
     return (kind.fields?.(id, ctx) ?? []).map((f) => f.name)
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'library', "Could not list an included entry's fields")
     return []
   }
 }

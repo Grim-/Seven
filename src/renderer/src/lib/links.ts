@@ -11,7 +11,7 @@ export function sevenHref(kind: string, ref = ''): string {
 
 export function openSevenLink(href: string): void {
   if (!IN_APP) {
-    void main('app.show', { sessionId: null })
+    void main('app.show', { sessionId: null }).catch(failed('Could not open Seven'))
     return
   }
   const body = href

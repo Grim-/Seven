@@ -12,6 +12,7 @@ import { onLibraryChange } from '../../lib/library'
 import { AssetMedia } from '../pictures/AssetMedia'
 import { SheetEditor } from './sheet/SheetEditor'
 import { entryMenuAt } from '../../views/data/entryMenu'
+import { noteFailure } from '../../store/problems'
 
 export function askNewSheet(select: (s: DataSelection | null) => void): void {
   askText('New character', 'Name', '', async (title) => {
@@ -30,7 +31,7 @@ function useSheets(): CharacterSheet[] {
     const load = () =>
       void engine('sheets.list')
         .then(setList)
-        .catch(() => setList([]))
+        .catch(noteFailure('sheets', 'Could not list the sheets', () => setList([])))
     load()
     const off = onLibraryChange(load)
     const offPage = on('page.changed', load)
@@ -71,7 +72,7 @@ export function SheetScreen({ id, select }: KindScreenProps) {
     let live = true
     void engine('sheets.get', { id })
       .then((s) => live && setSheet(s))
-      .catch(() => live && setSheet(null))
+      .catch(noteFailure('sheets', 'Could not load the sheet', () => live && setSheet(null)))
     return () => {
       live = false
     }

@@ -7,9 +7,11 @@ import {
   STARTER_TRIGGER_ACTIONS,
   type StoredTriggerAction
 } from '@shared/game/triggerActions'
-import { Button, Modal, Select } from '../ui'
+import { Button, Modal } from '../ui'
+import { BrowsePick, type BrowseOption } from '../ui/BrowsePick'
 import { TriggerActionEditor } from '../triggerActions/TriggerActionEditor'
 import { cn } from '../../lib/cn'
+import { failed } from '../../lib/notify'
 
 interface TriggerActionSelectProps {
   value?: string | null
@@ -20,6 +22,12 @@ interface TriggerActionSelectProps {
   hideInlineButton?: boolean
 }
 
+export function useTriggerActionOptions(): { actions: StoredTriggerAction[]; options: BrowseOption[] } {
+  const liveActions = useLive(() => engine('triggerActions.list'), 'triggerActions.changed')
+  const actions: StoredTriggerAction[] = liveActions && liveActions.length > 0 ? liveActions : STARTER_TRIGGER_ACTIONS
+  return { actions, options: actions.map((a) => ({ value: a.id, label: a.name, group: a.tags[0] ?? 'Trigger actions', note: a.description || undefined })) }
+}
+
 export function TriggerActionSelect({
   value,
   onChange,
@@ -28,10 +36,7 @@ export function TriggerActionSelect({
   inlineButtonLabel = '+ Action',
   hideInlineButton = false
 }: TriggerActionSelectProps) {
-  const liveActions = useLive(() => engine('triggerActions.list'), 'triggerActions.changed')
-  const actions: StoredTriggerAction[] =
-    liveActions && liveActions.length > 0 ? liveActions : STARTER_TRIGGER_ACTIONS
-
+  const { actions, options } = useTriggerActionOptions()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingAction, setEditingAction] = useState<StoredTriggerAction>(blankStoredTriggerAction())
   const [isNew, setIsNew] = useState(true)
@@ -39,7 +44,6 @@ export function TriggerActionSelect({
   const handleOpenCreate = () => {
     const blank = blankStoredTriggerAction()
     blank.name = 'New In-Game Action'
-    blank.actionType = 'give_item'
     setEditingAction(blank)
     setIsNew(true)
     setModalOpen(true)
@@ -53,7 +57,7 @@ export function TriggerActionSelect({
       setIsNew(false)
       setModalOpen(true)
     } else {
-      const fetched = await engine('triggerActions.get', { id: value }).catch(() => null)
+      const fetched = await engine('triggerActions.get', { id: value }).catch(failed('Could not open the trigger action'))
       if (fetched) {
         setEditingAction({ ...fetched })
         setIsNew(false)
@@ -75,33 +79,11 @@ export function TriggerActionSelect({
     setModalOpen(false)
   }
 
-  const handleSelect = (next: string) => {
-    if (next === '__NEW__') {
-      handleOpenCreate()
-      return
-    }
-    onChange(next ? next : null)
-  }
-
-  const options = [
-    { value: '', label: placeholder },
-    { value: '__NEW__', label: '+ Create new in-game action...' },
-    ...actions.map((a) => ({
-      value: a.id,
-      label: `${a.name} [${a.actionType}]`
-    }))
-  ]
-
   return (
     <>
       <div className={cn('flex items-center gap-1.5 w-full', className)}>
         <div className="flex-1 min-w-0 h-full">
-          <Select
-            value={value ?? ''}
-            options={options}
-            onChange={handleSelect}
-            className="h-full w-full text-inherit"
-          />
+          <BrowsePick value={value ?? null} options={options} placeholder={placeholder} onChange={onChange} className="h-full w-full" />
         </div>
 
         {!hideInlineButton && (

@@ -30,6 +30,8 @@ export interface GameSave {
   records: Record<string, Record<string, SaveRecord>>
   journeys: Record<string, JourneyEntry[]>
   board: WorldPost[]
+  placed: Record<string, EntityRecord>
+  thingFlags: Record<string, Record<string, string | number | boolean>>
 }
 
 export interface SaveMeta {
@@ -73,10 +75,15 @@ function cleanBoard(raw: unknown): WorldPost[] {
   return (Array.isArray(raw) ? raw : []).map(obj).filter((p) => typeof p.message === 'string').map((p) => ({ at: str(p.at), author: str(p.author), to: str(p.to) || 'ALL', message: str(p.message), ...(p.edited === true ? { edited: true } : {}) }))
 }
 
+function cleanFlags(raw: unknown): Record<string, string | number | boolean> {
+  const flags: Record<string, string | number | boolean> = {}
+  for (const [k, f] of Object.entries(obj(raw))) if (typeof f === 'string' || typeof f === 'number' || typeof f === 'boolean') flags[k] = f
+  return flags
+}
+
 export function cleanSave(raw: unknown, id: string): GameSave {
   const v = obj(raw)
-  const flags: Record<string, string | number | boolean> = {}
-  for (const [k, f] of Object.entries(obj(v.flags))) if (typeof f === 'string' || typeof f === 'number' || typeof f === 'boolean') flags[k] = f
+  const flags = cleanFlags(v.flags)
   return {
     id,
     name: typeof v.name === 'string' && v.name.trim() ? v.name.trim() : id,
@@ -92,7 +99,9 @@ export function cleanSave(raw: unknown, id: string): GameSave {
     stand: Object.fromEntries(Object.entries(obj(v.stand)).map(([map, s]) => [map, cleanStand(s)])),
     records: cleanRecords(v.records),
     journeys: cleanJourneys(v.journeys),
-    board: cleanBoard(v.board)
+    board: cleanBoard(v.board),
+    thingFlags: Object.fromEntries(Object.entries(obj(v.thingFlags)).map(([key, f]) => [key, cleanFlags(f)])),
+    placed: Object.fromEntries(Object.entries(obj(v.placed)).filter((e): e is [string, EntityRecord] => isRecord(e[1])))
   }
 }
 

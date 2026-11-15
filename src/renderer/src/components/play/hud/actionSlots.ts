@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Ability } from '@shared/game/components'
+import { readStored, writeStored } from '../../../lib/stored'
 
 export const ACTION_DRAG_MIME = 'application/x-seven-action'
 export const ACTION_SLOT_SWAP_MIME = 'application/x-seven-action-slot'
@@ -73,21 +74,12 @@ const STORAGE_KEY = 'seven:action_slots:v1'
 const EVENT_NAME = 'seven:action_slots:changed'
 
 function loadAllSlots(): Record<string, (ActionSlotDef | null)[]> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
-  }
+  return readStored<Record<string, (ActionSlotDef | null)[]>>(STORAGE_KEY, {})
 }
 
 function saveAllSlots(data: Record<string, (ActionSlotDef | null)[]>): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    window.dispatchEvent(new CustomEvent(EVENT_NAME))
-  } catch {
-    // ignore
-  }
+  writeStored(STORAGE_KEY, data)
+  window.dispatchEvent(new CustomEvent(EVENT_NAME))
 }
 
 export const DEFAULT_TOTAL_SLOTS = 48

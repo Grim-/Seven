@@ -1,12 +1,29 @@
 import { Component, evaluate, rollInt, type GameEntity } from '../core'
 import type { Point } from '@shared/shapes'
+import type { EffectResult, ViewEvent } from '@shared/effects'
 import { Stats } from './Stats'
+import type { EffectGroup } from '../effectGroups'
+
+export interface EffectBranch {
+  param: string
+  label: string
+  tone: 'pass' | 'fail'
+  always?: boolean
+}
+
+export interface EffectLane {
+  event: string
+  label: string
+}
 
 export interface UseContext {
   user: GameEntity
   target: GameEntity | null
   at: Point | null
   distance: number
+  collect?: (result: EffectResult) => void
+  runStored?: (id: string, event: ActionEvent) => boolean
+  view?: (event: ViewEvent) => void
 }
 
 export interface ActionEvent extends UseContext {
@@ -35,6 +52,8 @@ export function actionValue(formula: string, event: UseContext & { [extra: strin
 }
 
 export abstract class Action extends Component {
+  static readonly LANES: EffectLane[] = []
+  static readonly TRIES: boolean = true
   uses = 0
 
   get id(): string {
@@ -59,11 +78,24 @@ export abstract class Action extends Component {
   }
 }
 
+const WHO: Record<string, (event: ActionEvent) => GameEntity | null> = {
+  target: (event) => event.target,
+  caster: (event) => event.user
+}
+
+const originals = new WeakMap<ActionEvent, ActionEvent>()
+
 export abstract class ActionPiece extends Component {
   static readonly PARAMS_BASE = {
     on: { kind: 'text' as const, default: 'OnUse', description: 'Event this piece runs on.' },
-    emit: { kind: 'text' as const, default: '', description: 'Event it sends to the next pieces. Empty sends nothing.' }
+    emit: { kind: 'text' as const, default: '', description: 'Event it sends to the next pieces. Empty sends nothing.' },
+    who: { kind: 'choice' as const, choices: Object.keys(WHO), default: 'target', description: 'Who it acts on: the target, or the caster.' }
   }
+  static readonly AIMS: boolean = true
+  static readonly SENTENCE: string = ''
+  static readonly GROUP: EffectGroup | null = null
+  static readonly ICON: string = 'Sparkles'
+  static readonly BRANCHES: EffectBranch[] = [{ param: 'emit', label: 'If it works', tone: 'pass' }]
 
   canApply(host: Component | GameEntity): true | string {
     return host instanceof Action ? true : 'this piece belongs inside an ability, item or reaction'
@@ -76,14 +108,29 @@ export abstract class ActionPiece extends Component {
   onApplied(): void {
     super.onApplied()
     const action = this.action
-    if (action) this.bind(action, String(this.params.on), (payload) => this.handle(payload as ActionEvent))
+    if (action) this.bind(action, String(this.params.on), (payload) => this.handle(this.aim(payload as ActionEvent)))
+  }
+
+  private aim(event: ActionEvent): ActionEvent {
+    const pick = (this.constructor as typeof ActionPiece).AIMS ? WHO[String(this.params.who)] : undefined
+    if (!pick) return event
+    const aimed = { ...event, target: pick(event) }
+    originals.set(aimed, event)
+    return aimed
+  }
+
+  original(event: ActionEvent): ActionEvent {
+    return originals.get(event) ?? event
   }
 
   abstract handle(event: ActionEvent): void
 
   next(event: ActionEvent): void {
-    const name = String(this.params.emit)
-    if (name) this.action?.emit(name, { ...event })
+    this.branch(event, String(this.params.emit))
+  }
+
+  branch(event: ActionEvent, name: string): void {
+    if (name) this.action?.emit(name, { ...this.original(event) })
   }
 
   seed(event: ActionEvent): string {
@@ -92,6 +139,10 @@ export abstract class ActionPiece extends Component {
 
   value(formula: string, event: ActionEvent): number {
     return actionValue(formula, event, this.seed(event))
+  }
+
+  report(event: ActionEvent, values: EffectResult['values'], line: string): void {
+    event.collect?.({ effect: this.type, target: event.target?.uid ?? null, values, line })
   }
 
   canUse(_ctx: UseContext): true | string {

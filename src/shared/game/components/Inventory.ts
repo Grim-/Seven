@@ -28,15 +28,17 @@ export interface EquipSlot {
 
 export class Item extends Action {
   static readonly type: string = 'item'
+  static readonly LABEL: string = 'Item'
+  static readonly ICON: string = 'Package'
   static readonly DESCRIPTION: string = 'An item. Its pieces decide what it does: used, worn or wielded.'
   static readonly PARAMS = {
     id: { kind: 'text' as const, default: '', description: 'Which item this is; same ids stack.' },
     label: { kind: 'text' as const, default: '', description: 'Its name.' },
-    value: { kind: 'number' as const, default: 0, min: 0, description: 'Price in gold.' },
-    weight: { kind: 'number' as const, default: 0, min: 0, description: 'Weight.' },
-    maxStack: { kind: 'number' as const, default: 1, min: 1, description: 'How many fit in one stack.' },
-    usedUp: { kind: 'flag' as const, default: false, description: 'One is used up each time it is used.' },
-    grantsWhen: { kind: 'choice' as const, default: 'worn', choices: ['worn', 'carried'], description: 'When the abilities inside it can be used: while it is worn or wielded, or while it is carried.' }
+    value: { kind: 'number' as const, default: 0, min: 0, description: 'Price in gold.', section: 'Trade and carrying' },
+    weight: { kind: 'number' as const, default: 0, min: 0, description: 'Weight.', section: 'Trade and carrying' },
+    maxStack: { kind: 'number' as const, default: 1, min: 1, description: 'How many fit in one stack.', section: 'Trade and carrying' },
+    usedUp: { kind: 'flag' as const, default: false, description: 'One is used up each time it is used.', section: 'Use' },
+    grantsWhen: { kind: 'choice' as const, default: 'worn', choices: ['worn', 'carried'], description: 'When the abilities inside it can be used: while it is worn or wielded, or while it is carried.', section: 'Use' }
   }
   count = 1
 
@@ -96,6 +98,8 @@ export class Item extends Action {
 
 export class Inventory extends Component {
   static readonly type: string = 'inventory'
+  static readonly LABEL: string = 'Inventory'
+  static readonly ICON: string = 'Backpack'
   static readonly DESCRIPTION: string = 'Items and gold carried.'
   static readonly PARAMS = { slots: { kind: 'number' as const, default: 20, min: 0, description: 'Stacks it can hold.' } }
   gold = 0
@@ -159,6 +163,8 @@ export class Inventory extends Component {
 
 export class Equipment extends Component {
   static readonly type: string = 'equipment'
+  static readonly LABEL: string = 'Equipment'
+  static readonly ICON: string = 'Shield'
   static readonly DESCRIPTION: string = 'What is worn and wielded, by slot. Worn items change stats.'
   static readonly PARAMS = {
     slots: { kind: 'list' as const, default: ['head', 'chest', 'legs', 'mainHand', 'offHand', 'bag', 'belt'], of: { kind: 'template' as const, templateKind: 'slot', default: '', description: 'A slot.' }, description: 'Slots it has, in order. A slot whose definition takes its number from a stat gives that many.' }

@@ -17,6 +17,11 @@ export class Camera {
   private area: Size = { w: 1, h: 1 }
   private screen: Size = { w: 1, h: 1 }
   onSettle: (view: View) => void = () => {}
+  onWake?: () => void
+
+  get animating(): boolean {
+    return this.target !== null
+  }
 
   get zoom(): number {
     return this.view.zoom
@@ -48,11 +53,13 @@ export class Camera {
     const next = { ...view, zoom: this.clampZoom(view.zoom) }
     if (animate) {
       this.target = next
+      this.onWake?.()
       return
     }
     this.target = null
     this.view = next
     this.apply()
+    this.onWake?.()
     this.onSettle(this.current)
   }
 
@@ -95,6 +102,7 @@ export class Camera {
     const close = Math.abs(next.x - t.x) < 0.5 && Math.abs(next.y - t.y) < 0.5 && Math.abs(next.zoom - t.zoom) < t.zoom * 0.001
     this.view = close ? t : next
     this.apply()
+    this.onWake?.()
     if (close) {
       this.target = null
       this.onSettle(this.current)

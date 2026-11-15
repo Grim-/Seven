@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Dices, Plus, Save, X } from 'lucide-react'
 import { hasSwap, NO_SWAP } from '@shared/cardDecks'
-import { BASE, CHANCE, MIDDLE, NEEDS_LABEL, actionText, chanceOf, findTarget, targetOf, type Action, type ActionCheck } from '@shared/actions'
+import { ACTION_LANES, BASE, CHANCE, MIDDLE, NEEDS_LABEL, actionEffects, actionText, chanceOf, findTarget, targetOf, type Action, type ActionCheck } from '@shared/actions'
+import { Effects } from '@shared/game/components'
 import { Button, Eyebrow, Input, NumberField, Segmented } from '../ui'
 import { SheetSelect } from '../data/sheet/SheetSelect'
 import { SkillSelect } from '../decisions/SkillSelect'
@@ -10,10 +11,10 @@ import { rollAction } from './play'
 import { useCheckTargets } from './useCheckTargets'
 import type { PlayWhere } from './playStore'
 import { CardSwapField } from './CardSwapField'
-import { TriggerActionSelect } from '../game/TriggerActionSelect'
+import { EffectsEditor } from '../game/effects/EffectsEditor'
 
-const BLANK_CHECK: ActionCheck = { against: CHANCE, difficulty: MIDDLE, base: BASE - 1, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null }
-export const BLANK_ACTION: Action = { attempt: '', needs: 'any', by: null, roller: 'player', checks: [BLANK_CHECK], pass: '', fail: '', passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null }
+const BLANK_CHECK: ActionCheck = { against: CHANCE, difficulty: MIDDLE, base: BASE - 1, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null, effects: [] }
+export const BLANK_ACTION: Action = { attempt: '', needs: 'any', by: null, roller: 'player', checks: [BLANK_CHECK], pass: '', fail: '', passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null, effects: [] }
 const NEEDS = (['any', 'all'] as const).map((value) => ({ value, label: NEEDS_LABEL[value] }))
 
 interface Props {
@@ -101,7 +102,7 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
           const bonus = isChance ? 0 : (findTarget(targets, c.against)?.bonus ?? 0)
           const currentTarget = targetOf(c)
           const chance = isChance ? chanceOf(0, currentTarget) : chanceOf(bonus, currentTarget)
-          const hasCustom = Boolean(c.pass || c.fail || hasSwap(c.passCards) || hasSwap(c.failCards))
+          const hasCustom = Boolean(c.pass || c.fail || hasSwap(c.passCards) || hasSwap(c.failCards) || actionEffects(c).length)
           const showDetails = openDetails[i] || hasCustom
 
           return (
@@ -188,20 +189,7 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
                     <CardSwapField value={c.passCards} onChange={(passCards) => setCheck(i, { passCards })} />
                     <CardSwapField value={c.failCards} onChange={(failCards) => setCheck(i, { failCards })} />
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <TriggerActionSelect
-                      value={c.passAction}
-                      onChange={(passAction) => setCheck(i, { passAction })}
-                      placeholder="No in-game trigger on pass"
-                      className="h-7 text-[11px]"
-                    />
-                    <TriggerActionSelect
-                      value={c.failAction}
-                      onChange={(failAction) => setCheck(i, { failAction })}
-                      placeholder="No in-game trigger on fail"
-                      className="h-7 text-[11px]"
-                    />
-                  </div>
+                  <EffectsEditor host={Effects.type} lanes={ACTION_LANES} aside={false} value={actionEffects(c)} onChange={(effects) => setCheck(i, { effects, passAction: null, failAction: null })} />
                 </div>
               )}
             </div>
@@ -229,12 +217,6 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
             className="h-8 text-[12.5px]"
           />
           <CardSwapField value={a.passCards} onChange={(passCards) => set({ ...a, passCards })} />
-          <TriggerActionSelect
-            value={a.passAction}
-            onChange={(passAction) => set({ ...a, passAction })}
-            placeholder="No in-game action on pass"
-            className="h-8 text-[11.5px]"
-          />
         </div>
 
         <div className="flex flex-col gap-2 border border-alert/40 bg-alert/[0.05] p-3">
@@ -249,14 +231,10 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
             className="h-8 text-[12.5px]"
           />
           <CardSwapField value={a.failCards} onChange={(failCards) => set({ ...a, failCards })} />
-          <TriggerActionSelect
-            value={a.failAction}
-            onChange={(failAction) => set({ ...a, failAction })}
-            placeholder="No in-game action on fail"
-            className="h-8 text-[11.5px]"
-          />
         </div>
       </div>
+
+      <EffectsEditor host={Effects.type} lanes={ACTION_LANES} value={actionEffects(a)} onChange={(effects) => set({ ...a, effects, passAction: null, failAction: null })} />
 
       {/* Bottom Bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line/40 pt-2">

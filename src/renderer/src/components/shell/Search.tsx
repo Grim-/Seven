@@ -21,6 +21,8 @@ import { useHasForm } from '../../lib/form'
 import { useSheet } from '../../lib/sheet'
 import { Sheet } from '../ui'
 import { NavButton } from './NavButton'
+import { noteFailure } from '../../store/problems'
+import { matchesKeybind, useKeybindLabel } from '../../store/keybinds'
 
 const PER_KIND = 6
 const MAX_ACTIONS = 8
@@ -53,7 +55,7 @@ function useResults(query: string): LibrarySection[] | null {
           noteKindFamilies(s)
           if (n === latest.current) setSections(s.filter((x) => x.entries.length))
         })
-        .catch(() => n === latest.current && setSections([]))
+        .catch(noteFailure('search', 'Could not search', () => n === latest.current && setSections([])))
     }, 150)
     return () => clearTimeout(timer)
   }, [query])
@@ -186,10 +188,11 @@ function DesktopSearch() {
   const input = useRef<HTMLInputElement>(null)
   const search = useSearch(open)
   const { query, setQuery } = search
+  const searchShortcut = useKeybindLabel('app.search')
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+      if (matchesKeybind('app.search', e)) {
         e.preventDefault()
         input.current?.focus()
         input.current?.select()
@@ -229,7 +232,7 @@ function DesktopSearch() {
     <Command ref={box} shouldFilter={false} loop vimBindings={false} label="Search and commands" className="relative flex min-w-0 shrink items-center px-2">
       <div className={open ? 'contents' : undefined}>
         <div
-          title="Search everything or run an action (Ctrl+K)"
+          title={`Search everything or run an action (${searchShortcut})`}
           onClick={() => input.current?.focus()}
           className={cn(
             'flex h-7 max-w-full cursor-text items-center gap-2 border px-2 transition-[width,border-color,background-color] duration-200',

@@ -1,3 +1,4 @@
+import { registerBackgroundDrawer } from './drawers'
 import { BaseBackground, rgbOf } from './base'
 
 interface Look {
@@ -267,3 +268,5 @@ export class CyberdeckBackground extends BaseBackground {
     ctx.fillRect(0, y - 80, this.width, 80)
   }
 }
+
+registerBackgroundDrawer('cyberdeck', CyberdeckBackground)

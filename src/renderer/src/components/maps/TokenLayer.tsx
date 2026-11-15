@@ -45,7 +45,7 @@ function Token({ token, handlers, mapSize }: { token: MapToken; handlers: TokenH
       className={cn('pointer-events-auto absolute flex flex-col items-center gap-1 [transform-origin:0_0]', handlers.onMove ? 'cursor-grab' : 'cursor-pointer')}
     >
       <span style={{ width: px, height: px }}>
-        <SheetPortrait image={v.image} className={cn('h-full w-full border-2 shadow-[0_4px_14px_rgba(0,0,0,0.7)]', v.sheet === handlers.mine ? 'border-accent' : v.agent ? 'border-purple' : 'border-cyan')} />
+        <SheetPortrait image={v.image} usedBy={`The map token ${showName(v.name)}`} className={cn('h-full w-full border-2 shadow-[0_4px_14px_rgba(0,0,0,0.7)]', v.sheet === handlers.mine ? 'border-accent' : v.agent ? 'border-purple' : 'border-cyan')} />
       </span>
       {v.hp && <HpBar hp={v.hp} thin className="w-full" />}
       <span className="max-w-[160px] truncate bg-black/85 px-1.5 py-0.5 font-mono text-[11px] text-white">{showName(v.name)}</span>

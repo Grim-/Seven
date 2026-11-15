@@ -17,8 +17,16 @@ import { protocol } from 'electron'
 import { assetScheme, handleAssets } from './assets'
 import { resetWindow } from './windowState'
 import { handleWidgets, widgetScheme } from './widgets'
+import { noteMainFailure, problems } from './problems'
+import { vaultsReadError } from './paths'
+import { errorReport, type Problem, type ProblemReport } from '@shared/problems'
 
-const engine = new EngineSupervisor()
+const engine = new EngineSupervisor(() => settings.get().problems.stderrLines)
+engine.on('problem', (report: ProblemReport) => problems.add(report))
+if (settings.loadError) noteMainFailure(settings.loadError, 'settings', 'Could not read settings.json, so Seven started with default settings', 'error')
+if (vaultsReadError) noteMainFailure(vaultsReadError, 'vault', 'Could not read the list of vaults, so Seven opened the default vault', 'error')
+process.on('uncaughtException', (err) => problems.add({ severity: 'error', area: 'main', ...errorReport(err) }))
+process.on('unhandledRejection', (err) => problems.add({ severity: 'error', area: 'main', ...errorReport(err) }))
 const overlay = new OverlayController(broadcast)
 const hotkey = new Hotkey(() => {
   if (!settings.get().overlayEnabled) settings.set({ overlayEnabled: true })
@@ -89,20 +97,19 @@ if (!app.requestSingleInstanceLock()) {
     vault = new Vault(engine, broadcast)
     const network = new Gateway(() => engine.modelRoutes())
     gateway = network
-    const ipc = registerIpc({ engine, overlay, hotkey, vault, gateway: network, showApp, quit })
+    const ipc = registerIpc({ engine, overlay, hotkey, vault, gateway: network, problems, showApp, quit })
     const link = new Bridge(() => network.settings(), network.devices, network.uploads, (name, params) => engine.request(name as EngineRequestName, params as never), ipc, () => void network.refresh())
     network.attachBridge({ connected: () => link.connectedDevices(), disconnect: (deviceId) => link.disconnectDevice(deviceId) })
     bridge = link
     network.on('server', (server) => link.attach(server))
-    network.on('changed', (status) => {
-      const message: EventMessage = { event: 'network.changed', payload: status }
+    const share = (message: EventMessage) => {
       broadcast(message)
       link.feed(message)
-    })
-    engine.on('event', (message: EventMessage) => {
-      broadcast(message)
-      link.feed(message)
-    })
+    }
+    network.on('changed', (status) => share({ event: 'network.changed', payload: status }))
+    engine.on('event', share)
+    problems.on('changed', (list: Problem[]) => share({ event: 'problems.changed', payload: list }))
+    problems.on('added', (problem: Problem, shown: boolean) => share({ event: 'problem.new', payload: { problem, shown } }))
     setupBrowser(engine)
     engine.on('event', createNotifier(showApp))
 
@@ -114,6 +121,7 @@ if (!app.requestSingleInstanceLock()) {
         tray?.refresh()
       }
       if (value.startWithWindows !== previous.startWithWindows) applyLoginItem(value.startWithWindows)
+      if (value.problems.keep !== previous.problems.keep) problems.trim()
       previous = value
     })
 
@@ -126,7 +134,7 @@ if (!app.requestSingleInstanceLock()) {
     const current = settings.get()
     if (current.overlayEnabled) overlay.show()
     const hotkeyError = hotkey.apply(current.hotkey)
-    if (hotkeyError) console.warn(`[Seven] Hotkey not registered: ${hotkeyError}`)
+    if (hotkeyError) problems.add({ severity: 'warning', area: 'hotkey', message: `The hotkey ${current.hotkey} is not registered: ${hotkeyError}` })
     applyLoginItem(current.startWithWindows)
 
     tray = createTray({

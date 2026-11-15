@@ -11,8 +11,10 @@ import { showName } from '@shared/ids'
 import { SlideshowPlayer } from '../slideshow/SlideshowPlayer'
 import { useSlideshows } from '../slideshow/useSlideshow'
 import { PictureGrid } from '../pictures/PictureGrid'
-import { BACKDROP_DIM, BACKDROP_SCOPES, setBackdrop, type BackdropScope } from './backdropActions'
+import { BACKDROP_DIM, BACKDROP_SCOPES, clearAllBackdrops, setBackdrop, type BackdropScope, type SurfaceBackdropTarget } from './backdropActions'
+import { setBoardSurfaceBackdrop, useBoardSurfaces } from '../chat/tabletopStore'
 import { cn } from '../../lib/cn'
+import { noteFailure } from '../../store/problems'
 
 function fill(colors: string[]): string | undefined {
   if (!colors.length) return undefined
@@ -20,7 +22,7 @@ function fill(colors: string[]): string | undefined {
 }
 
 function ImageLayer({ id }: { id: string }) {
-  const asset = useAsset(id)
+  const asset = useAsset(id, 'The backdrop')
   if (!asset) return null
   const url = assetUrl(asset)
   if (asset.kind === 'video') return <video src={url} autoPlay loop muted playsInline className="absolute inset-0 h-full w-full object-cover" />
@@ -54,7 +56,7 @@ export function ChatBackdrop({ sessionId }: { sessionId: string | null }) {
   const state = useBackdrops((s) => (sessionId ? s.chats[sessionId] : undefined))
   const [, tick] = useState(0)
   useEffect(() => {
-    if (sessionId) void useBackdrops.getState().load(sessionId).catch(() => undefined)
+    if (sessionId) void useBackdrops.getState().load(sessionId).catch(noteFailure('backdrop', 'Could not load the backdrop'))
   }, [sessionId])
   const until = state?.timed?.until ?? 0
   useEffect(() => {
@@ -67,29 +69,138 @@ export function ChatBackdrop({ sessionId }: { sessionId: string | null }) {
   return <BackdropLayer key={JSON.stringify(active)} backdrop={active} />
 }
 
+export function SurfaceBackdrop({ dashboardId, surfaceId }: { dashboardId: string; surfaceId: string }) {
+  const { state: surfaceState } = useBoardSurfaces(dashboardId)
+  const rawBackdrop = surfaceState.slots.find((s) => s.id === surfaceId)?.backdrop ?? null
+  const assets = useData((s) => s.assets)
+  const missingAssets = useData((s) => s.missingAssets)
+  const pages = useData((s) => s.pages)
+  const slideshows = useSlideshows()
+
+  const imageMissing = Boolean(
+    rawBackdrop?.image &&
+      (missingAssets[rawBackdrop.image] || (assets.length > 0 && !assets.some((a) => a.id === rawBackdrop.image))),
+  )
+  const slideshowMissing = Boolean(
+    rawBackdrop?.slideshow &&
+      pages.length > 0 &&
+      !slideshows.some((s) => s.id === rawBackdrop.slideshow),
+  )
+
+  useEffect(() => {
+    if (!rawBackdrop || (!imageMissing && !slideshowMissing)) return
+    const nextImage = imageMissing ? null : rawBackdrop.image
+    const nextSlideshow = slideshowMissing ? null : rawBackdrop.slideshow
+    const next: Backdrop | null =
+      rawBackdrop.colors.length || nextImage || nextSlideshow
+        ? { ...rawBackdrop, image: nextImage, slideshow: nextSlideshow }
+        : null
+    setBoardSurfaceBackdrop(dashboardId, surfaceId, next)
+  }, [dashboardId, surfaceId, rawBackdrop, imageMissing, slideshowMissing])
+
+  if (!rawBackdrop) return null
+  const active: Backdrop | null =
+    rawBackdrop.colors.length || (!imageMissing && rawBackdrop.image) || (!slideshowMissing && rawBackdrop.slideshow)
+      ? {
+          ...rawBackdrop,
+          image: imageMissing ? null : rawBackdrop.image,
+          slideshow: slideshowMissing ? null : rawBackdrop.slideshow,
+        }
+      : null
+  if (!active) return null
+  return <BackdropLayer key={JSON.stringify(active)} backdrop={active} />
+}
+
 
 const PRESETS = ['#0b0d12', '#1a0f2e', '#0f2a2e', '#2e1a0f', '#2e0f17', '#0f1f3a', '#1f2e0f', '#333333']
 
-function BackdropPicker({ sessionId, onClose }: { sessionId: string | null; onClose: () => void }) {
+export function BackdropPicker({
+  sessionId,
+  surfaceTarget,
+  initialScope,
+  onClose,
+}: {
+  sessionId: string | null
+  surfaceTarget?: SurfaceBackdropTarget | null
+  initialScope?: BackdropScope
+  onClose: () => void
+}) {
   const assets = useData((s) => s.assets)
   const images = assets.filter((a) => a.kind === 'image' || a.kind === 'video').map((a) => a.id)
-  const [scope, setScope] = useState<BackdropScope>(sessionId ? 'chat' : 'app')
-  const [colors, setColors] = useState<string[]>([])
-  const [image, setImage] = useState<string | null>(null)
-  const [slideshow, setSlideshow] = useState<string | null>(null)
+  const { state: surfaceState } = useBoardSurfaces(surfaceTarget?.dashboardId ?? null)
+  const surfaceBackdrop = surfaceTarget ? (surfaceState.slots.find((s) => s.id === surfaceTarget.surfaceId)?.backdrop ?? null) : null
+  const chatState = useBackdrops((s) => (sessionId ? s.chats[sessionId] : undefined))
+  const appBackdrop = useApp((s) => s.settings?.backdrop ?? null)
+  const allChatsBackdrop = useApp((s) => s.settings?.chatBackdrop ?? null)
+  const timedBackdrop = chatState?.timed && chatState.timed.until > Date.now() ? chatState.timed.backdrop : null
+  const chatBackdrop = chatState?.chat ?? null
+
+  useEffect(() => {
+    if (sessionId && !chatState) {
+      void useBackdrops.getState().load(sessionId).catch(noteFailure('backdrop', 'Could not load the backdrop'))
+    }
+  }, [sessionId, chatState])
+
+  const backdropForScope = (targetScope: BackdropScope): Backdrop | null => {
+    if (targetScope === 'surface') return surfaceBackdrop
+    if (targetScope === 'chat') return chatBackdrop
+    if (targetScope === 'timed') return timedBackdrop
+    if (targetScope === 'chats') return allChatsBackdrop
+    return appBackdrop
+  }
+
+  const availableScopes: BackdropScope[] = [
+    ...(surfaceTarget ? (['surface'] as const) : []),
+    ...(sessionId ? (['chat', 'timed'] as const) : []),
+    'chats',
+    'app',
+  ]
+  const activeScopeMatch = availableScopes.find((s) => Boolean(backdropForScope(s)))
+  const defaultScope: BackdropScope =
+    initialScope && availableScopes.includes(initialScope)
+      ? initialScope
+      : surfaceTarget
+        ? 'surface'
+        : activeScopeMatch ?? (sessionId ? 'chat' : 'app')
+
+  const initialValue = backdropForScope(defaultScope)
+  const [scope, setScope] = useState<BackdropScope>(defaultScope)
+  const [colors, setColors] = useState<string[]>(() => initialValue?.colors ?? [])
+  const [image, setImage] = useState<string | null>(() => initialValue?.image ?? null)
+  const [slideshow, setSlideshow] = useState<string | null>(() => initialValue?.slideshow ?? null)
   const slideshows = useSlideshows()
-  const [dim, setDim] = useState(BACKDROP_DIM)
+  const [dim, setDim] = useState<number>(() => initialValue?.dim ?? BACKDROP_DIM)
   const [minutes, setMinutes] = useState(10)
 
+  const syncScope = (nextScope: BackdropScope) => {
+    const cur = backdropForScope(nextScope)
+    setScope(nextScope)
+    setColors(cur?.colors ?? [])
+    setImage(cur?.image ?? null)
+    setSlideshow(cur?.slideshow ?? null)
+    setDim(cur?.dim ?? BACKDROP_DIM)
+  }
+
+  const currentSaved = backdropForScope(scope)
+  const hasAnyActive = availableScopes.some((s) => Boolean(backdropForScope(s)))
   const backdrop: Backdrop | null = colors.length || image || slideshow ? { colors, image, slideshow, dim } : null
   const toggleColor = (c: string) => setColors(colors.includes(c) ? colors.filter((x) => x !== c) : [...colors, c].slice(-4))
 
   const apply = async (value: Backdrop | null) => {
     try {
-      await setBackdrop(scope, value, sessionId, minutes)
+      await setBackdrop(scope, value, sessionId, minutes, surfaceTarget)
       onClose()
     } catch (err) {
       toast.error('Could not change the background', errorText(err))
+    }
+  }
+
+  const resetAll = async () => {
+    try {
+      await clearAllBackdrops(sessionId, surfaceTarget)
+      onClose()
+    } catch (err) {
+      toast.error('Could not reset backgrounds', errorText(err))
     }
   }
 
@@ -100,10 +211,15 @@ function BackdropPicker({ sessionId, onClose }: { sessionId: string | null; onCl
       onClose={onClose}
       footer={
         <>
+          {hasAnyActive && (
+            <Button variant="ghost" onClick={() => void resetAll()} title="Clear all chat, app, timed, and surface backgrounds back to default">
+              Reset all
+            </Button>
+          )}
           <Button variant="ghost" onClick={() => void apply(null)}>
             Clear
           </Button>
-          <Button variant="primary" disabled={!backdrop} onClick={() => void apply(backdrop)}>
+          <Button variant="primary" disabled={!backdrop && !currentSaved} onClick={() => void apply(backdrop)}>
             Apply
           </Button>
         </>
@@ -112,9 +228,16 @@ function BackdropPicker({ sessionId, onClose }: { sessionId: string | null; onCl
       <div className="flex flex-col gap-4">
         <ShellTabs<BackdropScope>
           value={scope}
-          onChange={setScope}
-          options={((sessionId ? ['chat', 'timed', 'chats', 'app'] : ['chats', 'app']) as BackdropScope[]).map((value) => ({ value, label: BACKDROP_SCOPES[value] }))}
+          onChange={syncScope}
+          options={availableScopes.map((value) => {
+            const baseLabel = value === 'surface' && surfaceTarget?.label ? `Surface: ${surfaceTarget.label}` : BACKDROP_SCOPES[value]
+            return {
+              value,
+              label: backdropForScope(value) ? `${baseLabel} •` : baseLabel,
+            }
+          })}
         />
+        {scope === 'surface' && <div className="text-[12px] text-dim">Saved to this SurfaceTop in tabletop view. If a picture or slideshow is later deleted from Data, this surface clears it and returns to normal.</div>}
         {scope === 'chats' && <div className="text-[12px] text-dim">Fills the chat window in every chat, over the app background. An agent's own background, or one set for a single chat, shows instead.</div>}
         {scope === 'timed' && (
           <label className="flex items-center gap-3 text-[12.5px] text-dim">
@@ -159,14 +282,24 @@ function BackdropPicker({ sessionId, onClose }: { sessionId: string | null; onCl
   )
 }
 
-export function BackdropButton({ sessionId, trigger }: { sessionId: string | null; trigger?: ReactNode }) {
+export function BackdropButton({
+  sessionId,
+  surfaceTarget,
+  initialScope,
+  trigger,
+}: {
+  sessionId: string | null
+  surfaceTarget?: SurfaceBackdropTarget | null
+  initialScope?: BackdropScope
+  trigger?: ReactNode
+}) {
   const [open, setOpen] = useState(false)
   return (
     <>
       <button title="Background" onClick={() => setOpen(true)} className={trigger ? 'flex' : 'flex h-7 w-7 items-center justify-center border border-line/60 text-dim hover:text-white'}>
         {trigger ?? <ImageIcon className="h-4 w-4" />}
       </button>
-      {open && <BackdropPicker sessionId={sessionId} onClose={() => setOpen(false)} />}
+      {open && <BackdropPicker sessionId={sessionId} surfaceTarget={surfaceTarget} initialScope={initialScope} onClose={() => setOpen(false)} />}
     </>
   )
 }

@@ -17,6 +17,7 @@ import { cn } from '../../lib/cn'
 import { showName } from '@shared/ids'
 import { entryMenuAt } from '../../views/data/entryMenu'
 import { showInData } from '../../lib/library'
+import { noteFailure } from '../../store/problems'
 
 const HISTORY = '_history'
 const drafts = new Map<string, string[]>()
@@ -510,7 +511,7 @@ export function openWorkout(): void {
       if (day) openEntry('workout', day.id)
       else useApp.getState().setView('data')
     })
-    .catch(() => useApp.getState().setView('data'))
+    .catch(noteFailure('workout', 'Could not open the workout', () => useApp.getState().setView('data')))
 }
 
 export function WorkoutResult({ data }: { data: unknown }) {

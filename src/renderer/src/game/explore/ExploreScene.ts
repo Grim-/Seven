@@ -1,5 +1,5 @@
 import { Container, Graphics } from 'pixi.js'
-import { mapArea, type MapData, type ObjectLayerData, type PlaceVisitor } from '@shared/maps'
+import { asToken, mapArea, type MapData, type ObjectLayerData, type PlaceVisitor } from '@shared/maps'
 import { formHas, shapeBounds, smallestAt, type Point, type ShapeForm } from '@shared/shapes'
 import type { TriggerDef } from '@shared/game/triggers'
 import { NavGrid, findPath } from '@shared/game/nav'
@@ -74,6 +74,7 @@ export class ExploreScene implements Scene {
   private label: PlaceLabel | null = null
   private areas: PlaceAreas | null = null
   private zoom = 0
+  private lastCamera: View | null = null
   private gone = false
   private nav: NavGrid | null = null
   private navFor = ''
@@ -129,7 +130,24 @@ export class ExploreScene implements Scene {
         this.label?.show(trigger ? trigger.name : key ? (this.data.names[key] ?? key) : null, world)
       }
     }
-    void MapView.load(this.data.map, engine.assets, (target, object) =>
+    this.drawMap(true)
+    this.sync()
+  }
+
+  setData(data: ExploreData): void {
+    const redraw = data.map !== this.data.map
+    this.data = data
+    if (!this.engine) return
+    if (redraw) this.drawMap(false)
+    this.sync()
+    this.engine.invalidate()
+  }
+
+  private drawMap(fade: boolean): void {
+    const engine = this.engine
+    if (!engine) return
+    const map = this.data.map
+    void MapView.load(map, engine.assets, (target, object) =>
       engine.input.bind(target, {
         tap: (hit) => {
           this.events.emit('object', { object, hit })
@@ -143,19 +161,17 @@ export class ExploreScene implements Scene {
         }
       })
     ).then((view) => {
-      if (this.gone) return view.destroy()
+      if (this.gone || this.data.map !== map) return view.destroy()
+      this.mapView?.destroy()
       this.mapView = view
-      view.root.alpha = 0
       this.root.addChildAt(view.root, 0)
-      engine.tweens.to(view.root, { alpha: 1 }, 0.4)
+      if (fade) {
+        view.root.alpha = 0
+        engine.tweens.to(view.root, { alpha: 1 }, 0.4)
+      }
       this.zoom = 0
+      engine.invalidate()
     })
-    this.sync()
-  }
-
-  setData(data: ExploreData): void {
-    this.data = data
-    if (this.engine) this.sync()
   }
 
   private syncClock(): void {
@@ -187,14 +203,17 @@ export class ExploreScene implements Scene {
     const dark = this.clock ? (1 - this.clock.daylight) * NIGHT_DARKNESS : 0
     this.night.clear()
     if (dark > 0.01) this.night.rect(0, 0, area.w, area.h).fill({ color: NIGHT_COLOUR, alpha: dark })
+    this.engine?.invalidate()
   }
 
   setSpeed(speed: number): void {
     this.clock?.setSpeed(speed)
+    this.engine?.invalidate()
   }
 
   setPaused(paused: boolean): void {
     this.clock?.setPaused(paused)
+    this.engine?.invalidate()
   }
 
   private grid(): NavGrid {
@@ -270,6 +289,7 @@ export class ExploreScene implements Scene {
         }
       }
       this.marker?.show(this.walk.walk.end, true)
+      this.engine?.invalidate()
       return true
     }
 
@@ -286,10 +306,12 @@ export class ExploreScene implements Scene {
     const path = findPath(this.grid(), view.at, target)
     if (!path) {
       this.marker?.show(target, false)
+      this.engine?.invalidate()
       return true
     }
     this.walk = { view, walk: new Walk(view.at, path, WALK_TILES_PER_SECOND * this.data.map.tile.w), onArrive }
     this.marker?.show(this.walk.walk.end, true)
+    this.engine?.invalidate()
     return true
   }
 
@@ -316,6 +338,7 @@ export class ExploreScene implements Scene {
     this.walk.view.stopWalking()
     this.marker?.hide()
     this.walk = null
+    this.engine?.invalidate()
   }
 
   private follow(at: Point): void {
@@ -395,7 +418,6 @@ export class ExploreScene implements Scene {
     }
     this.syncMarkers()
     this.syncBattle()
-    this.zoom = 0
   }
 
   private syncBattle(): void {
@@ -576,7 +598,7 @@ export class ExploreScene implements Scene {
       if (!form) continue
       const b = shapeBounds(form)
       const list = visitors.filter((v) => !standing.has(v.sheet))
-      list.forEach((visitor, i) => wanted.set(`${place}/${visitor.sheet}`, { visitor, at: { x: b.x + b.w / 2 + (i - (list.length - 1) / 2) * (MARKER_SIDE + MARKER_GAP), y: b.y + b.h / 2 } }))
+      list.forEach((visitor, i) => wanted.set(`${place}/${visitor.sheet}`, { visitor: asToken(visitor, visitor.sheet, 'sheet'), at: { x: b.x + b.w / 2 + (i - (list.length - 1) / 2) * (MARKER_SIDE + MARKER_GAP), y: b.y + b.h / 2 } }))
     }
     for (const [key, token] of wanted) {
       const known = this.markers.get(key)
@@ -605,6 +627,7 @@ export class ExploreScene implements Scene {
     const now = this.zonesAt(at)
     for (const t of this.live()) if (t.fires === 'enter' && now.has(t.id) && !this.inside.has(t.id)) this.events.emit('trigger', { id: t.id, sheet: going.view.sheet })
     this.inside = now
+    this.engine.invalidate()
     if (!going.walk.done) return
     const callback = going.onArrive
     this.stopWalk()
@@ -615,8 +638,20 @@ export class ExploreScene implements Scene {
     callback?.()
   }
 
+  active(): boolean {
+    return Boolean(this.walk || (this.clock && !this.clock.paused))
+  }
+
+  visualActive(): boolean {
+    return Boolean(this.walk)
+  }
+
   render(): void {
-    this.events.emit('camera', this.engine.camera.current)
+    const cam = this.engine.camera.current
+    if (!this.lastCamera || Math.abs(this.lastCamera.x - cam.x) > 1e-4 || Math.abs(this.lastCamera.y - cam.y) > 1e-4 || Math.abs(this.lastCamera.zoom - cam.zoom) > 1e-6) {
+      this.lastCamera = cam
+      this.events.emit('camera', cam)
+    }
     const zoom = this.engine.camera.zoom
     if (zoom !== this.zoom) {
       this.zoom = zoom

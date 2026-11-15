@@ -3,8 +3,9 @@ import { ITEM_TEMPLATES } from '@shared/game/defs'
 import type { ParamSchema } from '@shared/game/core'
 import { shapeBounds, type ShapeForm } from '@shared/shapes'
 import { Eyebrow, Field, FieldGrid, SaveState, useAutosavedState } from '../../ui'
-import { ParamFields } from '../../game/ParamFields'
+import { ParamTokens } from '../../game/ParamTokens'
 import { FlagSelect } from '../../game/FlagSelect'
+import { EntityPieces } from '../../game/EntityPieces'
 import { triggerUi } from './registry'
 
 const COMMON: ParamSchema = {
@@ -21,7 +22,7 @@ function resized(shape: ShapeForm, w: number, h: number): ShapeForm {
   return { kind: 'box', x: b.x + b.w / 2 - w / 2, y: b.y + b.h / 2 - h / 2, w, h }
 }
 
-export function TriggerEditor({ start, world, onSave }: { start: TriggerDef; world: string; onSave: (next: TriggerDef) => Promise<unknown> }) {
+export function TriggerEditor({ start, world, map = '', onSave }: { start: TriggerDef; world: string; map?: string; onSave: (next: TriggerDef) => Promise<unknown> }) {
   const state = useAutosavedState<TriggerDef>(start, onSave)
   const t = state.value
   const type = triggerType(t.type)
@@ -38,7 +39,7 @@ export function TriggerEditor({ start, world, onSave }: { start: TriggerDef; wor
           <span className="flex-1" />
           <SaveState status={state.status} error={state.error} />
         </div>
-        <ParamFields dense schema={COMMON} values={common} onChange={setCommon} />
+        <ParamTokens schema={COMMON} values={common} onChange={setCommon} />
         <FieldGrid dense>
           <Field label="Needs a flag" tip="A flag another trigger set in this save.">
             <FlagSelect
@@ -63,7 +64,11 @@ export function TriggerEditor({ start, world, onSave }: { start: TriggerDef; wor
           <Eyebrow className="text-purple">{type?.label ?? t.type}</Eyebrow>
           <span className="text-[12px] text-dim">{type?.description}</span>
         </div>
-        {ui?.Editor ? <ui.Editor trigger={t} world={world} onValues={setValues} /> : type && <ParamFields dense schema={type.params} values={t.values} onChange={setValues} />}
+        {ui?.Editor ? <ui.Editor trigger={t} world={world} map={map} onValues={setValues} /> : type && <ParamTokens schema={type.params} values={t.values} onChange={setValues} />}
+      </section>
+      <section className="flex flex-col gap-3 border-t border-line/50 pt-4">
+        <Eyebrow>As a thing in the game</Eyebrow>
+        <EntityPieces value={t.comps} onChange={(comps) => state.set({ ...t, comps })} />
       </section>
     </div>
   )

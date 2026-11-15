@@ -19,16 +19,21 @@ export function isVaultLockedError(err: unknown): boolean {
 class CodedError extends Error {
   constructor(
     readonly code: string,
-    message: string
+    message: string,
+    readonly request?: string
   ) {
     super(message)
   }
 }
 
+export function requestOf(err: unknown): string | undefined {
+  return err instanceof CodedError ? err.request : undefined
+}
+
 function unwrap<T>(result: T): T {
   if (result && typeof result === 'object' && ERROR_MARKER in result) {
-    const { code, message } = (result as unknown as CodedErrorWire)[ERROR_MARKER]
-    throw new CodedError(code, message)
+    const { code, message, request } = (result as unknown as CodedErrorWire)[ERROR_MARKER]
+    throw new CodedError(code, message, request)
   }
   return result
 }

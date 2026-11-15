@@ -1,3 +1,4 @@
+import { notFound } from '@shared/errors'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { toId } from '@shared/ids'
@@ -28,7 +29,7 @@ export class FactionStore extends EventEmitter {
 
   get(id: string): StoredFaction {
     const hit = this.list().find((f) => f.id === id)
-    if (!hit) throw new ToolError(`No faction "${id}". find with kind faction lists them.`)
+    if (!hit) throw notFound(new ToolError(`No faction "${id}". find with kind faction lists them.`))
     return hit
   }
 
@@ -47,7 +48,7 @@ export class FactionStore extends EventEmitter {
 
   remove(id: string): void {
     const all = this.list()
-    if (!all.some((f) => f.id === id)) throw new ToolError(`No faction "${id}".`)
+    if (!all.some((f) => f.id === id)) throw notFound(new ToolError(`No faction "${id}".`))
     this.write(all.filter((f) => f.id !== id))
   }
 

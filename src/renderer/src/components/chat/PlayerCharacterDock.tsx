@@ -1,15 +1,16 @@
 import type { AgentProfile } from '@shared/types'
-import type { CardSource } from '@shared/cardDecks'
 import { showName } from '@shared/ids'
 import { Popover, Field } from '../ui'
 import { SheetSelect } from '../data/sheet/SheetSelect'
-import { CardSourceSelect } from '../cards/CardSourceSelect'
 import { CharacterAvatar } from './CharacterAvatar'
 import { changeAgent } from './changeAgent'
 import { useEntryPreview } from '../entries/entryPreview'
 import { openEntry } from '../../lib/library'
 import { useWorlds } from '../worlds/Worlds'
-import { useWorldPlayer } from '../play/useWorldPlayer'
+import { useChatPlayer } from './useChatPlayer'
+import { useCharacterStatus } from './status/useCharacterStatus'
+import { HealthBar } from './status/HealthBar'
+import { StatusDetails } from './status/StatusDetails'
 import { engine } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
 import { cn } from '../../lib/cn'
@@ -25,11 +26,11 @@ export function PlayerCharacterDock({
 }) {
   const worlds = useWorlds()
   const boundWorld = agent?.world?.worldId ? worlds.find((w) => w.id === agent.world!.worldId) ?? null : null
-  const worldPlayer = useWorldPlayer(agent?.world?.worldId ?? null)
-  const activePlayer = agent?.player || worldPlayer || null
+  const activePlayer = useChatPlayer(agent)
   const preview = useEntryPreview(activePlayer ? `@sheet:${activePlayer}` : '')
   const valid = preview && !('missing' in preview) ? preview : null
   const playerName = valid ? showName(valid.title) : activePlayer ? showName(activePlayer) : null
+  const status = useCharacterStatus(activePlayer)
 
   const handlePlayerChange = async (sheet: string | null) => {
     if (agent) await changeAgent(agent, { player: sheet }, 'player character')
@@ -38,13 +39,9 @@ export function PlayerCharacterDock({
     }
   }
 
-  const handleCardsChange = (cards: CardSource | null) => {
-    if (agent) void changeAgent(agent, { cards }, 'cards')
-  }
-
   return (
     <Popover
-      title="Player character and deck settings"
+      title="Player character"
       className="w-72 gap-2.5 p-3 font-mono"
       side="top"
       align="start"
@@ -60,11 +57,13 @@ export function PlayerCharacterDock({
           )}
           title={
             activePlayer
-              ? `You: ${playerName} · Click or right-click to switch character or deck`
+              ? `You: ${playerName} · Click to switch character`
               : 'No player character · Click or right-click to choose your character'
           }
         >
           <CharacterAvatar sheetId={activePlayer} size={size} className="w-full h-full border-none" />
+          {status?.health && <HealthBar health={status.health} className="absolute inset-x-0 top-0 h-1" />}
+          {status && status.effects.length > 0 && <span className="pointer-events-none absolute right-0.5 top-1.5 h-1.5 w-1.5 rounded-full bg-purple" />}
           <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/75 to-transparent px-1 py-0.5 text-center font-mono text-[8.5px] font-bold uppercase tracking-wider text-accent truncate">
             {playerName ?? 'YOU'}
           </span>
@@ -92,6 +91,8 @@ export function PlayerCharacterDock({
         )}
       </div>
 
+      {status && <StatusDetails status={status} />}
+
       <Field label="Character">
         <SheetSelect
           value={activePlayer}
@@ -101,15 +102,7 @@ export function PlayerCharacterDock({
         />
       </Field>
 
-      {agent && (
-        <Field label="Cards & Deck">
-          <CardSourceSelect
-            value={agent.cards ?? null}
-            onChange={handleCardsChange}
-            className="h-8 text-[12px]"
-          />
-        </Field>
-      )}
+      <div className="text-[10.5px] text-faint">Your hand plays {playerName ? `${playerName}'s deck` : 'your own deck'}.</div>
     </Popover>
   )
 }

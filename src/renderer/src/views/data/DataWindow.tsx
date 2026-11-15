@@ -12,6 +12,7 @@ import { KindRail } from './KindRail'
 import { rememberSections } from './entryMenu'
 import { useRememberedLocation } from '../../lib/window'
 import type { DataSelection } from '../../store/data'
+import { noteFailure } from '../../store/problems'
 
 function useQuery(): [string, string, (q: string) => void] {
   const [query, setQuery] = useState('')
@@ -40,7 +41,7 @@ export function DataWindow() {
     void useData
       .getState()
       .refresh()
-      .catch(() => undefined)
+      .catch(noteFailure('library', 'Could not refresh the library'))
   }, [])
 
   const kind = selected ? (kindUi(selected.kind).showsAs ?? selected.kind) : null

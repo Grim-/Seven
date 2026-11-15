@@ -84,6 +84,7 @@ function Sky({ phase }: { phase: SkyPhase | null }) {
 function palette(theme: Theme): void {
   const root = document.documentElement.style
   const keys = ['--color-accent', '--color-accent-soft', '--color-teal', '--color-cyan', '--color-bg', '--color-line', '--color-line-strong']
+  root.setProperty('--chat-fade-opacity', String(theme.chatFadeOpacity ?? SEVEN_THEME.chatFadeOpacity))
   if (theme.builtin) {
     for (const k of keys) root.removeProperty(k)
     return

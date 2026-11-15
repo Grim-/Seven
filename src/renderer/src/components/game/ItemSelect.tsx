@@ -10,17 +10,15 @@ interface ItemSelectProps {
   onChange: (item: string | undefined) => void
   placeholder?: string
   className?: string
-  ruleSet?: string | null
 }
 
 export function ItemSelect({
   value,
   onChange,
   placeholder = 'Select inventory item...',
-  className,
-  ruleSet
+  className
 }: ItemSelectProps) {
-  const defs = useGameDefs(ITEM_TEMPLATES, ruleSet)
+  const defs = useGameDefs(ITEM_TEMPLATES)
   const items = defs.list ?? []
 
   const [isTypingCustom, setIsTypingCustom] = useState(false)

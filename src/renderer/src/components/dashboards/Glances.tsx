@@ -4,6 +4,7 @@ import { engine } from '../../lib/ipc'
 import { formatRelative } from '../../lib/format'
 import { KindIcon, onLibraryChange, openEntry } from '../../lib/library'
 import { ThemeGlance } from '../themes/ThemeControl'
+import { BackgroundControlGlance, DiceGlance } from './RoleplayGlances'
 import { WorkoutState, lastDone, openWorkout, useWorkout } from '../workout/Workout'
 import { useTools } from '../../store/tools'
 import { modelName, useModels } from '../../store/models'
@@ -18,6 +19,7 @@ import { Database } from 'lucide-react'
 import type { WidgetChoice, WidgetProviderInfo } from '@shared/types'
 import { glanceView, registerGlanceView } from '../../registries/glances'
 import { MissingWidget, registerWidgetUi, type WidgetBodyProps, type WidgetEditorProps } from '../../registries/widgets'
+import { noteFailure } from '../../store/problems'
 
 function Label({ children }: { children: ReactNode }) {
   return <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-accent-soft">{children}</div>
@@ -116,7 +118,7 @@ function TodayGlance() {
 function RecentGlance() {
   const [rows, setRows] = useState<TimelineRow[]>([])
   useEffect(() => {
-    const load = () => void engine('timeline.recent', { limit: 14 }).then(setRows).catch(() => undefined)
+    const load = () => void engine('timeline.recent', { limit: 14 }).then(setRows).catch(noteFailure('dashboards', 'Could not load recent activity'))
     load()
     return onLibraryChange(load)
   }, [])
@@ -162,6 +164,8 @@ registerGlanceView('recent', { View: RecentGlance })
 registerGlanceView('system', { View: SystemGlance })
 registerGlanceView('player', { View: PlayerGlance })
 registerGlanceView('theme', { View: ThemeGlance })
+registerGlanceView('background_control', { View: BackgroundControlGlance })
+registerGlanceView('dice', { View: DiceGlance })
 
 function glanceChoices(info: WidgetProviderInfo, modules: { id: string; state: string }[]): WidgetChoice[] {
   return (info.choices ?? []).filter((c) => !c.module || modules.some((m) => m.id === c.module && m.state === 'on'))

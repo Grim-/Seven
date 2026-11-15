@@ -6,6 +6,7 @@ import { errorText } from '../../lib/format'
 import { Button, EmptyState, Panel, ListRow } from '../ui'
 import { Markdown } from '../chat/Markdown'
 import { rowMenu } from '../../views/data/entryMenu'
+import { noteFailure } from '../../store/problems'
 
 export function KindBrowser({ kind, title, empty, initial = null }: { kind: string; title: string; empty: string; initial?: string | null }) {
   const [list, setList] = useState<LibraryHit[] | null>(null)
@@ -14,7 +15,7 @@ export function KindBrowser({ kind, title, empty, initial = null }: { kind: stri
   const load = () =>
     void engine('library.find', { query: '', kind })
       .then(setList)
-      .catch(() => setList([]))
+      .catch(noteFailure('library', 'Could not list them', () => setList([])))
   useEffect(load, [kind])
   useEffect(() => {
     if (!selected) return setText('')

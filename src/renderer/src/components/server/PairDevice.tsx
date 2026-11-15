@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ComponentProps } from 'react'
 import QRCode from 'qrcode'
 import { Check, QrCode, X } from 'lucide-react'
 import type { NetworkStatus, PairingInfo } from '@shared/types'
 import { Button, Modal } from '../ui'
 import { main } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
+import { noteFailure } from '../../store/problems'
 
-export function PairDevice({ network }: { network: NetworkStatus }) {
+export function PairDevice({ network, size = 'sm' }: { network: NetworkStatus; size?: ComponentProps<typeof Button>['size'] }) {
   const [info, setInfo] = useState<PairingInfo | null>(null)
   const [image, setImage] = useState<string | null>(null)
 
@@ -14,7 +15,7 @@ export function PairDevice({ network }: { network: NetworkStatus }) {
   const close = () => {
     setInfo(null)
     setImage(null)
-    void main('network.pair.cancel').catch(() => undefined)
+    void main('network.pair.cancel').catch(noteFailure('network', 'Could not cancel pairing'))
   }
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export function PairDevice({ network }: { network: NetworkStatus }) {
       .then(setImage)
       .catch(failed('Could not draw the QR code'))
     return () => {
-      void main('network.pair.cancel').catch(() => undefined)
+      void main('network.pair.cancel').catch(noteFailure('network', 'Could not cancel pairing'))
     }
   }, [info])
 
@@ -41,7 +42,7 @@ export function PairDevice({ network }: { network: NetworkStatus }) {
 
   return (
     <>
-      <Button size="sm" icon={<QrCode />} disabled={!network.listening} onClick={start}>
+      <Button size={size} variant="primary" icon={<QrCode />} disabled={!network.listening} onClick={start}>
         Pair a device
       </Button>
       <Modal

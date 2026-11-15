@@ -19,8 +19,19 @@ const NO_CATALOG: Catalog = {
   entity: () => null
 }
 
-export function componentsFor(host: string): ComponentClass[] {
+export interface ComponentFit {
+  Class: ComponentClass
+  fits: true | string
+}
+
+export function componentFits(host: string): ComponentFit[] {
   const made = host === ENTITY_HOST ? new GameEntity('fit', { kind: ENTITY_HOST, id: 'fit' }, 'fit', NO_CATALOG) : createComponent({ type: host })
   if (!made) return []
-  return componentTypes().filter((Class) => new Class({}).canApply(made) === true)
+  return componentTypes().map((Class) => ({ Class, fits: new Class({}).canApply(made) }))
+}
+
+export function componentsFor(host: string): ComponentClass[] {
+  return componentFits(host)
+    .filter((f) => f.fits === true)
+    .map((f) => f.Class)
 }

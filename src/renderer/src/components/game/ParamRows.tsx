@@ -1,5 +1,5 @@
 import type { ParamSchema } from '@shared/game/core/params'
-import { Fold, TunableRow } from '../ui'
+import { Fold, SettingGrid, TunableRow } from '../ui'
 import { paramEditor, paramLabel, paramWide } from './params'
 
 type Values = Record<string, unknown>
@@ -9,7 +9,7 @@ function same(a: unknown, b: unknown): boolean {
 }
 
 function Rows({ schema, keys, values, onChange }: { schema: ParamSchema; keys: string[]; values: Values; onChange: (next: Values) => void }) {
-  return keys.map((key) => {
+  return <SettingGrid>{keys.map((key) => {
     const spec = schema[key]
     const editor = paramEditor(spec.kind)
     return (
@@ -17,7 +17,7 @@ function Rows({ schema, keys, values, onChange }: { schema: ParamSchema; keys: s
         {editor ? <editor.Editor spec={spec} value={values[key]} onChange={(v) => onChange({ ...values, [key]: v })} /> : <span className="text-[12px] text-faint">This can't be edited here yet.</span>}
       </TunableRow>
     )
-  })
+  })}</SettingGrid>
 }
 
 export function ParamRows({ schema, keys, values, onChange, moreLabel }: { schema: ParamSchema; keys: string[]; values: Values; onChange: (next: Values) => void; moreLabel: string }) {

@@ -1,13 +1,15 @@
+import type { ProblemPrefs } from './problems'
 import type { EntityRecord } from './game/core/GameEntity'
 import { isAssetId } from './ids'
 import type { DndStats } from './dnd'
-import type { Story } from './story'
+import type { Story, StoryMemory } from './story'
 import type { WorldBinding } from './world'
-import type { CardSource } from './cardDecks'
 import type { PickDecisionProps } from './pickDecision'
 import type { RolledDecisionProps } from './rolledDecision'
 import type { OpposedProps } from './opposedCheck'
 import type { ParamSchema } from './game/core/params'
+import type { MoodName } from './moods'
+import type { ChatElement } from './chatElements'
 export type ModelStatus = 'unloaded' | 'loading' | 'ready' | 'error'
 
 export type RemoteApi = 'openai' | 'anthropic'
@@ -406,7 +408,7 @@ export type ModuleSource = 'builtin' | 'user'
 
 export type ModuleKind = 'tools' | 'mcp'
 
-export type ModuleState = 'on' | 'off' | 'needs-enabling' | 'changed' | 'error' | 'loading'
+export type ModuleState = 'on' | 'off' | 'needs-enabling' | 'changed' | 'error' | 'loading' | 'missing-dependency'
 
 export interface ModuleSettingDef {
   name: string
@@ -464,12 +466,16 @@ export interface ModuleInfo {
   pages: PageTypeInfo[]
   values: Record<string, unknown>
   changedFiles: string[]
+  dependencies: string[]
+  missingDependencies: string[]
+  adds: { label: string; items: string[] }[]
   mcp: { transport: string; target: string; status: string } | null
 }
 
 export interface ToolsPrefs {
   toolsFolder: string
   skillsFolder: string
+  zipLimitMb: number
 }
 
 export type ToolChoiceMode = 'auto' | 'force_reason' | 'required' | 'none'
@@ -507,10 +513,13 @@ export interface AgentProfile {
   sheet?: string | null
   sheets?: string[] | null
   player?: string | null
-  cards?: CardSource | null
   createdBy?: string | null
   createdAt: number
   updatedAt: number
+}
+
+export function chatPlayer(agent: { player?: string | null } | null | undefined, worldPlayer: string | null): string | null {
+  return agent?.player || worldPlayer || null
 }
 
 export function agentSheets(agent: { sheet?: string | null; sheets?: string[] | null } | null | undefined): string[] {
@@ -522,7 +531,7 @@ export function agentSheets(agent: { sheet?: string | null; sheets?: string[] | 
   return list
 }
 
-export type AvatarRef = { kind: 'file'; assetId: string } | { kind: 'coded'; type: string }
+export type AvatarRef = { kind: 'file'; assetId: string } | { kind: 'coded'; type: string } | { kind: 'avatar'; id: string }
 
 export interface AgentLook {
   avatar: AvatarRef | null
@@ -554,9 +563,7 @@ export interface SystemStats {
   vramTotal: number | null
 }
 
-export type AvatarState = 'idle' | 'thinking' | 'talking' | 'laughing' | 'happy' | 'sad' | 'angry' | 'error'
-
-export const AVATAR_STATES: AvatarState[] = ['idle', 'thinking', 'talking', 'laughing', 'happy', 'sad', 'angry', 'error']
+export type AvatarState = MoodName
 
 export const REACTIONS: Record<string, string> = {
   sweat_drop: '💧',
@@ -570,12 +577,6 @@ export const REACTIONS: Record<string, string> = {
   fire: '🔥',
   thumbs_up: '👍'
 }
-
-export const CODED_AVATARS: { id: string; label: string }[] = [
-  { id: 'ascii_face', label: 'ASCII face' },
-  { id: 'glitch_skull', label: 'Glitch skull' },
-  { id: 'ascii_hd', label: 'ASCII skull (animated)' }
-]
 
 export interface AgentReaction {
   sessionId: string
@@ -1001,11 +1002,20 @@ export interface TerminalData {
 export type UiRequestKind = 'question' | 'confirm' | 'approval' | 'form' | 'unlock' | 'gather' | 'decide' | 'rolled' | 'opposed'
 export type UiRequestStatus = 'pending' | 'answered' | 'cancelled' | 'expired'
 
+export interface CommandArg {
+  name: string
+  label?: string
+  hint?: string
+  default?: string
+}
+
 export interface CommandInfo {
   name: string
   summary: string
   usage: string
   needsChat: boolean
+  prompt?: string
+  args?: CommandArg[]
 }
 
 export interface CommandResult {
@@ -1148,6 +1158,7 @@ export interface ChatMessage {
   stats?: TurnStats
   notice?: string
   attachments?: string[]
+  elements?: ChatElement[]
   edited?: boolean
 }
 
@@ -1266,7 +1277,7 @@ export function cleanBackdrop(value: unknown): Backdrop | null {
   return { colors, image, slideshow, dim }
 }
 
-export type AvatarSize = 'small' | 'medium' | 'large'
+export type AvatarSize = 'small' | 'medium' | 'large' | 'xl'
 
 export interface VoiceRef {
   id: string
@@ -1358,6 +1369,7 @@ export interface Settings {
   overlayPosition: ScreenPoint | null
   startWithWindows: boolean
   droppedPictures: DropPrefs
+  problems: ProblemPrefs
 }
 
 export interface AppInfo {
@@ -1463,6 +1475,14 @@ export interface RepoEntry {
   updatedAt: number
 }
 
+export interface CharacterMind {
+  reasoningStyle?: string | null
+  howItThinks?: string
+  voiceConstraints?: string
+  forceReason?: boolean
+  memories?: StoryMemory[]
+}
+
 export interface CharacterSheet {
   id: string
   title: string
@@ -1474,6 +1494,7 @@ export interface CharacterSheet {
   faction?: string | null
   save?: string
   story: Story
+  mind?: CharacterMind | null
   image: string | null
   updatedAt: number
 }
@@ -1483,6 +1504,7 @@ export interface CustomCommand {
   name: string
   summary: string
   prompt: string
+  args?: CommandArg[]
   updatedAt: number
 }
 
@@ -1491,6 +1513,7 @@ export interface ReasoningStyle {
   name: string
   instruction: string
   voices: StyleVoice[]
+  constraints?: string
   updatedAt: number
 }
 
@@ -1673,8 +1696,10 @@ export interface EntryPreview {
   icon: string
   id: string
   title: string
+  line?: string
   card: string
   image: string | null
+  fields?: { name: string; text: string }[]
 }
 
 export interface LibraryHit {
@@ -1688,6 +1713,13 @@ export interface LibraryHit {
 }
 
 export const hitDetail = (h: LibraryHit): string => h.excerpt || h.summary
+
+export interface KindLinkActionInfo {
+  name: string
+  label: string
+  detail: string
+  mode: 'insert' | 'placeholder'
+}
 
 export interface KindFlags {
   exportable: boolean

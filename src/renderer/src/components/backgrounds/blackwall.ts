@@ -1,3 +1,4 @@
+import { registerBackgroundDrawer } from './drawers'
 import { BaseBackground } from './base'
 import { BLACKWALL_FACE } from './blackwallFace'
 
@@ -490,3 +491,5 @@ export class BlackwallBackground extends BaseBackground {
     }
   }
 }
+
+registerBackgroundDrawer('blackwall', BlackwallBackground)

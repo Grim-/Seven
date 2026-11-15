@@ -4,13 +4,14 @@ import { NumberField, SettingCard, SettingRow, Toggle } from '../components/ui'
 import { EmbeddingSetting } from '../components/mind/EmbeddingSetting'
 import { engine } from '../lib/ipc'
 import { failed } from '../lib/notify'
+import { noteFailure } from '../store/problems'
 
 export function useContextPrefs(): [ContextPrefs | null, (patch: Partial<ContextPrefs>) => void] {
   const [prefs, setPrefs] = useState<ContextPrefs | null>(null)
   useEffect(() => {
     engine('contextPrefs.get')
       .then(setPrefs)
-      .catch(() => setPrefs(null))
+      .catch(noteFailure('chat', 'Could not read the context settings', () => setPrefs(null)))
   }, [])
   const update = (patch: Partial<ContextPrefs>) => {
     engine('contextPrefs.set', patch)

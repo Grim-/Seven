@@ -1,3 +1,4 @@
+import { noteFailure } from './problems'
 import { create } from 'zustand'
 import type { PlayerCommand, PlayerTrack } from '@shared/types'
 import { engine } from '../lib/ipc'
@@ -19,7 +20,7 @@ const audio = new Audio()
 
 function report(): void {
   const { queue, index, playing } = usePlayer.getState()
-  void engine('player.report', { queue, index, playing }).catch(() => undefined)
+  void engine('player.report', { queue, index, playing }).catch(noteFailure('player', 'Could not report the player state'))
 }
 
 function tracks(ids: string[]): PlayerTrack[] {

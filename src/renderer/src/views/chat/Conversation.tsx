@@ -1,29 +1,34 @@
 import type { ReactNode } from 'react'
-import { Clapperboard, MoreHorizontal } from 'lucide-react'
-import { Button, MainPane, Panel, Popover } from '../../components/ui'
+import { MoreHorizontal } from 'lucide-react'
+import { MainPane, Panel, Popover } from '../../components/ui'
 import { Thread } from '../../components/chat/Thread'
+import { AgentSide } from '../../components/chat/AgentSide'
 import { ContextMeter, InstructionsBanner } from '../../components/chat/ContextMeter'
 import { PromptPeek } from '../../components/chat/PromptPeek'
 import { ChatSettings } from '../../components/chat/ChatSettings'
+import { ChatTabletop } from '../../components/chat/ChatTabletop'
+import { useBoardSurfaces, useChatDashboard, useTabletopMode } from '../../components/chat/tabletopStore'
 import { AgentAvatar, LookBackground, lookVars } from '../../components/agents/look'
 import { VaultVeil } from '../../components/vault/Vault'
 import { SidePanel, SidePanelToggle } from '../../components/side/SidePanel'
-import { BackdropButton, ChatBackdrop, ChatsBackdrop } from '../../components/backdrop/Backdrop'
+import { BackdropButton, ChatBackdrop, ChatsBackdrop, SurfaceBackdrop } from '../../components/backdrop/Backdrop'
 import { useApp } from '../../store/app'
 import { threadProps, useOpenChat } from '../../components/chat/useOpenChat'
 import { DraftAgentSelect } from '../../components/chat/DraftAgentSelect'
-import { useCinema } from '../../lib/cinema'
 import { IncognitoMark } from '../../components/chat/IncognitoMark'
 import { agentSheets, type AvatarSize } from '@shared/types'
 
-const NEXT_SIZE: Record<AvatarSize, AvatarSize> = { small: 'medium', medium: 'large', large: 'small' }
-const HEADER_AVATAR: Record<AvatarSize, number> = { small: 30, medium: 44, large: 64 }
+const NEXT_SIZE: Record<AvatarSize, AvatarSize> = { small: 'medium', medium: 'large', large: 'xl', xl: 'small' }
+const HEADER_AVATAR: Record<AvatarSize, number> = { small: 30, medium: 40, large: 52, xl: 64 }
 
 export function Conversation({ lead }: { lead?: ReactNode }) {
   const chat = useOpenChat()
   const { conv, active, agent, agentId } = chat
   const activeId = conv.sessionId
-  const [, setCinema] = useCinema()
+  const [tabletopMode] = useTabletopMode()
+  const [dashboard] = useChatDashboard(activeId)
+  const { activeSlot } = useBoardSurfaces(dashboard?.id ?? null)
+  const surfaceTarget = dashboard ? { dashboardId: dashboard.id, surfaceId: activeSlot.id, label: activeSlot.label } : null
   const updateSettings = useApp((st) => st.updateSettings)
   const avatarSize = useApp((st) => st.settings?.avatarSize ?? 'small')
 
@@ -39,8 +44,11 @@ export function Conversation({ lead }: { lead?: ReactNode }) {
           <DraftAgentSelect conv={conv} agentId={agentId} />
         </div>
       )}
-      <BackdropButton sessionId={activeId} />
-      <Button size="sm" title="Cinema (Ctrl+Shift+F)" icon={<Clapperboard />} onClick={() => setCinema(true)} className="w-7 px-0" />
+      <BackdropButton
+        sessionId={activeId}
+        surfaceTarget={tabletopMode.windowed ? surfaceTarget : null}
+        initialScope={tabletopMode.windowed && surfaceTarget ? 'surface' : undefined}
+      />
       <ContextMeter />
     </>
   )
@@ -60,7 +68,7 @@ export function Conversation({ lead }: { lead?: ReactNode }) {
               </span>
               <span className="contents tablet:hidden">{extras}</span>
               <span className="hidden tablet:flex">
-                <Popover title="More" side="bottom" align="start" className="flex flex-col items-start gap-2 p-2" trigger={<Button size="sm" title="More" icon={<MoreHorizontal />} className="w-7 px-0" />}>
+                <Popover title="More" side="bottom" align="start" className="flex flex-col items-start gap-2 p-2" triggerClassName="h-7 w-7 justify-center border border-line/60 text-dim hover:border-accent hover:text-white" trigger={<MoreHorizontal className="h-4 w-4" />}>
                   {extras}
                 </Popover>
               </span>
@@ -68,6 +76,7 @@ export function Conversation({ lead }: { lead?: ReactNode }) {
           }
           actions={
             <>
+              <AgentSide agent={agent ?? null} height={HEADER_AVATAR[avatarSize]} />
               {agent ? (
                 <ChatSettings
                   agent={agent}
@@ -96,12 +105,24 @@ export function Conversation({ lead }: { lead?: ReactNode }) {
           loading={chat.running || chat.loading}
           bodyClassName="relative flex flex-col p-0"
         >
-          <ChatsBackdrop />
-          <LookBackground look={agent?.look} />
-          <ChatBackdrop sessionId={activeId} />
+          {tabletopMode.windowed && dashboard ? (
+            <SurfaceBackdrop dashboardId={dashboard.id} surfaceId={activeSlot.id} />
+          ) : (
+            <>
+              <ChatsBackdrop />
+              <LookBackground look={agent?.look} />
+              <ChatBackdrop sessionId={activeId} />
+            </>
+          )}
           <VaultVeil agentId={agentId ?? null} />
-          <InstructionsBanner />
-          <Thread key={activeId ?? 'new'} {...threadProps(chat, 'No model is loaded. Load one in Models, or give this agent a model, then start typing.')} />
+          <ChatTabletop sessionId={activeId} agent={agent ?? null}>
+            <InstructionsBanner />
+            <Thread
+              key={activeId ?? 'new'}
+              look={tabletopMode.windowed ? 'tabletop' : 'panel'}
+              {...threadProps(chat, 'No model is loaded. Load one in Models, or give this agent a model, then start typing.')}
+            />
+          </ChatTabletop>
         </Panel>
       </MainPane>
       <SidePanel />

@@ -1,3 +1,4 @@
+import { notFound } from '@shared/errors'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import type { Reminder, ReminderFired, ReminderRepeat } from '@shared/types'
@@ -105,7 +106,7 @@ export class Reminders extends EventEmitter {
 
   cancel(id: string): Reminder[] {
     const list = this.list()
-    if (!list.some((r) => r.id === id)) throw new Error(`There is no reminder "${id}"`)
+    if (!list.some((r) => r.id === id)) throw notFound(new Error(`There is no reminder "${id}"`))
     this.waiting.delete(id)
     return this.save(list.filter((r) => r.id !== id))
   }
@@ -117,7 +118,7 @@ export class Reminders extends EventEmitter {
   snooze(id: string, minutes: number): Reminder[] {
     const list = this.list()
     const r = list.find((x) => x.id === id)
-    if (!r) throw new Error(`There is no reminder "${id}"`)
+    if (!r) throw notFound(new Error(`There is no reminder "${id}"`))
     const snoozed: Reminder = { ...r, id: newId('rem'), repeat: 'none', next: Date.now() + minutes * 60_000, enabled: true, createdAt: Date.now(), lastFiredAt: null }
     return this.save([...list, snoozed])
   }

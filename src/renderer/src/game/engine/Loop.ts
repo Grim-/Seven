@@ -9,7 +9,8 @@ export class Loop {
 
   constructor(
     private update: (dt: number) => void,
-    private render: (alpha: number) => void
+    private render: (alpha: number) => void,
+    private shouldContinue: () => boolean = () => true
   ) {}
 
   get active(): boolean {
@@ -38,6 +39,10 @@ export class Loop {
       this.carry -= STEP
     }
     this.render(this.carry / STEP)
-    this.frame = requestAnimationFrame(this.tick)
+    if (this.running && this.shouldContinue()) {
+      this.frame = requestAnimationFrame(this.tick)
+    } else {
+      this.running = false
+    }
   }
 }

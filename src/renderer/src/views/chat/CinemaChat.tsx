@@ -12,10 +12,13 @@ import { VaultVeil } from '../../components/vault/Vault'
 import { EdgeRail, HudFrame, Popover, RailButton, RailItem, SquareIcon } from '../../components/ui'
 import { useSessions } from '../../store/sessions'
 import { useEscapeLayer } from '../../lib/escape'
+import { useKeybindLabel } from '../../store/keybinds'
 
 export function CinemaChat({ onLeave }: { onLeave: () => void }) {
   const chat = useOpenChat()
   const { conv, active, agent, agentId } = chat
+  const modeKey = useKeybindLabel('chat.cycleMode')
+  const cinemaKey = useKeybindLabel('chat.cinema')
   useEscapeLayer(true, onLeave)
   return (
     <div style={lookVars(agent?.look)} className="relative h-full overflow-hidden bg-bg">
@@ -26,7 +29,7 @@ export function CinemaChat({ onLeave }: { onLeave: () => void }) {
         title={active?.title ?? 'New chat'}
         hint={
           <>
-            <b>Esc</b> leave · <b>Ctrl+Shift+F</b> cinema
+            <b>Esc</b> leave · <b>{modeKey}</b> view · <b>{cinemaKey}</b> cinema
           </>
         }
       />

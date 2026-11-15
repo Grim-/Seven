@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import type { InstallChoice } from '@shared/types'
 import { helperOf, type Choice, type StoredRelease } from './registry'
 import { change, record, settingsOf } from './store'
@@ -22,7 +23,7 @@ export function refreshReleases(id: string): Promise<void> {
 
 export function checkIfDue(id: string, hours: number): void {
   const at = record(id).checkedAt
-  if (hours > 0 && (at === null || Date.now() - at > hours * 3_600_000)) void refreshReleases(id).catch(() => undefined)
+  if (hours > 0 && (at === null || Date.now() - at > hours * 3_600_000)) void refreshReleases(id).catch((err: unknown) => noteFailure(err, 'install', 'Could not refresh the release list'))
 }
 
 export function releaseOf(id: string, tag: string): StoredRelease {

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { create } from 'zustand'
-import { REACTIONS, type AgentReaction, type AvatarState } from '@shared/types'
+import { REACTIONS, type AgentReaction } from '@shared/types'
+import { FAILED_MOOD, type Activity, type MoodName } from '@shared/moods'
 import { useSessions } from './sessions'
 
 interface Mood {
-  state: AvatarState
+  state: MoodName
   until: number
 }
 
@@ -60,22 +61,32 @@ export const useReactions = create<ReactionsState>((set, get) => ({
   }
 }))
 
-function streamState(sessionId: string | null): AvatarState | null {
-  if (!sessionId) return null
+function activityOf(sessionId: string | null): Activity {
+  if (!sessionId) return 'idle'
   const s = useSessions.getState()
-  if (!s.running[sessionId]) return null
+  if (!s.running[sessionId]) return 'idle'
   const last = s.messages[sessionId]?.at(-1)
   if (!last || last.role !== 'assistant') return 'thinking'
   const part = last.parts.at(-1)
-  if (!part || part.type === 'thought' || (part.type === 'tool' && part.status === 'running')) return 'thinking'
-  if (part.type === 'text') return 'talking'
+  if (part?.type === 'tool' && part.status === 'running') return 'tool'
+  if (part?.type === 'text') return 'talking'
   return 'thinking'
 }
 
-export function useAvatarState(sessionId: string | null): AvatarState {
+export function useActivity(sessionId: string | null): Activity {
+  return useSessions(() => activityOf(sessionId))
+}
+
+export function spokenLength(sessionId: string): number {
+  const last = useSessions.getState().messages[sessionId]?.at(-1)
+  if (!last || last.role !== 'assistant') return 0
+  const part = last.parts.at(-1)
+  return part?.type === 'text' ? part.text.length : 0
+}
+
+export function useAvatarMood(sessionId: string | null): MoodName | null {
   const mood = useReactions((s) => (sessionId ? s.moods[sessionId] : undefined))
   const failed = useReactions((s) => (sessionId ? s.failed[sessionId] : undefined))
-  const stream = useSessions(() => streamState(sessionId))
   const [, setNow] = useState(0)
   const now = Date.now()
   useEffect(() => {
@@ -85,9 +96,8 @@ export function useAvatarState(sessionId: string | null): AvatarState {
     return () => clearTimeout(timer)
   }, [mood, failed])
   if (mood && mood.until > now) return mood.state
-  if (stream) return stream
-  if (failed && failed > now) return 'error'
-  return 'idle'
+  if (failed && failed > now) return FAILED_MOOD
+  return null
 }
 
 export function useBubbles(sessionId: string | null): Bubble[] {

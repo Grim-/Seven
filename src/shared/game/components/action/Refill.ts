@@ -1,4 +1,6 @@
-import { registerComponent, type TooltipRow } from '../../core'
+import { ITEMS, type EffectGroup } from '../../effectGroups'
+import { registerComponent, type Component, type GameEntity, type TooltipRow } from '../../core'
+import { Ability } from '../Abilities'
 import { ActionPiece, type ActionEvent, type UseContext } from '../Action'
 import { Inventory, Item } from '../Inventory'
 import { ItemResource } from '../item/ItemResource'
@@ -12,6 +14,10 @@ export class Refill extends ActionPiece {
     item: { kind: 'template' as const, templateKind: 'game_item', default: '', description: 'The item taken from the inventory.' },
     perItem: { kind: 'number' as const, default: 1, min: 0.001, description: 'How much each item taken adds.' }
   }
+  static readonly SENTENCE: string = 'Refill {resource} from {item}[, {perItem} per item]'
+  static readonly GROUP: EffectGroup | null = ITEMS
+  static readonly ICON: string = 'RotateCw'
+  static readonly AIMS: boolean = false
 
   private pool(): ItemResource | null {
     const item = this.action?.parent
@@ -20,6 +26,10 @@ export class Refill extends ActionPiece {
 
   private stacks(ctx: { user: UseContext['user'] }): Item[] {
     return ctx.user.comp(Inventory)?.items.filter((i) => i.id === String(this.params.item)) ?? []
+  }
+
+  canApply(host: Component | GameEntity): true | string {
+    return host instanceof Ability ? true : 'only in an ability inside an item'
   }
 
   canUse(ctx: UseContext): true | string {
@@ -36,12 +46,15 @@ export class Refill extends ActionPiece {
     if (!pool || !bag) return
     const per = Number(this.params.perItem)
     let wanted = Math.ceil((pool.max() - pool.get()) / per - 1e-9)
+    let added = 0
     for (const stack of this.stacks(event)) {
       if (wanted <= 0) break
       const taken = bag.take(stack, wanted)
       pool.change(taken * per)
+      added += taken * per
       wanted -= taken
     }
+    this.report(event, { added }, added ? `Refilled ${String(pool.params.label || pool.id)} by ${added}.` : `Nothing left to refill ${String(pool.params.label || pool.id)} with.`)
     this.next(event)
   }
 

@@ -86,3 +86,8 @@ export function catalogData(defs: Record<string, GameDef[]>): CatalogData {
   for (const type of defTypes()) for (const def of defs[type.type] ?? []) type.addTo(data, def)
   return data
 }
+
+export function splitDefRef(ref: string): { id: string } {
+  const at = ref.indexOf('/')
+  return { id: at < 0 ? ref : ref.slice(at + 1) }
+}

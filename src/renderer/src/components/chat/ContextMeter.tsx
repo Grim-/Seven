@@ -10,6 +10,7 @@ import { engine } from '../../lib/ipc'
 import { formatBytes } from '../../lib/format'
 import { cn } from '../../lib/cn'
 import { failed } from '../../lib/notify'
+import { noteFailure } from '../../store/problems'
 
 const EMPTY: ChatMessage[] = []
 
@@ -57,7 +58,7 @@ function Inspector({ sessionId, usage, onClose }: { sessionId: string | null; us
   useEffect(() => {
     engine('models.facts')
       .then(setFacts)
-      .catch(() => setFacts(null))
+      .catch(noteFailure('model', 'Could not read the model facts', () => setFacts(null)))
   }, [])
   const turns = messages.filter((m) => m.role === 'assistant' && m.stats)
   return (
@@ -228,7 +229,7 @@ export function SummaryCard() {
       <div className="flex shrink-0 items-center gap-3 border-t border-accent/40 bg-accent/[0.06] px-3.5 py-2 text-[12.5px] text-white/90">
         <span className="h-1.5 w-1.5 animate-pulse bg-accent" />
         <span className="min-w-0 flex-1">Summarising the oldest turns for the model…</span>
-        <Button size="sm" variant="ghost" icon={<Square />} onClick={() => void engine('sessions.abort', { id: activeId })}>
+        <Button size="sm" variant="ghost" icon={<Square />} onClick={() => void engine('sessions.abort', { id: activeId }).catch(failed('Could not stop it'))}>
           Stop
         </Button>
       </div>

@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { LinkedFolder } from '@shared/types'
@@ -153,7 +154,8 @@ export function displayPath(scope: Scope, absolute: string): string {
     let root: string
     try {
       root = folderRoot(folder)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'folders', 'A linked folder could not be reached')
       continue
     }
     if (within(root, absolute)) {
@@ -172,7 +174,8 @@ export function isHidden(scope: Scope, absolute: string): boolean {
     let root: string
     try {
       root = folderRoot(folder)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'folders', 'A linked folder could not be reached')
       continue
     }
     if (within(root, absolute)) return excludedBy(folder, relIn(root, absolute)) !== null

@@ -1,7 +1,8 @@
+import { noteFailure } from '../util/report'
 import { toolGuide } from '../tools/signature'
-import { sheetMarkdown } from '../library/sheets'
+import { characterMindFor, sheetMarkdown } from '../library/sheets'
 import os from 'node:os'
-import { agentSheets, type AgentProfile, type ToolChoiceMode } from '@shared/types'
+import { agentSheets, type AgentProfile } from '@shared/types'
 import type { ToolDef } from '../tools/types'
 import { detectShell } from '../tools/shell'
 import { modules } from '../modules/registry'
@@ -10,6 +11,7 @@ import { placesGuide } from '../present/guide'
 import { libraryGuide } from '../library/kinds'
 import { worldGuide } from '../worlds/ops'
 import { userSection } from '../user/identity'
+import { styles } from '../mind/styles'
 import { linkFor } from '@shared/text'
 
 const ROLEPLAY = [
@@ -20,13 +22,48 @@ const ROLEPLAY = [
   '- narration as plain paragraphs.'
 ].join('\n')
 
-function deliberationDirective(mode: ToolChoiceMode | null | undefined): string {
-  if (mode !== 'force_reason') return ''
-  return [
-    '## Deliberation Protocol',
-    '- Before providing dialogue or in-character speech, you must deliberate using the reason tool.',
-    '- Weigh conflicting viewpoints and motives first, then formulate your decision.'
-  ].join('\n')
+function reasoningDirective(agent: AgentProfile, tools: ToolDef[]): string {
+  const hasReasonTool = tools.some((t) => t.name === 'reason')
+  const sheets = agentSheets(agent)
+  const hasCharacter = sheets.length > 0 || agent.roleplay === true
+  const charMind = sheets.length ? characterMindFor(sheets) : null
+  const chosenStyleRef = agent.reasoningStyle || charMind?.reasoningStyle || null
+  const explicitStyle = chosenStyleRef ? styles.find(chosenStyleRef) : null
+  const forced = agent.toolChoice === 'force_reason' || charMind?.forceReason === true
+  const style = explicitStyle ?? (forced || (hasReasonTool && hasCharacter) ? (styles.list()[0] ?? null) : null)
+  if (!forced && !style && !charMind && !(hasReasonTool && hasCharacter)) return ''
+
+  const lines: string[] = ['## Pre-output reasoning & voice filter']
+  if (forced && hasReasonTool) {
+    lines.push('- Before outputting any visible dialogue, action, or reply, you MUST deliberate using the `reason` tool on what is about to happen, be said, or be done.')
+  } else if (hasReasonTool && (style || charMind)) {
+    lines.push('- Before outputting visible dialogue or key actions, use the `reason` tool (or your internal thinking) to work through what is about to happen, be said, or be done.')
+  } else {
+    lines.push('- Inside your thinking before writing any visible text, reason through what is about to happen, be said, or be done first.')
+  }
+
+  if (style) {
+    lines.push(`- Modus operandi (${style.name}): ${style.instruction}`)
+    if (style.voices.length) {
+      lines.push('- Voices to weigh:')
+      for (const v of style.voices) lines.push(`  - ${v.label}: ${v.line}`)
+    }
+    if (style.constraints?.trim()) {
+      lines.push(`- Style constraints (enforced on every output): ${style.constraints.trim()}`)
+    }
+  }
+
+  if (charMind?.howItThinks?.trim()) {
+    lines.push(`- Character modus operandi: ${charMind.howItThinks.trim()}`)
+  }
+  if (charMind?.voiceConstraints?.trim()) {
+    lines.push(`- Character output constraints (enforced on every reply): ${charMind.voiceConstraints.trim()}`)
+  }
+
+  if (hasCharacter) {
+    lines.push('- Voice & character filter: forcefully filter every line of dialogue, word choice, and action through your character’s way of thinking and speaking (Speech, Motivations & goals, Core beliefs) before writing output. Strip generic or out-of-character phrasing.')
+  }
+  return lines.join('\n')
 }
 
 function memorySection(memoryText: string): string {
@@ -47,7 +84,8 @@ function characterOf(agent: AgentProfile): string {
     return `## Your characters\nYou play the following characters in this conversation:\n\n${sheets
       .map((s) => sheetMarkdown(s, true).replace(/^# /, '### ').replace(/\n## /g, '\n#### '))
       .join('\n\n---\n\n')}`
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'chat', 'Could not add the character to the prompt')
     return ''
   }
 }
@@ -101,7 +139,7 @@ function guidesSection(tools: ToolDef[]): string {
 }
 
 export function buildInstructions(agent: AgentProfile, tools: ToolDef[], memoryText = ''): string {
-  if (!tools.length) return [characterOf(agent), agent.systemPrompt, userSection(), agent.roleplay ? ROLEPLAY : '', deliberationDirective(agent.toolChoice), memorySection(memoryText)].filter(Boolean).join('\n\n')
+  if (!tools.length) return [characterOf(agent), agent.systemPrompt, userSection(), agent.roleplay ? ROLEPLAY : '', reasoningDirective(agent, tools), memorySection(memoryText)].filter(Boolean).join('\n\n')
   const env = [`- Operating system: ${os.type()} (${process.platform})`]
   const folders = linkedFolders.forAgent(agent.id)
   if (tools.some((t) => t.needsWorkspace)) {
@@ -129,7 +167,7 @@ export function buildInstructions(agent: AgentProfile, tools: ToolDef[], memoryT
     ].join('\n')
   ]
   if (agent.roleplay) sections.push(ROLEPLAY)
-  sections.push(deliberationDirective(agent.toolChoice))
+  sections.push(reasoningDirective(agent, tools))
   sections.push(libraryGuide(tools.map((t) => t.name), agent.id))
   sections.push(placesGuide(tools))
   if (tools.some((t) => t.name === 'world_recall')) sections.push(worldGuide(agent.world, tools.some((t) => t.name === 'world_create')))

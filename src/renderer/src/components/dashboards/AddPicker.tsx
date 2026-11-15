@@ -1,188 +1,262 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
-import { Check, Import } from 'lucide-react'
+import { useMemo } from 'react'
+import { Import, LayoutDashboard, Plus } from 'lucide-react'
 import { widgetUiOf } from '../../registries/widgets'
 import { useWidgetInfo } from '../../store/widgetInfo'
 import { useTools } from '../../store/tools'
-import type { AssetMeta, Dashboard, LibrarySection } from '@shared/types'
+import type { AssetMeta, Dashboard } from '@shared/types'
 import { showName } from '@shared/ids'
-import { presentOf } from '../../registries/kinds'
-import { KindIcon } from '../../lib/library'
-import { Button, Modal, SearchBox } from '../ui'
+import { Button, KindShell, Modal, type ShellAdd, type ShellItem } from '../ui'
+import { KindExplorer } from '../library/KindExplorer'
 import { engine } from '../../lib/ipc'
 import { errorText } from '../../lib/format'
 import { toast } from '../../store/toasts'
 import { chooseFiles } from '../../lib/importFiles'
-import { cn } from '../../lib/cn'
+import { useBusy } from '../../lib/useBusy'
+import {
+  getBoardSurfaces,
+  updateWidgetTokenPose,
+  useBoardLayoutMode,
+  usePendingBoardPlacement,
+  useTabletopMode,
+  type WidgetTokenPose
+} from '../chat/tabletopStore'
+import { useApp } from '../../store/app'
+import { useDashboards } from '../../store/dashboards'
 
 export function fileThings(files: AssetMeta[]): string[] {
   return files.map((f) => `file/${f.id}`)
 }
 
-export async function placeOnBoard(dashboardId: string, things: string[], at: { x: number; y: number } | null = null): Promise<void> {
+export async function placeOnBoard(
+  dashboardId: string,
+  things: string[],
+  at: { x: number; y: number } | null = null,
+  posePatch?: Partial<WidgetTokenPose>
+): Promise<void> {
   if (!things.length) return
-  await engine('widgets.place', { dashboardId, things, at })
+  const activeSurfaceId = getBoardSurfaces(dashboardId).activeId
+  const updated = await engine('widgets.place', { dashboardId, things, at: null })
+  useDashboards.getState().onChanged(updated.id, updated)
+  const count = things.length
+  const added = updated.widgets.slice(-count)
+  added.forEach((w, idx) => {
+    const widgetIndex = updated.widgets.length - count + idx
+    updateWidgetTokenPose(
+      dashboardId,
+      w.id,
+      {
+        surfaceId: activeSurfaceId,
+        ...(at ? { x: at.x + idx * 28, y: at.y + idx * 28, expanded: true } : {}),
+        ...posePatch
+      },
+      widgetIndex,
+      w
+    )
+  })
 }
 
-type Key = `e:${string}` | `c:${string}:${string}`
+function GlancesAndWidgetsTab({
+  dashboard,
+  clickToPlace,
+  onAdded
+}: {
+  dashboard: Dashboard
+  clickToPlace: boolean
+  onAdded: () => void
+}) {
+  const modules = useTools((s) => s.list)
+  const providers = useWidgetInfo((s) => s.providers)
+  const setPending = usePendingBoardPlacement((s) => s.setPending)
+  const [, run] = useBusy()
 
-const SHOWN = 30
+  const items: ShellItem[] = useMemo(() => {
+    const out: ShellItem[] = []
+    for (const p of providers) {
+      const ui = widgetUiOf(p.kind)?.choices
+      if (!ui) continue
+      const list = (p.choices ?? []).filter((c) => !c.module || modules.some((m) => m.id === c.module && m.state === 'on'))
+      for (const c of list) {
+        out.push({
+          key: `${p.kind}:${c.id}`,
+          title: c.label,
+          subtitle: ui.heading,
+          tag: ui.meta.toUpperCase(),
+          icon: ui.icon
+        })
+      }
+    }
+    return out
+  }, [providers, modules])
 
-function Row({ picked, onClick, icon, title, meta }: { picked: boolean; onClick: () => void; icon: React.ReactNode; title: string; meta: string }) {
+  const adds: ShellAdd[] = providers
+    .filter((p) => p.create)
+    .map((p) => ({
+      label: p.create as string,
+      icon: widgetUiOf(p.kind)?.createIcon ?? <Plus />,
+      onClick: () => {
+        const label = p.create as string
+        const commit = async (pt?: { x: number; y: number }) => {
+          const activeSurfaceId = getBoardSurfaces(dashboard.id).activeId
+          const updated = await engine('widgets.create', { dashboardId: dashboard.id, kind: p.kind })
+          useDashboards.getState().onChanged(updated.id, updated)
+          const newest = updated.widgets.at(-1)
+          if (newest) {
+            updateWidgetTokenPose(
+              dashboard.id,
+              newest.id,
+              {
+                surfaceId: activeSurfaceId,
+                ...(pt ? { x: pt.x, y: pt.y, expanded: true } : {})
+              },
+              updated.widgets.length - 1,
+              newest
+            )
+          }
+          toast.success(`Added to ${dashboard.name}`, label)
+        }
+        if (clickToPlace) {
+          setPending({ dashboardId: dashboard.id, label, commit: (pt) => commit(pt) })
+          onAdded()
+          return
+        }
+        void run(() => commit(), 'Could not add widget')
+      }
+    }))
+
   return (
-    <button onClick={onClick} className={cn('flex w-full items-center gap-2.5 px-2.5 py-1.5 text-left', picked ? 'bg-accent/10' : 'hover:bg-white/[0.04]')}>
-      <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center border', picked ? 'border-accent bg-accent text-black' : 'border-line')}>
-        {picked && <Check className="h-3 w-3" />}
-      </span>
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden border border-line/50">{icon}</span>
-      <span className="min-w-0 flex-1 truncate text-[13px] text-white">{title}</span>
-      <span className="shrink-0 font-mono text-[10.5px] uppercase tracking-wider text-teal/70">{meta}</span>
-    </button>
+    <KindShell
+      id="pick-board-widgets"
+      layouts={['cards', 'tiles', 'list']}
+      items={items}
+      adds={adds}
+      onOpen={(item) => {
+        const colon = item.key.indexOf(':')
+        if (colon < 0) return
+        const kind = item.key.slice(0, colon)
+        const id = item.key.slice(colon + 1)
+        const source = widgetUiOf(kind)?.choices?.source(id)
+        if (!source) return
+        const commit = async (pt?: { x: number; y: number }) => {
+          const activeSurfaceId = getBoardSurfaces(dashboard.id).activeId
+          const updated = await engine('widgets.add', { dashboardId: dashboard.id, title: null, source, view: null, options: null })
+          useDashboards.getState().onChanged(updated.id, updated)
+          const newest = updated.widgets.at(-1)
+          if (newest) {
+            updateWidgetTokenPose(
+              dashboard.id,
+              newest.id,
+              {
+                surfaceId: activeSurfaceId,
+                ...(pt ? { x: pt.x, y: pt.y, expanded: true } : {})
+              },
+              updated.widgets.length - 1,
+              newest
+            )
+          }
+          toast.success(`Added to ${dashboard.name}`, item.title)
+        }
+        if (clickToPlace) {
+          setPending({ dashboardId: dashboard.id, label: item.title, commit: (pt) => commit(pt) })
+          onAdded()
+          return
+        }
+        void run(async () => {
+          await commit()
+          onAdded()
+        }, 'Could not add widget')
+      }}
+      empty="No glances or tool widgets available."
+    />
   )
 }
 
 export function AddPicker({ dashboard, onClose }: { dashboard: Dashboard; onClose: () => void }) {
-  const modules = useTools((s) => s.list)
-  const [sections, setSections] = useState<LibrarySection[]>([])
-  const providers = useWidgetInfo((s) => s.providers)
-  const [query, setQuery] = useState('')
-  const [picked, setPicked] = useState<Key[]>([])
-  const [busy, setBusy] = useState(false)
-  const q = query.trim().toLowerCase()
-  const match = (text: string) => !q || text.toLowerCase().includes(q)
-  useEffect(() => {
-    let live = true
-    const timer = setTimeout(
-      () =>
-        void engine('library.overview', { query: q, perKind: SHOWN })
-          .then((list) => live && setSections(list.filter((s) => s.boardable && s.entries.length)))
-          .catch(() => undefined),
-      q ? 200 : 0
-    )
-    return () => {
-      live = false
-      clearTimeout(timer)
-    }
-  }, [q])
-  const toggle = (key: Key) => setPicked((p) => (p.includes(key) ? p.filter((k) => k !== key) : [...p, key]))
+  const [busy, run] = useBusy()
+  const appView = useApp((s) => s.view)
+  const [chatMode] = useTabletopMode()
+  const [boardMode] = useBoardLayoutMode(dashboard.id, 'grid')
+  const setPending = usePendingBoardPlacement((s) => s.setPending)
+  const clickToPlace = appView === 'chat' ? chatMode.layoutMode === 'tabletop' : boardMode === 'tabletop'
 
-  const lists = useMemo(
-    () => ({
-      choices: providers.flatMap((p) => {
-        const ui = widgetUiOf(p.kind)?.choices
-        const list = (p.choices ?? []).filter((c) => (!c.module || modules.some((m) => m.id === c.module && m.state === 'on')) && match(c.label))
-        return ui && list.length ? [{ kind: p.kind, ui, list }] : []
+  const pickEntry = (kind: string, id: string) => {
+    const label = showName(id)
+    if (clickToPlace) {
+      setPending({
+        dashboardId: dashboard.id,
+        label,
+        commit: async (pt) => {
+          await placeOnBoard(dashboard.id, [`${kind}/${id}`], pt)
+          toast.success(`Added to ${dashboard.name}`, label)
+        }
       })
-    }),
-    [q, modules, providers]
-  )
-
-  const add = async (keys: Key[]) => {
-    setBusy(true)
-    try {
-      for (const key of keys.filter((k) => k.startsWith('c:'))) {
-        const [, kind, id] = key.split(':')
-        const source = widgetUiOf(kind)?.choices?.source(id)
-        if (source) await engine('widgets.add', { dashboardId: dashboard.id, title: null, source, view: null, options: null })
-      }
-      await placeOnBoard(dashboard.id, keys.filter((k) => k.startsWith('e:')).map((k) => k.slice(2)))
       onClose()
-    } catch (err) {
-      toast.error('Could not add', errorText(err))
+      return
     }
-    setBusy(false)
-  }
-
-  const create = async (kind: string) => {
-    setBusy(true)
-    try {
-      await engine('widgets.create', { dashboardId: dashboard.id, kind })
-      onClose()
-    } catch (err) {
-      toast.error('Could not add', errorText(err))
-    }
-    setBusy(false)
+    void run(async () => {
+      await placeOnBoard(dashboard.id, [`${kind}/${id}`])
+      toast.success(`Added to ${dashboard.name}`, label)
+    }, 'Could not add to board')
   }
 
   const importFiles = async () => {
     const added = await chooseFiles()
     if (!added.length) return
+    const label = `${added.length} file${added.length === 1 ? '' : 's'}`
+    if (clickToPlace) {
+      setPending({
+        dashboardId: dashboard.id,
+        label,
+        commit: async (pt) => {
+          await placeOnBoard(dashboard.id, fileThings(added), pt)
+          toast.success(`Added to ${dashboard.name}`, label)
+        }
+      })
+      onClose()
+      return
+    }
     try {
       await placeOnBoard(dashboard.id, fileThings(added))
-      onClose()
+      toast.success(`Added to ${dashboard.name}`, label)
     } catch (err) {
       toast.error('Could not add files', errorText(err))
     }
   }
 
-  const heading = (text: string, count: number) =>
-    count > 0 && <div className="mt-2 px-2.5 pb-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-accent-soft">{text}</div>
-
   return (
     <Modal
       open
+      wide
       title={`Add to ${dashboard.name}`}
       onClose={onClose}
+      bodyClassName="flex h-[72vh] min-h-0 flex-col p-3"
       footer={
         <>
-          <Button variant="ghost" icon={<Import />} onClick={() => void importFiles()}>
+          <Button variant="ghost" icon={<Import />} disabled={busy} onClick={() => void importFiles()}>
             Files from disk…
           </Button>
-          <span className="flex-1" />
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" disabled={!picked.length || busy} onClick={() => void add(picked)}>
-            Add{picked.length > 1 ? ` ${picked.length}` : ''}
+          <span className="flex-1 font-mono text-[11px] text-dim">
+            {clickToPlace
+              ? `Select any item, then click on ${dashboard.name} where you want to place it.`
+              : `Click any card, tile, or row to place it on ${dashboard.name}, or drag items straight onto the board.`}
+          </span>
+          <Button variant="primary" onClick={onClose}>
+            Done
           </Button>
         </>
       }
     >
-      <div className="flex flex-col gap-2">
-        <SearchBox value={query} onChange={setQuery} />
-        <div className="flex gap-2">
-          {providers
-            .filter((p) => p.create)
-            .map((p) => (
-              <Button key={p.kind} size="sm" variant="secondary" icon={widgetUiOf(p.kind)?.createIcon} onClick={() => void create(p.kind)}>
-                {p.create}
-              </Button>
-            ))}
-        </div>
-        <div className="max-h-[50vh] overflow-y-auto border border-line/50">
-          {lists.choices.map(({ kind, ui, list }) => (
-            <Fragment key={kind}>
-              {heading(ui.heading, list.length)}
-              {list.map((c) => (
-                <Row key={c.id} picked={picked.includes(`c:${kind}:${c.id}`)} onClick={() => toggle(`c:${kind}:${c.id}`)} icon={ui.icon} title={c.label} meta={ui.meta} />
-              ))}
-            </Fragment>
-          ))}
-          {sections.map((section) => {
-            const { Thumb } = presentOf(section.kind)
-            return (
-              <Fragment key={section.kind}>
-                {heading(section.plural, section.entries.length)}
-                {section.entries.map((h) => {
-                  const key: Key = `e:${section.kind}/${h.id}`
-                  return (
-                    <Row
-                      key={key}
-                      picked={picked.includes(key)}
-                      onClick={() => toggle(key)}
-                      icon={Thumb ? <Thumb id={h.id} /> : <KindIcon name={section.icon} className="h-3.5 w-3.5 text-dim" />}
-                      title={showName(h.title)}
-                      meta={section.label}
-                    />
-                  )
-                })}
-              </Fragment>
-            )
-          })}
-          {!sections.length && !lists.choices.length && (
-            <div className="px-3 py-4 text-[12.5px] text-dim">{q ? 'Nothing matches.' : 'Nothing yet. Add files from disk, or a Text or Page item.'}</div>
-          )}
-        </div>
-      </div>
+      <KindExplorer
+        id="board.addExplorer"
+        onPick={pickEntry}
+        tabs={[
+          {
+            id: '__widgets',
+            label: 'Glances & Widgets',
+            icon: <LayoutDashboard className="h-3.5 w-3.5" />,
+            node: <GlancesAndWidgetsTab dashboard={dashboard} clickToPlace={clickToPlace} onAdded={onClose} />
+          }
+        ]}
+      />
     </Modal>
   )
 }

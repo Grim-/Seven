@@ -39,6 +39,5 @@ export function paintTiles(layer: TileLayerData, ctx: PaintContext): Container {
     } else sprite.scale.set(fh, fv)
     chunkOf(col, row).addChild(sprite)
   })
-  for (const chunk of chunks.values()) chunk.cacheAsTexture({ scaleMode: 'nearest', resolution: 1, antialias: false })
   return root
 }

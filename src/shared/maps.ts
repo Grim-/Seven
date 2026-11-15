@@ -3,6 +3,8 @@ import { PLACE_TYPE_KEY, recordKey } from './world'
 import type { DndStats } from './dnd'
 import type { EntityRecord } from './game/core/GameEntity'
 import { cleanTrigger, type TriggerDef } from './game/triggers'
+import { cleanComponents } from './game/core/params'
+import type { ComponentDef } from './game/core/registry'
 import { refsIn } from './story'
 
 export interface LayerBase {
@@ -171,6 +173,7 @@ export interface ObjectLayerData extends LayerBase, PictureLayer {
   actions?: string
   decisions?: string
   states?: ObjectStateRule[]
+  comps?: ComponentDef[]
 }
 
 export type MapLayer = TileLayerData | ImageLayerData | GroupLayerData | ObjectLayerData
@@ -279,6 +282,10 @@ export interface TokenVisitor extends PlaceVisitor {
   hp: { cur: number; max: number } | null
 }
 
+export function asToken(visitor: PlaceVisitor, token: string, source: string): TokenVisitor {
+  return { ...visitor, token, source, hp: visitor.dnd ? { cur: visitor.dnd.hp.cur, max: visitor.dnd.hp.max } : null }
+}
+
 export interface MapMeta {
   id: string
   name: string
@@ -355,7 +362,8 @@ function cleanLayer(raw: unknown): MapLayer | null {
       entry: str(v.entry) || null,
       actions: str(v.actions),
       decisions: str(v.decisions),
-      states: cleanStateRules(v.states)
+      states: cleanStateRules(v.states),
+      comps: cleanComponents(v.comps)
     }
   }
   return null
@@ -504,6 +512,21 @@ export function childLayers(layer: MapLayer): MapLayer[] | null {
 
 const withChildren = (layer: MapLayer, layers: MapLayer[]): MapLayer => ({ ...layer, layers }) as MapLayer
 
+export type Flags = Record<string, string | number | boolean>
+
+export function mapInPlay(map: MapData, use: WorldMapUse, flags: Flags, own: (object: string) => Flags): MapData {
+  const states = new Map(mapObjects(map.layers).map((o) => [o.id, resolveObjectState(o, { ...flags, ...own(o.id) })]))
+  const shown = (layer: MapLayer): MapLayer => {
+    const gated = checkConditionGating(use.layerGating?.[layer.id], flags) && checkConditionGating(use.propGating?.[layer.id], flags)
+    const state = states.get(layer.id)
+    const children = childLayers(layer)
+    const next = children ? withChildren(layer, children.map(shown)) : layer
+    const changed = state ? ({ ...next, image: state.image, collision: state.collision, opacity: state.opacity } as MapLayer) : next
+    return { ...changed, visible: layer.visible && gated && (state?.visible ?? true) }
+  }
+  return { ...map, layers: map.layers.map(shown) }
+}
+
 export function changeLayer(layers: MapLayer[], id: string, fn: (layer: MapLayer) => MapLayer | null): MapLayer[] {
   return layers.flatMap((l) => {
     if (l.id === id) {
@@ -620,5 +643,5 @@ export function mapPictureIds(map: MapData): string[] {
         ? inLayers(l.layers)
         : []
     )
-  return [...new Set([...map.tilesets.map((t) => t.image), ...inLayers(map.layers)])]
+  return [...new Set([...map.tilesets.map((t) => t.image), ...inLayers(map.layers)])].filter(Boolean)
 }

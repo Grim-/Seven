@@ -1,3 +1,5 @@
+import { noteFailure, report, reportError, logText } from '../util/report'
+import { notFound } from '@shared/errors'
 import { templateTool } from '../present/templates'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -15,6 +17,8 @@ import { readJson, writeJson } from '../util/fs'
 import { secure, vaultEvents } from '../util/secure'
 import { isVaultLocked } from '@shared/sealed'
 import { ID_PATTERN, parseManifest, type Manifest } from './manifest'
+import { contributionsOf } from './contributions'
+import { installZip, type ZipInstallResult } from './install'
 import { sdk, type ModuleFactory, type ModulePage, type ModuleTool, type ToolModule } from './sdk'
 import { toGrammarSchema } from './schema'
 import { McpConnection } from './mcp'
@@ -145,7 +149,7 @@ export class ModuleRegistry extends EventEmitter {
   }
 
   private async reloadOn(): Promise<void> {
-    for (const [id, e] of this.entries) if (e.state === 'on' && e.manifest.settings.length) await this.reload(id).catch(() => undefined)
+    for (const [id, e] of this.entries) if (e.state === 'on' && e.manifest.settings.length) await this.reload(id).catch((err: unknown) => noteFailure(err, 'modules', 'Could not reload a module after its settings changed'))
   }
   private watcher: fs.FSWatcher | null = null
   private timer: NodeJS.Timeout | null = null
@@ -175,6 +179,7 @@ export class ModuleRegistry extends EventEmitter {
     const next = { ...this.prefs }
     if (typeof patch.toolsFolder === 'string' && patch.toolsFolder.trim()) next.toolsFolder = path.resolve(patch.toolsFolder.trim())
     if (typeof patch.skillsFolder === 'string' && patch.skillsFolder.trim()) next.skillsFolder = path.resolve(patch.skillsFolder.trim())
+    if (typeof patch.zipLimitMb === 'number' && Number.isFinite(patch.zipLimitMb) && patch.zipLimitMb > 0) next.zipLimitMb = Math.round(patch.zipLimitMb)
     const moved = next.toolsFolder !== this.prefs.toolsFolder
     this.prefs = next
     saveToolsPrefs(next)
@@ -287,6 +292,7 @@ export class ModuleRegistry extends EventEmitter {
       this.entries.set(u.manifest.id, u)
     }
     for (const entry of this.entries.values()) await this.evaluate(entry)
+    await this.settleDependencies()
     this.checkClashes()
     this.watch()
     this.emitChanged()
@@ -300,7 +306,7 @@ export class ModuleRegistry extends EventEmitter {
         entry.state = 'off'
         return
       }
-      await this.load(entry)
+      await this.loadIfReady(entry)
       return
     }
     if (!record) {
@@ -318,7 +324,39 @@ export class ModuleRegistry extends EventEmitter {
       entry.state = 'off'
       return
     }
+    await this.loadIfReady(entry)
+  }
+
+  private missing(entry: Entry): string[] {
+    return entry.manifest.dependencies.filter((id) => this.entries.get(id)?.state !== 'on')
+  }
+
+  private async loadIfReady(entry: Entry): Promise<void> {
+    if (this.missing(entry).length) {
+      entry.state = 'missing-dependency'
+      entry.error = null
+      return
+    }
     await this.load(entry)
+  }
+
+  private async settleDependencies(): Promise<void> {
+    for (let round = 0; round <= this.entries.size; round++) {
+      let changed = false
+      for (const entry of this.entries.values()) {
+        if (!entry.manifest.dependencies.length) continue
+        const short = this.missing(entry).length > 0
+        if (short && (entry.state === 'on' || entry.state === 'loading')) {
+          await this.unload(entry)
+          entry.state = 'missing-dependency'
+          changed = true
+        } else if (!short && entry.state === 'missing-dependency') {
+          await this.evaluate(entry)
+          changed = true
+        }
+      }
+      if (!changed) return
+    }
   }
 
   private toolFrom(entry: Entry, tool: ModuleTool | ToolDef): ToolDef {
@@ -386,7 +424,7 @@ export class ModuleRegistry extends EventEmitter {
           dir: entry.dir,
           dataDir: path.join(MODULE_DATA, entry.manifest.id),
           settings: values,
-          log: { info: (...a) => console.log(prefix, ...a), warn: (...a) => console.warn(prefix, ...a), error: (...a) => console.error(prefix, ...a) }
+          log: { info: (...a) => console.log(prefix, ...a), warn: (...a) => report('warning', `module:${entry.manifest.id}`, logText(a)), error: (...a) => report('error', `module:${entry.manifest.id}`, logText(a)) }
         })
         await instance.init()
         const tools: ToolDef[] = []
@@ -404,6 +442,7 @@ export class ModuleRegistry extends EventEmitter {
       await this.unload(entry)
       entry.state = 'error'
       entry.error = err instanceof Error ? err.message : String(err)
+      reportError('error', `module:${entry.manifest.id}`, err, `${entry.manifest.name} could not start`)
     }
   }
 
@@ -438,6 +477,7 @@ export class ModuleRegistry extends EventEmitter {
       await this.unload(entry)
       entry.state = 'error'
       entry.error = err instanceof Error ? err.message : String(err)
+      reportError('error', `module:${entry.manifest.id}`, err, `${entry.manifest.name} could not connect`)
     }
     this.emitChanged()
   }
@@ -451,7 +491,7 @@ export class ModuleRegistry extends EventEmitter {
     try {
       await instance?.dispose()
     } catch (err) {
-      console.error(`[${entry.manifest.id}] dispose failed`, err)
+      reportError('warning', `module:${entry.manifest.id}`, err, `${entry.manifest.name} could not shut down`)
     }
     await conn?.close()
   }
@@ -482,7 +522,7 @@ export class ModuleRegistry extends EventEmitter {
         this.timer = setTimeout(() => void this.serial(() => this.rescan()), 400)
       })
     } catch (err) {
-      console.error('Could not watch the tools folder', err)
+      reportError('error', 'modules', err, 'Could not watch the tools folder, so new or changed modules are not picked up until Seven restarts')
     }
   }
 
@@ -511,7 +551,7 @@ export class ModuleRegistry extends EventEmitter {
 
   private require(id: string): Entry {
     const entry = this.entries.get(id)
-    if (!entry) throw new Error(`There is no module "${id}"`)
+    if (!entry) throw notFound(new Error(`There is no module "${id}"`))
     return entry
   }
 
@@ -527,6 +567,7 @@ export class ModuleRegistry extends EventEmitter {
       this.saveTrust()
       await this.unload(entry)
       await this.evaluate(entry)
+      await this.settleDependencies()
       this.checkClashes()
     })
     this.emitChanged()
@@ -542,6 +583,7 @@ export class ModuleRegistry extends EventEmitter {
       await this.unload(entry)
       entry.state = 'off'
       entry.error = null
+      await this.settleDependencies()
     })
     this.emitChanged()
     return this.list()
@@ -559,6 +601,7 @@ export class ModuleRegistry extends EventEmitter {
           await this.evaluate(fresh)
         }
       } else await this.evaluate(entry)
+      await this.settleDependencies()
       this.checkClashes()
     })
     this.emitChanged()
@@ -636,6 +679,16 @@ export class ModuleRegistry extends EventEmitter {
     }
     await this.serial(() => this.rescan())
     return this.list()
+  }
+
+  async installZip(file: string, replace: boolean): Promise<ZipInstallResult> {
+    let result: ZipInstallResult = { installed: null, needsReplace: null }
+    await this.serial(async () => {
+      result = await installZip(file, this.prefs.toolsFolder, this.prefs.zipLimitMb, (id) => this.entries.get(id)?.manifest ?? null, replace)
+      if (result.installed) await this.rescan()
+    })
+    this.emitChanged()
+    return result
   }
 
   async importMcp(json: string): Promise<{ created: string[]; skipped: string[] }> {
@@ -730,7 +783,8 @@ export class ModuleRegistry extends EventEmitter {
     try {
       const { instance, spec, page } = this.pageModule(pageId)
       return instance.pageText(spec.type, page)
-    } catch {
+    } catch (err) {
+      noteFailure(err, 'modules', 'Could not read a module page')
       return null
     }
   }
@@ -794,6 +848,9 @@ export class ModuleRegistry extends EventEmitter {
           pages: e.manifest.pages,
           values,
           changedFiles: e.changedFiles,
+          dependencies: e.manifest.dependencies,
+          missingDependencies: this.missing(e),
+          adds: contributionsOf(key),
           mcp: mcp ? { transport: mcp.transport, target: mcp.transport === 'stdio' ? [mcp.command, ...mcp.args].join(' ') : (mcp.url ?? ''), status: e.mcp?.status ?? 'disconnected' } : null
         }
       })

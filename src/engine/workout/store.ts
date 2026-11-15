@@ -1,3 +1,4 @@
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { ExerciseData, PageMeta, WorkoutData, WorkoutDay, WorkoutExercise, WorkoutItem, WorkoutLogRow, WorkoutNote, WorkoutOverview, WorkoutPageType, WorkoutHistory, WorkoutSession } from '@shared/types'
@@ -298,7 +299,8 @@ const LABEL: Record<WorkoutPageType, string> = { exercise: 'exercise', workout: 
 function readOld<T>(file: string, fallback: T): T {
   try {
     return fs.existsSync(file) ? (JSON.parse(readText(file)) as T) : fallback
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'workout', 'Could not read a workout file')
     return fallback
   }
 }

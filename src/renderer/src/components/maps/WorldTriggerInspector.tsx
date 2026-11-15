@@ -186,6 +186,7 @@ export function WorldTriggerInspector({ trigger, world = '', isExpanded, onToggl
               <ui.Editor
                 trigger={trigger}
                 world={world}
+                map=""
                 onValues={(v) => {
                   setValues(v)
                   onChange({ ...trigger, values: v })

@@ -1,4 +1,7 @@
 import type { CompendiumRef } from './compendium'
+import { signed } from './text'
+
+export { signed }
 
 export const DND_STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const
 
@@ -63,6 +66,10 @@ export interface DndSpell {
   note: string
 }
 
+export type DndExtra = number | { cur: number; max: number }
+
+export const DND_POOL_STATS = { hp: 'health', ac: 'armour', speed: 'speed' } as const satisfies Partial<Record<keyof DndStats, string>>
+
 export interface DndStats {
   race: string
   cls: string
@@ -89,6 +96,7 @@ export interface DndStats {
   spellAbility: DndStat | null
   slots: { max: number; used: number }[]
   spells: DndSpell[]
+  extra: Record<string, DndExtra>
 }
 
 const ZERO_STATS = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }
@@ -120,7 +128,20 @@ export function blankDnd(): DndStats {
     spellAbility: null,
     slots: Array.from({ length: 9 }, () => ({ max: 0, used: 0 })),
     spells: [],
+    extra: {},
   }
+}
+
+function cleanExtra(raw: unknown): Record<string, DndExtra> {
+  return Object.fromEntries(
+    Object.entries(obj(raw)).flatMap(([key, v]): [string, DndExtra][] => {
+      if (typeof v === 'number' && Number.isFinite(v)) return [[key, v]]
+      const r = obj(v)
+      if (typeof r.max !== 'number') return []
+      const max = num(r.max, 0, 0)
+      return [[key, { cur: num(r.cur, max, 0, max), max }]]
+    })
+  )
 }
 
 function num(value: unknown, fallback: number, min = -Infinity, max = Infinity): number {
@@ -187,6 +208,7 @@ export function cleanDnd(raw: unknown): DndStats {
       return { max: most, used: num(s.used, 0, 0, most) }
     }),
     spells: list(d.spells).map((s) => ({ name: text(s.name), level: num(s.level, 0, 0, 9), prepared: s.prepared === true, note: text(s.note) })),
+    extra: cleanExtra(d.extra),
   }
 }
 
@@ -272,9 +294,6 @@ export function mod(score: number): number {
   return Math.floor((score - 10) / 2)
 }
 
-export function signed(n: number): string {
-  return n >= 0 ? `+${n}` : String(n)
-}
 
 export function modifier(score: number): string {
   return signed(mod(score))

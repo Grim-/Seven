@@ -1,3 +1,4 @@
+import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -100,7 +101,7 @@ export class SessionStore extends EventEmitter {
 
   get(id: string): SessionMeta {
     const meta = this.metas.get(id)
-    if (!meta) throw new Error('That chat no longer exists. Open another chat, or start a new one.')
+    if (!meta) throw notFound(new Error('That chat no longer exists. Open another chat, or start a new one.'))
     return meta
   }
 

@@ -13,6 +13,7 @@ export interface SideTabDef {
   label: string
   icon: ReactNode
   order: number
+  always?: boolean
   visible?: (ctx: SideTabContext) => boolean
   render: (ctx: SideTabContext) => ReactNode
 }

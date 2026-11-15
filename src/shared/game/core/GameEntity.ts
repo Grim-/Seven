@@ -28,6 +28,7 @@ export interface EntityLookup {
 export class GameEntity implements SignalSource {
   readonly signals = new SignalBus()
   world: EntityLookup | null = null
+  link: string | null = null
   comps: Component[] = []
   private live = false
 
@@ -37,6 +38,10 @@ export class GameEntity implements SignalSource {
     public name: string,
     readonly catalog: Catalog
   ) {}
+
+  get named(): string {
+    return this.link ?? this.name
+  }
 
   comp<T extends Component>(Type: abstract new (...args: never[]) => T): T | null {
     for (const c of this.comps) if (c instanceof Type) return c

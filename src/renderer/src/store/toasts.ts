@@ -33,8 +33,30 @@ export const useToasts = create<ToastState>((set, get) => ({
   dismiss: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) })
 }))
 
+export interface ErrorToastDetail {
+  request?: string
+  detail?: string
+}
+
+type ErrorToastWatcher = (title: string, message: string | undefined, extra: ErrorToastDetail) => void
+
+const errorWatchers = new Set<ErrorToastWatcher>()
+let errorAction: ToastAction | undefined
+
+export function setErrorToastAction(action: ToastAction | undefined): void {
+  errorAction = action
+}
+
+export function watchErrorToasts(fn: ErrorToastWatcher): () => void {
+  errorWatchers.add(fn)
+  return () => errorWatchers.delete(fn)
+}
+
 export const toast = {
   info: (title: string, message?: string, action?: ToastAction) => useToasts.getState().push({ kind: 'info', title, message, action }),
   success: (title: string, message?: string, action?: ToastAction) => useToasts.getState().push({ kind: 'success', title, message, action }),
-  error: (title: string, message?: string) => useToasts.getState().push({ kind: 'error', title, message })
+  error: (title: string, message?: string, extra: ErrorToastDetail = {}) => {
+    useToasts.getState().push({ kind: 'error', title, message, action: errorAction })
+    for (const fn of errorWatchers) fn(title, message, extra)
+  }
 }

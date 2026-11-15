@@ -4,7 +4,7 @@ import { GameEntity, spawn, type Catalog, type CheckDef } from '@shared/game/cor
 import { CREATURE_TEMPLATES } from '@shared/game/defs'
 import { checkBonus, checkText, contest, rollCheck, rollLine, type CheckResult, type CheckRoll } from '@shared/game/rules'
 import { rollDie } from '@shared/storyRolls'
-import { signed } from '@shared/dnd'
+import { signed } from '@shared/text'
 import { showName } from '@shared/ids'
 import type { PlaceVisitor } from '@shared/maps'
 import { ActionBar, Button, Field, FieldGrid, Input, Select } from '../../ui'

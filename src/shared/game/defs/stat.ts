@@ -28,14 +28,14 @@ registerDefType({
   icon: 'bar-chart-3',
   description: 'game stats: attributes, the maximum of each resource (Health, Stamina, Mana), combat numbers and resists, with their default, limits and regeneration',
   params: {
-    domain: { label: 'Group', kind: 'text', default: 'attribute', description: 'The group it belongs to (attribute, resource, combat, resist…). Buffs and equipment change stats by group and id.' },
-    default: { label: 'Default', kind: 'number', default: 10, description: 'The value when a sheet or creature sets none.' },
-    min: { label: 'Lowest', kind: 'number', default: 0, description: 'It never goes below this.' },
-    max: { label: 'Highest', kind: 'number', default: 9999, description: 'It never goes above this.' },
-    regen: { label: 'Regeneration', kind: 'number', default: 0, description: 'For a resource: how much comes back (or drains, if negative) each period.' },
-    regenEvery: { label: 'Per', kind: 'choice', choices: ['second', 'minute', 'hour', 'day'], default: 'hour', description: 'The period of the regeneration, in game time.' },
-    colour: { label: 'Bar colour', kind: 'choice', choices: ['none', 'accent', 'alert', 'ok', 'cyan', 'purple'], default: 'none', description: 'For a resource: the colour of its bar on tokens and in the HUD, from the theme.' },
-    regenScaledBy: { label: 'Regeneration scaled by', kind: 'template', templateKind: 'stat', default: '', description: 'A stat the regeneration is multiplied by. Empty for none.' }
+    domain: { label: 'Group', kind: 'text', default: 'attribute', description: 'The group it belongs to (attribute, resource, combat, resist…). Buffs and equipment change stats by group and id.', section: 'Values' },
+    default: { label: 'Default', kind: 'number', default: 10, description: 'The value when a sheet or creature sets none.', section: 'Values' },
+    min: { label: 'Lowest', kind: 'number', default: 0, description: 'It never goes below this.', section: 'Values' },
+    max: { label: 'Highest', kind: 'number', default: 9999, description: 'It never goes above this.', section: 'Values' },
+    regen: { label: 'Regeneration', kind: 'number', default: 0, description: 'For a resource: how much comes back (or drains, if negative) each period.', section: 'Regeneration' },
+    regenEvery: { label: 'Per', kind: 'choice', choices: ['second', 'minute', 'hour', 'day'], default: 'hour', description: 'The period of the regeneration, in game time.', section: 'Regeneration' },
+    colour: { label: 'Bar colour', kind: 'choice', choices: ['none', 'accent', 'alert', 'ok', 'cyan', 'purple'], default: 'none', description: 'For a resource: the colour of its bar on tokens and in the HUD, from the theme.', section: 'Look' },
+    regenScaledBy: { label: 'Regeneration scaled by', kind: 'template', templateKind: 'stat', default: '', description: 'A stat the regeneration is multiplied by. Empty for none.', section: 'Regeneration' }
   },
   starter: [
     attribute('str', 'Strength'),

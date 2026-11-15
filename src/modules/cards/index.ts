@@ -1,16 +1,23 @@
-import type { JsonSchema } from '../../engine/tools/schema'
+import type { JsonObjectSchema } from '../../engine/tools/schema'
+import { ANY_CHECK, LIVE_CHECKS, type CheckSchema } from '../../engine/tools/checkSchema'
+import { cardVariationDefs, liveCardVariations, type CardVariationDef } from '../../engine/cards/variations'
+import './promptVariation'
 import type { ModuleFactory, ModulePage, ModuleViewResult } from '../../engine/modules/sdk'
 import type { ToolContext, ToolDef } from '../../engine/tools/types'
 import { cleanSvg } from '@shared/svg'
 import { cardText, fieldId, readLayout, type CardLayout, type CardValue } from '@shared/cards'
-import { CHANCE, actionText, checkNames } from '@shared/actions'
+import { actionText } from '@shared/actions'
 import { decisionText } from '@shared/decisions'
-import { totalOf, type DeckRef, type DeckEntry } from '@shared/cardDecks'
+import { totalOf, userSide, type DeckRef, type DeckEntry } from '@shared/cardDecks'
+import { chatPlayer } from '@shared/types'
 import { data } from '../../engine/data/hub'
 import { vaultEvents } from '../../engine/util/secure'
 import { isVaultLocked } from '@shared/sealed'
 import { rollText } from '../../engine/library/kinds'
 import { addCard, takeCard } from '../../engine/cards/decks'
+import { agentAccess } from '../../engine/agents/access'
+import { worlds } from '../../engine/worlds/store'
+import { ifMissing } from '../../engine/util/report'
 import { CardError, cleanCard, cleanDeck, cleanLayout, cleanSet, type CardData, type CardSetData } from './clean'
 import html from './cards.html?raw'
 import { linkFor } from '@shared/text'
@@ -19,9 +26,25 @@ import { drawn } from '@shared/random'
 type Json = Record<string, unknown>
 
 const MOVED = 'setsMoved'
-const CHECK: JsonSchema = { type: 'object', properties: { against: { oneOf: [{ type: 'null' }, { enum: [CHANCE, ...checkNames().map((c) => c.id)] }] }, difficulty: { type: ['number', 'null'] }, base: { type: ['number', 'null'] }, pass: { type: ['string', 'null'] }, fail: { type: ['string', 'null'] } } }
-const ACTION: JsonSchema = { type: 'object', properties: { attempt: { type: 'string' }, needs: { enum: ['any', 'all'] }, checks: { type: 'array', items: CHECK }, pass: { type: 'string' }, fail: { type: 'string' } } }
-const DECISION: JsonSchema = { type: 'object', properties: { question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, own: { type: 'boolean' }, decider: { type: ['string', 'null'] } } }
+
+const makeCardParams = (check: CheckSchema, variations: CardVariationDef[]): JsonObjectSchema => ({
+  type: 'object',
+  properties: {
+    card: { type: 'string', description: 'its name' },
+    variation: {
+      oneOf: [
+        { type: 'null' },
+        ...variations.map((v) => ({ type: 'object', properties: { type: { const: v.id }, data: v.remove ? { oneOf: [{ type: 'null' }, v.data(check)] } : v.data(check) }, required: ['type', 'data'] }))
+      ],
+      description: 'adds or replaces this one; data null removes it'
+    },
+    text: { type: ['string', 'null'], description: 'flavour' },
+    art: { type: ['string', 'null'] },
+    color: { type: ['string', 'null'] },
+    layout: { type: ['string', 'null'] },
+    values: { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }, { type: 'array', items: { type: 'string' } }] } }] }
+  }
+})
 const LINK = /^@[\w.:-]+?:"?(.+?)"?$/
 
 const factory: ModuleFactory = (sdk) =>
@@ -93,7 +116,9 @@ const factory: ModuleFactory = (sdk) =>
 
     private chatDeck(ctx: ToolContext): DeckRef {
       if (!ctx.sessionId || !ctx.agentId) throw new sdk.ToolError('Cards can only be given or taken in a chat with an agent.')
-      return { chat: ctx.sessionId, agent: ctx.agentId }
+      const agent = agentAccess.get(ctx.agentId)
+      const world = agent?.world?.worldId ?? null
+      return userSide(chatPlayer(agent, world ? ifMissing(() => worlds.meta(world).player, null) : null))
     }
 
     private looted(repo: string): string {
@@ -110,29 +135,29 @@ const factory: ModuleFactory = (sdk) =>
       add({
         name: 'make_card',
         activity: () => 'making a card',
-        description: 'Make or change a card. use is generic (prompt is sent as the user\'s message when played), action (rolled against the character\'s stats) or decision (a choice). layout is a card layout name use basic if unsure; values sets its fields by name. art can be a short glyph or an <svg>.',
-        params: {
-          type: 'object',
-          properties: {
-            name: { type: 'string' },
-            use: { enum: ['generic', 'action', 'decision'] },
-            prompt: { type: ['string', 'null'] },
-            action: { oneOf: [{ type: 'null' }, ACTION] },
-            decision: { oneOf: [{ type: 'null' }, DECISION] },
-            text: { type: ['string', 'null'] },
-            art: { type: ['string', 'null'] },
-            color: { type: ['string', 'null'] },
-            layout: { type: ['string', 'null'] },
-            values: { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }, { type: 'array', items: { type: 'string' } }] } }] }
-          }
-        },
+        description: 'Make or change a card. variation adds or replaces one of its variations; call again for another. layout: a card layout name, basic if unsure; values: its fields by name. art: a short glyph or an <svg>.',
+        params: makeCardParams(ANY_CHECK, cardVariationDefs.all()),
+        forAgent: () => ({ params: makeCardParams(LIVE_CHECKS, liveCardVariations()) }),
         execute: async (params) => {
           try {
             const raw = params as Json
+            const name = sdk.params.str(params, 'card')
+            const existing = this.cardPage(name)
+            let next: Json = { ...((existing?.data as Json | undefined) ?? {}), name: existing?.title ?? name }
+            for (const key of ['text', 'color'] as const) if (typeof raw[key] === 'string') next[key] = raw[key]
+            if (typeof raw.art === 'string') next.art = raw.art.includes('<svg') ? cleanSvg(raw.art) : raw.art
             const layoutRef = sdk.params.optStr(params, 'layout')
-            const values = layoutRef ? this.checkValues(this.layout(layoutRef), raw.values) : {}
-            const card = cleanCard({ ...raw, layout: layoutRef ? this.named('layout', layoutRef, 'card layout').title : null, values, art: typeof raw.art === 'string' && raw.art.includes('<svg') ? cleanSvg(raw.art) : raw.art })
-            const existing = this.cardPage(card.name)
+            if (layoutRef) next = { ...next, layout: this.named('layout', layoutRef, 'card layout').title, values: this.checkValues(this.layout(layoutRef), raw.values) }
+            const v = raw.variation && typeof raw.variation === 'object' ? (raw.variation as Json) : null
+            if (v) {
+              const def = liveCardVariations().find((d) => d.id === v.type)
+              if (!def) throw new CardError(`No card variation "${String(v.type)}".`)
+              if (v.data === null) {
+                if (!def.remove) throw new CardError(`A card always has ${def.name}.`)
+                next = def.remove(next)
+              } else next = def.apply(next, (v.data as Json) ?? {})
+            }
+            const card = cleanCard(next)
             const page = existing ? this.pages.save(existing.id, card) : this.pages.create('card', card.name, card)
             return `${existing ? 'Changed' : 'Made'} ${linkFor('cards.card', page.title)}.`
           } catch (err) {
@@ -247,7 +272,8 @@ const factory: ModuleFactory = (sdk) =>
       const layoutPage = c.layout ? this.pages.find('layout', c.layout) : null
       const face = layoutPage ? cardText(c.name, readLayout(layoutPage.data, layoutPage.title), c.values, (id) => data.assets.metaFor(id)?.description ?? data.assets.metaFor(id)?.name ?? id) : `${c.name}${c.text ? `: ${c.text}` : ''}`
       const use = c.use === 'action' && c.action ? `Action card:\n${actionText(c.action)}` : c.use === 'decision' && c.decision ? `Decision card:\n${decisionText(c.decision)}` : `Generic card. Prompt: ${c.prompt || '(none)'}`
-      return `${face}\n${use}`
+      const variations = liveCardVariations().flatMap((v) => v.text?.(page.data as Json) ?? [])
+      return [face, use, ...variations].join('\n')
     }
   }
 

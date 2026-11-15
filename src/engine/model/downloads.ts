@@ -1,3 +1,4 @@
+import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
@@ -152,7 +153,7 @@ class Downloads extends EventEmitter {
 
   async cancel(id: string): Promise<DownloadItem[]> {
     const item = this.all().find((d) => d.id === id)
-    if (!item) throw new Error('That download is no longer listed.')
+    if (!item) throw notFound(new Error('That download is no longer listed.'))
     await this.stop(id)
     this.items = this.all().filter((d) => d.id !== id)
     this.save()

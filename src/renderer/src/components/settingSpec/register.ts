@@ -1,0 +1,7 @@
+import './controls/RangeControl'
+import './controls/ColorControl'
+import './controls/ChoiceControl'
+import './controls/ToggleControl'
+import './controls/TextControl'
+import './controls/PictureControl'
+import './controls/FramesControl'

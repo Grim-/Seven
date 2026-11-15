@@ -16,7 +16,7 @@ export function useStyles(): ReasoningStyle[] {
 export function StylePicker({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
   const list = useStyles()
   return (
-    <Field label="Reasoning style" className="col-span-2" hint="How this agent reasons when it calls reason. Styles are in Data under Reasoning styles.">
+    <Field label="Reasoning style" className="col-span-2" hint="Modus operandi and voice filter used in pre-output reasoning (reason tool and thinking). Styles live in Data under Reasoning styles.">
       <Select value={value ?? ''} options={[{ value: '', label: `Default (${list[0]?.name ?? 'plain'})` }, ...list.map((s) => ({ value: s.id, label: s.name }))]} onChange={(v) => onChange(v || null)} className="h-8 text-[12px]" />
     </Field>
   )
@@ -27,9 +27,10 @@ interface Draft {
   name: string
   instruction: string
   voices: StyleVoice[]
+  constraints: string
 }
 
-const BLANK: Draft = { id: null, name: '', instruction: '', voices: [] }
+const BLANK: Draft = { id: null, name: '', instruction: '', voices: [], constraints: '' }
 
 function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => void }) {
   const clean = (d: Draft): Draft => ({ ...d, voices: d.voices.filter((v) => v.label.trim()) })
@@ -71,6 +72,15 @@ function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => voi
           )}
         </div>
       </Field>
+      <Field label="Output & voice constraints" hint="Optional. Rules that forcefully filter what gets said or done through this character’s way of thinking and speaking before any text is output.">
+        <LinkTextarea
+          rolls={false}
+          rows={3}
+          value={draft.constraints}
+          onValue={(constraints) => setDraft({ ...draft, constraints })}
+          placeholder="e.g. Filter every line through clipped, cynical guard jargon. Refuse flowery apologies; say only what they would risk saying aloud."
+        />
+      </Field>
       <div className="flex items-center gap-2">
         <MakeOrSaved made={Boolean(draft.id)} saver={editor} what="style" onMake={make} disabled={busy || !valid(draft)} size="md" />
       </div>
@@ -82,7 +92,7 @@ export function StylesPanel({ initial }: { initial?: string | null }) {
   const list = useStyles()
   const [pick, setPick] = useState<string | null>(initial ?? null)
   const style = pick === '_new' ? null : (list.find((s) => s.id === pick) ?? list[0] ?? null)
-  const editing = pick === '_new' ? BLANK : style ? { id: style.id, name: style.name, instruction: style.instruction, voices: style.voices } : null
+  const editing = pick === '_new' ? BLANK : style ? { id: style.id, name: style.name, instruction: style.instruction, voices: style.voices, constraints: style.constraints ?? '' } : null
   const remove = (s: ReasoningStyle) =>
     confirmDelete(`Delete ${s.name}?`, 'Agents using it go back to the default style.', () => engine('styles.delete', { id: s.id }), () => setPick(null))
   return (

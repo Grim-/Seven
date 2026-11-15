@@ -3,6 +3,8 @@ import { Input, SaveState, SettingCard, SettingRow, useAutosavedState } from '..
 import { engine } from '../../lib/ipc'
 import { Chip } from '../../components/chat/References'
 import { MarkdownEditor } from '../../components/data/MarkdownEditor'
+import { OwnerDeck } from '../../components/cards/OwnerDeck'
+import { noteFailure } from '../../store/problems'
 
 export function Profile() {
   const [loaded, setLoaded] = useState(false)
@@ -14,9 +16,10 @@ export function Profile() {
         autosave.reset({ name: u.name, about: u.about })
         setLoaded(true)
       })
-      .catch(() => setLoaded(true))
+      .catch(noteFailure('settings', 'Could not read your profile', () => setLoaded(true)))
   }, [])
   return (
+    <>
     <SettingCard
       title="You"
       actions={
@@ -48,5 +51,11 @@ export function Profile() {
         <Chip kind="page" refText="User Profile" />
       </SettingRow>
     </SettingCard>
+    <SettingCard title="Your cards">
+      <div className="flex h-[32rem] min-h-0 flex-col">
+        <OwnerDeck owner={{ user: true }} />
+      </div>
+    </SettingCard>
+    </>
   )
 }

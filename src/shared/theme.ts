@@ -29,6 +29,7 @@ export interface Theme {
   backdrop: Backdrop | null
   effect: ThemeEffect
   effectSettings: EffectSettings
+  chatFadeOpacity: number
   music: string[]
   volume: number
   sounds: Record<ThemeSoundEvent, string | null>
@@ -70,6 +71,7 @@ export const SEVEN_THEME: Theme = {
   backdrop: null,
   effect: 'feed',
   effectSettings: {},
+  chatFadeOpacity: 0.55,
   music: [],
   volume: 0.6,
   sounds: { reply: null, reminder: null, ask: null },
@@ -122,6 +124,7 @@ export function cleanTheme(value: unknown, base: Theme = SEVEN_THEME): Omit<Them
     backdrop: 'backdrop' in v ? cleanBackdrop(v.backdrop) : base.backdrop,
     effect: isEffect(v.effect) ? v.effect : base.effect,
     effectSettings: 'effectSettings' in v ? cleanEffectSettings(v.effectSettings) : (base.effectSettings ?? {}),
+    chatFadeOpacity: unit(v.chatFadeOpacity, base.chatFadeOpacity ?? SEVEN_THEME.chatFadeOpacity),
     music: 'music' in v ? cleanTracks(v.music) : base.music,
     volume: unit(v.volume, base.volume),
     sounds: { reply: sound('reply'), reminder: sound('reminder'), ask: sound('ask') },

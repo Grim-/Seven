@@ -6,5 +6,6 @@ import './changeWorld'
 import './check'
 import './rolled'
 import './shop'
+import './effects'
 
 export * from './trigger'

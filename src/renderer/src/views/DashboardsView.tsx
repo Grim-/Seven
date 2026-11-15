@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, Check, LayoutGrid, Plus, Settings2, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Layers, LayoutGrid, MessageSquare, Plus, Settings2, Trash2 } from 'lucide-react'
 import type { AssetMeta, Dashboard } from '@shared/types'
 import { SUGGESTED_ICONS } from '@shared/widgets'
-import { Button, EmptyState, Field, Input, Modal, ShellTabs, Toggle, ViewHeader, DoneEditing, useAutosavedState } from '../components/ui'
-import { DashboardGrid } from '../components/dashboards/DashboardGrid'
+import { Button, EmptyState, Field, Input, Modal, Select, ShellTabs, Toggle, ViewHeader, DoneEditing, useAutosavedState } from '../components/ui'
+import { BoardTabletop } from '../components/dashboards/BoardTabletop'
 import { DashboardIcon } from '../components/dashboards/DashboardIcon'
 import { AddPicker, fileThings, placeOnBoard } from '../components/dashboards/AddPicker'
+import { takeBoardIntoChat, useBoardLayoutMode, useBoardSurfaces, useSurfaceSwitcher } from '../components/chat/tabletopStore'
 import { useDashboards } from '../store/dashboards'
 import { engine } from '../lib/ipc'
 import { errorText } from '../lib/format'
@@ -15,6 +16,8 @@ import { LockedState, useLocked } from '../components/vault/Vault'
 import { importPaths } from '../lib/importFiles'
 import { failed } from '../lib/notify'
 import { filePath } from '../lib/transport'
+import { noteFailure } from '../store/problems'
+import { useKeybindLabel } from '../store/keybinds'
 
 function IconPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
@@ -138,15 +141,18 @@ export function DashboardsView() {
 
 function DashboardsViewBody() {
   useEffect(() => {
-    void useDashboards.getState().refresh().catch(() => undefined)
+    void useDashboards.getState().refresh().catch(noteFailure('dashboards', 'Could not list the dashboards'))
   }, [])
   const list = useDashboards((s) => s.list)
   const activeId = useDashboards((s) => s.activeId)
   const setActive = useDashboards((s) => s.setActive)
   const [settings, setSettings] = useState<'new' | 'edit' | null>(null)
   const [adding, setAdding] = useState(false)
-  const [editing, setEditing] = useState(false)
   const active = list.find((d) => d.id === activeId) ?? list[0] ?? null
+  const [layoutMode, setLayoutMode] = useBoardLayoutMode(active?.id ?? null, 'grid')
+  const { state: surfaces, activeSlot, setActiveSurface } = useBoardSurfaces(active?.id ?? null)
+  const toggleSwitcher = useSurfaceSwitcher((s) => s.toggle)
+  const switcherKey = useKeybindLabel('tabletop.surfaceSwitcher')
 
   useEffect(() => {
     if (!active) return
@@ -200,8 +206,48 @@ function DashboardsViewBody() {
         >
           {active && (
             <>
-              <Button size="sm" variant={editing ? 'primary' : 'ghost'} icon={editing ? <Check /> : <LayoutGrid />} onClick={() => setEditing(!editing)}>
-                {editing ? 'Done' : 'Edit board'}
+              <div className="flex items-center border border-line/60 bg-bg-1 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setLayoutMode('grid')}
+                  className={cn(
+                    'flex items-center gap-1 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider transition-colors',
+                    layoutMode === 'grid' ? 'bg-accent/15 text-accent' : 'text-dim hover:text-white'
+                  )}
+                  title="12-column resizable widget grid"
+                >
+                  <LayoutGrid className="h-3 w-3" />
+                  Grid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLayoutMode('tabletop')}
+                  className={cn(
+                    'flex items-center gap-1 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider transition-colors',
+                    layoutMode === 'tabletop' ? 'bg-accent/15 text-accent' : 'text-dim hover:text-white'
+                  )}
+                  title="Freeform tabletop tokens that unfold in-place"
+                >
+                  <Layers className="h-3 w-3" />
+                  Tabletop
+                </button>
+              </div>
+              <div className="flex items-center gap-1">
+                <Select
+                  value={activeSlot.id}
+                  options={surfaces.slots.map((s) => ({
+                    value: s.id,
+                    label: `${s.index}: ${s.label}`
+                  }))}
+                  onChange={setActiveSurface}
+                  className="h-7 w-36 font-mono text-[11px]"
+                />
+                <Button size="sm" variant="ghost" icon={<Layers />} onClick={toggleSwitcher} title={`SurfaceTop Overview (${switcherKey})`}>
+                  Surfaces
+                </Button>
+              </div>
+              <Button size="sm" variant="secondary" icon={<MessageSquare />} onClick={() => void takeBoardIntoChat(active.id)}>
+                Take into chat
               </Button>
               <Button size="sm" variant="secondary" icon={<Plus />} onClick={() => setAdding(true)}>
                 Add
@@ -213,12 +259,12 @@ function DashboardsViewBody() {
           )}
         </ShellTabs>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+      <div className="min-h-0 flex-1 overflow-hidden">
         {!active ? (
           <EmptyState title="No dashboards">Create one here, or give an agent the Dashboards tools and ask it to build one.</EmptyState>
         ) : (
-          <div className="relative h-full">
-            <DashboardGrid key={active.id} dashboard={active} editing={editing} />
+          <div className="relative h-full min-h-[520px] border border-line/40 bg-[#05070c]">
+            <BoardTabletop key={active.id} dashboard={active} layoutMode={layoutMode} />
             {active.widgets.length === 0 && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="pointer-events-auto">

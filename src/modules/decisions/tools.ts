@@ -1,11 +1,12 @@
-import type { JsonSchema } from '../../engine/tools/schema'
+import type { JsonObjectSchema, JsonSchema } from '../../engine/tools/schema'
+import { ANY_CHECK, LIVE_CHECKS, type CheckSchema } from '../../engine/tools/checkSchema'
 import { linkFor } from '@shared/text'
 import { pickMadeText, type PickAnswer, type PickOption } from '@shared/pickDecision'
 import { DICE, rolledMadeText, type RolledAnswer } from '@shared/rolledDecision'
 import { opposedText, type OpposedAnswer, type OpposedSide } from '@shared/opposedCheck'
 import { optionRollFrom } from '@shared/storyRolls'
 import { isLater, laterDecisionText } from '@shared/uiLater'
-import { CHANCE, checkNames, cleanAction } from '@shared/actions'
+import { cleanAction } from '@shared/actions'
 import type { DecisionMode, RollerChoice, StoredDecision } from '@shared/storedDecision'
 import { ToolError, type ToolContext, type ToolDef } from '../../engine/tools/types'
 import { agentAccess } from '../../engine/agents/access'
@@ -14,28 +15,26 @@ import { decisions, storyActions } from './store'
 
 type Json = Record<string, unknown>
 
-const CHECK_IDS = checkNames().map((c) => c.id)
-
-const OPTION: JsonSchema = {
+const optionSchema = (check: CheckSchema): JsonSchema => ({
   type: 'object',
   properties: {
     text: { type: 'string' },
     chance: { type: ['number', 'null'], description: 'percent' },
-    against: { oneOf: [{ type: 'null' }, { enum: CHECK_IDS }] },
+    against: { oneOf: [{ type: 'null' }, check(false)] },
     dc: { type: ['number', 'null'] }
   }
-}
+})
 
-const SIDE: JsonSchema = {
+const sideSchema = (check: CheckSchema): JsonSchema => ({
   type: 'object',
   properties: {
     name: { type: 'string' },
     character: { type: ['string', 'null'] },
     does: { type: 'string', description: 'what winning means, e.g. spots the lie' },
-    against: { enum: CHECK_IDS },
+    against: check(false),
     bonus: { type: ['number', 'null'], description: 'if no sheet' }
   }
-}
+})
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 
@@ -87,23 +86,26 @@ function sheetName(id: string | null): string | null {
 
 const base = { group: 'decisions', needsWorkspace: false, permission: 'none' as const }
 
+const decideParams = (check: CheckSchema): JsonObjectSchema => ({
+    type: 'object',
+    properties: {
+      question: { type: ['string', 'null'] },
+      options: { type: 'array', items: optionSchema(check) },
+      character: { type: ['string', 'null'] },
+      roller: { enum: ['agent', 'player'] },
+      own: { type: ['boolean', 'null'], description: 'allow their own answer' },
+      from: { type: ['string', 'null'] }
+    }
+  })
+
 const decide: ToolDef = {
   ...base,
   name: 'decide',
   maxRepeats: 1,
   activity: () => 'asking for a decision',
   description: 'The user picks one of your options; an option that can fail gets a chance or a check against a DC. from: a stored @story_decision.',
-  params: {
-    type: 'object',
-    properties: {
-      question: { type: ['string', 'null'] },
-      options: { type: 'array', items: OPTION },
-      character: { type: ['string', 'null'] },
-      roller: { enum: ['agent', 'player'] },
-      own: { type: ['boolean', 'null'], description: 'allow their own answer' },
-      from: { type: ['string', 'null'] }
-    }
-  },
+  params: decideParams(ANY_CHECK),
+  forAgent: () => ({ params: decideParams(LIVE_CHECKS) }),
   execute: async (params, ctx) => {
     const from = stored(params.from, 'pick')
     const given = pickOptions(params.options)
@@ -151,21 +153,24 @@ const rollDecision: ToolDef = {
   }
 }
 
+const opposedParams = (check: CheckSchema): JsonObjectSchema => ({
+    type: 'object',
+    properties: {
+      question: { type: 'string' },
+      a: sideSchema(check),
+      b: sideSchema(check),
+      dc: { type: ['number', 'null'] }
+    }
+  })
+
 const opposedCheck: ToolDef = {
   ...base,
   name: 'opposed_check',
   maxRepeats: 1,
   activity: () => 'setting up an opposed check',
   description: 'a tries, b resists; both roll d20, ties to b. dc: a rolls against it instead of b.',
-  params: {
-    type: 'object',
-    properties: {
-      question: { type: 'string' },
-      a: SIDE,
-      b: SIDE,
-      dc: { type: ['number', 'null'] }
-    }
-  },
+  params: opposedParams(ANY_CHECK),
+  forAgent: () => ({ params: opposedParams(LIVE_CHECKS) }),
   execute: async (params, ctx) => {
     const question = str(params.question)
     if (!question) throw new ToolError('Give the question, e.g. "Does the guard spot the lie?"')
@@ -178,12 +183,7 @@ const opposedCheck: ToolDef = {
   }
 }
 
-const createDecisions: ToolDef = {
-  ...base,
-  name: 'create_decisions',
-  activity: () => 'creating decisions',
-  description: 'Create stored decisions, all in one call. options only if they never change; otherwise a prompt to write them from.',
-  params: {
+const createDecisionsParams = (check: CheckSchema): JsonObjectSchema => ({
     type: 'object',
     properties: {
       decisions: {
@@ -197,13 +197,21 @@ const createDecisions: ToolDef = {
             prompt: { type: 'string' },
             die: { oneOf: [{ type: 'null' }, { enum: DICE }] },
             count: { type: ['integer', 'null'], description: 'options to write, for pick' },
-            options: { type: 'array', items: OPTION },
+            options: { type: 'array', items: optionSchema(check) },
             tags: { type: 'array', items: { type: 'string' } }
           }
         }
       }
     }
-  },
+  })
+
+const createDecisions: ToolDef = {
+  ...base,
+  name: 'create_decisions',
+  activity: () => 'creating decisions',
+  description: 'Create stored decisions, all in one call. options only if they never change; otherwise a prompt to write them from.',
+  params: createDecisionsParams(ANY_CHECK),
+  forAgent: () => ({ params: createDecisionsParams(LIVE_CHECKS) }),
   execute: async (params) => {
     const list = Array.isArray(params.decisions) ? (params.decisions as Json[]) : []
     if (!list.length) throw new ToolError('Give decisions as a list.')
@@ -216,22 +224,17 @@ const createDecisions: ToolDef = {
   }
 }
 
-const ACTION_CHECK: JsonSchema = {
+const actionCheckSchema = (check: CheckSchema): JsonSchema => ({
   type: 'object',
   properties: {
-    against: { oneOf: [{ type: 'null' }, { enum: [CHANCE, ...CHECK_IDS] }] },
+    against: { oneOf: [{ type: 'null' }, check(true)] },
     dc: { type: ['number', 'null'] },
     pass: { type: ['string', 'null'] },
     fail: { type: ['string', 'null'] }
   }
-}
+})
 
-const createStoryActions: ToolDef = {
-  ...base,
-  name: 'create_story_actions',
-  activity: () => 'creating story actions',
-  description: 'Create stored actions, all in one call. needs any: one check is tried; all: every check must pass.',
-  params: {
+const storyActionsParams = (check: CheckSchema): JsonObjectSchema => ({
     type: 'object',
     properties: {
       actions: {
@@ -242,7 +245,7 @@ const createStoryActions: ToolDef = {
             name: { type: 'string' },
             attempt: { type: 'string' },
             needs: { enum: ['any', 'all'] },
-            checks: { type: 'array', items: ACTION_CHECK },
+            checks: { type: 'array', items: actionCheckSchema(check) },
             pass: { type: 'string' },
             fail: { type: 'string' },
             tags: { type: 'array', items: { type: 'string' } }
@@ -250,7 +253,15 @@ const createStoryActions: ToolDef = {
         }
       }
     }
-  },
+  })
+
+const createStoryActions: ToolDef = {
+  ...base,
+  name: 'create_story_actions',
+  activity: () => 'creating story actions',
+  description: 'Create stored actions, all in one call. needs any: one check is tried; all: every check must pass.',
+  params: storyActionsParams(ANY_CHECK),
+  forAgent: () => ({ params: storyActionsParams(LIVE_CHECKS) }),
   execute: async (params) => {
     const list = Array.isArray(params.actions) ? (params.actions as Json[]) : []
     if (!list.length) throw new ToolError('Give actions as a list.')

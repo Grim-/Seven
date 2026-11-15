@@ -35,7 +35,7 @@ export function useRollers(
     const preferred = options.preferred ?? null
 
     const list: Roller[] = sheets.map((s) => {
-      const targets = checkTargets(s.dnd)
+      const targets = checkTargets(s)
       const found = against ? findTarget(targets, against) : null
       const bonus = against ? (found?.bonus ?? null) : 0
 

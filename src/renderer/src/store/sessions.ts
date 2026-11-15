@@ -1,13 +1,18 @@
+import { failed } from '../lib/notify'
+import { noteFailure } from './problems'
 import { create } from 'zustand'
 import type { AssetMeta, ChatMessage, ChatPart, ContextSummary, ContextUsage, PermissionMode, SessionMeta, ThinkingLevel, ToolChoiceMode, TodoItem, TodoList, ToolPart } from '@shared/types'
 import { engine } from '../lib/ipc'
 import { DEFAULT_AGENT_ID } from './agents'
 import { importPaths } from '../lib/importFiles'
 import type { Conversation } from '../lib/conversation'
+import { dropSendOffer } from '../lib/composer'
+import type { ChatElement } from '@shared/chatElements'
 
 const PENDING_ID = '__pending__'
 const fresh = new Set<string>()
 const NO_FILES: AssetMeta[] = []
+const NO_ELEMENTS: ChatElement[] = []
 
 export interface ChatDraft {
   agentId: string
@@ -15,6 +20,7 @@ export interface ChatDraft {
   thinking: ThinkingLevel | null
   toolChoice: ToolChoiceMode | null
   files: AssetMeta[]
+  elements: ChatElement[]
   usage: ContextUsage | null
 }
 
@@ -34,6 +40,8 @@ interface SessionsState {
   setDraftToolChoice: (key: string, toolChoice: ToolChoiceMode | null) => void
   attach: (key: string, paths: string[]) => Promise<void>
   detach: (key: string, id: string) => void
+  attachElements: (key: string, elements: ChatElement[]) => void
+  detachElement: (key: string, index: number) => void
   summaries: Record<string, ContextSummary[]>
   todos: Record<string, TodoList | null>
   setTodos: (sessionId: string, items: TodoItem[]) => Promise<void>
@@ -50,13 +58,14 @@ interface SessionsState {
   startNew: (conv: Conversation, agentId?: string) => void
   setDraftAgent: (key: string, agentId: string) => void
   ensureSession: (conv: Conversation) => Promise<string>
-  send: (conv: Conversation, text: string) => Promise<string>
+  send: (conv: Conversation, text: string, elements?: ChatElement[]) => Promise<string>
   abort: (sessionId: string) => Promise<void>
   rename: (id: string, title: string) => Promise<void>
   remove: (id: string) => Promise<void>
   onTurnStart: (sessionId: string, user: ChatMessage, assistant: ChatMessage) => void
   onDelta: (sessionId: string, messageId: string, type: 'text' | 'thought', text: string) => void
   onPart: (sessionId: string, messageId: string, part: ToolPart) => void
+  onElement: (sessionId: string, messageId: string, element: ChatElement) => void
   onOutput: (partId: string, chunk: string) => void
   setMode: (id: string, mode: PermissionMode | null) => Promise<void>
   onTurnFinish: (sessionId: string, message: ChatMessage) => void
@@ -83,7 +92,7 @@ function pendingFrom(sessionId: string, messages: ChatMessage[], current: Record
 }
 
 export function draftOf(s: Pick<SessionsState, 'drafts' | 'defaultAgentId'>, key: string): ChatDraft {
-  return s.drafts[key] ?? { agentId: s.defaultAgentId, style: null, thinking: null, toolChoice: null, files: NO_FILES, usage: null }
+  return s.drafts[key] ?? { agentId: s.defaultAgentId, style: null, thinking: null, toolChoice: null, files: NO_FILES, elements: NO_ELEMENTS, usage: null }
 }
 
 export const useSessions = create<SessionsState>((set, get) => {
@@ -111,6 +120,8 @@ export const useSessions = create<SessionsState>((set, get) => {
   },
 
   detach: (key, id) => patchDraft(key, { files: draftOf(get(), key).files.filter((f) => f.id !== id) }),
+  attachElements: (key, elements) => patchDraft(key, { elements: [...draftOf(get(), key).elements, ...elements] }),
+  detachElement: (key, index) => patchDraft(key, { elements: draftOf(get(), key).elements.filter((_, i) => i !== index) }),
   summaries: {},
   todos: {},
   setTodos: async (sessionId, items) => {
@@ -128,14 +139,14 @@ export const useSessions = create<SessionsState>((set, get) => {
   recheckContext: async (conv) => {
     if (conv.sessionId) return get().checkContext(conv.sessionId)
     const agentId = draftOf(get(), conv.key).agentId
-    const usage = await engine('agents.contextUsage', { agentId }).catch(() => null)
+    const usage = await engine('agents.contextUsage', { agentId }).catch((err: unknown) => (noteFailure('chat', 'Could not read the context usage')(err), null))
     if (draftOf(get(), conv.key).agentId === agentId) patchDraft(conv.key, { usage })
   },
 
   onUsage: (sessionId, usage) => set((s) => ({ usage: { ...s.usage, [sessionId]: usage } })),
 
   checkContext: async (sessionId) => {
-    const ctx = await engine('sessions.context', { id: sessionId }).catch(() => null)
+    const ctx = await engine('sessions.context', { id: sessionId }).catch((err: unknown) => (noteFailure('chat', 'Could not read the context usage')(err), null))
     if (!ctx) return
     set((s) => ({ usage: { ...s.usage, [sessionId]: ctx.usage }, instructionsChanged: { ...s.instructionsChanged, [sessionId]: ctx.instructionsChanged } }))
   },
@@ -186,9 +197,9 @@ export const useSessions = create<SessionsState>((set, get) => {
     const draft = draftOf(get(), conv.key)
     const created = await engine('sessions.create', { agentId: draft.agentId })
     const meta = { ...created, ...(draft.style ? { reasoningStyle: draft.style } : {}), ...(draft.thinking ? { thinking: draft.thinking } : {}), ...(draft.toolChoice ? { toolChoice: draft.toolChoice } : {}) }
-    if (draft.style) await engine('sessions.setStyle', { id: meta.id, style: draft.style }).catch(() => undefined)
-    if (draft.thinking) await engine('sessions.setThinking', { id: meta.id, thinking: draft.thinking }).catch(() => undefined)
-    if (draft.toolChoice) await engine('sessions.setToolChoice', { id: meta.id, toolChoice: draft.toolChoice }).catch(() => undefined)
+    if (draft.style) await engine('sessions.setStyle', { id: meta.id, style: draft.style }).catch(failed('Could not set the reasoning style'))
+    if (draft.thinking) await engine('sessions.setThinking', { id: meta.id, thinking: draft.thinking }).catch(failed('Could not set thinking'))
+    if (draft.toolChoice) await engine('sessions.setToolChoice', { id: meta.id, toolChoice: draft.toolChoice }).catch(failed('Could not set the tool choice'))
     patchDraft(conv.key, { style: null, thinking: null, toolChoice: null })
     fresh.add(meta.id)
     set((s) => ({ list: [meta, ...s.list.filter((x) => x.id !== meta.id)], messages: { ...s.messages, [meta.id]: [] } }))
@@ -196,8 +207,10 @@ export const useSessions = create<SessionsState>((set, get) => {
     return meta.id
   },
 
-  send: async (conv, text) => {
-    const files = draftOf(get(), conv.key).files
+  send: async (conv, text, extra = []) => {
+    dropSendOffer(conv.key)
+    const { files, elements: drafted } = draftOf(get(), conv.key)
+    const elements = [...drafted, ...extra]
     const sessionId = await get().ensureSession(conv)
     const attachments = files.map((f) => f.id)
     const pending: ChatMessage = {
@@ -206,17 +219,18 @@ export const useSessions = create<SessionsState>((set, get) => {
       parts: [{ type: 'text', text }],
       createdAt: Date.now(),
       status: 'complete',
-      ...(attachments.length ? { attachments } : {})
+      ...(attachments.length ? { attachments } : {}),
+      ...(elements.length ? { elements } : {})
     }
-    patchDraft(conv.key, { files: [] })
+    patchDraft(conv.key, { files: [], elements: [] })
     set((s) => ({
       messages: { ...s.messages, [sessionId]: [...(s.messages[sessionId] ?? []), pending] },
       running: { ...s.running, [sessionId]: true }
     }))
     try {
-      await engine('sessions.send', { id: sessionId, text, attachments })
+      await engine('sessions.send', { id: sessionId, text, attachments, elements })
     } catch (err) {
-      patchDraft(conv.key, { files })
+      patchDraft(conv.key, { files, elements: drafted })
       set((s) => ({
         messages: { ...s.messages, [sessionId]: (s.messages[sessionId] ?? []).filter((m) => m.id !== PENDING_ID) },
         running: { ...s.running, [sessionId]: false }
@@ -292,6 +306,18 @@ export const useSessions = create<SessionsState>((set, get) => {
         messages: {
           ...s.messages,
           [sessionId]: list.map((m) => (m.id === messageId ? { ...m, parts: upsertPart(m.parts, part) } : m))
+        }
+      }
+    }),
+
+  onElement: (sessionId, messageId, element) =>
+    set((s) => {
+      const list = s.messages[sessionId]
+      if (!list) return s
+      return {
+        messages: {
+          ...s.messages,
+          [sessionId]: list.map((m) => (m.id === messageId ? { ...m, elements: [...(m.elements ?? []), element] } : m))
         }
       }
     }),

@@ -7,7 +7,7 @@ export function SettingRow({ label, hint, error, aside, wide = false, children }
   const card = useInSettingCard()
   if (card)
     return (
-      <div data-setting={label} className={cn('setting-row', wide ? 'flex flex-col gap-2' : 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-1')}>
+      <div data-setting={label} data-wide={wide || undefined} className={cn('setting-row', wide ? 'flex flex-col gap-2' : 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-1')}>
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="flex items-center gap-2 text-[13.5px] text-white">
             {label}

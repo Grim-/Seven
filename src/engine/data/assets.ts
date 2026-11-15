@@ -1,3 +1,4 @@
+import { notFound } from '@shared/errors'
 import { fileName, isAssetId } from '@shared/ids'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -149,7 +150,7 @@ export class AssetStore {
 
   get(id: string): AssetMeta {
     const meta = this.metaFor(id)
-    if (!meta) throw new DataError(`There is no file with id "${id}". Use find with kind file to list the files Seven has.`)
+    if (!meta) throw notFound(new DataError(`There is no file with id "${id}". Use find with kind file to list the files Seven has.`))
     return meta
   }
 

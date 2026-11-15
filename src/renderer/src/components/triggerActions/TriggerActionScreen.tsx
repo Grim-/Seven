@@ -1,4 +1,4 @@
-import { blankStoredTriggerAction, type StoredTriggerAction } from '@shared/game/triggerActions'
+import { blankStoredTriggerAction, triggerActionEffects, type StoredTriggerAction } from '@shared/game/triggerActions'
 import { engine } from '../../lib/ipc'
 import type { KindScreenProps } from '../../registries/kinds'
 import { StoredScreen } from '../decisions/StoredScreen'
@@ -13,7 +13,7 @@ export function TriggerActionScreen(props: KindScreenProps) {
       get={(id) => engine('triggerActions.get', { id }).then((a) => a ?? blankStoredTriggerAction())}
       save={(action, previousId) => engine('triggerActions.save', { action, previousId })}
       blank={blankStoredTriggerAction}
-      badge={(a) => `${a.actionType}`}
+      badge={(a) => `${triggerActionEffects(a).length} effects`}
       Editor={TriggerActionEditor}
     />
   )

@@ -139,7 +139,7 @@ export function entryActions(section: LibrarySection, hit: LibraryHit, ctx: { op
     { label: 'Reference in chat', icon: <MessageSquareQuote />, onSelect: () => referenceInChat(link) },
     { label: 'Start chat with', icon: <MessageSquarePlus />, children: startChatItems(link) },
     { label: 'Show in chat panel', icon: <PanelRight />, onSelect: () => void showInPanel(entry) },
-    ...(section.boardable ? [boardMenu(entry)] : []),
+    boardMenu(entry),
     { label: 'Copy link', icon: <Link />, onSelect: () => void copyText(link, 'Link copied', link) },
     favouriteItem({ kind: section.kind, id: hit.id, label: hit.title, icon: section.icon }),
     {

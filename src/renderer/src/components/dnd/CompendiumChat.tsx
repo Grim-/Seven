@@ -37,5 +37,5 @@ export function CompendiumChat({ kind, id }: EntrySurfaceProps) {
 }
 
 export function CompendiumWidget({ kind, id }: EntrySurfaceProps) {
-  return <EntryView kind={kind} id={id} short />
+  return <EntryView kind={kind} id={id} short={false} />
 }

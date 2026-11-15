@@ -87,7 +87,13 @@ export function NavMenu() {
         <Section title="More tools">
           <div className="grid grid-cols-2 gap-1.5">
             {links.map((l) => (
-              <NavTile key={l.view} icon={l.icon} label={l.label} active={view === l.view} onClick={() => go(() => setView(l.view))} />
+              <NavTile
+                key={l.view ?? l.label}
+                icon={l.icon}
+                label={l.label}
+                active={l.view ? view === l.view : false}
+                onClick={() => go(() => (l.onSelect ? l.onSelect() : l.view && setView(l.view)))}
+              />
             ))}
           </div>
         </Section>

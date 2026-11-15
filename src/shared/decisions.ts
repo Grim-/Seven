@@ -1,9 +1,20 @@
 import { NO_SWAP, cleanSwap, hasSwap, parseSwap, swapSentence, swapText, type CardSwap } from './cardDecks'
+import { cleanComponents, type ComponentDef } from './game/core'
+import { storedPiece } from './game/components/action/storedPiece'
 
 export interface DecisionOption {
   text: string
   cards: CardSwap
   action?: string | null
+  effects?: ComponentDef[]
+}
+
+export const CHOSEN_EVENT = 'OnChosen'
+
+export const OPTION_LANES = [{ event: CHOSEN_EVENT, label: 'When chosen' }]
+
+export function optionEffects(o: DecisionOption): ComponentDef[] {
+  return [...storedPiece(o.action ?? null, CHOSEN_EVENT), ...(o.effects ?? [])]
 }
 
 export interface Decision {
@@ -49,7 +60,7 @@ function parseOption(line: string): DecisionOption {
       if (hasSwap(parsed)) cards = parsed
     }
   }
-  return { text, cards, action }
+  return { text, cards, action, effects: [] }
 }
 
 export function parseDecisions(text: string): Decision[] {
@@ -69,9 +80,9 @@ export function cleanDecision(raw: unknown): Decision {
   const v = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const text = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim() : null)
   const option = (x: unknown): DecisionOption | null => {
-    if (typeof x === 'string') return text(x) ? { text: text(x) as string, cards: NO_SWAP, action: null } : null
+    if (typeof x === 'string') return text(x) ? { text: text(x) as string, cards: NO_SWAP, action: null, effects: [] } : null
     const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>
-    return text(o.text) ? { text: text(o.text) as string, cards: cleanSwap(o.cards), action: text(o.action) } : null
+    return text(o.text) ? { text: text(o.text) as string, cards: cleanSwap(o.cards), action: text(o.action), effects: cleanComponents(o.effects) } : null
   }
   const options = Array.isArray(v.options) ? v.options.map(option).filter((o): o is DecisionOption => o !== null) : []
   return { question: text(v.question) ?? 'What happens next?', options, own: v.own !== false, decider: text(v.decider) }
@@ -85,6 +96,6 @@ export function decisionForAgent(d: Decision): string {
   return ['DECISION FOR YOU (not rolled)', `"${d.question}"`, `Options: ${optionList(d)}`, ...cardsNote(d), 'Choose one, say which, and play it out.'].join('\n')
 }
 
-export function decisionMade(d: Decision, choice: string, cards: CardSwap = NO_SWAP): string {
-  return ['DECISION MADE BY THE USER', `"${d.question}" The user chose: ${sentence(choice)}`, ...(hasSwap(cards) ? [swapSentence(cards)] : []), 'Play this out.'].join('\n')
+export function decisionMade(d: Decision, choice: string, cards: CardSwap = NO_SWAP, effects: string[] = []): string {
+  return ['DECISION MADE BY THE USER', `"${d.question}" The user chose: ${sentence(choice)}`, ...(hasSwap(cards) ? [swapSentence(cards)] : []), ...effects, 'Play this out.'].join('\n')
 }

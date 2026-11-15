@@ -18,3 +18,7 @@ export function useSheet(id: string): SheetHandle {
     toggle: () => useOpenSheet.setState((s) => ({ id: s.id === id ? null : id }))
   }
 }
+
+export function showSheet(id: string): void {
+  useOpenSheet.setState({ id })
+}

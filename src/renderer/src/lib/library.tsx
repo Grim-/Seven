@@ -1,3 +1,4 @@
+import { noteFailure } from '../store/problems'
 import { useEffect, useRef, useState } from 'react'
 import { icons, Box, type LucideProps } from 'lucide-react'
 import type { LibrarySection } from '@shared/types'
@@ -62,7 +63,10 @@ export function useLibrary(query: string, perKind: number, skip: string[] = [], 
         noteKindFamilies(s)
         if (n === latest.current) setSections(s)
       })
-      .catch(() => n === latest.current && setSections([]))
+      .catch((err: unknown) => {
+        if (n === latest.current) setSections([])
+        noteFailure('library', 'Could not load the library')(err)
+      })
   }
   useEffect(() => {
     load()

@@ -10,6 +10,7 @@ import type { ModelFacts } from '@shared/types'
 import { toast } from '../../store/toasts'
 import { failed } from '../../lib/notify'
 import { formatBytes } from '../../lib/format'
+import { noteFailure } from '../../store/problems'
 
 const DOT: Record<Tone, string> = {
   ok: 'bg-ok shadow-[0_0_6px_var(--color-ok)]',
@@ -71,7 +72,7 @@ export function StatusControl() {
       setFacts(null)
       return
     }
-    const read = () => void ask('models.facts').then(setFacts).catch(() => setFacts(null))
+    const read = () => void ask('models.facts').then(setFacts).catch(noteFailure('model', 'Could not read the model facts', () => setFacts(null)))
     read()
     const timer = setInterval(read, 2000)
     return () => clearInterval(timer)

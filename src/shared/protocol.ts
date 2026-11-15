@@ -1,4 +1,4 @@
-import type { CarryMode, CarryOpened, CarrySource, CarrySummary } from './carry'
+import type { CarryAbout, CarryMode, CarryOpened, CarrySource, CarrySummary } from './carry'
 import type { DndStats } from './dnd'
 import type { ExportChoice, ExportInfo } from './exporting'
 import type { Slideshow, SlideshowData } from './slideshow'
@@ -8,17 +8,23 @@ import type { TimelineRow } from './timeline'
 import type { WorldChanges, WorldEntity, WorldMeta, WorldPost, WorldSchema } from './world'
 import type { JourneyEntry, JourneyKind, MapData, MapListing, PlaceVisitor, TokenVisitor, WorldMapUse } from './maps'
 import type { Action, ActionResult } from './actions'
+import type { ChatElement } from './chatElements'
+import type { EffectOutcome, EffectRun } from './effects'
 import type { Decision } from './decisions'
-import type { CardSwap, DeckRef } from './cardDecks'
+import type { CardSwap, DeckOwner, DeckRef } from './cardDecks'
 import type { Ambience, AmbienceCue, Theme } from './theme'
+import type { Avatar, AvatarInput } from './avatars'
 import type { StoredFaction } from './game/factions'
 import type { StoredMapObject } from './game/mapObjects'
 import type { StoredTriggerAction } from './game/triggerActions'
 import type { StoredLootTable, ResolvedLootDrop } from './game/lootTables'
+import type { Problem, ProblemReport } from './problems'
 import type {
   KindInfo,
+  KindLinkActionInfo,
   PlayerCommand,
   PlayerState,
+  CommandArg,
   CommandInfo,
   UserIdentity,
   PendingRequest,
@@ -88,6 +94,7 @@ import type {
   ModelConfig,
   ModelConfigResult,
   CustomCommand,
+  CharacterMind,
   CharacterSheet,
   RepoEntry,
   ChatTemplate,
@@ -130,9 +137,9 @@ import type {
 } from './types'
 import type { CompendiumEntry, CompendiumKind, CompendiumRef } from './compendium'
 import type { CatalogData, GameDef } from './game/defs/defs'
-import type { RuleSet } from './game/defs/ruleSets'
 import type { EntityRecord } from './game/core/GameEntity'
 import type { Point } from './shapes'
+import type { BlueprintRow, BlueprintSource } from './game/blueprints'
 import type { ClockState } from './game/core/clock'
 import type { GameSave, SaveMeta, WorldSaves } from './game/save'
 import type { StoredDecision } from './storedDecision'
@@ -183,7 +190,7 @@ export interface EngineRequests {
   'sessions.list': Req<void, SessionMeta[]>
   'sessions.create': Req<{ agentId: string }, SessionMeta>
   'sessions.open': Req<{ id: string }, SessionSnapshot>
-  'sessions.send': Req<{ id: string; text: string; attachments?: string[] }, { userMessageId: string; assistantMessageId: string }>
+  'sessions.send': Req<{ id: string; text: string; attachments?: string[]; elements?: ChatElement[] }, { userMessageId: string; assistantMessageId: string }>
   'sessions.abort': Req<{ id: string }, boolean>
   'sessions.rename': Req<{ id: string; title: string }, SessionMeta>
   'sessions.delete': Req<{ id: string }, boolean>
@@ -205,9 +212,9 @@ export interface EngineRequests {
   'mind.prefs.set': Req<Partial<MindPrefs>, MindPrefs & { loaded: boolean; error: string | null }>
   'styles.list': Req<void, ReasoningStyle[]>
   'commands.custom.list': Req<void, CustomCommand[]>
-  'commands.custom.save': Req<{ id: string | null; name: string; summary: string; prompt: string }, CustomCommand>
+  'commands.custom.save': Req<{ id: string | null; name: string; summary: string; prompt: string; args?: CommandArg[] }, CustomCommand>
   'commands.custom.delete': Req<{ id: string }, boolean>
-  'styles.save': Req<{ id: string | null; name: string; instruction: string; voices: { label: string; line: string }[] }, ReasoningStyle>
+  'styles.save': Req<{ id: string | null; name: string; instruction: string; voices: { label: string; line: string }[]; constraints?: string }, ReasoningStyle>
   'styles.delete': Req<{ id: string }, boolean>
   'sessions.refreshInstructions': Req<{ id: string }, boolean>
   'sessions.context': Req<{ id: string }, { usage: ContextUsage | null; instructionsChanged: boolean }>
@@ -235,15 +242,15 @@ export interface EngineRequests {
   'worlds.changes': Req<{ id: string; type: string; layer?: 'template' | 'play' }, Record<string, WorldChanges>>
   'maps.list': Req<void, MapListing[]>
   'worlds.setPlayer': Req<{ id: string; sheet: string | null }, WorldMeta>
-  'worlds.setRules': Req<{ id: string; rules: string }, WorldMeta>
   'worlds.setTags': Req<{ id: string; tags: string[] }, WorldMeta>
   'actions.roll': Req<{ action: Action; character: string | null; pick?: number | null; world?: string | null; deck?: DeckRef | null }, ActionResult>
   'decisions.roll': Req<{ decision: Decision }, Decision>
-  'decks.find': Req<{ ref: DeckRef; make?: boolean }, { deck: string | null; set: string | null }>
+  'decks.find': Req<{ ref: DeckRef; make?: boolean }, { deck: string | null }>
   'decks.take': Req<{ ref: DeckRef; card: string }, { deck: string }>
   'decks.add': Req<{ ref: DeckRef; card: string; by: number }, { deck: string }>
   'decks.swap': Req<{ ref: DeckRef; swap: CardSwap }, { deck: string }>
   'decks.addSet': Req<{ ref: DeckRef; set: string }, { deck: string }>
+  'decks.setOwner': Req<{ deck: string; owner: DeckOwner | null }, boolean>
   'worlds.journey': Req<{ id: string; sheet: string }, JourneyEntry[]>
   'worlds.addJourney': Req<{ id: string; sheet: string; kind: JourneyKind; text: string }, JourneyEntry>
   'places.visitors': Req<{ sheets: string[] }, PlaceVisitor[]>
@@ -308,6 +315,9 @@ export interface EngineRequests {
   'themes.list': Req<void, Theme[]>
   'themes.save': Req<Omit<Partial<Theme>, 'id'> & { id: string | null }, Theme>
   'themes.delete': Req<{ id: string }, boolean>
+  'avatars.list': Req<void, Avatar[]>
+  'avatars.save': Req<AvatarInput, Avatar>
+  'avatars.delete': Req<{ id: string }, boolean>
   'ambience.get': Req<{ sessionId: string }, Ambience>
   'ambience.set': Req<{ sessionId: string; ambience: Partial<Ambience> | null; minutes: number | null }, Ambience>
   'backdrop.set': Req<{ sessionId: string; scope: 'chat' | 'timed'; backdrop: Backdrop | null; minutes?: number }, ChatBackdrops>
@@ -341,6 +351,7 @@ export interface EngineRequests {
   'tools.settings': Req<{ id: string; values: Record<string, unknown> }, ModuleInfo[]>
   'tools.create': Req<{ id: string; name: string; kind: 'tools' | 'mcp' }, ModuleInfo[]>
   'tools.importMcp': Req<{ json: string }, { created: string[]; skipped: string[] }>
+  'tools.installZip': Req<{ path: string; replace: boolean }, { installed: string | null; needsReplace: { id: string; name: string; from: string; to: string } | null }>
   'tools.action': Req<{ id: string; name: string }, { message: string | null }>
   'tools.prefs.get': Req<void, ToolsPrefs>
   'tools.prefs.set': Req<Partial<ToolsPrefs>, ToolsPrefs>
@@ -365,15 +376,12 @@ export interface EngineRequests {
   'dnd.get': Req<{ kind: CompendiumKind; id: string }, { entry: CompendiumEntry; srd: boolean; own: boolean }>
   'dnd.save': Req<{ kind: CompendiumKind; entry: CompendiumEntry; previousId: string | null }, CompendiumEntry>
   'dnd.remove': Req<{ kind: CompendiumKind; id: string }, boolean>
-  'game.ruleSets': Req<void, RuleSet[]>
-  'game.saveRuleSet': Req<{ id: string | null; name: string; notes: string; copy: string | null }, RuleSet>
-  'game.removeRuleSet': Req<{ id: string }, boolean>
-  'game.list': Req<{ ruleSet: string; type: string }, GameDef[]>
-  'game.get': Req<{ ruleSet: string; type: string; id: string }, GameDef>
-  'game.save': Req<{ ruleSet: string; type: string; def: GameDef; previousId: string | null }, GameDef>
-  'game.remove': Req<{ ruleSet: string; type: string; id: string }, boolean>
-  'game.catalog': Req<{ ruleSet: string }, CatalogData>
-  'game.joinCharacter': Req<{ sheet: string; ruleSet: string; template: string }, EntityRecord>
+  'game.list': Req<{ type: string }, GameDef[]>
+  'game.get': Req<{ type: string; id: string }, GameDef>
+  'game.save': Req<{ type: string; def: GameDef; previousId: string | null }, GameDef>
+  'game.remove': Req<{ type: string; id: string }, boolean>
+  'game.catalog': Req<void, CatalogData>
+  'game.joinCharacter': Req<{ sheet: string; template: string }, EntityRecord>
   'game.saveCharacter': Req<{ sheet: string; record: EntityRecord }, EntityRecord>
   'game.leaveCharacter': Req<{ sheet: string }, boolean>
   'game.tickCharacters': Req<{ sheets: string[]; seconds: number }, number>
@@ -391,8 +399,15 @@ export interface EngineRequests {
   'saves.travel': Req<{ sheet: string; id: string; map: string; place: string }, GameSave>
   'saves.spawnCreature': Req<{ world: string; map: string; creature: EntityRecord; faction: string; at: Point }, GameSave>
   'saves.updateCreature': Req<{ world: string; creature: EntityRecord; faction?: string }, GameSave>
+  'saves.spawnBlueprint': Req<{ world: string; map: string; source: string; id: string; name: string; faction: string; at: Point }, GameSave>
+  'blueprints.sources': Req<void, BlueprintSource[]>
+  'blueprints.search': Req<{ source: string; query: string; limit: number }, BlueprintRow[]>
   'game.misfits': Req<{ sheet: string }, string[]>
   'game.giveItem': Req<{ sheet: string; item: string; count: number; gold: number }, { given: number; gold: number }>
+  'game.takeItem': Req<{ sheet: string; item: string; count: number }, number>
+  'game.changeHealth': Req<{ sheet: string; delta: number }, { from: number; to: number }>
+  'game.changeCreatureHealth': Req<{ world: string; uid: string; delta: number }, { from: number; to: number }>
+  'effects.run': Req<EffectRun, EffectOutcome>
   'game.useAbility': Req<{ sheet: string; ability: string; target: string | null; at: { x: number; y: number } | null; distance: number }, string>
   'saves.markUsed': Req<{ id: string; trigger: string; flag: string }, GameSave>
   'saves.setFlag': Req<{ id: string; flag: string }, GameSave>
@@ -435,13 +450,14 @@ export interface EngineRequests {
   'routines.save': Req<RoutineDraft, Routine>
   'routines.enable': Req<{ id: string; on: boolean }, Routine[]>
   'routines.run': Req<{ id: string }, boolean>
-  'library.kinds': Req<void, { kind: string; label: string; description: string; short: string; rollable: boolean; parts: { name: string; description: string }[] }[]>
+  'library.kinds': Req<void, { kind: string; label: string; description: string; short: string; rollable: boolean; parts: { name: string; description: string }[]; linkActions: KindLinkActionInfo[] }[]>
   'library.kindInfo': Req<void, KindInfo[]>
   'library.reindex': Req<void, boolean>
   'library.guides': Req<void, { id: string; title: string; summary: string }[]>
   'library.rename': Req<{ entry: string; name: string }, string>
   'slideshows.save': Req<{ id: string | null; title: string; data: SlideshowData }, Slideshow>
-  'carry.save': Req<{ entry: string | null; text: string | null; picture: string; lock: boolean; path: string }, void>
+  'carry.save': Req<{ entry: string | null; text: string | null; picture: string; lock: boolean; path: string; framed?: string | null }, void>
+  'carry.describe': Req<{ entry: string }, CarryAbout>
   'carry.peek': Req<{ sources: CarrySource[] }, CarrySummary[]>
   'carry.open': Req<{ source: CarrySource; mode: CarryMode }, CarryOpened>
   'sheets.list': Req<void, CharacterSheet[]>
@@ -449,7 +465,7 @@ export interface EngineRequests {
   'repos.list': Req<void, RepoEntry[]>
   'repos.get': Req<{ id: string }, RepoEntry>
   'repos.save': Req<{ id: string | null; title: string; tags: string[]; scope: 'use' | 'run'; values: string[] }, RepoEntry>
-  'sheets.save': Req<{ id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story }, CharacterSheet>
+  'sheets.save': Req<{ id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story; mind?: CharacterMind | null }, CharacterSheet>
   'sheets.setFaction': Req<{ id: string; faction: string | null }, CharacterSheet>
   'library.rollText': Req<{ text: string }, { text: string; rolled: { token: string; value: string; error?: string }[] }>
   'library.remove': Req<{ entry: string }, boolean>
@@ -470,6 +486,7 @@ export interface EngineRequests {
   'library.exportFolder': Req<{ entries: string[]; kind: string | null; tag: string | null; target: 'obsidian' | 'markdown'; dir: string }, { folder: string; files: number; attachments: number; skipped: string[] }>
   'data.pages.list': Req<void, PageMeta[]>
   'data.pages.get': Req<{ id: string }, Page>
+  'data.pages.find': Req<{ id: string }, Page | null>
   'data.pages.create': Req<{ title: string; body: string; fields: FieldDef[]; type: string | null; parent?: string | null }, Page>
   'data.pages.write': Req<{ id: string; title: string | null; body: string | null }, Page>
   'data.pages.append': Req<{ ref: string; text: string }, Page>
@@ -489,6 +506,7 @@ export interface EngineRequests {
   'data.records.delete': Req<{ pageId: string; recordIds: string[] }, string[]>
   'data.assets.list': Req<void, AssetMeta[]>
   'data.assets.get': Req<{ id: string }, AssetMeta>
+  'data.assets.find': Req<{ id: string }, AssetMeta | null>
   'data.assets.import': Req<{ paths: string[]; parent?: string | null }, AssetMeta[]>
   'data.pages.makeFolders': Req<{ path: string }, string | null>
   'data.assets.delete': Req<{ id: string }, boolean>
@@ -520,7 +538,7 @@ export type EngineResult<K extends EngineRequestName> = EngineRequests[K]['resul
 
 export const ERROR_MARKER = '__sevenError'
 
-export type CodedErrorWire = { [ERROR_MARKER]: { code: string; message: string } }
+export type CodedErrorWire = { [ERROR_MARKER]: { code: string; message: string; request?: string } }
 
 export const LONG_REQUESTS: ReadonlySet<EngineRequestName> = new Set<EngineRequestName>([
   'models.load',
@@ -549,6 +567,7 @@ export const LONG_REQUESTS: ReadonlySet<EngineRequestName> = new Set<EngineReque
   'tools.settings',
   'tools.create',
   'tools.importMcp',
+  'tools.installZip',
   'tools.prefs.set',
   'tools.action'
 ])
@@ -612,6 +631,10 @@ export interface MainRequests {
   'network.revoke': Req<{ deviceId: string }, NetworkStatus>
   'network.unpairAll': Req<void, NetworkStatus>
   'network.deviceLevel': Req<{ deviceId: string; level: DeviceLevelId }, NetworkStatus>
+  'problems.list': Req<void, Problem[]>
+  'problems.report': Req<ProblemReport, void>
+  'problems.dismiss': Req<{ id: string }, void>
+  'problems.clear': Req<void, void>
 }
 
 export type MainRequestName = keyof MainRequests
@@ -660,12 +683,15 @@ export interface Events {
   'thought.delta': { sessionId: string; messageId: string; text: string }
   'turn.finish': { sessionId: string; message: ChatMessage }
   'message.part': { sessionId: string; messageId: string; part: ToolPart }
+  'message.element': { sessionId: string; messageId: string; element: ChatElement }
   'turn.phase': { sessionId: string; messageId: string; phase: TurnPhase }
   'tool.draft': { sessionId: string; messageId: string; callIndex: number; name: string; chunk: string; done: boolean }
   'tool.output': { sessionId: string; messageId: string; partId: string; chunk: string }
   'ui.notify': { sessionId: string; title: string; message: string }
   'ui.pending': PendingRequest[]
-  'engine.error': { sessionId: string | null; message: string }
+  'engine.problem': ProblemReport
+  'problems.changed': Problem[]
+  'problem.new': { problem: Problem; shown: boolean }
   'window.maximized': boolean
   'settings.changed': Settings
   'overlay.expanded': boolean
@@ -684,6 +710,7 @@ export interface Events {
   'triggerActions.changed': Record<string, never>
   'lootTables.changed': Record<string, never>
   'themes.changed': Theme[]
+  'avatars.changed': Avatar[]
   'ambience.changed': { sessionId: string; ambience: Ambience }
   'ambience.cue': AmbienceCue
   'python.changed': Record<string, never>

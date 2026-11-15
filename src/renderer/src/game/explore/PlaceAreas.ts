@@ -25,6 +25,7 @@ export class PlaceAreas {
   ) {}
 
   set(shapes: Record<string, ShapeForm>, selected: string | null): void {
+    let changed = false
     for (const [key, form] of Object.entries(shapes)) {
       const known = this.areas.get(key)
       if (known && known.form === form) continue
@@ -33,16 +34,19 @@ export class PlaceAreas {
       this.areas.set(key, { form, view })
       this.root.addChild(view)
       this.paint(key)
+      changed = true
     }
     for (const [key, area] of this.areas) {
       if (shapes[key]) continue
       area.view.destroy()
       this.areas.delete(key)
+      changed = true
     }
-    this.mark({ selected })
+    if (changed || selected !== this.selected) this.mark({ selected })
   }
 
   hover(key: string | null): void {
+    if (key === this.hovered) return
     this.mark({ hovered: key })
   }
 

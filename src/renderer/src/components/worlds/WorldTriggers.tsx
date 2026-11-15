@@ -174,6 +174,7 @@ export function WorldTriggers({ world }: Props) {
           <TriggerEditor
             start={editingTrigger.trigger}
             world={world.id}
+            map={editingTrigger.mapId}
             onSave={(next) => handleSaveTrigger(next, editingTrigger.mapId)}
           />
         </Modal>

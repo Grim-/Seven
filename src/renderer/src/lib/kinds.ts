@@ -3,6 +3,7 @@ import type { KindInfo } from '@shared/types'
 import { engine, on } from './ipc'
 import { useApp } from '../store/app'
 import { failed } from './notify'
+import { noteFailure } from '../store/problems'
 
 const fetchKinds = () => engine('library.kinds')
 
@@ -40,7 +41,7 @@ export function useKindList(): KindInfo[] {
     const load = () =>
       void engine('library.kindInfo')
         .then(setList)
-        .catch(() => undefined)
+        .catch(noteFailure('library', 'Could not list the kinds'))
     load()
     return on('tools.changed', load)
   }, [])

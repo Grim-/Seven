@@ -1,3 +1,4 @@
+import { noteMainFailure } from './problems'
 import { Menu, Tray, nativeImage } from 'electron'
 import icon from '../../resources/icon.png?asset'
 
@@ -40,7 +41,8 @@ export function createTray(actions: TrayActions): SevenTray | null {
     rebuild()
     tray.on('click', actions.showApp)
     return { tray, refresh: rebuild }
-  } catch {
+  } catch (err) {
+    noteMainFailure(err, 'tray', 'Could not create the tray icon', 'error')
     return null
   }
 }

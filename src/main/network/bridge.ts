@@ -135,7 +135,7 @@ export class Bridge {
         .then((result) => this.send(conn, { id, result }))
         .catch((err: unknown) => {
           try {
-            this.send(conn, { id, result: coded(err) })
+            this.send(conn, { id, result: coded(err, name) })
           } catch {
             this.send(conn, { id, error: err instanceof Error ? err.message : String(err) })
           }

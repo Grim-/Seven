@@ -1,3 +1,4 @@
+import { noteMainFailure } from '../problems'
 import fs from 'node:fs'
 import https from 'node:https'
 import net from 'node:net'
@@ -173,8 +174,8 @@ export class Gateway extends EventEmitter {
     if (!saved.announceId) {
       try {
         writeJson(FILE, stored)
-      } catch {
-        this.error = null
+      } catch (err) {
+        noteMainFailure(err, 'network', 'Could not save the network settings')
       }
     }
     return stored

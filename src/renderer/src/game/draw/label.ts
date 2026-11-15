@@ -16,12 +16,13 @@ export class Label {
     this.root.addChild(this.back, this.text)
   }
 
-  set(value: string): void {
+  set(value: string): boolean {
     const shown = this.upper ? value.toUpperCase() : value
-    if (this.text.text === shown) return
+    if (this.text.text === shown) return false
     this.text.text = shown
     this.back.clear()
     this.back.rect(0, 0, this.width, this.height).fill({ color: this.theme.bg, alpha: 0.88 }).stroke({ width: 1, color: this.theme.line })
+    return true
   }
 
   get width(): number {

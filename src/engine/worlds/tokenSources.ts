@@ -1,8 +1,12 @@
 import type { GameSave } from '@shared/game/save'
 import type { Standing, TokenVisitor } from '@shared/maps'
 
+import { contribute } from '../modules/contributions'
+
 export interface TokenSource {
   id: string
+  module: string
+  label: string
   owns(token: string, save: GameSave | null): boolean
   resolve(tokens: string[], save: GameSave | null, world: string): TokenVisitor[]
   placed?(token: string, save: GameSave): GameSave
@@ -15,6 +19,7 @@ export function registerTokenSource(source: TokenSource): void {
   const at = sources.findIndex((s) => s.id === source.id)
   if (at >= 0) sources[at] = source
   else sources.push(source)
+  contribute(source.module, 'Map tokens', source.label)
 }
 
 export function tokenOwner(token: string, save: GameSave | null): TokenSource | null {

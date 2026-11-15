@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { create } from 'zustand'
-import { ChevronDown, ChevronLeft, Database, Dumbbell, FolderOpen, Gauge, Inbox, Maximize2, Minimize2, Plus, Trash2, X } from 'lucide-react'
-import type { PanelItem, SidePanelPrefs } from '@shared/types'
+import { ChevronDown, ChevronUp, Database, Dumbbell, FolderOpen, Gauge, Inbox, Maximize2, Minimize2, Plus, Star, Trash2, X } from 'lucide-react'
+import { FOLDER_TYPE, showName } from '@shared/ids'
+import { pageKindOf, type PanelItem, type SidePanelPrefs } from '@shared/types'
 import { useApp } from '../../store/app'
 import type { DataSelection } from '../../store/data'
 import { DataBrowser } from '../../views/DataView'
+import { KindPane } from '../../views/data/KindPane'
 import { LockedState, useLocked } from '../vault/Vault'
 import { cn } from '../../lib/cn'
 import { formatRelative } from '../../lib/format'
@@ -15,18 +17,19 @@ import { agentGroups, useToolsets } from '../../store/toolsets'
 import { unseenIn, usePanel } from '../../store/panel'
 import { registerSideTab, sideTabs, type SideTabContext, type SideTabDef } from '../../registries/side'
 import { ViewRenderer } from '../../registries/views'
-import { EmptyState, Gutter, SidePane, openMenu } from '../ui'
+import { BackBar, EmptyState, Gutter, Popover, SidePane, openMenu } from '../ui'
 import { ModulePageView } from '../present/template'
 import { WorkoutPanel } from '../workout/Workout'
 import { useData, usePage } from '../../store/data'
+import { PageExplorer } from '../data/PageExplorer'
 import { StatsTab } from './StatsTab'
-import { KindIcon } from '../../lib/library'
-import { presentOf, viewKinds } from '../../registries/kinds'
-import { KindBrowser } from '../data/KindBrowser'
+import { KindIcon, useLibrary } from '../../lib/library'
+import { presentOf } from '../../registries/kinds'
 import './BrowserTab'
 import { useAgentIdOf, useConversation } from '../../lib/conversation'
 import { saveTrayKinds, useKindList } from '../../lib/kinds'
 import { useDrawerPrefs } from '../../lib/listPrefs'
+import { noteFailure } from '../../store/problems'
 
 const MIN = 280
 const MAX = 900
@@ -51,7 +54,7 @@ function useActiveItems(): { sessionId: string | null; items: PanelItem[] } {
   const { sessionId } = useConversation()
   const items = usePanel((s) => (sessionId ? (s.items[sessionId] ?? EMPTY) : EMPTY))
   useEffect(() => {
-    if (sessionId) void usePanel.getState().load(sessionId).catch(() => undefined)
+    if (sessionId) void usePanel.getState().load(sessionId).catch(noteFailure('side', 'Could not load the side panel'))
   }, [sessionId])
   return { sessionId, items }
 }
@@ -60,8 +63,62 @@ function FilesTab() {
   const locked = useLocked()
   const selected = useSide((s) => s.files)
   const select = useSide((s) => s.setFiles)
-  if (locked) return <div className="p-2.5"><LockedState what="Pages and files" /></div>
-  return <DataBrowser mode="panel" selected={selected} select={select} only={viewKinds('pages')} />
+  const pages = useData((s) => s.pages)
+  const assets = useData((s) => s.assets)
+  useEffect(() => {
+    void useData.getState().refresh().catch(noteFailure('library', 'Could not refresh files'))
+  }, [])
+  if (locked) return <div className="p-2.5"><LockedState what="Files and pages" /></div>
+
+  if (!selected || selected.kind === 'folder') {
+    const folderId = selected?.kind === 'folder' ? selected.id : null
+    const parentFolder = folderId ? pages.find((p) => p.id === folderId)?.parent ?? null : null
+    const validParent = parentFolder && pages.some((p) => p.id === parentFolder) ? parentFolder : null
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-2 p-2.5">
+        {folderId && (
+          <BackBar
+            onBack={() => select(validParent ? { kind: 'folder', id: validParent } : null)}
+            kind={showName(pages.find((p) => p.id === folderId)?.title ?? 'Folder')}
+          />
+        )}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <PageExplorer
+            key={folderId ?? 'root'}
+            folder={folderId}
+            onOpen={(id) => {
+              if (!id) return void select(null)
+              const page = pages.find((p) => p.id === id)
+              const kind = page?.type === FOLDER_TYPE ? 'folder' : pageKindOf(page?.type)
+              select({ kind, id })
+            }}
+            onOpenFile={(id) => select({ kind: 'file', id })}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  const rawParent =
+    selected.kind === 'file'
+      ? (assets.find((a) => a.id === selected.id)?.parent ?? null)
+      : (pages.find((p) => p.id === selected.id)?.parent ?? null)
+  const parentId = rawParent && pages.some((p) => p.id === rawParent) ? rawParent : null
+  const parentLabel = parentId ? showName(pages.find((p) => p.id === parentId)?.title ?? 'Folder') : 'Files'
+  const Screen = presentOf(selected.kind).Screen
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2 p-2.5">
+      <BackBar onBack={() => select(parentId ? { kind: 'folder', id: parentId } : null)} kind={parentLabel} />
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {Screen ? (
+          <Screen key={`${selected.kind}/${selected.id}`} kind={selected.kind} id={selected.id} select={select} />
+        ) : (
+          <EmptyState title="No view">Could not display this item.</EmptyState>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function DataTab() {
@@ -135,7 +192,7 @@ function TypedPageTab({ type }: { type: string }) {
   const meta = useData((s) => s.pages.find((p) => p.type === type))
   const page = usePage(meta?.id ?? null)
   useEffect(() => {
-    if (!meta) void useData.getState().refresh().catch(() => undefined)
+    if (!meta) void useData.getState().refresh().catch(noteFailure('library', 'Could not refresh the library'))
   }, [meta])
   if (!page) return null
   return (
@@ -198,22 +255,25 @@ const KIND_TAB = 'kind:'
 function KindTab({ kind, label }: { kind: string; label: string }) {
   const locked = useLocked()
   const [sel, setSel] = useState<DataSelection>({ kind, id: 'all' })
+  useEffect(() => {
+    setSel({ kind, id: 'all' })
+    void useData.getState().refresh().catch(noteFailure('library', 'Could not refresh the library'))
+  }, [kind])
+  const only = useMemo(() => (sel.kind === kind ? [kind] : [kind, sel.kind]), [kind, sel.kind])
+  const { sections } = useLibrary('', 50, [], only)
   if (locked) return <div className="p-2.5"><LockedState what={label} /></div>
-  const Screen = presentOf(sel.kind).Screen
-  const id = sel.id === 'all' ? null : sel.id
+  const section = sections?.find((s) => s.kind === sel.kind) ?? sections?.[0] ?? null
   const select = (s: DataSelection | null) => setSel(s ?? { kind, id: 'all' })
   const home = sel.kind === kind && sel.id === 'all'
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 p-2.5">
-      {!home && (
-        <div className="flex items-center border-b border-line/50 pb-1.5">
-          <button onClick={() => setSel({ kind, id: 'all' })} className="flex items-center gap-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft hover:text-white">
-            <ChevronLeft className="h-3.5 w-3.5" /> {label}
-          </button>
-        </div>
-      )}
+      {!home && <BackBar onBack={() => setSel({ kind, id: 'all' })} kind={label} />}
       <div className="flex min-h-0 flex-1 flex-col">
-        {Screen ? <Screen key={`${sel.kind}/${sel.id}`} kind={sel.kind} id={id} select={select} /> : <KindBrowser key={`${sel.kind}/${sel.id}`} kind={sel.kind} title={label} empty="Nothing here yet." initial={id} />}
+        {!section ? (
+          <div className="px-2 py-1.5 font-mono text-[11px] text-dim">Loading…</div>
+        ) : (
+          <KindPane section={section} selected={sel} select={select} />
+        )}
       </div>
     </div>
   )
@@ -229,7 +289,7 @@ export function SidePanel() {
   const kindTabs: SideTabDef[] = allKindKeys.flatMap((k, i) => {
     const info = kindList.find((x) => x.kind === k)
     if (!info) return []
-    return [{ id: `${KIND_TAB}${k}`, label: info.plural, icon: <KindIcon name={info.icon} className="h-3.5 w-3.5" />, order: 1000 + i, render: () => <KindTab kind={k} label={info.plural} /> }]
+    return [{ id: `${KIND_TAB}${k}`, label: info.plural, icon: <KindIcon name={info.icon} className="h-3.5 w-3.5" />, order: 1000 + i, render: () => <KindTab key={k} kind={k} label={info.plural} /> }]
   })
   const tabs = [...baseTabs, ...kindTabs]
   const seen = usePanel((s) => s.seen)
@@ -319,35 +379,29 @@ export const useTray = create<TrayState>((set) => ({
   set: (patch) => set(patch)
 }))
 
+const FRONT_TABS = 4
+
+export function openTrayTab(id: string): void {
+  const shown = useApp.getState().settings?.trayTabs ?? []
+  if (!shown.includes(id)) void useApp.getState().updateSettings({ trayTabs: [...shown, id] })
+  useTray.getState().set({ tab: id })
+}
+
 export function OutputTray() {
   const { tabs: allBuiltIn, ctx, sessionId, items } = useTabs()
   const pinned = useApp((s) => s.settings?.trayKinds) ?? []
   const shownTabs = useApp((s) => s.settings?.trayTabs) ?? []
   const saveTrayTabs = (next: string[]) => void useApp.getState().updateSettings({ trayTabs: next })
-  const builtIn = allBuiltIn.filter((t) => shownTabs.includes(t.id))
-  const hiddenBuiltIn = allBuiltIn.filter((t) => !shownTabs.includes(t.id))
+  const builtIn = allBuiltIn.filter((t) => t.always || shownTabs.includes(t.id))
+  const hiddenBuiltIn = allBuiltIn.filter((t) => !t.always && !shownTabs.includes(t.id))
   const kindList = useKindList()
-  const kindTabs: SideTabDef[] = pinned.flatMap((k, i) => {
+  const kindTabs: SideTabDef[] = pinned.map((k, i) => {
     const info = kindList.find((x) => x.kind === k)
-    if (!info) return []
-    return [{ id: `${KIND_TAB}${k}`, label: info.plural, icon: <KindIcon name={info.icon} className="h-3.5 w-3.5" />, order: 1000 + i, render: () => <KindTab kind={k} label={info.plural} /> }]
+    const label = info?.plural ?? showName(k)
+    return { id: `${KIND_TAB}${k}`, label, icon: <KindIcon name={info?.icon ?? ''} className="h-3.5 w-3.5" />, order: 1000 + i, render: () => <KindTab key={k} kind={k} label={label} /> }
   })
   const tabs = [...builtIn, ...kindTabs]
-  const addMenu = (e: React.MouseEvent) =>
-    openMenu(
-      e,
-      'Add a button',
-      [
-        ...hiddenBuiltIn.map((t) => ({ label: t.label, icon: t.icon, onSelect: () => saveTrayTabs([...shownTabs, t.id]) })),
-        ...(hiddenBuiltIn.length ? [{ label: '', separator: true }] : []),
-        ...(kindList.length
-          ? kindList
-              .filter((k) => !pinned.includes(k.kind))
-              .sort((a, b) => a.plural.localeCompare(b.plural))
-              .map((k) => ({ label: k.plural, icon: <KindIcon name={k.icon} />, onSelect: () => saveTrayKinds([...pinned, k.kind]) }))
-          : [{ label: 'Loading kinds…', disabled: true }])
-      ]
-    )
+  const unpinned = kindList.filter((k) => !pinned.includes(k.kind)).sort((a, b) => a.plural.localeCompare(b.plural))
   const seen = usePanel((s) => s.seen)
   const tab = useTray((s) => s.tab)
   const expanded = useTray((s) => s.expanded)
@@ -365,9 +419,83 @@ export function OutputTray() {
   useEffect(() => {
     if (current && sessionId) usePanel.getState().markSeen(sessionId, current.id)
   }, [current?.id, sessionId, items])
+  const tabButton = (t: SideTabDef, close?: () => void) => {
+    const active = t.id === tab
+    const fresh = !active && sessionId ? unseenIn(items, seen, sessionId, t.id) : 0
+    return (
+      <button
+        key={t.id}
+        onClick={() => {
+          setTray({ tab: active ? null : t.id })
+          close?.()
+        }}
+        onContextMenu={(e) => {
+          if (t.always) return
+          if (!t.id.startsWith(KIND_TAB))
+            return openMenu(e, t.label, [
+              {
+                label: 'Remove button',
+                icon: <X />,
+                danger: true,
+                onSelect: () => {
+                  if (active) setTray({ tab: null })
+                  saveTrayTabs(shownTabs.filter((x) => x !== t.id))
+                }
+              }
+            ])
+          const k = t.id.slice(KIND_TAB.length)
+          const at = pinned.indexOf(k)
+          const move = (to: number) => {
+            const next = pinned.filter((x) => x !== k)
+            next.splice(to, 0, k)
+            saveTrayKinds(next)
+          }
+          openMenu(e, t.label, [
+            { label: 'Move up', disabled: at <= 0, onSelect: () => move(at - 1) },
+            { label: 'Move down', disabled: at >= pinned.length - 1, onSelect: () => move(at + 1) },
+            { label: '', separator: true },
+            {
+              label: 'Remove from favourites',
+              icon: <X />,
+              danger: true,
+              onSelect: () => {
+                if (active) setTray({ tab: null })
+                saveTrayKinds(pinned.filter((x) => x !== k))
+              }
+            }
+          ])
+        }}
+        className={cn(
+          'relative flex h-6 items-center gap-1.5 border px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors',
+          active ? 'border-accent/70 bg-accent/15 text-accent' : 'border-line/50 text-dim hover:border-line hover:text-white'
+        )}
+      >
+        {t.icon}
+        {t.label}
+        {fresh > 0 && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-accent" />}
+      </button>
+    )
+  }
+  const front = builtIn.slice(0, FRONT_TABS)
+  const more = [...builtIn.slice(FRONT_TABS), ...kindTabs]
+  const moreActive = more.find((t) => t.id === tab)
+  const addRow = (key: string, label: string, icon: React.ReactNode, onAdd: () => void, close: () => void) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => {
+        onAdd()
+        close()
+      }}
+      className="shell-row flex w-full items-center gap-2 px-2 py-1.5 text-left text-[12px] [&>svg]:h-3.5 [&>svg]:w-3.5"
+    >
+      {icon}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+    </button>
+  )
   if (!tabs.length) return null
   return (
-    <div className="relative z-20">
+    <div className="relative z-30">
       <div className={cn('pointer-events-none absolute inset-x-2 bottom-full overflow-hidden transition-[height] duration-300', expanded ? 'h-[78vh]' : 'h-[44vh]')}>
         <section
           className={cn(
@@ -395,66 +523,44 @@ export function OutputTray() {
         </section>
       </div>
       <div className="flex flex-wrap items-center gap-1.5 bg-black/40 px-3 pt-2">
-        {tabs.map((t) => {
-          const active = t.id === tab
-          const fresh = !active && sessionId ? unseenIn(items, seen, sessionId, t.id) : 0
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTray({ tab: active ? null : t.id })}
-              onContextMenu={(e) => {
-                if (!t.id.startsWith(KIND_TAB))
-                  return openMenu(e, t.label, [
-                    {
-                      label: 'Remove button',
-                      icon: <X />,
-                      danger: true,
-                      onSelect: () => {
-                        if (active) setTray({ tab: null })
-                        saveTrayTabs(shownTabs.filter((x) => x !== t.id))
-                      }
-                    }
-                  ])
-                const k = t.id.slice(KIND_TAB.length)
-                const at = pinned.indexOf(k)
-                const move = (to: number) => {
-                  const next = pinned.filter((x) => x !== k)
-                  next.splice(to, 0, k)
-                  saveTrayKinds(next)
-                }
-                openMenu(e, t.label, [
-                  { label: 'Move left', disabled: at <= 0, onSelect: () => move(at - 1) },
-                  { label: 'Move right', disabled: at >= pinned.length - 1, onSelect: () => move(at + 1) },
-                  { label: '', separator: true },
-                  {
-                    label: 'Remove button',
-                    icon: <X />,
-                    danger: true,
-                    onSelect: () => {
-                      if (active) setTray({ tab: null })
-                      saveTrayKinds(pinned.filter((x) => x !== k))
-                    }
-                  }
-                ])
-              }}
-              className={cn(
-                'relative flex h-6 items-center gap-1.5 border px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors',
-                active ? 'border-accent/70 bg-accent/15 text-accent' : 'border-line/50 text-dim hover:border-line hover:text-white'
-              )}
-            >
-              {t.icon}
-              {t.label}
-              {fresh > 0 && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-accent" />}
-            </button>
-          )
-        })}
-        <button
-          title="Add a button"
-          onClick={addMenu}
-          className="flex h-6 w-6 items-center justify-center border border-dashed border-line/50 text-dim hover:border-accent/60 hover:text-accent"
+        {front.map((t) => tabButton(t))}
+        {more.length > 0 && (
+          <Popover
+            title="Favourites"
+            side="top"
+            align="start"
+            className="flex max-h-[50vh] w-56 flex-col items-stretch gap-1.5 p-2"
+            triggerClassName={cn(
+              'h-6 gap-1.5 border px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors',
+              moreActive ? 'border-accent/70 bg-accent/15 text-accent' : 'border-line/50 text-dim hover:border-line hover:text-white'
+            )}
+            trigger={
+              <>
+                <Star className="h-3.5 w-3.5" />
+                {moreActive ? moreActive.label : `Favourites ${more.length}`}
+                <ChevronUp className="h-3 w-3" />
+              </>
+            }
+          >
+            {(close) => more.map((t) => tabButton(t, close))}
+          </Popover>
+        )}
+        <Popover
+          title="Add a favourite"
+          side="top"
+          align="start"
+          className="flex max-h-[60vh] w-60 flex-col p-1.5"
+          triggerClassName="h-6 w-6 justify-center border border-dashed border-line/50 text-dim hover:border-accent/60 hover:text-accent"
+          trigger={<Plus className="h-3.5 w-3.5" />}
         >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+          {(close) => (
+            <>
+              {hiddenBuiltIn.map((t) => addRow(t.id, t.label, t.icon, () => saveTrayTabs([...shownTabs, t.id]), close))}
+              {hiddenBuiltIn.length > 0 && <div className="my-1 border-t border-line/50" />}
+              {kindList.length ? unpinned.map((k) => addRow(k.kind, k.plural, <KindIcon name={k.icon} />, () => saveTrayKinds([...pinned, k.kind]), close)) : <div className="px-2 py-1.5 text-[12px] text-dim">Loading kinds…</div>}
+            </>
+          )}
+        </Popover>
       </div>
     </div>
   )

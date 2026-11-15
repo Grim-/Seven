@@ -12,6 +12,7 @@ import { useApp } from '../../store/app'
 import { KindPane } from './KindPane'
 import { openEntryMenu } from './entryMenu'
 import { openIn } from './KindList'
+import { noteFailure } from '../../store/problems'
 
 function isCurrent(current: DataSelection | null, kind: string, id: string): boolean {
   return Boolean(current && current.id === id && (current.kind === kind || kindUi(current.kind) === kindUi(kind)))
@@ -47,7 +48,7 @@ function KindSection({
     let live = true
     void engine('library.find', { query, kind: section.kind })
       .then((hits) => live && setAll(hits.filter((h) => h.kind === section.kind).sort((a, b) => (b.at ?? 0) - (a.at ?? 0))))
-      .catch(() => undefined)
+      .catch(noteFailure('library', 'Could not search'))
     return () => {
       live = false
     }
@@ -105,7 +106,7 @@ function KindSection({
 
 export function PanelBrowser({ selected, select, only = null }: { selected: DataSelection | null; select: (s: DataSelection | null) => void; only?: string[] | null }) {
   useEffect(() => {
-    void useData.getState().refresh().catch(() => undefined)
+    void useData.getState().refresh().catch(noteFailure('library', 'Could not refresh the library'))
   }, [])
   const listPrefs = useApp((s) => s.settings?.dataList) ?? { open: true, width: 288 }
   const updateSettings = useApp((s) => s.updateSettings)

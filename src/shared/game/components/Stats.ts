@@ -2,6 +2,8 @@ import { Component, registerComponent, type GameEntity, type TooltipRow } from '
 
 export class Stats extends Component {
   static readonly type: string = 'stats'
+  static readonly LABEL: string = 'Stats'
+  static readonly ICON: string = 'BarChart3'
   static readonly DESCRIPTION: string = 'Base stat and resist values. Every read adds what equipment, buffs and other components change.'
   static readonly PARAMS = { base: { kind: 'values' as const, templateKind: 'stat', default: {}, description: 'Base value per stat or resist id. Missing ones use the stat default.' } }
   private base: Record<string, number> = { ...(this.params.base as Record<string, number>) }

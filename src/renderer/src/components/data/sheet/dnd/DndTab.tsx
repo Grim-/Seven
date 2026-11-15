@@ -5,6 +5,7 @@ import { Button, askConfirm } from '../../../ui'
 import { AbilityScores } from './AbilityScores'
 import { Attacks } from './Attacks'
 import { Conditions } from './Conditions'
+import { ExtraStats } from './ExtraStats'
 import { Features } from './Features'
 import { Gear } from './Gear'
 import { Identity } from './Identity'
@@ -29,7 +30,10 @@ export function DndTab({ dnd, onChange, story, onStory, onOpenStory }: { dnd: Dn
       <Identity dnd={dnd} onChange={patch} />
       <Vitals dnd={dnd} onChange={patch} />
       <div className="grid grid-cols-1 items-start gap-2.5 lg:grid-cols-[17rem_minmax(0,1fr)] 2xl:grid-cols-[17rem_minmax(0,1fr)_21rem]">
-        <AbilityScores dnd={dnd} onChange={patch} />
+        <div className="flex min-w-0 flex-col gap-2.5">
+          <AbilityScores dnd={dnd} onChange={patch} />
+          <ExtraStats dnd={dnd} onChange={patch} />
+        </div>
         <div className="flex min-w-0 flex-col gap-2.5">
           <Conditions dnd={dnd} onChange={patch} />
           <Attacks dnd={dnd} onChange={patch} />

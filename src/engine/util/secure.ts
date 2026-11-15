@@ -1,3 +1,4 @@
+import { noteFailure } from './report'
 import fs from 'node:fs'
 import { EventEmitter } from 'node:events'
 import path from 'node:path'
@@ -11,7 +12,8 @@ export const vaultFile = path.join(dataRoot, 'vault.json')
 export function loadVaultFile(): VaultFile | null {
   try {
     return JSON.parse(fs.readFileSync(vaultFile, 'utf8')) as VaultFile
-  } catch {
+  } catch (err) {
+    noteFailure(err, 'vault', 'Could not read the vault file')
     return null
   }
 }

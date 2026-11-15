@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react'
 import { ListRow } from './ListRow'
+import { cn } from '../../lib/cn'
+import { matchesKeybind } from '../../store/keybinds'
 
 export interface BrowserSection {
   id: string
@@ -20,6 +22,7 @@ export function SettingsBrowser({
   placeholder = 'Search settings',
   empty,
   bodyRef,
+  wide = false,
   children
 }: {
   sections: BrowserSection[]
@@ -31,12 +34,13 @@ export function SettingsBrowser({
   placeholder?: string
   empty?: ReactNode
   bodyRef?: RefObject<HTMLDivElement | null>
+  wide?: boolean
   children: ReactNode
 }) {
   const search = useRef<HTMLInputElement>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== '/' || (e.target as HTMLElement | null)?.closest('input, textarea, [contenteditable="true"]')) return
+      if (!matchesKeybind('app.settingsSearch', e) || (e.target as HTMLElement | null)?.closest('input, textarea, [contenteditable="true"]')) return
       e.preventDefault()
       search.current?.focus()
     }
@@ -74,7 +78,7 @@ export function SettingsBrowser({
         ))}
         {!sections.length && empty}
       </nav>
-      <div ref={bodyRef} className="flex min-h-0 max-w-4xl flex-1 flex-col gap-3 overflow-y-auto pr-1 [&>*]:shrink-0">
+      <div ref={bodyRef} className={cn('flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 [&>*]:shrink-0', !wide && 'max-w-4xl')}>
         {children}
       </div>
     </div>

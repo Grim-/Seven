@@ -1,15 +1,26 @@
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 
+export const InsideSlateContext = createContext(false)
+
 export function EntryCard({ title, tag, aside, children, className }: { title: ReactNode; tag: string; aside?: ReactNode; children: ReactNode; className?: string }) {
+  const insideSlate = useContext(InsideSlateContext)
+  if (insideSlate) {
+    return (
+      <div className={cn('flex flex-col gap-2.5', className)}>
+        {aside && <div className="flex items-center justify-end gap-2 font-mono text-[10.5px] text-faint">{aside}</div>}
+        {children}
+      </div>
+    )
+  }
   return (
-    <div className={cn('notch-sm border border-line border-l-2 border-l-accent bg-black/60', className)}>
+    <div className={cn('notch-sm border border-line border-l-2 border-l-accent bg-black/85 backdrop-blur-md shadow-[0_14px_38px_rgba(0,0,0,0.85)]', className)}>
       <div className="flex items-center gap-2 border-b border-line/40 px-3 py-2">
-        <span className="min-w-0 truncate text-[13.5px] font-semibold uppercase tracking-[0.06em] text-white">{title}</span>
+        <span className="min-w-0 truncate text-[13px] font-semibold uppercase tracking-[0.06em] text-white">{title}</span>
         <span className="shrink-0 border border-teal/35 px-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-teal">{tag}</span>
         {aside && <span className="ml-auto flex shrink-0 items-center gap-2">{aside}</span>}
       </div>
-      <div className="flex flex-col gap-2.5 px-3 py-2.5">{children}</div>
+      <div className="flex flex-col gap-2.5 px-3.5 py-3">{children}</div>
     </div>
   )
 }
