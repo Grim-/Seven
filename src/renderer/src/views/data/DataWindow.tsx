@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ListPane, ListToggle, MainPane, ReadingPane, SearchBox, Split } from '../../components/ui'
+import { ArrowLeft } from 'lucide-react'
+import { Button, ListPane, ListToggle, MainPane, ReadingPane, SearchBox, Split } from '../../components/ui'
 import { useListPrefs } from '../../lib/listPrefs'
 import { useCompactLayout } from '../../lib/form'
 import { useLibrary } from '../../lib/library'
@@ -10,8 +11,10 @@ import { KindPane } from './KindPane'
 import { kindUi, ownViewKinds } from '../../registries/kinds'
 import { KindRail } from './KindRail'
 import { rememberSections } from './entryMenu'
+import { recordOpenedEntry, useRecentEntries } from '../../lib/recentData'
 import { useRememberedLocation } from '../../lib/window'
 import type { DataSelection } from '../../store/data'
+import { useDataHistory } from '../../store/dataHistory'
 import { noteFailure } from '../../store/problems'
 
 function useQuery(): [string, string, (q: string) => void] {
@@ -33,10 +36,18 @@ export function DataWindow() {
   const compact = useCompactLayout()
   const closed = new Set(prefs.closed ?? [])
   const [query, q, setQuery] = useQuery()
+  const overview = useDataHistory((s) => s.overview)
+  const setOverview = useDataHistory((s) => s.setOverview)
+  const canBack = useDataHistory((s) => s.past.length > 0 && !s.checking)
+  const back = () => void useDataHistory.getState().goBack(sections)
+  const recentEntries = useRecentEntries()
   const { sections: found } = useLibrary(q, 20, skip)
   useEffect(() => {
     if (sections) rememberSections(sections)
   }, [sections])
+  useEffect(() => {
+    if (selected && selected.id && selected.id !== 'all') recordOpenedEntry(selected.kind, selected.id)
+  }, [selected?.kind, selected?.id])
   useEffect(() => {
     void useData
       .getState()
@@ -94,6 +105,14 @@ export function DataWindow() {
               sections={sections ?? []}
               current={kind}
               closed={closed}
+              overview={overview}
+              recentCount={recentEntries.length}
+              onPickOverview={(mode) => {
+                setQuery('')
+                setOverview(mode)
+                select(null)
+                if (compact) save({ open: false })
+              }}
               onPick={(k) => {
                 setQuery('')
                 select(k ? { kind: k, id: 'all' } : null)
@@ -115,7 +134,7 @@ export function DataWindow() {
               <div className="font-mono text-[11px] text-dim">Loading…</div>
             ) : selected && section ? (
               <>
-                <KindHeader section={section} selected={selected} select={select} lead={toggle} />
+                <KindHeader section={section} selected={selected} select={select} lead={toggle} canBack={canBack} onBack={back} />
                 <ReadingPane on={selected.id !== 'all'}>
                   <KindPane section={section} selected={selected} select={select} />
                 </ReadingPane>
@@ -124,6 +143,7 @@ export function DataWindow() {
               <>
                 <div className="flex shrink-0 items-center gap-3">
                   {toggle}
+                  <Button size="sm" variant="ghost" icon={<ArrowLeft />} title="Back" disabled={!canBack} onClick={back} />
                   {!prefs.open && <div className="min-w-0 max-w-md flex-1">{search}</div>}
                 </div>
                 <Everything
@@ -131,6 +151,8 @@ export function DataWindow() {
                   query={q}
                   selected={selected}
                   select={select}
+                  mode={overview}
+                  onModeChange={setOverview}
                 />
               </>
             )}

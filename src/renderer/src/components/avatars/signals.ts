@@ -10,11 +10,25 @@ export interface AvatarMood {
   strength: number
 }
 
+export interface AvatarReactionSignal {
+  kind: string
+  at: number
+  until: number
+  detail?: Record<string, unknown>
+}
+
+export interface AvatarToolSignal {
+  name: string
+  label: string
+}
+
 export interface AvatarSignals {
   activity: Activity
   since: number
   rate: number
   mood: AvatarMood
+  reaction: AvatarReactionSignal | null
+  tool: AvatarToolSignal | null
   gaze: { x: number; y: number } | null
   colors: AnimatedColors
   size: AvatarSize
@@ -57,9 +71,12 @@ export class SignalSource {
   private colorsAt = 0
   changed: (() => void) | null = null
   activityChanged: ((from: Activity, to: Activity) => void) | null = null
+  reactionTriggered: ((kind: string, durationMs: number, detail?: Record<string, unknown>) => void) | null = null
   private activity: Activity = 'idle'
   private activityAt = performance.now()
   private blend: Blend = { from: { energy: 0, warmth: 0, strength: 0, name: NEUTRAL_MOOD }, to: { energy: 0, warmth: 0, strength: 0, name: NEUTRAL_MOOD }, at: 0 }
+  private reaction: AvatarReactionSignal | null = null
+  private tool: AvatarToolSignal | null = null
   private spoken = 0
   private spokenAt = 0
   private rate = 0
@@ -93,6 +110,19 @@ export class SignalSource {
     this.changed?.()
   }
 
+  triggerReaction(kind: string, durationMs = 1600, detail?: Record<string, unknown>): void {
+    const now = performance.now()
+    this.reaction = kind ? { kind, at: now, until: now + durationMs, detail } : null
+    if (kind) this.reactionTriggered?.(kind, durationMs, detail)
+    this.changed?.()
+  }
+
+  setTool(tool: AvatarToolSignal | null): void {
+    if (this.tool?.name === tool?.name && this.tool?.label === tool?.label) return
+    this.tool = tool
+    this.changed?.()
+  }
+
   noteSpoken(length: number): void {
     const now = performance.now()
     const added = length - this.spoken
@@ -106,11 +136,14 @@ export class SignalSource {
 
   read(time: number, el: HTMLElement | null, size: AvatarSize): AvatarSignals {
     const quiet = this.spokenAt ? Math.exp(-Math.max(0, time - this.spokenAt - 250) / 600) : 0
+    if (this.reaction && time >= this.reaction.until) this.reaction = null
     return {
       activity: this.activity,
       since: (time - this.activityAt) / 1000,
       rate: this.forcedRate ?? this.rate * quiet,
       mood: this.moodAt(time),
+      reaction: this.reaction,
+      tool: this.tool,
       gaze: this.gazeFrom(el),
       colors: this.colorsFrom(el, time),
       size,

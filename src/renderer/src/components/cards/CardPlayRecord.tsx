@@ -6,6 +6,7 @@ import { CardBack } from './CardBack'
 import { LiveCard } from './LiveCard'
 import { readOutcome } from './cardPlay'
 import { useCardPage } from './useCardPage'
+import { useVfx } from '../vfx'
 import { Markdown } from '../chat/Markdown'
 
 export function CardPlayRecord({ data }: ChatElementProps) {
@@ -13,8 +14,9 @@ export function CardPlayRecord({ data }: ChatElementProps) {
   const said = typeof data.said === 'string' ? data.said : ''
   const outcome = readOutcome(data.outcome)
   const id = useCardPage(name)
+  const vfxRef = useVfx<HTMLDivElement>([`card:${name}`, id ? `card:${id}` : null])
   return (
-    <div className="card-play-record">
+    <div ref={vfxRef} className="card-play-record">
       <div className="w-20 shrink-0 phone:w-14">{id ? <LiveCard id={id} /> : <CardBack className="w-full" />}</div>
       <div className="flex min-w-0 flex-col items-start gap-1.5">
         <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent-soft">Played {showName(name)}</span>

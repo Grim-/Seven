@@ -1,5 +1,5 @@
 import { isAssetId } from '../ids'
-import { ACTIVITIES, MOODS } from '../moods'
+import { ACTIVITIES, MOODS, REACTION_POSES } from '../moods'
 import { pickSettings, settingsFor, type SettingSpec, type SettingValues } from '../settingSpec'
 import type { AvatarRef } from '../types'
 
@@ -49,12 +49,22 @@ export interface AvatarRendererInfo {
   builtins: AvatarSeed[]
 }
 
-export const POSE_KEYS: string[] = [...new Set<string>([...MOODS.map((m) => m.name), ...ACTIVITIES.map((a) => a.name)])]
+export const MEDIA_CLIP_SETTING: SettingSpec = { name: 'picture', label: 'Fallback clip', type: 'picture', group: 'look', default: '' }
+
+export const POSE_KEYS: string[] = [...new Set<string>([...MOODS.map((m) => m.name), ...ACTIVITIES.map((a) => a.name), ...REACTION_POSES.map((r) => r.name)])]
 
 const renderers = new Map<string, AvatarRendererInfo>()
 
 export function registerAvatarRenderer(info: AvatarRendererInfo): void {
-  renderers.set(info.id, info)
+  const hasMedia = info.settings.some((s) => s.name === 'picture')
+  const normalized: AvatarRendererInfo = hasMedia
+    ? info
+    : {
+        ...info,
+        settings: [...info.settings, MEDIA_CLIP_SETTING],
+        poseSettings: [...new Set([...info.poseSettings, 'picture'])]
+      }
+  renderers.set(info.id, normalized)
 }
 
 export function avatarRenderers(): AvatarRendererInfo[] {

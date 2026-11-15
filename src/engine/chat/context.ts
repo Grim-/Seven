@@ -12,6 +12,7 @@ import { libraryGuide } from '../library/kinds'
 import { worldGuide } from '../worlds/ops'
 import { userSection } from '../user/identity'
 import { styles } from '../mind/styles'
+import { agentDeckSummary } from '../cards/decks'
 import { linkFor } from '@shared/text'
 
 const ROLEPLAY = [
@@ -171,6 +172,7 @@ export function buildInstructions(agent: AgentProfile, tools: ToolDef[], memoryT
   sections.push(libraryGuide(tools.map((t) => t.name), agent.id))
   sections.push(placesGuide(tools))
   if (tools.some((t) => t.name === 'world_recall')) sections.push(worldGuide(agent.world, tools.some((t) => t.name === 'world_create')))
+  if (tools.some((t) => t.name === 'play_card')) sections.push(agentDeckSummary(agent))
   sections.push(guidesSection(tools))
   sections.push(memorySection(memoryText))
   return sections.filter(Boolean).join('\n\n')

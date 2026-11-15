@@ -59,17 +59,34 @@ export function isActivity(value: unknown): value is Activity {
   return ACTIVITIES.some((a) => a.name === value)
 }
 
+export const REACTION_POSES = [
+  { name: 'hit', label: 'Hit' },
+  { name: 'heal', label: 'Heal' },
+  { name: 'crit', label: 'Crit' }
+] as const
+
+export type ReactionPoseName = (typeof REACTION_POSES)[number]['name']
+
+export function isReactionPose(value: unknown): value is ReactionPoseName {
+  return REACTION_POSES.some((r) => r.name === value)
+}
+
 export interface AvatarPose {
   mood?: MoodName
   activity?: Activity
+  reaction?: string | null
   energy?: number
   warmth?: number
   rate?: number
 }
 
 export function poseOf(name: unknown): AvatarPose | undefined {
-  const pose: AvatarPose = { mood: isMood(name) ? name : undefined, activity: isActivity(name) ? name : undefined }
-  return pose.mood || pose.activity ? pose : undefined
+  const pose: AvatarPose = { mood: isMood(name) ? name : undefined, activity: isActivity(name) ? name : undefined, reaction: isReactionPose(name) ? name : undefined }
+  return pose.mood || pose.activity || pose.reaction ? pose : undefined
 }
 
-export const POSE_OPTIONS: { value: string; label: string }[] = [...ACTIVITIES.filter((a) => !isMood(a.name)).map((a) => ({ value: a.name, label: a.label })), ...MOODS.map((m) => ({ value: m.name, label: m.label }))]
+export const POSE_OPTIONS: { value: string; label: string }[] = [
+  ...ACTIVITIES.filter((a) => !isMood(a.name)).map((a) => ({ value: a.name, label: a.label })),
+  ...MOODS.map((m) => ({ value: m.name, label: m.label })),
+  ...REACTION_POSES.map((r) => ({ value: r.name, label: r.label }))
+]

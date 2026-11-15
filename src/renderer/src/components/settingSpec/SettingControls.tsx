@@ -10,7 +10,8 @@ export function SettingControls({
   onChange,
   readOnly = false,
   changed = [],
-  onReset
+  onReset,
+  itemClassName
 }: {
   specs: SettingSpec[]
   values: SettingValues
@@ -18,6 +19,7 @@ export function SettingControls({
   readOnly?: boolean
   changed?: string[]
   onReset?: (name: string) => void
+  itemClassName?: string
 }) {
   return (
     <fieldset disabled={readOnly} className="contents">
@@ -26,7 +28,7 @@ export function SettingControls({
         if (!control) return null
         const { Control } = control
         return (
-          <div key={spec.name} className={cn('relative min-w-0', control.wide && 'col-span-full')}>
+          <div key={spec.name} className={cn('relative min-w-0', control.wide ? 'col-span-full w-full' : itemClassName)}>
             <Control spec={spec} value={values[spec.name] ?? spec.default} onChange={(v) => onChange(spec.name, v)} />
             {onReset && changed.includes(spec.name) && (
               <button type="button" title="Back to the base look" onClick={() => onReset(spec.name)} className="absolute right-0 top-0 flex items-center gap-1 font-mono text-[10px] uppercase text-accent hover:text-white">

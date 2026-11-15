@@ -15,6 +15,7 @@ import { vaultEvents } from '../../engine/util/secure'
 import { isVaultLocked } from '@shared/sealed'
 import { rollText } from '../../engine/library/kinds'
 import { addCard, takeCard } from '../../engine/cards/decks'
+import { playCardForAgent } from '../../engine/cards/play'
 import { agentAccess } from '../../engine/agents/access'
 import { worlds } from '../../engine/worlds/store'
 import { ifMissing } from '../../engine/util/report'
@@ -144,10 +145,21 @@ const factory: ModuleFactory = (sdk) =>
             const name = sdk.params.str(params, 'card')
             const existing = this.cardPage(name)
             let next: Json = { ...((existing?.data as Json | undefined) ?? {}), name: existing?.title ?? name }
-            for (const key of ['text', 'color'] as const) if (typeof raw[key] === 'string') next[key] = raw[key]
-            if (typeof raw.art === 'string') next.art = raw.art.includes('<svg') ? cleanSvg(raw.art) : raw.art
-            const layoutRef = sdk.params.optStr(params, 'layout')
-            if (layoutRef) next = { ...next, layout: this.named('layout', layoutRef, 'card layout').title, values: this.checkValues(this.layout(layoutRef), raw.values) }
+            if (raw.text === null) next.text = ''
+            else if (typeof raw.text === 'string') next.text = raw.text
+            if (raw.color === null) next.color = null
+            else if (typeof raw.color === 'string') next.color = raw.color
+            if (raw.art === null) next.art = ''
+            else if (typeof raw.art === 'string') next.art = raw.art.includes('<svg') ? cleanSvg(raw.art) : raw.art
+            const prevLayout = typeof next.layout === 'string' && next.layout ? next.layout : null
+            if (raw.layout === null) next = { ...next, layout: null, values: {} }
+            else {
+              const layoutRef = sdk.params.optStr(params, 'layout')
+              const layoutTitle = layoutRef ? this.named('layout', layoutRef, 'card layout').title : prevLayout
+              const prevValues = raw.values === null || (layoutRef && layoutTitle !== prevLayout) ? {} : ((next.values as Record<string, CardValue> | undefined) ?? {})
+              const patchValues = raw.values && typeof raw.values === 'object' ? (layoutTitle ? this.checkValues(this.layout(layoutTitle), raw.values) : (() => { throw new sdk.ToolError('Set layout before setting card values.') })()) : {}
+              if (layoutRef || 'values' in raw) next = { ...next, layout: layoutTitle, values: { ...prevValues, ...patchValues } }
+            }
             const v = raw.variation && typeof raw.variation === 'object' ? (raw.variation as Json) : null
             if (v) {
               const def = liveCardVariations().find((d) => d.id === v.type)
@@ -215,6 +227,41 @@ const factory: ModuleFactory = (sdk) =>
           const card = sdk.params.str(params, 'card')
           takeCard(this.chatDeck(ctx), card)
           return `The user loses ${linkFor('cards.card', card)}.`
+        }
+      })
+
+      add({
+        name: 'play_card',
+        activity: () => 'playing a card',
+        description: 'Play a card from your deck. target can be "user", "self", a character sheet, a creature, or a map object (omitted targets the user). Seven selects Gameplay, Roleplay, or Prompt automatically.',
+        params: {
+          type: 'object',
+          properties: {
+            card: { type: 'string', description: 'card name or link from your deck' },
+            target: { type: ['string', 'null'], description: '"user", "self", or target name; omitted targets user' },
+            say: { type: ['string', 'null'], description: 'short in-character line displayed on the played card' }
+          },
+          required: ['card']
+        },
+        execute: async (params, ctx) => {
+          const say = sdk.params.optStr(params, 'say')
+          const played = await playCardForAgent(sdk.params.str(params, 'card'), sdk.params.optStr(params, 'target'), say, ctx)
+          ctx.addElement?.({
+            type: 'card_play',
+            data: {
+              card: played.card,
+              said: say ?? '',
+              outcome: {
+                tone: played.outcome.tone,
+                label: played.outcome.label,
+                detail: played.outcome.detail,
+                effects: played.outcome.effects
+              },
+              hidden: played.hideInstructions
+            }
+          })
+          ctx.viewEvents?.(played.outcome.view, played.card, played.world)
+          return [`PLAYED ${linkFor('cards.card', played.card)} [${played.mode}] -> ${played.target}`, ...played.outcome.lines, 'Play this out in your reply.'].join('\n')
         }
       })
     }

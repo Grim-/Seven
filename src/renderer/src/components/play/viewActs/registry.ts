@@ -24,12 +24,18 @@ export interface ViewActContext {
 }
 
 export type ViewAct = (data: Record<string, unknown>, ctx: ViewActContext) => Promise<unknown> | void
+export type AmbientViewAct = (data: Record<string, unknown>, ctx: { target: string | null; token: MapToken | null }) => void
 
 const acts = new Map<string, ViewAct>()
+const ambientActs = new Map<string, AmbientViewAct>()
 let current: (() => WorldViewHost) | null = null
 
 export function registerViewAct(kind: string, act: ViewAct): void {
   acts.set(kind, act)
+}
+
+export function registerAmbientAct(kind: string, act: AmbientViewAct): void {
+  ambientActs.set(kind, act)
 }
 
 export function setWorldViewHost(get: (() => WorldViewHost) | null): void {
@@ -46,9 +52,16 @@ const tokenOf = (host: WorldViewHost, id: string | null | undefined): MapToken |
 
 export async function playViewEvents(events: ViewEvent[], title: string, world: string | null): Promise<void> {
   if (!events.length) return
-  const host = current?.()
-  if (!host || host.world !== world) return void toast.info(title, 'This only happens in the world.')
+  const host = current?.() ?? null
+  const worldEvents: ViewEvent[] = []
   for (const event of events) {
+    const ambient = ambientActs.get(event.kind)
+    if (ambient) ambient(event.data, { target: event.target ?? null, token: host && host.world === world ? tokenOf(host, event.target) : null })
+    else worldEvents.push(event)
+  }
+  if (!worldEvents.length) return
+  if (!host || host.world !== world) return void toast.info(title, 'This only happens in the world.')
+  for (const event of worldEvents) {
     const act = acts.get(event.kind)
     if (!act) {
       toast.info(title, 'Not carried out in the world yet.')

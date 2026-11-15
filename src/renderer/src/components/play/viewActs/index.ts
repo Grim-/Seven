@@ -6,6 +6,7 @@ import './startCombat'
 import './script'
 import './recruit'
 import './cue'
+import './vfx'
 
 export { playViewEvents, registerViewAct, spotBeside, type ViewAct, type ViewActContext, type WorldViewHost } from './registry'
 export { useWorldViewHost } from './useWorldViewHost'

@@ -12,6 +12,7 @@ import { bulkItems, moveEntries } from './bulkMenu'
 import { presentOf } from '../../registries/kinds'
 import { FolderPath } from './FolderPath'
 import { chooseFiles } from '../../lib/importFiles'
+import { FavouriteButton } from '../../lib/favourites'
 import { CopyLinkButton } from './CopyLinkButton'
 import { VIEWABLE_MEDIA_KINDS } from '../pictures/FileEditor'
 import { matchesKeybind } from '../../store/keybinds'
@@ -132,6 +133,7 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMe
           <Upload className="h-3 w-3 text-accent-soft" />
           <span className="hidden sm:inline">Upload</span>
         </button>
+        {folder && currentFolder && <FavouriteButton pin={{ kind: 'folder', id: folder, label: currentFolder.title, icon: 'folder' }} size="xs" />}
         {folder && <CopyLinkButton kind="folder" id={folder} />}
         {!folder && (
           <button

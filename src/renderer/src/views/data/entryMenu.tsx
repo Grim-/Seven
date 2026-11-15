@@ -17,6 +17,7 @@ import { referenceInChat, startChatWith } from '../../lib/conversation'
 import { useAgents } from '../../store/agents'
 import { boardMenu } from '../../components/data/boardMenu'
 import { favouriteItem } from '../../lib/favourites'
+import { useDataHistory } from '../../store/dataHistory'
 
 
 export function openIn(kind: string, id: string, select: (s: DataSelection | null) => void): void {
@@ -85,10 +86,19 @@ export function entryMenuAt(e: React.MouseEvent, kind: string, id: string, title
   )
 }
 
+export function deleteEntry(section: LibrarySection, id: string, title: string, after?: () => void): void {
+  const entry = `${section.kind}/${id}`
+  confirmDelete(`Delete ${showName(title)}?`, `This removes it from ${section.plural} for good.`, () => engine('library.remove', { entry }), () => {
+    after?.()
+    useDataHistory.getState().forgetEntry(section.kind, id)
+  })
+}
+
 export function clearKind(section: LibrarySection): void {
   askConfirm(`Delete all ${section.count} ${section.plural.toLowerCase()}?`, "This can't be undone. Export them first if you might want them back.", 'Delete all', async () => {
     try {
       const r = await engine('library.clearKind', { kind: section.kind })
+      useDataHistory.getState().forgetKindEntries(section.kind)
       toast.success(`Deleted ${r.removed}`, r.failed ? `${r.failed} could not be deleted` : section.plural)
     } catch (err) {
       toast.error('Could not delete', errorText(err))
@@ -115,7 +125,11 @@ export function kindMenuAt(e: React.MouseEvent, section: LibrarySection, select:
     where,
     section.plural,
     joined(
-      [{ label: 'Open', icon: <FolderOpen />, onSelect: () => select({ kind: section.kind, id: 'all' }) }, ...(add ? [{ label: ui.addLabel ?? `New ${section.label.toLowerCase()}`, icon: <Plus />, onSelect: add }] : [])],
+      [
+        { label: 'Open', icon: <FolderOpen />, onSelect: () => select({ kind: section.kind, id: 'all' }) },
+        favouriteItem({ kind: section.kind, id: null, label: section.plural, icon: section.icon }),
+        ...(add ? [{ label: ui.addLabel ?? `New ${section.label.toLowerCase()}`, icon: <Plus />, onSelect: add }] : [])
+      ],
       section.exportable && section.count > 0 ? [{ label: 'Export all', icon: <Download />, children: exportKindMenu(section.kind, section.plural) }] : [],
       section.removable && section.count > 0 ? [{ label: `Delete all ${section.plural.toLowerCase()}`, icon: <Trash2 />, danger: true, onSelect: () => clearKind(section) }] : [],
       [{ label: 'Rebuild index', icon: <RefreshCw />, onSelect: () => void rebuildIndex().catch(failed('Could not rebuild the index')) }]
@@ -174,7 +188,7 @@ export function entryActions(section: LibrarySection, hit: LibraryHit, ctx: { op
         icon: <Trash2 />,
         danger: true,
         onSelect: () =>
-          confirmDelete(`Delete ${showName(hit.title)}?`, `This removes it from ${section.plural} for good.`, () => engine('library.remove', { entry }), () => {
+          deleteEntry(section, hit.id, hit.title, () => {
             if (ctx.selected?.kind === section.kind && ctx.selected.id === hit.id) ctx.select({ kind: section.kind, id: 'all' })
           })
       }

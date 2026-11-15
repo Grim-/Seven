@@ -4,6 +4,7 @@ import type { LibrarySection } from '@shared/types'
 import { showName } from '@shared/ids'
 import { EmptyState, TagInput, openMenu } from '../../components/ui'
 import { Markdown } from '../../components/chat/Markdown'
+import { FavouriteButton } from '../../lib/favourites'
 import { engine } from '../../lib/ipc'
 import { errorText } from '../../lib/format'
 import { onLibraryChange } from '../../lib/library'
@@ -36,9 +37,12 @@ export function EntryView({ section, id, selected, select }: { section: LibraryS
       <div className="flex items-center gap-3">
         <h2 onContextMenu={(e) => hit && openMenu(e, showName(hit.title), entryActions(section, hit, { open: () => undefined, select, selected }).slice(1))} className="min-w-0 flex-1 truncate text-[20px] font-semibold text-white">{showName(hit?.title ?? id)}</h2>
         {hit && (
-          <button title="More" onClick={(e) => openMenu(e, showName(hit.title), entryActions(section, hit, { open: () => undefined, select, selected }).slice(1))} className="flex h-8 w-8 items-center justify-center text-dim hover:text-white">
-            <MoreHorizontal className="h-5 w-5" />
-          </button>
+          <>
+            <FavouriteButton pin={{ kind: section.kind, id, label: hit.title, icon: section.icon }} size="md" />
+            <button title="More" onClick={(e) => openMenu(e, showName(hit.title), entryActions(section, hit, { open: () => undefined, select, selected }).slice(1))} className="flex h-8 w-8 items-center justify-center text-dim hover:text-white">
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
+          </>
         )}
       </div>
       {hit && <TagInput value={hit.tags ?? []} onChange={(tags) => void engine('tags.set', { entry, tags }).catch(failed('Could not tag'))} placeholder="Tags" />}

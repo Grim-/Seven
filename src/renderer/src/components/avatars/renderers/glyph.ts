@@ -1,3 +1,4 @@
+import { frameMedia, frameText, type FrameEntry } from '@shared/settingSpec'
 import { BaseAvatar } from '../BaseAvatar'
 import { registerAvatarDrawer } from '../drawers'
 import type { AvatarSignals } from '../signals'
@@ -7,7 +8,7 @@ const LINE = 1.15
 
 function padded(frames: string[]): string[][] {
   const lines = frames.map((f) => f.split('\n'))
-  const width = Math.max(...lines.flat().map((l) => [...l].length))
+  const width = Math.max(1, ...lines.flat().map((l) => [...l].length))
   return lines.map((frame) =>
     frame.map((l) => {
       const gap = width - [...l].length
@@ -19,8 +20,10 @@ function padded(frames: string[]): string[][] {
 
 interface Layout {
   key: string
-  frames: string[][]
-  glances: string[][]
+  entries: FrameEntry[]
+  glances: FrameEntry[]
+  lines: string[][]
+  glanceLines: string[][]
   font: number
   chars: number
   rows: number
@@ -52,16 +55,16 @@ class GlyphAvatar extends BaseAvatar {
   private layoutFor(key: string | null): Layout {
     const id = key ?? ''
     if (this.layout?.key === id) return this.layout
-    const frames = this.frames('frames', key)
+    const entries = this.frames('frames', key)
     const glances = key ? [] : this.frames('blinks', null)
-    const all = padded([...frames, ...glances])
+    const all = padded([...entries, ...glances].map(frameText))
     const chars = Math.max(1, ...all.flat().map((l) => [...l].length))
     const rows = Math.max(1, ...all.map((f) => f.length))
     const ctx = this.ctx
     ctx.font = `bold 100px ${this.mono}`
     const per = ctx.measureText('M').width / 100
     const font = Math.max(4, Math.min((this.width * 0.92) / (chars * per), (this.height * 0.9) / (rows * LINE)))
-    this.layout = { key: id, frames: all.slice(0, frames.length), glances: all.slice(frames.length), font, chars, rows }
+    this.layout = { key: id, entries, glances, lines: all.slice(0, entries.length), glanceLines: all.slice(entries.length), font, chars, rows }
     return this.layout
   }
 
@@ -77,12 +80,14 @@ class GlyphAvatar extends BaseAvatar {
     }
     const speed = Math.max(16, this.num('speed', key) * (1 - s.rate * 0.4))
     this.elapsed += dt * 1000
-    if (layout.frames.length > 1 && this.elapsed >= speed) {
+    if (layout.entries.length > 1 && this.elapsed >= speed) {
       const steps = Math.floor(this.elapsed / speed)
-      this.index = (this.index + steps) % layout.frames.length
+      this.index = (this.index + steps) % layout.entries.length
       this.elapsed -= steps * speed
     }
-    let lines = layout.frames[this.index % layout.frames.length]
+    const framePos = this.index % layout.entries.length
+    let entry = layout.entries[framePos]
+    let lines = layout.lines[framePos]
     const every = this.num('blinkEvery', null)
     if (!key && every > 0 && layout.glances.length) {
       if (!this.glanceAt) this.glanceAt = time + every * 1000 * (0.5 + Math.random())
@@ -91,8 +96,10 @@ class GlyphAvatar extends BaseAvatar {
         this.glanceUntil = time + this.num('blinkFor', null)
       }
       if (this.glanceUntil) {
-        if (time < this.glanceUntil) lines = layout.glances[this.glance]
-        else {
+        if (time < this.glanceUntil) {
+          entry = layout.glances[this.glance]
+          lines = layout.glanceLines[this.glance]
+        } else {
           this.glanceUntil = 0
           this.glanceAt = time + every * 1000 * (0.5 + Math.random())
         }
@@ -100,7 +107,10 @@ class GlyphAvatar extends BaseAvatar {
     }
 
     const ctx = this.ctx
-    ctx.clearRect(0, 0, this.width, this.height)
+    const clip = frameMedia(entry) || this.poseClip(key, 'frames')
+    const hasMedia = this.paintMediaClip(clip, time, key)
+    if (!hasMedia) ctx.clearRect(0, 0, this.width, this.height)
+    if (hasMedia && !frameText(entry).trim()) return
     const unit = layout.font / BASE_PX
     const t = time / 1000
     const shake = this.num('shake', key) * unit

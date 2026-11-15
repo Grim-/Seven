@@ -516,6 +516,7 @@ export const REMOTE_EVENTS: Record<EventName, RemoteLevelId> = {
   'turn.finish': 'chat',
   'message.part': 'chat',
   'message.element': 'chat',
+  'view.events': 'chat',
   'turn.phase': 'chat',
   'tool.draft': 'chat',
   'tool.output': 'chat',

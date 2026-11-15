@@ -4,6 +4,7 @@ import type { Catalog } from '@shared/game/core'
 import type { PlaceVisitor } from '@shared/maps'
 import { SheetPortrait } from '../../components/data/SheetPortrait'
 import { RecordBars } from '../../components/game/ResourceBars'
+import { useVfx } from '../../components/vfx'
 import { cn } from '../../lib/cn'
 
 export function GamePortrait({
@@ -21,8 +22,10 @@ export function GamePortrait({
   trailing?: ReactNode
   className?: string
 }) {
+  const vfxRef = useVfx<HTMLDivElement>(visitor.sheet ? `sheet:${visitor.sheet}` : null)
   return (
     <div
+      ref={vfxRef}
       onClick={onClick}
       className={cn(
         'relative flex w-full items-start gap-2.5 px-2.5 py-2 text-left transition-colors',

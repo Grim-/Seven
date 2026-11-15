@@ -1,3 +1,4 @@
+import { frameMedia, frameText } from '@shared/settingSpec'
 import { BaseAvatar } from '../BaseAvatar'
 import { registerAvatarDrawer } from '../drawers'
 import type { AvatarSignals } from '../signals'
@@ -79,13 +80,13 @@ class LatticeAvatar extends BaseAvatar {
         grid[y][x] = { ch, level: i === packet ? 3 : 2 }
       }
     })
-    grid[CY][CX] = { ch: cores[beat % cores.length], level: 3 }
+    grid[CY][CX] = { ch: frameText(cores[beat % cores.length]) || '╬', level: 3 }
     grid[CY][CX - 1] = { ch: '═', level: 2 }
     grid[CY][CX + 1] = { ch: '═', level: 2 }
     return grid
   }
 
-  protected draw(dt: number, _time: number, s: AvatarSignals): void {
+  protected draw(dt: number, time: number, s: AvatarSignals): void {
     const key = this.poseKey(s)
     if ((key ?? '') !== this.shown) {
       this.shown = key ?? ''
@@ -101,6 +102,18 @@ class LatticeAvatar extends BaseAvatar {
       const tearing = Math.random() < this.num('tear', key)
       this.tearRow = tearing ? Math.floor(Math.random() * H) : -1
       this.tearShift = tearing ? Math.random() * size * 2 - size : 0
+    }
+
+    const cores = this.frames('cores', key)
+    const activeCore = cores[this.beat % cores.length]
+    const clip = frameMedia(activeCore) || this.poseClip(key, 'cores')
+    const hasMedia = this.paintMediaClip(clip, time, key)
+    if (hasMedia) {
+      if (this.flag('scanlines', null)) {
+        this.ctx.fillStyle = 'rgba(0,0,0,0.45)'
+        for (let y = 0; y < this.height; y += 3) this.ctx.fillRect(0, y, this.width, 1)
+      }
+      return
     }
 
     const net = this.color('net', key)

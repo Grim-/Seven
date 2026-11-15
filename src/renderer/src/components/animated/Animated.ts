@@ -82,8 +82,12 @@ export abstract class Animated<S> implements Ticking {
     this.refresh()
   }
 
-  react(name: string): void {
-    this.onReaction(name)
+  react(name: string, detail?: Record<string, unknown>): void {
+    this.onReaction(name, detail)
+  }
+
+  protected reschedule(): void {
+    if (this.running) this.schedule()
   }
 
   tick(time: number): void {
@@ -120,6 +124,6 @@ export abstract class Animated<S> implements Ticking {
   protected onResize(): void {}
   protected onColors(): void {}
   protected onSettings(): void {}
-  protected onReaction(_name: string): void {}
+  protected onReaction(_name: string, _detail?: Record<string, unknown>): void {}
   protected abstract onFrame(dt: number, time: number): void
 }

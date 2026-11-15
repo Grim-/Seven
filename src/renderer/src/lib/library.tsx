@@ -8,6 +8,7 @@ import type { DataSelection } from '../store/data'
 import { useApp } from '../store/app'
 import { kindUi, noteKindFamilies } from '../registries/kinds'
 import { openChat as openConversation } from './conversation'
+import { recordOpenedEntry } from './recentData'
 import { useWindows } from '../store/windows'
 
 const EVENTS: EventName[] = [
@@ -89,6 +90,7 @@ export function KindIcon({ name, ...props }: { name: string } & LucideProps) {
 }
 
 export function showInData(selection: DataSelection | null, show = true): void {
+  if (selection && selection.id !== 'all') recordOpenedEntry(selection.kind, selection.id)
   useWindows.getState().set('data', selection)
   if (!show) return
   useWindows.getState().focus('data')
@@ -96,6 +98,7 @@ export function showInData(selection: DataSelection | null, show = true): void {
 }
 
 export function openEntry(kind: string, id: string): void {
+  recordOpenedEntry(kind, id)
   const ui = kindUi(kind)
   if (ui.open) return ui.open(id)
   showInData({ kind, id })

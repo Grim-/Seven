@@ -9,7 +9,7 @@ import type { WorldChanges, WorldEntity, WorldMeta, WorldPost, WorldSchema } fro
 import type { JourneyEntry, JourneyKind, MapData, MapListing, PlaceVisitor, TokenVisitor, WorldMapUse } from './maps'
 import type { Action, ActionResult } from './actions'
 import type { ChatElement } from './chatElements'
-import type { EffectOutcome, EffectRun } from './effects'
+import type { EffectOutcome, EffectRun, ViewEvent } from './effects'
 import type { Decision } from './decisions'
 import type { CardSwap, DeckOwner, DeckRef } from './cardDecks'
 import type { Ambience, AmbienceCue, Theme } from './theme'
@@ -684,6 +684,7 @@ export interface Events {
   'turn.finish': { sessionId: string; message: ChatMessage }
   'message.part': { sessionId: string; messageId: string; part: ToolPart }
   'message.element': { sessionId: string; messageId: string; element: ChatElement }
+  'view.events': { sessionId: string; world: string | null; title: string; events: ViewEvent[] }
   'turn.phase': { sessionId: string; messageId: string; phase: TurnPhase }
   'tool.draft': { sessionId: string; messageId: string; callIndex: number; name: string; chunk: string; done: boolean }
   'tool.output': { sessionId: string; messageId: string; partId: string; chunk: string }

@@ -6,6 +6,7 @@ import type { PickDecisionProps } from '@shared/pickDecision'
 import type { RolledDecisionProps } from '@shared/rolledDecision'
 import type { OpposedProps } from '@shared/opposedCheck'
 import type { ChatElement } from '@shared/chatElements'
+import type { ViewEvent } from '@shared/effects'
 
 export interface UiAccess {
   ask(kind: 'question', props: QuestionProps): Promise<unknown>
@@ -36,6 +37,7 @@ export interface ToolContext {
   agentId: string | null
   react: (state: AvatarState | null, reaction: string | null, seconds: number) => void
   addElement?: (element: ChatElement) => void
+  viewEvents?: (events: ViewEvent[], title: string, world: string | null) => void
   panel: PanelAccess
 }
 

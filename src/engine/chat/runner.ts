@@ -679,6 +679,9 @@ export class ChatRunner extends EventEmitter {
         message.elements = [...(message.elements ?? []), element]
         this.emitEvent('message.element', { sessionId, messageId: message.id, element })
       },
+      viewEvents: (events, title, world) => {
+        if (events.length) this.emitEvent('view.events', { sessionId, world, title, events })
+      },
       updatePart: (part) => {
         emitPart(part)
         if (part.ui?.status === 'pending') this.phase(turn, 'waiting', part.name)

@@ -11,6 +11,7 @@ import { effectLines } from '../cardEffects'
 import { NoteView } from '../NoteView'
 import { showPlay, usePlay } from '../playStore'
 import { playViewEvents } from '../viewActs'
+import { triggerOutcomeVfx } from '../../vfx'
 import { registerTriggerUi, type TriggerEditorProps } from './registry'
 
 function EffectsTriggerEditor({ trigger, map, onValues }: TriggerEditorProps) {
@@ -39,6 +40,7 @@ registerTriggerUi('effects', {
     const target = ctx.save?.creatures.some((c) => c.uid === ctx.sheet) ? { creature: ctx.sheet } : { sheet: ctx.sheet }
     engine('effects.run', { defs, user: { placed: { map: ctx.map, id: caster } }, target, world: ctx.world })
       .then(async (done) => {
+        triggerOutcomeVfx(done, [ctx.sheet ? `sheet:${ctx.sheet}` : null])
         await playViewEvents(done.view, trigger.name, ctx.world)
         const lines = effectLines(done)
         if (usePlay.getState().view) return

@@ -1,13 +1,15 @@
 import { useMemo, type ReactNode } from 'react'
 import { Globe } from 'lucide-react'
+import { showName } from '@shared/ids'
 import { viewsIn } from '../../views/registry'
 import { showBrowser } from '../side/BrowserTab'
 import { useTools } from '../../store/tools'
 import { useApp } from '../../store/app'
 import { useVault } from '../../store/vault'
 import { usePlayer } from '../../store/player'
-import { useFavourites } from '../../lib/favourites'
-import { KindIcon, openEntry } from '../../lib/library'
+import { isFileFavouriteKind, openFavourite, useFavourites } from '../../lib/favourites'
+import { showPage } from '../../views/PagesView'
+import { KindIcon } from '../../lib/library'
 import { useSheet } from '../../lib/sheet'
 import { cn } from '../../lib/cn'
 import { Button, Eyebrow, Sheet } from '../ui'
@@ -48,7 +50,7 @@ export function NavMenu() {
   const setView = useApp((s) => s.setView)
   const views = useMemo(() => [...viewsIn('tabs'), ...viewsIn('settings')], [])
   const links = useMemo(() => viewsIn('tabs').flatMap((t) => t.menu ?? []), [])
-  const favourites = useFavourites().filter((p) => p.id)
+  const favourites = useFavourites()
   const track = usePlayer((s) => s.queue[s.index])
   const browserOn = useTools((s) => s.list.some((m) => m.id === 'browser' && m.state === 'on'))
   const vaultOn = useVault((s) => s.status.configured)
@@ -103,13 +105,14 @@ export function NavMenu() {
           <div className="flex flex-col gap-1">
             {favourites.map((p) => (
               <button
-                key={`${p.kind}/${p.id}`}
+                key={`${p.kind}/${p.id ?? ''}`}
                 type="button"
-                onClick={() => go(() => openEntry(p.kind, p.id as string))}
+                onClick={() => go(() => (isFileFavouriteKind(p.kind) && p.id ? showPage(p.id) : openFavourite(p)))}
                 className="flex min-h-11 items-center gap-2.5 border border-transparent px-2.5 text-left font-sans text-[13px] text-white/90 hover:border-line/40 hover:bg-accent/10"
               >
                 <KindIcon name={p.icon} className="h-4 w-4 shrink-0 text-accent" />
-                <span className="truncate">{p.label}</span>
+                <span className="min-w-0 flex-1 truncate">{showName(p.label)}</span>
+                {!p.id && <span className="shrink-0 font-mono text-[9.5px] uppercase tracking-wider text-faint">Kind</span>}
               </button>
             ))}
           </div>

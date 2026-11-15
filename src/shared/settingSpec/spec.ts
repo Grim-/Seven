@@ -1,5 +1,26 @@
-export type SettingValue = number | string | boolean | string[]
+export interface FrameItem {
+  text?: string
+  media?: string
+}
+
+export type FrameEntry = string | FrameItem
+
+export type SettingValue = number | string | boolean | FrameEntry[]
 export type SettingValues = Record<string, SettingValue>
+
+export function frameText(entry: FrameEntry): string {
+  return typeof entry === 'string' ? entry : (entry.text ?? '')
+}
+
+export function frameMedia(entry: FrameEntry): string {
+  return typeof entry === 'string' ? '' : (entry.media ?? '')
+}
+
+export function normalizeFrame(text: string, media?: string): FrameEntry {
+  const cleanMedia = media?.trim() ?? ''
+  if (!cleanMedia) return text
+  return text ? { text, media: cleanMedia } : { media: cleanMedia }
+}
 
 export interface SettingOption {
   value: string
@@ -11,6 +32,7 @@ export interface SettingSpec {
   label: string
   type: string
   default: SettingValue
+  group?: string
   min?: number
   max?: number
   step?: number

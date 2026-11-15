@@ -19,6 +19,8 @@ import { usePhases } from './phases'
 import { useBackdrops } from './backdrops'
 import { useToolsets } from './toolsets'
 import { presentData, useStage } from '../registries/presentations'
+import { playViewEvents } from '../components/play/viewActs'
+import { triggerCardPlayVfx } from '../components/vfx'
 import '../components/present/story'
 import '../components/present/scene'
 import '../components/data/kindUis'
@@ -144,7 +146,15 @@ export async function bootstrap(windowMode: WindowMode = 'app'): Promise<void> {
     const data = part.status === 'done' && part.view?.kind === 'present' ? presentData(part.view.data) : null
     if (data?.where === 'stage' && focusedConversation()?.sessionId === sessionId) useStage.getState().play(data)
   })
-  on('message.element', ({ sessionId, messageId, element }) => useSessions.getState().onElement(sessionId, messageId, element))
+  on('message.element', ({ sessionId, messageId, element }) => {
+    useSessions.getState().onElement(sessionId, messageId, element)
+    if (element.type === 'card_play') {
+      const card = typeof element.data.card === 'string' ? element.data.card : ''
+      const outcome = element.data.outcome as { tone?: unknown } | undefined
+      triggerCardPlayVfx(sessionId, card, typeof outcome?.tone === 'string' ? outcome.tone : null)
+    }
+  })
+  on('view.events', ({ title, world, events }) => void playViewEvents(events, title, world).catch(noteFailure('play', 'Could not apply view events')))
   on('toolsets.changed', ({ list }) => useToolsets.getState().set(list))
   void useToolsets.getState().load().catch(noteFailure('tools', 'Could not load the toolsets'))
   on('backdrop.changed', ({ sessionId, state }) => useBackdrops.getState().set(sessionId, state))

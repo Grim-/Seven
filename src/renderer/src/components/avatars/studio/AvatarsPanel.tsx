@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Copy, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Copy, Plus, RotateCcw, Sparkles, Trash2 } from 'lucide-react'
 import { avatarIdOfRef, avatarRendererInfo, avatarRenderers, type Avatar } from '@shared/avatars'
-import { ACTIVITIES, MOODS, MOOD_NAMES, NEUTRAL_MOOD, moodDef, nearestMood, poseOf, type Activity, type AvatarPose, type MoodName } from '@shared/moods'
+import { ACTIVITIES, MOODS, MOOD_NAMES, NEUTRAL_MOOD, REACTION_POSES, isReactionPose, moodDef, nearestMood, poseOf, type Activity, type AvatarPose, type MoodName } from '@shared/moods'
 import { settingsFor, type SettingValue, type SettingValues } from '@shared/settingSpec'
 import { engine } from '../../../lib/ipc'
 import { errorText, formatRelative } from '../../../lib/format'
 import { failed } from '../../../lib/notify'
 import { toast } from '../../../store/toasts'
+import { triggerVfx } from '../../../store/vfx'
 import { useAgents } from '../../../store/agents'
 import { useAvatars } from '../../../store/avatars'
 import { rowMenu } from '../../../views/data/entryMenu'
@@ -24,6 +25,12 @@ type Draft = Omit<Avatar, 'id' | 'createdAt' | 'updatedAt' | 'builtin'>
 
 const FIRST_RENDERER = avatarRenderers()[0]?.id ?? ''
 const ACTIVITY_OPTIONS = ACTIVITIES.map((a) => ({ value: a.name as Activity, label: a.label }))
+const SPEC_GROUPS: { value: string; label: string }[] = [
+  { value: 'look', label: 'Look & Frames' },
+  { value: 'frames', label: 'Frame Sequence' },
+  { value: 'glances', label: 'Idle Glances' },
+  { value: 'motion', label: 'Motion & FX' }
+]
 
 function toDraft(a: Avatar): Draft {
   const { id: _id, createdAt: _c, updatedAt: _u, builtin: _b, ...rest } = a
@@ -61,8 +68,11 @@ export function AvatarsPanel({ initial = null }: { initial?: string | null }) {
   }, [selected, avatar?.updatedAt])
 
   const [editing, setEditing] = useState(BASE_POSE)
+  const [group, setGroup] = useState('look')
   const [activity, setActivity] = useState<Activity>('idle')
   const [dials, setDials] = useState<Dials | null>(null)
+  const [liveReaction, setLiveReaction] = useState<string | null>(null)
+  const reactionTimer = useRef<number | null>(null)
 
   const readOnly = Boolean(avatar?.builtin)
   const set = (patch: Partial<Draft>) => {
@@ -70,25 +80,45 @@ export function AvatarsPanel({ initial = null }: { initial?: string | null }) {
   }
   const info = draft ? avatarRendererInfo(draft.renderer) : null
   const preview = useMemo<Avatar | null>(() => (draft ? { ...draft, id: selected ?? NEW_AVATAR, createdAt: 0, updatedAt: 0 } : null), [draft, selected])
+  const studioTarget = preview ? `studio-avatar:${preview.id}` : null
   const pose: AvatarPose = {
     ...(dials ? { mood: nearestMood(dials.energy, dials.warmth, MOOD_NAMES) as MoodName, ...dials } : {}),
     activity,
+    reaction: (isReactionPose(editing) ? editing : liveReaction) || null,
     rate: ACTIVITIES.find((a) => a.name === activity)?.previewRate
   }
 
   const pick = (key: string) => {
     setEditing(key)
+    setLiveReaction(null)
     const p = poseOf(key)
     const def = moodDef(p?.mood)
     setDials(def && def.name !== NEUTRAL_MOOD ? { energy: def.energy, warmth: def.warmth } : null)
     setActivity(p?.activity ?? 'idle')
   }
+  const triggerStudioReaction = (name: string) => {
+    if (reactionTimer.current) window.clearTimeout(reactionTimer.current)
+    setLiveReaction(name)
+    if (studioTarget) triggerVfx(studioTarget, name === 'heal' ? { preset: 'flash', color: 'ok' } : { preset: 'hit', color: 'alert' })
+    reactionTimer.current = window.setTimeout(() => setLiveReaction(null), 1500)
+  }
+  useEffect(() => () => {
+    if (reactionTimer.current) window.clearTimeout(reactionTimer.current)
+  }, [])
+
   const posed = editing !== BASE_POSE
   const marked = draft ? Object.keys(draft.poses) : []
   const clearPose = (key: string) => draft && set({ poses: withPose(draft.poses, key, {}) })
   const actions: PoseActions = { marked, onPick: pick, onClear: clearPose, readOnly }
 
   const specs = info ? (posed ? info.settings.filter((s) => info.poseSettings.includes(s.name)) : info.settings) : []
+  const groupOptions = useMemo(() => {
+    const present = new Set(specs.map((s) => s.group ?? 'look'))
+    return SPEC_GROUPS.filter((g) => present.has(g.value))
+  }, [specs])
+  const activeGroup = groupOptions.some((g) => g.value === group) ? group : (groupOptions[0]?.value ?? 'look')
+  const visibleSpecs = useMemo(() => specs.filter((s) => (s.group ?? 'look') === activeGroup), [specs, activeGroup])
+
   const values: SettingValues = draft ? (posed ? { ...draft.settings, ...draft.poses[editing] } : draft.settings) : {}
   const change = (name: string, value: SettingValue) => {
     if (!draft) return
@@ -148,7 +178,7 @@ export function AvatarsPanel({ initial = null }: { initial?: string | null }) {
       }
       bodyClassName="flex min-h-0 gap-3 p-3"
     >
-      <div className="flex w-60 shrink-0 flex-col gap-0.5 overflow-y-auto">
+      <div className="flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-line/40 pr-2">
         {selected === NEW_AVATAR && <div className="border-l-2 border-l-accent bg-accent/10 px-2 py-1.5 text-[13px] text-white">{draft?.name || 'New avatar'}</div>}
         {list.map((a) => (
           <ListRow
@@ -163,69 +193,104 @@ export function AvatarsPanel({ initial = null }: { initial?: string | null }) {
           />
         ))}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {!draft || !preview ? (
           <EmptyState title="No avatar selected">Pick one on the left, or make a new one.</EmptyState>
         ) : (
           <>
-            <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-4">
-              <div className="flex min-w-0 flex-col gap-2">
-                <LiveAvatar avatar={preview} pose={pose} className="aspect-square w-full max-w-[420px]" />
+            <div className="flex shrink-0 flex-wrap items-start gap-4 border-b border-line/50 pb-3">
+              <div className="flex shrink-0 flex-col gap-2">
+                <LiveAvatar avatar={preview} pose={pose} target={studioTarget} size={136} />
                 <SizeStrip avatar={preview} pose={pose} />
               </div>
-              <div className="flex flex-col gap-3">
-                <Field label="Mood" hint="Drag to try any blend. Click a mood to edit its look.">
-                  <MoodPad value={dials} marks={marks} active={editing} onChange={setDials} onPick={pick} onMenu={(e, key) => openPoseMenu(e, key, actions)} />
-                </Field>
-                <Field label="Doing">
-                  <Segmented value={activity} options={ACTIVITY_OPTIONS} onChange={setActivity} wrap />
-                </Field>
-                <Button size="sm" variant="ghost" icon={<RotateCcw />} onClick={() => pick(BASE_POSE)} className="self-start">
-                  At rest
-                </Button>
+
+              <div className="flex min-w-[240px] flex-1 flex-col gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    value={draft.name}
+                    disabled={readOnly}
+                    placeholder="Avatar name..."
+                    onChange={(e) => set({ name: e.target.value })}
+                    className="min-w-[160px] flex-1"
+                  />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <MakeOrSaved made={selected !== NEW_AVATAR} saver={editor} what="avatar" onMake={make} disabled={!draft.name.trim()} />
+                    {avatar && (
+                      <Button size="sm" variant="ghost" icon={<Copy />} onClick={() => copy(avatar)}>
+                        Copy
+                      </Button>
+                    )}
+                    {avatar && !readOnly && (
+                      <Button size="sm" variant="ghost" icon={<Trash2 />} onClick={() => remove(avatar)}>
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <Input
+                  value={draft.description}
+                  disabled={readOnly}
+                  placeholder="Short description of how it looks or reacts..."
+                  onChange={(e) => set({ description: e.target.value })}
+                />
+                {!readOnly && (
+                  <Field label="Style">
+                    <RendererPicker value={draft.renderer} onChange={switchRenderer} />
+                  </Field>
+                )}
+                <span className="font-mono text-[10px] text-faint">
+                  {readOnly ? 'Built in: click Copy to make an editable copy.' : maker ? `Made by ${maker}.` : ''}
+                  {users.length ? ` Used by ${users.join(', ')}.` : ''}
+                </span>
+              </div>
+
+              <div className="flex shrink-0 items-start gap-3 border-l border-line/40 pl-3">
+                <MoodPad value={dials} marks={marks} active={editing} onChange={setDials} onPick={pick} onMenu={(e, key) => openPoseMenu(e, key, actions)} className="w-32 shrink-0" />
+                <div className="flex w-44 flex-col gap-2">
+                  <Field label="Doing">
+                    <Segmented value={activity} options={ACTIVITY_OPTIONS} onChange={setActivity} wrap />
+                  </Field>
+                  <Field label="Test FX">
+                    <div className="flex flex-wrap gap-1">
+                      {REACTION_POSES.map((r) => (
+                        <Button key={r.name} size="sm" variant="badge" onClick={() => triggerStudioReaction(r.name)}>
+                          {r.label}
+                        </Button>
+                      ))}
+                      {(['pulse', 'wobble', 'glitch', 'highlight'] as const).map((preset) => (
+                        <Button key={preset} size="sm" variant="ghost" icon={<Sparkles />} onClick={() => studioTarget && triggerVfx(studioTarget, { preset })}>
+                          {preset}
+                        </Button>
+                      ))}
+                      <Button size="sm" variant="ghost" icon={<RotateCcw />} onClick={() => pick(BASE_POSE)}>
+                        Rest
+                      </Button>
+                    </div>
+                  </Field>
+                </div>
               </div>
             </div>
-            <Field label="Editing the look for" hint="Base is how it always looks. A mood or activity can have its own look on top; right-click one to clear it.">
-              <PoseChips value={editing} {...actions} />
-            </Field>
-            <div className="grid grid-cols-2 gap-x-5 gap-y-3">
-              {!posed && (
-                <>
-                  <Field label="Name">
-                    <Input value={draft.name} disabled={readOnly} onChange={(e) => set({ name: e.target.value })} />
-                  </Field>
-                  <Field label="Description">
-                    <Input value={draft.description} disabled={readOnly} onChange={(e) => set({ description: e.target.value })} />
-                  </Field>
-                  {!readOnly && (
-                    <div className="col-span-full">
-                      <Field label="Drawn by">
-                        <RendererPicker value={draft.renderer} onChange={switchRenderer} />
-                      </Field>
-                    </div>
-                  )}
-                </>
-              )}
-              <SettingControls specs={specs} values={values} onChange={change} readOnly={readOnly} changed={posed ? (Object.keys(draft.poses[editing] ?? {}) as string[]) : []} onReset={posed ? reset : undefined} />
+
+            <div className="flex shrink-0 flex-wrap items-end justify-between gap-2 border-b border-line/40 py-2.5">
+              <Field label="State / pose" className="min-w-0 flex-1">
+                <PoseChips value={editing} {...actions} />
+              </Field>
+              {groupOptions.length > 1 && <Segmented value={activeGroup} options={groupOptions} onChange={setGroup} />}
             </div>
-            <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-3">
-              <span className="font-mono text-[10.5px] text-faint">
-                {readOnly ? 'Built in: copy it to make your own.' : maker ? `Made by ${maker}.` : ''}
-                {users.length ? ` Used by ${users.join(', ')}.` : ''}
-              </span>
-              <span className="ml-auto flex flex-wrap items-center gap-1.5">
-                <MakeOrSaved made={selected !== NEW_AVATAR} saver={editor} what="avatar" onMake={make} disabled={!draft.name.trim()} />
-                {avatar && (
-                  <Button size="sm" variant="ghost" icon={<Copy />} onClick={() => copy(avatar)}>
-                    Copy
-                  </Button>
-                )}
-                {avatar && !readOnly && (
-                  <Button size="sm" variant="ghost" icon={<Trash2 />} onClick={() => remove(avatar)}>
-                    Delete
-                  </Button>
-                )}
-              </span>
+
+            <div className="min-h-0 flex-1 overflow-y-auto pt-3 pr-1">
+              <div className="flex flex-wrap items-start gap-x-5 gap-y-3">
+                <SettingControls
+                  specs={visibleSpecs}
+                  values={values}
+                  onChange={change}
+                  readOnly={readOnly}
+                  changed={posed ? (Object.keys(draft.poses[editing] ?? {}) as string[]) : []}
+                  onReset={posed ? reset : undefined}
+                  itemClassName="min-w-[200px] max-w-[290px] flex-1"
+                />
+              </div>
             </div>
           </>
         )}

@@ -8,6 +8,7 @@ import type { Action, ActionCheck, ActionNeeds } from '@shared/actions'
 import { cleanSwap } from '@shared/cardDecks'
 import { cleanDecision } from '@shared/decisions'
 import './cardVariation'
+import './targets'
 
 export const SCALARS = { type: ['string', 'number', 'boolean', 'null'] } as const satisfies JsonSchema
 export const NUMBERS = { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { type: ['string', 'number', 'null'] } }] } as const satisfies JsonSchema

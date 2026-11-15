@@ -3,7 +3,7 @@ import { FOLDER_TYPE, showName } from '@shared/ids'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
 import MiniSearch from 'minisearch'
-import { ArrowUpToLine, BookOpen, ChevronDown, ChevronRight, Download, Folder, FolderInput, FolderOpen, FolderPlus, Hash, Plus, X } from 'lucide-react'
+import { ArrowUpToLine, BookOpen, ChevronDown, ChevronRight, Download, File, Folder, FolderInput, FolderOpen, FolderPlus, Hash, History, Plus, Star, X } from 'lucide-react'
 import { pageKindOf, type LibrarySection, type PageMeta } from '@shared/types'
 import { AddressPane, Button, EmptyState, ListPane, ListToggle, MainPane, PaneHeader, ReadingPane, Split, VirtualList, openMenu, type MenuItem } from '../components/ui'
 import { askNewFolder, folderNewItems, newPageMenu, renamePage, usePageTypes } from '../components/data/PageView'
@@ -17,6 +17,8 @@ import { GeneratedPage } from '../components/data/kindUis'
 import { PageExplorer } from '../components/data/PageExplorer'
 import { cn } from '../lib/cn'
 import { failed } from '../lib/notify'
+import { FavouriteButton, isFileFavouriteKind, useFavourites } from '../lib/favourites'
+import { recordOpenedFile, useRecentFiles } from '../lib/recentData'
 import { entryMenuAt, exportMenuAt, kindMenuAt } from './data/entryMenu'
 import { CopyLinkButton } from '../components/data/CopyLinkButton'
 import { pickWith } from '../lib/picking'
@@ -51,6 +53,9 @@ const INDENT = 14
 
 const ALL = '__all'
 const BY_TAG = '__tags'
+const FAVOURITES = '__favs'
+const RECENT = '__recent'
+const FILES_ROOT = '__files'
 
 interface TreeState {
   specials: Special[]
@@ -208,9 +213,17 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
   const special = selected && !current ? (specials.find((s) => s.id === selected) ?? null) : null
   const path = useMemo(() => (current ? ancestorsOf(current.id, byId) : []), [current, byId])
   const assets = useData((s) => s.assets)
-  const currentAsset = selected && !current && !special ? (assets.find((a) => a.id === selected) ?? null) : null
+  const assetsById = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets])
+  const currentAsset = selected && !current && !special ? (assetsById.get(selected) ?? null) : null
   const assetParent = currentAsset?.parent && byId.has(currentAsset.parent) ? currentAsset.parent : null
   const assetTrail = useMemo(() => (assetParent ? ancestorsOf(assetParent, byId) : []), [assetParent, byId])
+  const placesLoaded = usePlaces((s) => s.loaded)
+
+  useEffect(() => {
+    if (!placesLoaded) return
+    if (currentAsset) return recordOpenedFile('file', currentAsset.id)
+    if (current) return recordOpenedFile(pageKindOf(current.type), current.id)
+  }, [placesLoaded, currentAsset?.id, current?.id, current?.type])
 
   useEffect(() => {
     if (path.length) reveal(path.map((p) => p.id))
@@ -384,7 +397,60 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
     )
   }
 
+  const rawFavourites = useFavourites()
+  const rawRecents = useRecentFiles()
+  const favItems = useMemo(() => {
+    const items = rawFavourites
+      .filter((p) => Boolean(p.id) && isFileFavouriteKind(p.kind))
+      .map((p) => {
+        const id = p.id!
+        const page = byId.get(id)
+        const asset = assetsById.get(id)
+        const kind = page ? pageKindOf(page.type) : asset ? 'file' : p.kind
+        const label = page?.title ?? asset?.name ?? p.label
+        return { kind, id, label, icon: kind === 'folder' ? 'folder' : kind === 'file' ? 'file' : (icons[kind] ?? p.icon) }
+      })
+    return q ? items.filter((i) => showName(i.label).toLowerCase().includes(q)) : items
+  }, [rawFavourites, byId, assetsById, icons, q])
+
+  const recentItems = useMemo(() => {
+    const items: { kind: string; id: string; label: string; icon: string }[] = []
+    for (const r of rawRecents) {
+      const page = byId.get(r.id)
+      const asset = assetsById.get(r.id)
+      if (!page && !asset) continue
+      const kind = page ? pageKindOf(page.type) : 'file'
+      const label = page ? page.title : asset!.name
+      items.push({ kind, id: r.id, label, icon: kind === 'folder' ? 'folder' : kind === 'file' ? 'file' : (icons[kind] ?? 'file-text') })
+    }
+    return q ? items.filter((i) => showName(i.label).toLowerCase().includes(q)) : items
+  }, [rawRecents, byId, assetsById, icons, q])
+
   const lines: Line[] = []
+  const quickRow = (item: { kind: string; id: string; label: string; icon: string }, prefix: string): Line => ({
+    key: `${prefix}:${item.kind}:${item.id}`,
+    node: () => (
+      <button
+        type="button"
+        onClick={() => select(item.id)}
+        onContextMenu={(e) => entryMenuAt(e, item.kind, item.id, item.label, [{ label: 'Open', icon: <FolderOpen />, onSelect: () => select(item.id) }])}
+        style={{ paddingLeft: 4 + INDENT }}
+        className={cn(
+          'flex w-full items-center gap-1.5 border-l-2 py-1 pr-2 text-left text-[13px]',
+          selected === item.id ? 'border-l-accent bg-accent/[0.08] text-white' : 'border-l-transparent text-white/80 hover:bg-white/[0.03]'
+        )}
+      >
+        {item.kind === 'folder' ? (
+          <Folder className={cn('h-3.5 w-3.5 shrink-0', selected === item.id ? 'text-accent' : 'text-accent-soft')} />
+        ) : item.kind === 'file' ? (
+          <File className={cn('h-3.5 w-3.5 shrink-0', selected === item.id ? 'text-accent' : 'text-dim')} />
+        ) : (
+          <KindIcon name={item.icon} className={cn('h-3.5 w-3.5 shrink-0', selected === item.id ? 'text-accent' : 'text-dim')} />
+        )}
+        <span className="min-w-0 flex-1 truncate">{showName(item.label)}</span>
+      </button>
+    )
+  })
   const addPage = (p: PageMeta, depth: number, prefix: string) => {
     if (visible && !visible.has(p.id)) return
     lines.push({ key: `${prefix}/${p.id}`, node: () => pageLine(p, depth) })
@@ -397,7 +463,18 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
   }
 
   const roots = tree.get(ROOT) ?? []
-  if (tab === ALL) for (const p of roots) addPage(p, 0, '')
+  if (tab === ALL) {
+    if (favItems.length > 0 && addSection(FAVOURITES, <Star className="h-3.5 w-3.5 shrink-0 text-accent" />, 'Favourites', favItems.length, Boolean(q) || !shut[FAVOURITES], () => toggleShut(FAVOURITES))) {
+      for (const item of favItems) lines.push(quickRow(item, 'fav'))
+    }
+    if (recentItems.length > 0 && addSection(RECENT, <History className="h-3.5 w-3.5 shrink-0 text-dim" />, 'Recent', recentItems.length, Boolean(q) || !shut[RECENT], () => toggleShut(RECENT))) {
+      for (const item of recentItems) lines.push(quickRow(item, 'recent'))
+    }
+    const showFilesHead = favItems.length > 0 || recentItems.length > 0
+    if (!showFilesHead || addSection(FILES_ROOT, <FolderOpen className="h-3.5 w-3.5 shrink-0 text-dim" />, 'Files', roots.length, Boolean(q) || !shut[FILES_ROOT], () => toggleShut(FILES_ROOT))) {
+      for (const p of roots) addPage(p, 0, '')
+    }
+  }
   if (tab === BY_TAG) {
     for (const [t, n] of tagList) if (addSection(`tag:${t}`, <Hash className="h-3.5 w-3.5 shrink-0 text-dim" />, t, n, Boolean(q) || !shut[`tag:${t}`], () => toggleShut(`tag:${t}`))) for (const p of pages.filter((p) => tagsOf(p).includes(t))) addPage(p, 1, `tag:${t}`)
     const untagged = pages.filter((p) => !tagsOf(p).length)
@@ -515,7 +592,12 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
             <ReadingPane className="p-0 flex-1">
               <AddressPane
                 path={<FolderPath trail={assetTrail} current={currentAsset.name} up={assetParent} onPick={(id) => transitionView(() => select(id))} />}
-                tools={<CopyLinkButton kind="file" id={currentAsset.id} />}
+                tools={
+                  <>
+                    <FavouriteButton pin={{ kind: 'file', id: currentAsset.id, label: currentAsset.name, icon: 'file' }} size="xs" />
+                    <CopyLinkButton kind="file" id={currentAsset.id} />
+                  </>
+                }
               >
                 {FileScreen ? (
                   <FileScreen
@@ -535,7 +617,15 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
         ) : current ? (
           <div style={{ viewTransitionName: 'active-entry' }} className="flex h-full min-h-0 flex-1 flex-col">
             <ReadingPane className="p-0 flex-1">
-              <AddressPane path={<FolderPath trail={path} current={showName(current.title)} rename={{ value: current.title, onSave: (title) => void renamePage(current.id, title) }} onPick={(id) => transitionView(() => select(id))} />} tools={<CopyLinkButton kind={pageKindOf(current.type)} id={current.id} />}>
+              <AddressPane
+                path={<FolderPath trail={path} current={showName(current.title)} rename={{ value: current.title, onSave: (title) => void renamePage(current.id, title) }} onPick={(id) => transitionView(() => select(id))} />}
+                tools={
+                  <>
+                    <FavouriteButton pin={{ kind: pageKindOf(current.type), id: current.id, label: current.title, icon: icons[pageKindOf(current.type)] ?? 'file-text' }} size="xs" />
+                    <CopyLinkButton kind={pageKindOf(current.type)} id={current.id} />
+                  </>
+                }
+              >
                 {Screen ? <Screen key={kind} kind={kind!} id={current.id} select={screenSelect} /> : <EmptyState title="No view">This kind has no screen of its own.</EmptyState>}
               </AddressPane>
             </ReadingPane>
