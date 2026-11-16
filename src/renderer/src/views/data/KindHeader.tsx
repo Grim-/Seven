@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { ArrowLeft, ChevronRight, Download, Plus, Trash2, Upload } from 'lucide-react'
 import { showName } from '@shared/ids'
 import type { LibrarySection } from '@shared/types'
-import { Button } from '../../components/ui'
+import { Button, openMenu } from '../../components/ui'
+import { openPortableImportFromFiles } from '../../components/portability/portabilityStore'
 import { useEntryPreview } from '../../components/entries/entryPreview'
 import { FavouriteButton } from '../../lib/favourites'
 import { KindIcon } from '../../lib/library'
@@ -43,7 +44,26 @@ export function KindHeader({ section, selected, select, lead, canBack, onBack }:
           {ui.addLabel ?? `New ${section.label.toLowerCase()}`}
         </Button>
       )}
-      {!inEntry && Importer && <Button size="sm" variant="ghost" icon={<Upload />} title={ui.importLabel ?? 'Add from JSON'} onClick={() => setImporting(true)} />}
+      {!inEntry && (section.importable || Importer) && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<Upload />}
+          title={section.importable ? `Import into ${section.plural.toLowerCase()}` : (ui.importLabel ?? 'Add from JSON')}
+          onClick={(e) => {
+            if (section.importable && Importer) {
+              openMenu(e, `Import ${section.plural.toLowerCase()}`, [
+                { label: 'Import Card / JSON / Bundle…', icon: <Upload />, onSelect: () => void openPortableImportFromFiles(section.kind) },
+                { label: ui.importLabel ?? 'Add from JSON…', onSelect: () => setImporting(true) }
+              ])
+            } else if (section.importable) {
+              void openPortableImportFromFiles(section.kind)
+            } else {
+              setImporting(true)
+            }
+          }}
+        />
+      )}
       {importing && Importer && <Importer onClose={() => setImporting(false)} />}
       {(atRoot || hasEntry) && section.exportable && section.count > 0 && (
         <Button size="sm" variant="ghost" icon={<Download />} title="Export" onClick={(e) => exportMenuAt(e, section, hasEntry ? { id: selected.id, kind: section.kind, title: entryTitle } : null)} />

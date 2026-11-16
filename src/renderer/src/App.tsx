@@ -20,6 +20,7 @@ import { ExportHost } from './components/export/ExportModal'
 import { PlayHost } from './components/play/PlayHost'
 import { PicturePickerHost } from './components/data/PicturePicker'
 import { CarryHost } from './components/carry/CarryModals'
+import { PortabilityHost } from './components/portability/PortabilityHost'
 import { DropPicturesHost } from './components/files/DropPictures'
 import { StageOverlay } from './registries/presentations'
 import { useCinema, useCinemaKey } from './lib/cinema'
@@ -59,6 +60,7 @@ export function App() {
       <PlayHost />
       <PicturePickerHost />
       <CarryHost />
+      <PortabilityHost />
       <DropPicturesHost />
       <TooltipHost />
       <StageOverlay />

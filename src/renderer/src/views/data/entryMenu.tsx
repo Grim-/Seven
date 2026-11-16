@@ -1,4 +1,4 @@
-import { Download, FolderOpen, Hash, Link, MessageSquarePlus, MessageSquareQuote, PanelRight, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, FolderOpen, Hash, Link, MessageSquarePlus, MessageSquareQuote, PanelRight, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import type { LibraryHit, LibrarySection } from '@shared/types'
 import { showName } from '@shared/ids'
 import { askConfirm, askText, openMenu, type MenuItem, confirmDelete } from '../../components/ui'
@@ -6,6 +6,7 @@ import { showInPanel } from '../../components/data/showInPanel'
 import { engine } from '../../lib/ipc'
 import { errorText } from '../../lib/format'
 import { exportKindMenu, exportMenu } from '../../lib/exporting'
+import { openPortableImportFromFiles } from '../../components/portability/portabilityStore'
 import { toast } from '../../store/toasts'
 import { rebuildIndex, type DataSelection, entryLink } from '../../store/data'
 import { useApp } from '../../store/app'
@@ -128,7 +129,8 @@ export function kindMenuAt(e: React.MouseEvent, section: LibrarySection, select:
       [
         { label: 'Open', icon: <FolderOpen />, onSelect: () => select({ kind: section.kind, id: 'all' }) },
         favouriteItem({ kind: section.kind, id: null, label: section.plural, icon: section.icon }),
-        ...(add ? [{ label: ui.addLabel ?? `New ${section.label.toLowerCase()}`, icon: <Plus />, onSelect: add }] : [])
+        ...(add ? [{ label: ui.addLabel ?? `New ${section.label.toLowerCase()}`, icon: <Plus />, onSelect: add }] : []),
+        ...(section.importable ? [{ label: `Import into ${section.plural.toLowerCase()}…`, icon: <Upload />, onSelect: () => void openPortableImportFromFiles(section.kind) }] : [])
       ],
       section.exportable && section.count > 0 ? [{ label: 'Export all', icon: <Download />, children: exportKindMenu(section.kind, section.plural) }] : [],
       section.removable && section.count > 0 ? [{ label: `Delete all ${section.plural.toLowerCase()}`, icon: <Trash2 />, danger: true, onSelect: () => clearKind(section) }] : [],

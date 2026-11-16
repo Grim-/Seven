@@ -1,10 +1,11 @@
-import { FolderOutput, ImageDown, Send } from 'lucide-react'
+import { Archive, FolderOutput, Send } from 'lucide-react'
 import { engine, main } from './ipc'
 import { toast } from '../store/toasts'
 import { errorText } from './format'
 import { askConfirm, type MenuItem } from '../components/ui'
 import { openExport } from '../components/export/exportStore'
-import { openCarry, type CarryTarget } from '../components/carry/carryStore'
+import { type CarryTarget } from '../components/carry/carryStore'
+import { openPortableExport } from '../components/portability/portabilityStore'
 
 export async function saveAsset(id: string, name: string): Promise<void> {
   try {
@@ -43,15 +44,29 @@ function folderMenu(what: { entries?: string[]; kind?: string | null }): MenuIte
 }
 
 export function exportMenu(entry: string, carry: CarryTarget['title'] | null): MenuItem[] {
+  const slash = entry.indexOf('/')
+  const portableItem =
+    slash > 0
+      ? [{ kind: entry.slice(0, slash), id: entry.slice(slash + 1), title: carry ?? undefined }]
+      : undefined
   return [
+    {
+      label: 'Export (Card / JSON / Bundle)…',
+      icon: <Archive />,
+      onSelect: () => openPortableExport({ items: portableItem, defaultFormat: carry ? 'card' : 'bundle' })
+    },
     { label: 'Hand to an agent…', icon: <Send />, onSelect: () => openExport('entry', { entry }) },
-    ...(carry === null ? [] : [{ label: 'Save into a picture…', icon: <ImageDown />, onSelect: () => openCarry({ entry, title: carry }) }]),
     folderMenu({ entries: [entry] })
   ]
 }
 
 export function exportKindMenu(kind: string, label: string): MenuItem[] {
   return [
+    {
+      label: `Export all ${label.toLowerCase()} (Card / JSON / Bundle)…`,
+      icon: <Archive />,
+      onSelect: () => openPortableExport({ kind })
+    },
     { label: `Hand all ${label.toLowerCase()} to an agent…`, icon: <Send />, onSelect: () => openExport('kind', { kind }) },
     { ...folderMenu({ kind }), label: `Export all ${label.toLowerCase()} to a folder` }
   ]

@@ -1,6 +1,7 @@
 import { matchSnippet, plainText } from '@shared/text'
-import { COMPENDIUM, entryMarkdown, entrySummary, type CompendiumKindInfo } from '@shared/compendium'
+import { COMPENDIUM, entryMarkdown, entrySummary, type CompendiumEntry, type CompendiumKindInfo } from '@shared/compendium'
 import { ENTRY_WIDGET, type Kind } from '../../engine/library/kinds'
+import { freeName } from '../../engine/library/packing'
 import { compendium } from './compendium'
 
 function kindOf(info: CompendiumKindInfo): Kind {
@@ -20,6 +21,16 @@ function kindOf(info: CompendiumKindInfo): Kind {
     export: (id) => {
       const e = compendium.get(k, id)
       return { title: e.name, markdown: entryMarkdown(k, e), json: e }
+    },
+    pack: (id) => {
+      const e = compendium.get(k, id)
+      return compendium.isSrd(k, e.id) && e.source !== 'Yours' ? undefined : e
+    },
+    unpack: (value, how) => {
+      const raw = (value && typeof value === 'object' ? value : {}) as CompendiumEntry
+      const taken = new Set(compendium.all(k).map((e) => e.name.toLowerCase()))
+      const name = how.replace ? raw.name : freeName(raw.name || `Imported ${info.label}`, (n) => taken.has(n.toLowerCase()))
+      return compendium.save(k, { ...raw, name }, how.replace ?? null).id
     },
     available: () => true,
     search(query, limit) {

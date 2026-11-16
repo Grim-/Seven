@@ -33,6 +33,12 @@ export function KindRail({
 }) {
   const current = railKind(selected)
   const [picked, select] = useRememberedLocation<DataSelection | null>(null)
+  const menuSelect = (s: DataSelection | null) => {
+    if (!s) return onPick(null)
+    if (s.id === 'all') return onPick(s.kind)
+    if (onPickEntry) return onPickEntry(s.kind, s.id)
+    select(s)
+  }
   const favourites = useFavourites().filter((p) => !isFileFavouriteKind(p.kind))
   return (
     <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto py-1.5">
@@ -66,7 +72,7 @@ export function KindRail({
                   key={`${p.kind}/`}
                   active={current === p.kind && (!picked?.id || picked.id === 'all')}
                   onClick={() => onPick(p.kind)}
-                  onMenu={section ? (e) => kindMenuAt(e, section, select) : undefined}
+                  onMenu={section ? (e) => kindMenuAt(e, section, menuSelect) : undefined}
                   icon={<KindIcon name={p.icon} className="h-3.5 w-3.5" />}
                   title={showName(p.label)}
                   meta="kind"
@@ -99,7 +105,7 @@ export function KindRail({
             {(!shut || hasCurrent) &&
               group.sections
                 .filter((s) => !shut || s.kind === current)
-                .map((s) => <ListRow key={s.kind} active={s.kind === current} onClick={() => onPick(s.kind)} onMenu={(e) => kindMenuAt(e, s, select)} icon={<KindIcon name={s.icon} className="h-3.5 w-3.5" />} title={s.plural} meta={s.count} tooltip={s.description} />)}
+                .map((s) => <ListRow key={s.kind} active={s.kind === current} onClick={() => onPick(s.kind)} onMenu={(e) => kindMenuAt(e, s, menuSelect)} icon={<KindIcon name={s.icon} className="h-3.5 w-3.5" />} title={s.plural} meta={s.count} tooltip={s.description} />)}
           </div>
         )
       })}

@@ -1,5 +1,7 @@
 import { defTypes, type DefType, type GameDef } from '@shared/game/defs'
 import { ENTRY_WIDGET, type Kind } from '../../engine/library/kinds'
+import { freeName } from '../../engine/library/packing'
+import { gameDefSwap, gameDefUses } from '../../engine/portability/kindPackers'
 import { gameDefs } from './store'
 import { saves } from '../../engine/worlds/saves'
 import { removeSave } from '../../engine/worlds/party'
@@ -35,6 +37,19 @@ function kindOf(type: DefType): Kind {
     export: (ref) => {
       const def = located(type, ref)
       return { title: def.name, markdown: defText(type, def), json: def }
+    },
+    pack: (ref) => gameDefs.find(k, ref) ?? undefined,
+    uses: (ref) => {
+      const def = gameDefs.find(k, ref)
+      return def ? gameDefUses(type, def) : []
+    },
+    unpack: (value, how) => {
+      const raw = (value && typeof value === 'object' ? value : {}) as GameDef
+      const swapped = gameDefSwap(type, raw, how.entry)
+      const taken = new Set(gameDefs.list(k).map((d) => d.name.toLowerCase()))
+      const name = how.replace ? swapped.name : freeName(swapped.name || `Imported ${type.label}`, (n) => taken.has(n.toLowerCase()))
+      const clean = how.replace ? swapped : { ...swapped, id: '', name }
+      return gameDefs.save(k, clean, how.replace ?? null).id
     },
     available: () => true,
     search(query, limit) {

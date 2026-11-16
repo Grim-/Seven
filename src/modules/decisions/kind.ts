@@ -1,6 +1,7 @@
 import { decisionModeLabel, storedDecisionText } from '@shared/storedDecision'
 import { storedActionText } from '@shared/storedAction'
 import { ENTRY_WIDGET, type Kind } from '../../engine/library/kinds'
+import { storePacking } from '../../engine/library/packing'
 import { decisions, storyActions } from './store'
 
 const has = (text: string, q: string) => text.toLowerCase().includes(q)
@@ -9,6 +10,11 @@ const tagLine = (tags: string[]) => (tags.length ? ` · ${tags.join(', ')}` : ''
 export const decisionKind: Kind = {
   kind: 'story_decision',
   presents: { chat: true, widget: ENTRY_WIDGET },
+  ...storePacking({
+    find: (id) => decisions.list().find((d) => d.id === id) ?? null,
+    names: () => decisions.list().map((d) => d.name),
+    save: ({ id, ...rest }) => decisions.save(rest, typeof id === 'string' ? id : null)
+  }),
   label: 'Story decision',
   plural: 'Story decisions',
   icon: 'split',
@@ -51,6 +57,11 @@ export const decisionKind: Kind = {
 export const storyActionKind: Kind = {
   kind: 'story_action',
   presents: { chat: true, widget: ENTRY_WIDGET },
+  ...storePacking({
+    find: (id) => storyActions.list().find((a) => a.id === id) ?? null,
+    names: () => storyActions.list().map((a) => a.name),
+    save: ({ id, ...rest }) => storyActions.save(rest, typeof id === 'string' ? id : null)
+  }),
   label: 'Story action',
   plural: 'Story actions',
   icon: 'swords',

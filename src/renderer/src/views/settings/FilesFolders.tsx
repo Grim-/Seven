@@ -1,5 +1,6 @@
 import { FolderOpen } from 'lucide-react'
-import { Button, PathRow, SaveState, Segmented, SettingCard, SettingRow, useDraft } from '../../components/ui'
+import { DEFAULT_PORTABILITY_PREFS } from '@shared/portability'
+import { Button, Input, PathRow, SaveState, Segmented, SettingCard, SettingRow, Toggle, useDraft } from '../../components/ui'
 import { main } from '../../lib/ipc'
 import { useApp } from '../../store/app'
 import { failed } from '../../lib/notify'
@@ -36,6 +37,56 @@ function DroppedPictures() {
   )
 }
 
+function ExportImportPrefs() {
+  const prefs = useApp((s) => s.settings?.portability ?? DEFAULT_PORTABILITY_PREFS)
+  const updateSettings = useApp((s) => s.updateSettings)
+  const saveNumber = (key: 'warnJsonMb' | 'warnCardMb' | 'maxUnpackMb', raw: string) => {
+    const n = Number(raw)
+    if (!Number.isFinite(n) || n <= 0) return
+    void updateSettings({ portability: { ...prefs, [key]: n } })
+  }
+  return (
+    <SettingCard title="Export & import" intro="Size thresholds used for warnings when packing large entries, and the limit enforced when unpacking bundles.">
+      <SettingRow label="Warn on large JSON exports (MB)" hint="Shows a warning and recommends Bundle (.sevenpack) above this size.">
+        <Input
+          type="number"
+          min={1}
+          max={500}
+          value={prefs.warnJsonMb}
+          onChange={(e) => saveNumber('warnJsonMb', e.target.value)}
+          className="w-24 font-mono text-[12px]"
+        />
+      </SettingRow>
+      <SettingRow label="Warn on large PNG card exports (MB)" hint="PNG cards embed compressed payloads; large worlds belong in a bundle.">
+        <Input
+          type="number"
+          min={1}
+          max={500}
+          value={prefs.warnCardMb}
+          onChange={(e) => saveNumber('warnCardMb', e.target.value)}
+          className="w-24 font-mono text-[12px]"
+        />
+      </SettingRow>
+      <SettingRow label="Maximum unpacked bundle size (MB)" hint="Safety limit when reading imported .sevenpack archives.">
+        <Input
+          type="number"
+          min={10}
+          max={4096}
+          value={prefs.maxUnpackMb}
+          onChange={(e) => saveNumber('maxUnpackMb', e.target.value)}
+          className="w-24 font-mono text-[12px]"
+        />
+      </SettingRow>
+      <SettingRow label="Include linked dependencies by default" hint="Automatically pack referenced themes, game classes, traits, abilities, and maps.">
+        <Toggle
+          checked={prefs.includeDependenciesByDefault}
+          onChange={(v) => void updateSettings({ portability: { ...prefs, includeDependenciesByDefault: v } })}
+        />
+      </SettingRow>
+    </SettingCard>
+  )
+}
+
 export function FilesFolders() {
   const info = useApp((s) => s.info)
   return (
@@ -51,6 +102,7 @@ export function FilesFolders() {
       <ModelFolders />
       <LinkedFolders />
       <DroppedPictures />
+      <ExportImportPrefs />
     </>
   )
 }

@@ -4,6 +4,7 @@ import type { AssetMeta } from '@shared/types'
 import { engine } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
 import type { DroppedFile } from '../../lib/useFileDrop'
+import { arrivePortable, openPortableExport } from '../portability/portabilityStore'
 
 export interface CarryTarget {
   entry: string
@@ -26,7 +27,19 @@ function arrive(found: Omit<Arrival, 'id'>[]): void {
 }
 
 export function openCarry(target: CarryTarget | null): void {
-  useCarry.setState({ saving: target ?? 'data' })
+  if (!target) {
+    openPortableExport({ mode: 'text', defaultFormat: 'card' })
+    return
+  }
+  const slash = target.entry.indexOf('/')
+  if (slash > 0) {
+    openPortableExport({
+      items: [{ kind: target.entry.slice(0, slash), id: target.entry.slice(slash + 1), title: target.title }],
+      defaultFormat: 'card'
+    })
+    return
+  }
+  useCarry.setState({ saving: target })
 }
 
 export function closeCarry(): void {
@@ -40,8 +53,11 @@ export function nextArrived(): void {
 export function checkCarried(added: AssetMeta[]): void {
   const ids = added.filter((a) => a.mime === 'image/png').map((a) => a.id)
   if (!ids.length) return
-  void engine('carry.peek', { sources: ids.map((asset) => ({ asset })) })
-    .then((found) => arrive(found.map((f) => ({ found: f, dropped: null, ask: false }))))
+  void engine('portability.peek', { sources: ids.map((asset) => ({ asset })) })
+    .then((found) => {
+      const relevant = found.filter((f) => !f.error && (f.about || f.locked || f.text !== null || f.items.length > 0))
+      if (relevant.length) arrivePortable(relevant)
+    })
     .catch(failed('Could not read what the picture carries'))
 }
 

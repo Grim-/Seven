@@ -1,4 +1,15 @@
 import type { CarryAbout, CarryMode, CarryOpened, CarrySource, CarrySummary } from './carry'
+import type {
+  PortabilityEstimate,
+  PortabilityFormat,
+  PortableExportItemSpec,
+  PortableExportRequest,
+  PortableExportResult,
+  PortableImportRequest,
+  PortableImportResult,
+  PortablePeekResult,
+  PortableSource
+} from './portability'
 import type { DndStats } from './dnd'
 import type { ExportChoice, ExportInfo } from './exporting'
 import type { Slideshow, SlideshowData } from './slideshow'
@@ -471,6 +482,27 @@ export interface EngineRequests {
   'carry.describe': Req<{ entry: string }, CarryAbout>
   'carry.peek': Req<{ sources: CarrySource[] }, CarrySummary[]>
   'carry.open': Req<{ source: CarrySource; mode: CarryMode }, CarryOpened>
+  'portability.describeKind': Req<
+    { kind: string },
+    {
+      kind: string
+      label: string
+      plural: string
+      exportable: boolean
+      importable: boolean
+      preferBundle: boolean
+      bundleNote: string | null
+      options: { id: string; label: string; description?: string; defaultValue: boolean }[]
+      entries: { id: string; title: string; summary: string }[]
+    }
+  >
+  'portability.estimate': Req<
+    { items: PortableExportItemSpec[]; text?: string | null; includeDependencies: boolean; format: PortabilityFormat },
+    PortabilityEstimate
+  >
+  'portability.export': Req<PortableExportRequest, PortableExportResult>
+  'portability.peek': Req<{ sources: PortableSource[]; targetKind?: string | null; password?: string }, PortablePeekResult[]>
+  'portability.import': Req<PortableImportRequest, PortableImportResult>
   'sheets.list': Req<void, CharacterSheet[]>
   'sheets.get': Req<{ id: string }, CharacterSheet>
   'repos.list': Req<void, RepoEntry[]>

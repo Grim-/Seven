@@ -1386,6 +1386,7 @@ export interface Settings {
   startWithWindows: boolean
   droppedPictures: DropPrefs
   problems: ProblemPrefs
+  portability: PortabilityPrefs
 }
 
 export interface AppInfo {
@@ -1740,9 +1741,12 @@ export interface KindLinkActionInfo {
 
 export interface KindFlags {
   exportable: boolean
+  importable: boolean
   removable: boolean
   renamable: boolean
   carriable: boolean
+  preferBundle: boolean
+  bundleNote: string | null
   boardable: boolean
   family: string | null
 }

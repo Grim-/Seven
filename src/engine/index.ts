@@ -106,6 +106,7 @@ import path from 'node:path'
 import { board } from './board/store'
 import { errorCode } from '@shared/errors'
 import { carryDescribe, carryOpen, carryPeek, carrySave } from './carry'
+import { portabilityDescribeKind, portabilityEstimate, portabilityExport, portabilityImport, portabilityPeek } from './portability'
 import { agentFolders, liveFolder, removeFolderTree } from './agents/folders'
 import { currentActor } from './timeline/actor'
 import { compendium } from '../modules/dnd/compendium'
@@ -791,6 +792,11 @@ const handlers: Handlers = {
   'carry.describe': ({ entry }) => carryDescribe(entry),
   'carry.peek': ({ sources }) => carryPeek(sources),
   'carry.open': ({ source, mode }) => carryOpen(source, mode),
+  'portability.describeKind': ({ kind }) => portabilityDescribeKind(kind),
+  'portability.estimate': (input) => portabilityEstimate(input),
+  'portability.export': (input) => portabilityExport(input),
+  'portability.peek': (input) => portabilityPeek(input),
+  'portability.import': (input) => portabilityImport(input),
   'sheets.list': () => sheetIds().map((s) => getSheet(s.id)),
   'sheets.get': ({ id }) => getSheet(id),
   'repos.list': () => allRepos(),

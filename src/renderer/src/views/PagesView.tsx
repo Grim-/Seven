@@ -3,9 +3,12 @@ import { FOLDER_TYPE, showName } from '@shared/ids'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
 import MiniSearch from 'minisearch'
-import { ArrowUpToLine, BookOpen, ChevronDown, ChevronRight, Download, File, Folder, FolderInput, FolderOpen, FolderPlus, Hash, History, Plus, Star, X } from 'lucide-react'
+import { ArrowUpToLine, BookOpen, ChevronDown, ChevronRight, Download, File, Folder, FolderInput, FolderOpen, FolderPlus, Hash, History, Plus, Star, Upload, X } from 'lucide-react'
 import { pageKindOf, type LibrarySection, type PageMeta } from '@shared/types'
-import { AddressPane, Button, EmptyState, ListPane, ListToggle, MainPane, PaneHeader, ReadingPane, Split, VirtualList, openMenu, type MenuItem } from '../components/ui'
+import { AddressPane, Button, DropOverlay, EmptyState, ListPane, ListToggle, MainPane, PaneHeader, ReadingPane, Split, VirtualList, openMenu, type MenuItem } from '../components/ui'
+import { openPortableImportFromFiles } from '../components/portability/portabilityStore'
+import { useFileDrop } from '../lib/useFileDrop'
+import { dropFiles } from '../lib/dropFiles'
 import { askNewFolder, folderNewItems, newPageMenu, renamePage, usePageTypes } from '../components/data/PageView'
 import { ancestorsOf, findPage, useData, type DataSelection } from '../store/data'
 import { FolderPath } from '../components/data/FolderPath'
@@ -507,15 +510,18 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
   const kind = current ? pageKindOf(current.type) : null
   const Screen = kind ? presentOf(kind).Screen : undefined
   const FileScreen = presentOf('file').Screen
+  const fileDrop = useFileDrop((_, e, dropped) => void dropFiles(dropped, e.shiftKey, 'page'))
 
   return (
-    <div className="h-full min-h-0">
+    <div className="relative h-full min-h-0" {...fileDrop.props}>
+    <DropOverlay show={fileDrop.over} label="Drop to import into Pages" />
     <Split>
       <ListPane id="pages" open={listPrefs.open} width={listPrefs.width} min={200} max={640} reset={288} onWidth={(w) => saveList({ width: w })} onClose={() => saveList({ open: false })}>
       <aside className="panel-box flex h-full w-full flex-col">
         <PaneHeader title="Pages" titleHint="Top level" count={pages.length} onTitle={() => select(null)} onTitleMenu={(e) => kindMenuAt(e, section, selectData)} back={onBack ? { label: 'All kinds', onClick: onBack } : undefined}>
           <Button size="sm" variant="ghost" icon={<FolderPlus />} title="New folder" onClick={() => askNewFolder(made(null))} />
           <Button size="sm" variant="ghost" icon={<Plus />} title="New page" onClick={(e) => newPageMenu(e, types, made(null))} />
+          <Button size="sm" variant="ghost" icon={<Upload />} title="Import into Pages" onClick={() => void openPortableImportFromFiles('page')} />
           <Button size="sm" variant="ghost" icon={<Download />} title="Export" onClick={(e) => exportMenuAt(e, section, openPage)} />
         </PaneHeader>
         <div className="px-2 pt-2">

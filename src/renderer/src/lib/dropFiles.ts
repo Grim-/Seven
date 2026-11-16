@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { AssetMeta } from '@shared/types'
-import type { CarrySummary } from '@shared/carry'
+import type { PortablePeekResult } from '@shared/portability'
 import { engine } from './ipc'
 import { failed } from './notify'
 import { addPaths, importToLibrary } from './importFiles'
@@ -8,7 +8,7 @@ import { showInData } from './library'
 import type { DroppedFile } from './useFileDrop'
 import { toast } from '../store/toasts'
 import { useApp } from '../store/app'
-import { arriveDropped } from '../components/carry/carryStore'
+import { arrivePortable } from '../components/portability/portabilityStore'
 
 export const usePlacing = create<{ queue: { id: number; dropped: DroppedFile[] }[] }>(() => ({ queue: [] }))
 
@@ -39,23 +39,48 @@ export function placePictures(dropped: DroppedFile[], ask: boolean): void {
   else void importInto(dropped, prefs.folder)
 }
 
+const hasExt = (d: DroppedFile, ext: string) => d.file.name.toLowerCase().endsWith(ext)
 const isPicture = (d: DroppedFile) => d.file.type.startsWith('image/')
+const isPng = (d: DroppedFile) => d.file.type === 'image/png' || hasExt(d, '.png')
+const isBundle = (d: DroppedFile) => hasExt(d, '.sevenpack') || hasExt(d, '.zip')
+const isJson = (d: DroppedFile) => d.file.type === 'application/json' || hasExt(d, '.json')
 
-export async function dropFiles(dropped: DroppedFile[], ask: boolean): Promise<void> {
-  const pictures = dropped.filter(isPicture)
-  const rest = dropped.filter((d) => !isPicture(d))
+export async function dropFiles(dropped: DroppedFile[], ask: boolean, targetKind: string | null = null): Promise<void> {
+  const candidates = dropped.filter((d) => isPng(d) || isBundle(d) || isJson(d))
+  const candidatePaths = new Set(candidates.map((d) => d.path))
+  const nonPortablePictures = dropped.filter((d) => isPicture(d) && !candidatePaths.has(d.path))
+  const rest = dropped.filter((d) => !isPicture(d) && !candidatePaths.has(d.path))
+
   if (rest.length) {
     const { files } = await importToLibrary(rest.map((d) => d.path))
     shown(files)
   }
-  const pngs = pictures.filter((d) => d.file.type === 'image/png')
-  const found = pngs.length
-    ? await engine('carry.peek', { sources: pngs.map((d) => ({ path: d.path })) }).catch((err) => {
-        failed('Could not read what the picture carries')(err)
-        return [] as CarrySummary[]
+
+  const found = candidates.length
+    ? await engine('portability.peek', { sources: candidates.map((d) => ({ path: d.path })), targetKind }).catch((err) => {
+        failed('Could not inspect the dropped file')(err)
+        return [] as PortablePeekResult[]
       })
     : []
-  const carrying = new Set(found.flatMap((f) => ('path' in f.source ? [f.source.path] : [])))
-  arriveDropped(found, pngs, ask)
-  placePictures(pictures.filter((d) => !carrying.has(d.path)), ask)
+
+  const ordinaryPngs: DroppedFile[] = []
+  const portablePeeks: PortablePeekResult[] = []
+
+  for (const d of candidates) {
+    const peek = found.find((p) => 'path' in p.source && p.source.path === d.path)
+    if (isPng(d)) {
+      if (peek && !peek.error && (peek.about || peek.locked || peek.text !== null || peek.items.length > 0)) {
+        portablePeeks.push(peek)
+      } else {
+        ordinaryPngs.push(d)
+      }
+      continue
+    }
+    if (peek) portablePeeks.push(peek)
+  }
+
+  if (portablePeeks.length) {
+    arrivePortable(portablePeeks, { dropped: candidates, targetKind, ask })
+  }
+  placePictures([...nonPortablePictures, ...ordinaryPngs], ask)
 }
