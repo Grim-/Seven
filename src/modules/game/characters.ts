@@ -1,16 +1,21 @@
-import { CHARACTER_TEMPLATES, ITEM_TEMPLATES, catalogFrom, defType, misfitsOf } from '@shared/game/defs'
+import { BUFF_TEMPLATES, CHARACTER_TEMPLATES, ITEM_TEMPLATES, catalogFrom, defType, misfitsOf } from '@shared/game/defs'
 import {
   Abilities,
+  Buffs,
   CharacterClass,
   Classes,
+  Equipment,
   Health,
   Inventory,
   Progression,
+  Resource,
   Skills,
+  Stats,
   Tags,
   Traits,
   allEntityTags,
   ensureCharacterDefaults,
+  resourcesOf,
   usableAbilities,
   type PendingClassUnlock
 } from '@shared/game/components'
@@ -299,7 +304,7 @@ export function useAbility(sheet: string, ability: string, target: string | null
   user.start()
   other?.start()
   try {
-    const found = usableAbilities(user).find((a) => a.uid === ability)
+    const found = usableAbilities(user).find((a) => a.uid === ability || a.id === ability || String(a.params.label ?? '').toLowerCase() === ability.toLowerCase())
     if (!found) throw new ToolError(`${s.title} can't use that now.`)
     const done = found.use({ user, target: target === s.id ? user : other, at, distance })
     if (done !== true) throw new ToolError(done)
@@ -540,4 +545,218 @@ export function onEntityMoved(opts: { sheet?: string; world?: string; token?: st
     }
   }
   return { triggered }
+}
+
+export function inspectCharacterGame(sheet: string): string {
+  const s = getSheet(sheet)
+  if (!s.game) {
+    return `${s.title} is not initialized in the game yet. Call character_game with action "join" to add them.`
+  }
+  const cat = catalog()
+  const entity = GameEntity.fromRecord(s.game, cat)
+  entity.start()
+  try {
+    const prog = entity.comp(Progression)
+    const classesComp = entity.comp(Classes)
+    const classes = classesComp?.held ?? []
+    const offers = classesComp?.pendingUnlocks ?? []
+    const traits = entity.comp(Traits)?.held ?? []
+    const stats = entity.comp(Stats)
+    const bag = entity.comp(Inventory)
+    const equip = entity.comp(Equipment)
+    const buffs = entity.comp(Buffs)?.held ?? []
+    const abilities = usableAbilities(entity)
+    const res = resourcesOf(entity)
+    const lines: string[] = [`# ${s.title} (Game State)`]
+    if (prog) lines.push(`Level ${prog.level} · ${prog.xp}/${prog.xpNeeded()} XP`)
+    if (res.length) lines.push(`Resources: ${res.map((r) => `${r.label} (${r.stat}): ${Math.round(r.current)}/${Math.round(r.max)}`).join(', ')}`)
+    if (stats) {
+      const statList = cat.stats().map((st) => `${st.id}=${Math.round(stats.value(st.id) * 100) / 100}`)
+      if (statList.length) lines.push(`Stats: ${statList.join(', ')}`)
+    }
+    if (classes.length) {
+      lines.push(
+        `Classes: ${classes
+          .map((c) => `${c.title} [${c.id}] Lv ${c.level}${c.isActive() ? '' : ` (restricted: ${c.restrictionReasons().join('; ')})`}`)
+          .join('; ')}`
+      )
+    }
+    if (offers.length) lines.push(`Pending class offers: ${offers.map((o) => `${o.label} [${o.classId}]`).join(', ')}`)
+    if (traits.length) {
+      lines.push(
+        `Traits: ${traits
+          .map((t) => `${t.title} [${t.id}]${t.isActive() ? '' : ' [inactive]'}${t.exhausted ? ' [exhausted]' : t.cooldownLeft > 0 ? ` (${Math.ceil(t.cooldownLeft)}s cd)` : ''}`)
+          .join('; ')}`
+      )
+    }
+    if (bag) {
+      const bagText = bag.items.map((i) => `${String(i.params.label || i.id)} [${i.id}]${i.count > 1 ? ` x${i.count}` : ''}${i.usable() ? ' (usable)' : ''}`).join(', ')
+      lines.push(`Inventory (${bag.gold} gold): ${bagText || 'empty'}`)
+    }
+    if (equip) {
+      const worn = equip
+        .slotList()
+        .map((sl) => {
+          const item = equip.inSlot(sl.id)
+          return item ? `${sl.id}: ${String(item.params.label || item.id)} [${item.id}]` : `${sl.id}: empty`
+        })
+        .join(', ')
+      lines.push(`Equipment: ${worn}`)
+    }
+    if (buffs.length) {
+      lines.push(
+        `Buffs: ${buffs
+          .map((b) => `${b.id}${b.stacks > 1 ? ` x${b.stacks}` : ''}${Number.isFinite(b.remaining) ? ` (${Math.round(b.remaining)}s)` : ''}`)
+          .join(', ')}`
+      )
+    }
+    if (abilities.length) {
+      lines.push(
+        `Abilities: ${abilities
+          .map((a) => `${String(a.params.label || a.id)} [${a.id}]${a.cooling > 0 ? ` (cooldown ${Math.round(a.cooling)}s)` : ''}`)
+          .join(', ')}`
+      )
+    }
+    return lines.join('\n')
+  } finally {
+    entity.stop()
+  }
+}
+
+export function changeResource(
+  sheet: string,
+  opts: { resourceId?: string; delta?: number; setValue?: number }
+): { label: string; from: number; to: number; max: number } {
+  const s = getSheet(sheet)
+  if (!s.game) throw new ToolError(`${s.title} is not in the game.`)
+  const cat = catalog()
+  const entity = GameEntity.fromRecord(s.game, cat)
+  const targetStat = (opts.resourceId || 'health').trim()
+  const res = targetStat === 'health' ? (entity.comp(Health) ?? Resource.of(entity, 'health')) : Resource.of(entity, targetStat)
+  if (!res) throw new ToolError(`${s.title} has no resource "${targetStat}".`)
+  const from = res.get()
+  const next = opts.setValue !== undefined ? opts.setValue : from + (opts.delta ?? 0)
+  res.set(next)
+  setGame(s.id, entity.toRecord())
+  const label = cat.stat(targetStat)?.label ?? targetStat
+  return { label, from, to: res.get(), max: res.max() }
+}
+
+export function equipCharacterItem(sheet: string, itemRef: string, slotId?: string): string {
+  const s = getSheet(sheet)
+  if (!s.game) throw new ToolError(`${s.title} is not in the game.`)
+  const cat = catalog()
+  const entity = GameEntity.fromRecord(s.game, cat)
+  const bag = entity.comp(Inventory)
+  const equip = entity.comp(Equipment)
+  if (!bag || !equip) throw new ToolError(`${s.title} cannot equip items.`)
+  const item = bag.items.find((i) => i.id === itemRef || i.uid === itemRef || String(i.params.label || '').toLowerCase() === itemRef.toLowerCase())
+  if (!item) throw new ToolError(`No "${itemRef}" in ${s.title}'s inventory.`)
+  const fitting = equip.fitting(item)
+  const targetSlot = slotId?.trim() || fitting[0]
+  if (!targetSlot) throw new ToolError(`"${String(item.params.label || item.id)}" does not fit any equipment slot on ${s.title}.`)
+  entity.start()
+  try {
+    const res = equip.equip(item, targetSlot)
+    if (res !== true) throw new ToolError(`Could not equip: ${res}.`)
+    setGame(s.id, entity.toRecord())
+    return `Equipped ${String(item.params.label || item.id)} into ${targetSlot} on ${s.title}.`
+  } finally {
+    entity.stop()
+  }
+}
+
+export function unequipCharacterSlot(sheet: string, slotId: string): string {
+  const s = getSheet(sheet)
+  if (!s.game) throw new ToolError(`${s.title} is not in the game.`)
+  const cat = catalog()
+  const entity = GameEntity.fromRecord(s.game, cat)
+  const equip = entity.comp(Equipment)
+  if (!equip) throw new ToolError(`${s.title} has no equipment slots.`)
+  entity.start()
+  try {
+    const res = equip.unequip(slotId)
+    if (res !== true) throw new ToolError(`Could not unequip ${slotId}: ${res}.`)
+    setGame(s.id, entity.toRecord())
+    return `Unequipped ${slotId} on ${s.title}.`
+  } finally {
+    entity.stop()
+  }
+}
+
+export function useCharacterItem(sheet: string, itemRef: string, targetSheet?: string): string {
+  const s = getSheet(sheet)
+  if (!s.game) throw new ToolError(`${s.title} is not in the game.`)
+  const cat = catalog()
+  const user = GameEntity.fromRecord(s.game, cat)
+  const t = targetSheet && targetSheet !== s.id ? getSheet(targetSheet) : null
+  if (t && !t.game) throw new ToolError(`${t.title} is not in the game.`)
+  const targetEntity = t?.game ? GameEntity.fromRecord(t.game, cat) : null
+  const bag = user.comp(Inventory)
+  const equip = user.comp(Equipment)
+  const candidates = [...(bag?.items ?? []), ...(equip ? equip.slotList().map((sl) => equip.inSlot(sl.id)).filter((x): x is NonNullable<typeof x> => Boolean(x)) : [])]
+  const item = candidates.find((i) => i.id === itemRef || i.uid === itemRef || String(i.params.label || '').toLowerCase() === itemRef.toLowerCase())
+  if (!item) throw new ToolError(`No "${itemRef}" found on ${s.title}.`)
+  user.start()
+  targetEntity?.start()
+  try {
+    const res = item.use({ user, target: targetSheet === s.id ? user : (targetEntity ?? user), at: null, distance: 0 })
+    if (res !== true) throw new ToolError(`Could not use ${String(item.params.label || item.id)}: ${res}.`)
+    setGame(s.id, user.toRecord())
+    if (t && targetEntity) setGame(t.id, targetEntity.toRecord())
+    return `${s.title} used ${String(item.params.label || item.id)}${t ? ` on ${t.title}` : ''}.`
+  } finally {
+    user.stop()
+    targetEntity?.stop()
+  }
+}
+
+export function applyCharacterBuff(sheet: string, buffId: string): string {
+  const s = getSheet(sheet)
+  if (!s.game) throw new ToolError(`${s.title} is not in the game.`)
+  const cat = catalog()
+  const def = cat.template(BUFF_TEMPLATES, buffId)
+  if (!def) throw new ToolError(`Unknown buff template "${buffId}".`)
+  const before = s.game
+  const entity = GameEntity.fromRecord(before, cat)
+  entity.start()
+  try {
+    const buffs = entity.comp(Buffs) ?? (() => {
+      const made = createComponent({ type: Buffs.type })
+      if (made) entity.add(made)
+      return entity.comp(Buffs)
+    })()
+    if (!buffs) throw new ToolError(`${s.title} cannot hold buffs.`)
+    const applied = buffs.apply(def, entity)
+    if (!applied) throw new ToolError(`Could not apply buff "${buffId}" to ${s.title}.`)
+    const after = entity.toRecord()
+    setGame(s.id, after)
+    diffAndLogProgression(s.id, before, after, cat)
+    return `Applied buff ${applied.id}${applied.stacks > 1 ? ` (x${applied.stacks})` : ''} to ${s.title}.`
+  } finally {
+    entity.stop()
+  }
+}
+
+export function removeCharacterBuff(sheet: string, buffIdOrTag: string): string {
+  const s = getSheet(sheet)
+  if (!s.game) throw new ToolError(`${s.title} is not in the game.`)
+  const cat = catalog()
+  const before = s.game
+  const entity = GameEntity.fromRecord(before, cat)
+  entity.start()
+  try {
+    const buffs = entity.comp(Buffs)
+    const matches = buffs ? buffs.matching(buffIdOrTag, '') : []
+    const byTag = matches.length || !buffs ? [] : buffs.matching('', buffIdOrTag)
+    const hits = matches.length ? matches : byTag
+    if (!buffs || !hits.length) throw new ToolError(`${s.title} has no active buff matching "${buffIdOrTag}".`)
+    for (const b of hits) buffs.removeBuff(b)
+    const after = entity.toRecord()
+    setGame(s.id, after)
+    diffAndLogProgression(s.id, before, after, cat)
+    return `Removed ${hits.length} buff${hits.length === 1 ? '' : 's'} matching "${buffIdOrTag}" from ${s.title}.`
+  } finally {
+    entity.stop()
+  }
 }

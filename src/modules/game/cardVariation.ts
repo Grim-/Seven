@@ -6,7 +6,8 @@ import { cleanGameplay, BLANK_GAMEPLAY, GAMEPLAY_LANES, HIT_EVENT, MISS_EVENT } 
 import { effectsWords } from '@shared/game/effectWords'
 import { runEffects } from '../../engine/effects/run'
 import type { CheckSchema } from '../../engine/tools/checkSchema'
-import { LIVE_DEFENCES } from '../../engine/tools/checkSchema'
+import { LIVE_CHECKS, LIVE_DEFENCES } from '../../engine/tools/checkSchema'
+import { effectDefListSchema, normalizeEffectDefs } from '../../engine/tools/effectSchema'
 import { ToolError } from '../../engine/tools/types'
 import { cardVariationDefs } from '../../engine/cards/variations'
 import { triggerActionsStore } from '../../engine/triggerActions/store'
@@ -43,7 +44,11 @@ cardVariationDefs.add({
       defence: { oneOf: [{ type: 'null' }, LIVE_DEFENCES()], description: "the target's; null uses dc" },
       dc: { type: ['number', 'null'] },
       hit: { type: ['string', 'null'], description: 'trigger action' },
-      miss: { type: ['string', 'null'], description: 'trigger action' }
+      miss: { type: ['string', 'null'], description: 'trigger action' },
+      effects: {
+        oneOf: [{ type: 'null' }, { type: 'array', items: effectDefListSchema(c === LIVE_CHECKS) }],
+        description: 'Inline effects from registered effect components'
+      }
     }
   }),
   apply: (card, d) => {
@@ -55,7 +60,7 @@ cardVariationDefs.add({
       dc: patchInt(d, 'dc', prev.dc, BLANK_GAMEPLAY.dc),
       hit: patchText(d, 'hit', prev.hit, actionId),
       miss: patchText(d, 'miss', prev.miss, actionId),
-      effects: prev.effects
+      effects: 'effects' in d ? (d.effects === null ? [] : normalizeEffectDefs(d.effects, HIT_EVENT)) : prev.effects
     }
     return { ...card, gameplay }
   },

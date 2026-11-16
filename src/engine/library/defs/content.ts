@@ -520,7 +520,7 @@ const ADDON_ALIASES: Record<string, string[]> = {
 export function addonKinds(): Kind[] {
   return modules.pageTypes().map(({ module, spec }) => {
     const type = `${module}:${spec.type}`
-    const info = modules.list().find((m) => m.id === module)
+    const sourceName = modules.nameOf(module)
     const kind = pageKindOf(type)
     const aliases = ADDON_ALIASES[type]
     return {
@@ -531,8 +531,8 @@ export function addonKinds(): Kind[] {
       ...pagePacking(cardRefsFor(type)),
       label: spec.label,
       plural: spec.plural,
-      source: info?.name ?? module,
-      group: spec.group || info?.name || module,
+      source: sourceName,
+      group: spec.group || sourceName,
       exportable: true,
       handTo: PAGE_HAND_TO,
       pageTypes: [type],
@@ -541,7 +541,7 @@ export function addonKinds(): Kind[] {
       textParts: ['summary'],
       readView: (id, options, ctx) => readPageView(id, options, ctx),
       icon: spec.icon || 'box',
-      description: spec.description || info?.description || spec.label,
+      description: spec.description || modules.descriptionOf(module) || spec.label,
       parts: [...Object.keys(spec.parts), 'picture', 'summary'],
       actions: spec.actions,
       title: (id) => data.pages.get(id).title,

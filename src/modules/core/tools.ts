@@ -1,5 +1,7 @@
 import { findRepo, getRepo, saveRepo } from '../../engine/library/repos'
 import { SHEET_FIELDS, findSheet, getSheet, saveSheet } from '../../engine/library/sheets'
+import { factions } from '../../engine/factions/store'
+import { styles } from '../../engine/mind/styles'
 import { linkFor } from '@shared/text'
 import { stripRef, toId } from '@shared/ids'
 import { LIMITS } from '../../engine/limits'
@@ -57,6 +59,25 @@ const find: ToolDef = {
       where: { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { type: 'string' } }], description: 'Field filters (case-insensitive), e.g. {"Gender": "female", "Race": "tiefling OR demon"}' },
       limit: { type: ['integer', 'null'], description: 'Max results per page (1-100; default 25 when filtering)' },
       offset: { type: ['integer', 'null'], description: 'Skip this many matches to read the next page' }
+    }
+  },
+  forAgent: (scope) => {
+    const names = kinds({ agentId: scope.agentId }).map((k) => k.kind)
+    return {
+      params: {
+        type: 'object',
+        properties: {
+          query: { type: ['string', 'null'], description: 'Words to look for; supports OR / |, -exclude, "exact phrase", and #tag' },
+          kind: {
+            oneOf: [{ type: 'null' }, { enum: names }, { type: 'array', items: { enum: names } }],
+            description: `Only this kind or list of kinds: ${names.join(', ')}`
+          },
+          tags: { oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'string' } }], description: 'Only entries with all these tags' },
+          where: { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { type: 'string' } }], description: 'Field filters (case-insensitive), e.g. {"Gender": "female", "Race": "tiefling OR demon"}' },
+          limit: { type: ['integer', 'null'], description: 'Max results per page (1-100; default 25 when filtering)' },
+          offset: { type: ['integer', 'null'], description: 'Skip this many matches to read the next page' }
+        }
+      }
     }
   },
   async execute(params, ctx) {
@@ -524,20 +545,36 @@ const sheetWrite: ToolDef = {
   group: 'core',
   needsWorkspace: false,
   activity: () => 'writing a character',
-  description: 'Write a character sheet; a new name makes a new sheet.',
+  description: 'Create or update a character sheet: bio fields, faction allegiance, and mind/voice settings.',
   params: {
     type: 'object',
     properties: {
       sheet: { type: 'string', description: 'The character, e.g. Mira' },
       values: { oneOf: [{ type: 'null' }, OBJECT], description: `Each field name to its markdown, e.g. {"Appearance": "Tall, silver hair"}. Usual fields: ${SHEET_FIELDS.join(', ')}` },
-      remove: { oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'string' } }], description: 'Field names to remove' }
+      remove: { oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'string' } }], description: 'Field names to remove' },
+      faction: { type: ['string', 'null'], description: 'Faction id or name to align this character with, or empty string to clear' },
+      mind: {
+        oneOf: [
+          { type: 'null' },
+          {
+            type: 'object',
+            properties: {
+              reasoningStyle: { type: ['string', 'null'], description: 'Reasoning style id or name (or empty string to clear)' },
+              howItThinks: { type: ['string', 'null'], description: 'Notes on how this character thinks' },
+              voiceConstraints: { type: ['string', 'null'], description: 'Voice constraints and rules' },
+              forceReason: { type: ['boolean', 'null'], description: 'Always force reasoning before speaking' }
+            }
+          }
+        ],
+        description: 'Optional character mind/reasoning settings patch'
+      }
     }
   },
   async execute(params) {
     const name = str(params, 'sheet').trim()
     if (!name) throw new ToolError('Give sheet, the character sheet\'s name, e.g. "Mira".')
     const id = findSheet(name)
-    const current = id ? getSheet(id) : { id: null, title: name, fields: [...SHEET_FIELDS], values: {} as Record<string, string> }
+    const current = id ? getSheet(id) : { id: null, title: name, fields: [...SHEET_FIELDS], values: {} as Record<string, string>, faction: null, mind: null }
     const values = { ...current.values }
     const fields = [...current.fields]
     const given = params.values && typeof params.values === 'object' ? (params.values as Record<string, unknown>) : {}
@@ -548,7 +585,47 @@ const sheetWrite: ToolDef = {
       if (!fields.includes(key)) fields.push(key)
     }
     const drop = new Set(Array.isArray(params.remove) ? params.remove.map((f) => String(f).trim()) : [])
-    const saved = saveSheet({ id: current.id, title: current.title, fields: fields.filter((f) => !drop.has(f)), values })
+    let factionPatch: string | null | undefined = undefined
+    if (typeof params.faction === 'string') {
+      const rawFaction = params.faction.trim()
+      if (!rawFaction) factionPatch = null
+      else {
+        const found = factions.find(rawFaction)
+        if (!found) throw new ToolError(`No faction "${rawFaction}". Available: ${factions.list().map((f) => f.id).join(', ') || 'none'}.`)
+        factionPatch = found.id
+      }
+    }
+    let mindPatch = current.mind ?? null
+    if (params.mind && typeof params.mind === 'object' && !Array.isArray(params.mind)) {
+      const m = params.mind as Record<string, unknown>
+      const curMind = current.mind ?? {}
+      let nextStyle = curMind.reasoningStyle
+      if (typeof m.reasoningStyle === 'string') {
+        const ref = m.reasoningStyle.trim()
+        if (!ref) nextStyle = undefined
+        else {
+          const st = styles.find(ref)
+          if (!st) throw new ToolError(`No reasoning style "${ref}".`)
+          nextStyle = st.id
+        }
+      }
+      mindPatch = {
+        ...curMind,
+        ...(nextStyle !== undefined ? { reasoningStyle: nextStyle } : {}),
+        ...(typeof m.howItThinks === 'string' ? { howItThinks: m.howItThinks.trim() } : {}),
+        ...(typeof m.voiceConstraints === 'string' ? { voiceConstraints: m.voiceConstraints.trim() } : {}),
+        ...(typeof m.forceReason === 'boolean' ? { forceReason: m.forceReason } : {})
+      }
+      if (typeof m.reasoningStyle === 'string' && !m.reasoningStyle.trim()) delete mindPatch.reasoningStyle
+    }
+    const saved = saveSheet({
+      id: current.id,
+      title: current.title,
+      fields: fields.filter((f) => !drop.has(f)),
+      values,
+      ...(factionPatch !== undefined ? { faction: factionPatch } : {}),
+      ...(params.mind !== undefined ? { mind: mindPatch } : {})
+    })
     return `${id ? 'Updated' : 'Created'} the sheet ${linkFor('sheet', saved.id)}. Fields: ${saved.fields.join(', ')}.`
   }
 }

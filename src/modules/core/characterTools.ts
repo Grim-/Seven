@@ -1,4 +1,4 @@
-import { DND_SKILLS, DND_STATS, blankDnd, cleanDnd, type Proficiency } from '@shared/dnd'
+import { DND_COINS, DND_CONDITIONS, DND_SKILLS, DND_STATS, blankDnd, cleanDnd, type DndStat, type Proficiency } from '@shared/dnd'
 import { toId } from '@shared/ids'
 import {
   STORY_ENTRY_KINDS,
@@ -103,12 +103,14 @@ const addStoryLog: ToolDef = {
   name: 'add_story_log',
   group: 'core',
   needsWorkspace: false,
-  description: "Record structured historical story notes on a character sheet with phase ('session', 'recent', 'backstory'), entry kind ('scene', 'interaction', 'milestone', 'downtime'), location ('where'), people present ('who'), tags, outcome, and a short summary snippet.",
+  description: "Record, update, or remove structured historical story notes on a character sheet with phase ('session', 'recent', 'backstory'), entry kind ('scene', 'interaction', 'milestone', 'downtime'), location ('where'), people present ('who'), tags, outcome, and a short summary snippet.",
   params: {
     type: 'object',
     properties: {
       sheet: { type: 'string', description: 'The character' },
-      text: { type: 'string', description: 'Full event notes in markdown' },
+      id: TEXT('Existing story log id (s...) to update or remove instead of creating/appending'),
+      remove: { type: ['boolean', 'null'], description: 'When true with id, remove that story log entry' },
+      text: TEXT('Full event notes in markdown (required when creating/appending)'),
       summary: TEXT('Concise 1-line snippet summarizing the event for recall (recommended)'),
       outcome: TEXT('Optional consequence or outcome line'),
       title: TEXT('Optional title for this story log entry'),
@@ -123,26 +125,56 @@ const addStoryLog: ToolDef = {
   },
   async execute(params) {
     const s = sheetOf(str(params, 'sheet'))
-    const body = str(params, 'text').trim()
-    if (!body) throw new ToolError('Give the text to add.')
+    const existingId = optStr(params, 'id')?.trim()
+    const body = optStr(params, 'text')?.trim() ?? ''
     const summary = optStr(params, 'summary')?.trim()
     const outcome = optStr(params, 'outcome')?.trim()
     const title = optStr(params, 'title')?.trim()
     const rawPhase = optStr(params, 'phase')?.trim()
-    const phase: StoryPhase = rawPhase && (STORY_PHASES as readonly string[]).includes(rawPhase) ? (rawPhase as StoryPhase) : 'session'
+    const phase: StoryPhase | undefined = rawPhase && (STORY_PHASES as readonly string[]).includes(rawPhase) ? (rawPhase as StoryPhase) : undefined
     const rawKind = optStr(params, 'kind')?.trim()
     const kind: StoryEntryKind | undefined = rawKind && (STORY_ENTRY_KINDS as readonly string[]).includes(rawKind) ? (rawKind as StoryEntryKind) : undefined
     const where = optStr(params, 'where')?.trim()
     const who = strList(params.who)
     const tags = strList(params.tags)
     const pin = optBool(params, 'pin')
-    const createNew = optBool(params, 'new_session') === true || !s.story.sessions.length || phase !== 'session' || Boolean(title && s.story.sessions[s.story.sessions.length - 1]?.title && s.story.sessions[s.story.sessions.length - 1].title !== title)
+
+    if (existingId) {
+      const idx = s.story.sessions.findIndex((x) => x.id === existingId)
+      if (idx < 0) throw new ToolError(`No story log "${existingId}" on ${s.title}. Use story_recall to find ids.`)
+      if (optBool(params, 'remove') === true) {
+        const sessions = s.story.sessions.filter((x) => x.id !== existingId)
+        setStory(s.id, { ...s.story, sessions })
+        return `Removed story log ${existingId} from ${s.title}'s story.`
+      }
+      const prev = s.story.sessions[idx]
+      const updated = {
+        ...prev,
+        ...(title !== undefined ? { title } : {}),
+        ...(phase ? { phase } : {}),
+        ...(kind ? { kind } : {}),
+        ...(summary !== undefined ? { summary } : {}),
+        ...(outcome !== undefined ? { outcome } : {}),
+        ...(where !== undefined ? { where } : {}),
+        ...(pin !== null ? { pinned: pin } : {}),
+        ...(body ? { notes: body } : {}),
+        who: who.length ? mergeTags(prev.who, who) : prev.who,
+        tags: tags.length ? mergeTags(prev.tags, tags) : prev.tags
+      }
+      const sessions = [...s.story.sessions.slice(0, idx), updated, ...s.story.sessions.slice(idx + 1)]
+      setStory(s.id, { ...s.story, sessions })
+      return `Updated story log ${updated.id} on ${s.title}'s story.`
+    }
+
+    if (!body) throw new ToolError('Give text to add.')
+    const targetPhase: StoryPhase = phase ?? 'session'
+    const createNew = optBool(params, 'new_session') === true || !s.story.sessions.length || targetPhase !== 'session' || Boolean(title && s.story.sessions[s.story.sessions.length - 1]?.title && s.story.sessions[s.story.sessions.length - 1].title !== title)
 
     if (createNew) {
       const entry = newSession(undefined, {
         title: title ?? '',
         notes: body,
-        phase,
+        phase: targetPhase,
         ...(kind ? { kind } : {}),
         ...(summary ? { summary } : {}),
         ...(outcome ? { outcome } : {}),
@@ -153,7 +185,7 @@ const addStoryLog: ToolDef = {
       })
       const sessions = [...s.story.sessions, entry]
       setStory(s.id, { ...s.story, sessions })
-      return `Recorded ${phase} log ${entry.id} (${sessions.length}) on ${s.title}'s story.`
+      return `Recorded ${targetPhase} log ${entry.id} (${sessions.length}) on ${s.title}'s story.`
     }
 
     const last = s.story.sessions[s.story.sessions.length - 1]
@@ -188,13 +220,14 @@ const setStoryWhere: ToolDef = {
       goal: TEXT('Their current immediate focus or objective'),
       mood: TEXT('Current situational posture, condition, or stakes'),
       backstory_summary: TEXT('Concise pinned 2-4 line contextual backstory essence'),
-      add_thread: TEXT('Optional new open thread/arc title to track'),
+      add_thread: TEXT('Optional new open thread/arc title to track or update'),
       thread_kind: { type: ['string', 'null'], enum: [...STORY_THREAD_KINDS, null], description: "Thread type: 'arc', 'goal', 'mystery', 'bond', or 'threat'" },
       thread_status: { type: ['string', 'null'], enum: [...STORY_THREAD_STATUSES, null], description: "Thread status: 'active', 'waiting', 'resolved', or 'dropped'" },
       thread_detail: TEXT('Optional context notes or next beat for add_thread'),
       thread_who: { type: ['array', 'null'], items: { type: 'string' }, description: 'People/factions involved in the thread' },
       thread_where: TEXT('Where the thread takes place'),
-      resolve_thread: TEXT('Optional text matching an existing thread to mark resolved')
+      resolve_thread: TEXT('Optional text matching an existing thread to mark resolved'),
+      remove_thread: TEXT('Optional text matching an existing thread to delete it')
     }
   },
   async execute(params) {
@@ -206,10 +239,14 @@ const setStoryWhere: ToolDef = {
     const backstorySummary = optStr(params, 'backstory_summary')
     const addThread = optStr(params, 'add_thread')?.trim()
     const resolveThread = optStr(params, 'resolve_thread')?.trim().toLowerCase()
-    if (where === null && doing === null && goal === null && mood === null && backstorySummary === null && !addThread && !resolveThread) {
-      throw new ToolError('Provide a present field (where, doing, goal, mood), backstory_summary, add_thread, or resolve_thread.')
+    const removeThread = optStr(params, 'remove_thread')?.trim().toLowerCase()
+    if (where === null && doing === null && goal === null && mood === null && backstorySummary === null && !addThread && !resolveThread && !removeThread) {
+      throw new ToolError('Provide a present field (where, doing, goal, mood), backstory_summary, add_thread, resolve_thread, or remove_thread.')
     }
     let threads = s.story.threads
+    if (removeThread) {
+      threads = threads.filter((t) => !t.text.toLowerCase().includes(removeThread) && t.id !== removeThread)
+    }
     if (resolveThread) {
       threads = threads.map((t) => (t.text.toLowerCase().includes(resolveThread) ? { ...t, done: true, status: 'resolved' as StoryThreadStatus } : t))
     }
@@ -270,20 +307,21 @@ const addCharacterMemory: ToolDef = {
   name: 'add_character_memory',
   group: 'core',
   needsWorkspace: false,
-  description: 'Save or update an episodic memory/event on a character sheet (use set_character_relationship for the living bond/stance table). Keeps a short snippet separate from full details (fetched via story_recall).',
+  description: 'Save, update, or remove an episodic memory/event on a character sheet (use set_character_relationship for the living bond/stance table). Keeps a short snippet separate from full details (fetched via story_recall).',
   params: {
     type: 'object',
     properties: {
       sheet: { type: 'string', description: 'The character' },
-      summary: { type: 'string', description: 'Concise 1-sentence snippet surfaced when relevant (e.g. "Nearly killed by a goblin horde in Blackwood Pass")' },
+      id: TEXT('Existing memory id to update or remove instead of adding a new entry'),
+      remove: { type: ['boolean', 'null'], description: 'When true with id, remove that memory entry' },
+      summary: TEXT('Concise 1-sentence snippet surfaced when relevant (required when creating)'),
       detail: TEXT('Optional fuller recollection/details kept out of the default prompt until recalled by id'),
       category: { type: ['string', 'null'], enum: [...STORY_MEMORY_CATEGORIES, null], description: "One of: 'memory' (default), 'backstory', 'recent', 'relationship', 'secret'" },
       where: TEXT('Where it happened (@place:... or freeform location)'),
       who: { type: ['array', 'null'], items: { type: 'string' }, description: 'People/characters involved' },
       tags: { type: ['array', 'null'], items: { type: 'string' }, description: 'Topic/trigger keywords (e.g. ["goblin", "ambush", "tavern"])' },
       when: TEXT('Timeframe or date (e.g. "Last winter", "Session 3")'),
-      pin: { type: ['boolean', 'null'], description: 'True to keep this snippet pinned in the default character prompt' },
-      id: TEXT('Existing memory id to update instead of adding a new entry')
+      pin: { type: ['boolean', 'null'], description: 'True to keep this snippet pinned in the default character prompt' }
     }
   },
   async execute(params) {
@@ -304,6 +342,11 @@ const addCharacterMemory: ToolDef = {
     if (existingId) {
       const idx = existingMemories.findIndex((m) => m.id === existingId)
       if (idx < 0) throw new ToolError(`No memory ${existingId} in ${s.title}'s mind. Use story_recall to find memory ids.`)
+      if (optBool(params, 'remove') === true) {
+        const memories = existingMemories.filter((m) => m.id !== existingId)
+        setMind(s.id, { ...(s.mind ?? {}), memories })
+        return `Removed memory ${existingId} from ${s.title}'s mind.`
+      }
       const prev = existingMemories[idx]
       const updated = newMemory({
         ...prev,
@@ -467,4 +510,210 @@ const updateProficiencies: ToolDef = {
   }
 }
 
-export const CHARACTER_TOOLS: ToolDef[] = [updateStats, updateProficiencies, addStoryLog, setStoryWhere, addCharacterMemory, storyRecall, setCharacterRelationship, removeCharacterRelationship]
+function upsertNamed<T extends { name: string }>(
+  current: T[],
+  incoming: unknown,
+  build: (raw: Record<string, unknown>, prev?: T) => T | null,
+  removeRaw: unknown
+): T[] {
+  const drops = new Set(strList(removeRaw).map((n) => n.toLowerCase()))
+  let next = current.filter((item) => !drops.has(item.name.toLowerCase()))
+  if (!Array.isArray(incoming)) return next
+  for (const item of incoming) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const rec = item as Record<string, unknown>
+    const idx = typeof rec.name === 'string' ? next.findIndex((x) => x.name.toLowerCase() === rec.name!.toString().trim().toLowerCase()) : -1
+    const built = build(rec, idx >= 0 ? next[idx] : undefined)
+    if (!built) continue
+    next = idx >= 0 ? [...next.slice(0, idx), built, ...next.slice(idx + 1)] : [...next, built]
+  }
+  return next
+}
+
+const updateDnd: ToolDef = {
+  name: 'update_dnd',
+  group: 'core',
+  needsWorkspace: false,
+  activity: () => 'updating D&D sheet details',
+  description: "Update a character's D&D spells, spell slots, features, attacks, equipment, coins, conditions, exhaustion, inspiration, temp HP, hit dice, or death saves. Pass only fields that change; null keeps existing values.",
+  params: {
+    type: 'object',
+    properties: {
+      sheet: { type: 'string', description: 'The character, e.g. Valerius' },
+      temp_hp: INT('Temporary hit points'),
+      inspiration: { type: ['boolean', 'null'], description: 'Heroic inspiration' },
+      exhaustion: INT('Exhaustion level 0 to 6'),
+      add_conditions: NAMES(`Conditions to add, e.g. ["Poisoned"]. Common: ${DND_CONDITIONS.join(', ')}`),
+      remove_conditions: NAMES('Conditions to remove'),
+      hit_dice: { oneOf: [{ type: 'null' }, { type: 'object', properties: { total: TEXT('e.g. 5d8'), used: INT('Hit dice spent') } }] },
+      death_saves: { oneOf: [{ type: 'null' }, { type: 'object', properties: { ok: INT('Successes 0-3'), fail: INT('Failures 0-3') } }] },
+      coins: { oneOf: [{ type: 'null' }, { type: 'object', properties: { cp: INT('Copper'), sp: INT('Silver'), ep: INT('Electrum'), gp: INT('Gold'), pp: INT('Platinum') } }] },
+      spell_ability: { type: ['string', 'null'], enum: [...DND_STATS, null], description: 'Spellcasting ability stat' },
+      slots: {
+        oneOf: [
+          { type: 'null' },
+          {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { level: { type: 'integer', description: 'Spell level 1 to 9' }, max: INT('Max slots'), used: INT('Used slots') },
+              required: ['level']
+            }
+          }
+        ],
+        description: 'Patch spell slot counts by spell level (1-9)'
+      },
+      add_attacks: {
+        oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, bonus: TEXT('Attack bonus, e.g. +5'), damage: TEXT('e.g. 1d8+3 slashing'), notes: TEXT('Notes') }, required: ['name'] } }]
+      },
+      remove_attacks: NAMES('Attack names to remove'),
+      add_equipment: {
+        oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, qty: INT('Quantity'), equipped: { type: ['boolean', 'null'] }, note: TEXT('Notes') }, required: ['name'] } }]
+      },
+      remove_equipment: NAMES('Equipment item names to remove'),
+      add_features: {
+        oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, text: TEXT('Feature description') }, required: ['name'] } }]
+      },
+      remove_features: NAMES('Feature names to remove'),
+      add_spells: {
+        oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, level: INT('0 for cantrip, 1-9 for leveled'), prepared: { type: ['boolean', 'null'] }, note: TEXT('Notes') }, required: ['name'] } }]
+      },
+      remove_spells: NAMES('Spell names to remove')
+    }
+  },
+  async execute(params) {
+    const s = sheetOf(str(params, 'sheet'))
+    const cur = s.dnd ?? blankDnd()
+    const tempHp = optInt(params, 'temp_hp')
+    const inspiration = optBool(params, 'inspiration')
+    const exhaustion = optInt(params, 'exhaustion')
+
+    const addCond = strList(params.add_conditions)
+    const remCond = new Set(strList(params.remove_conditions).map((c) => c.toLowerCase()))
+    const conditions = strList([...cur.conditions, ...addCond]).filter((c) => !remCond.has(c.toLowerCase()))
+
+    const hd = params.hit_dice && typeof params.hit_dice === 'object' ? (params.hit_dice as Record<string, unknown>) : null
+    const ds = params.death_saves && typeof params.death_saves === 'object' ? (params.death_saves as Record<string, unknown>) : null
+    const coinPatch = params.coins && typeof params.coins === 'object' ? (params.coins as Record<string, unknown>) : null
+    const coins = { ...cur.coins }
+    if (coinPatch) {
+      for (const c of DND_COINS) {
+        if (typeof coinPatch[c] === 'number' && Number.isFinite(coinPatch[c])) coins[c] = Math.max(0, Math.round(coinPatch[c] as number))
+      }
+    }
+
+    const slots = cur.slots.map((sl) => ({ ...sl }))
+    if (Array.isArray(params.slots)) {
+      for (const item of params.slots) {
+        if (!item || typeof item !== 'object') continue
+        const sl = item as Record<string, unknown>
+        const lvl = typeof sl.level === 'number' ? Math.round(sl.level) : 0
+        if (lvl < 1 || lvl > 9) continue
+        const target = slots[lvl - 1]
+        if (typeof sl.max === 'number' && Number.isFinite(sl.max)) target.max = Math.max(0, Math.round(sl.max))
+        if (typeof sl.used === 'number' && Number.isFinite(sl.used)) target.used = Math.max(0, Math.round(sl.used))
+      }
+    }
+
+    const rawSpellAbility = optStr(params, 'spell_ability')
+    const spellAbilityPatch =
+      rawSpellAbility === null
+        ? cur.spellAbility
+        : rawSpellAbility === ''
+          ? null
+          : (DND_STATS as readonly string[]).includes(rawSpellAbility)
+            ? (rawSpellAbility as DndStat)
+            : (() => {
+                throw new ToolError(`spell_ability must be one of ${DND_STATS.join(', ')}.`)
+              })()
+
+    const attacks = upsertNamed(
+      cur.attacks,
+      params.add_attacks,
+      (raw, prev) => {
+        const name = typeof raw.name === 'string' ? raw.name.trim() : ''
+        if (!name) return null
+        return {
+          name,
+          bonus: typeof raw.bonus === 'string' ? raw.bonus.trim() : (prev?.bonus ?? ''),
+          damage: typeof raw.damage === 'string' ? raw.damage.trim() : (prev?.damage ?? ''),
+          notes: typeof raw.notes === 'string' ? raw.notes.trim() : (prev?.notes ?? '')
+        }
+      },
+      params.remove_attacks
+    )
+
+    const equipment = upsertNamed(
+      cur.equipment,
+      params.add_equipment,
+      (raw, prev) => {
+        const name = typeof raw.name === 'string' ? raw.name.trim() : ''
+        if (!name) return null
+        return {
+          name,
+          qty: typeof raw.qty === 'number' && Number.isFinite(raw.qty) ? Math.max(0, Math.round(raw.qty)) : (prev?.qty ?? 1),
+          equipped: typeof raw.equipped === 'boolean' ? raw.equipped : (prev?.equipped ?? false),
+          note: typeof raw.note === 'string' ? raw.note.trim() : (prev?.note ?? '')
+        }
+      },
+      params.remove_equipment
+    )
+
+    const features = upsertNamed(
+      cur.features,
+      params.add_features,
+      (raw, prev) => {
+        const name = typeof raw.name === 'string' ? raw.name.trim() : ''
+        if (!name) return null
+        return {
+          name,
+          text: typeof raw.text === 'string' ? raw.text.trim() : (prev?.text ?? '')
+        }
+      },
+      params.remove_features
+    )
+
+    const spells = upsertNamed(
+      cur.spells,
+      params.add_spells,
+      (raw, prev) => {
+        const name = typeof raw.name === 'string' ? raw.name.trim() : ''
+        if (!name) return null
+        return {
+          name,
+          level: typeof raw.level === 'number' && Number.isFinite(raw.level) ? Math.max(0, Math.min(9, Math.round(raw.level))) : (prev?.level ?? 0),
+          prepared: typeof raw.prepared === 'boolean' ? raw.prepared : (prev?.prepared ?? false),
+          note: typeof raw.note === 'string' ? raw.note.trim() : (prev?.note ?? '')
+        }
+      },
+      params.remove_spells
+    )
+
+    const next = cleanDnd({
+      ...cur,
+      ...(inspiration !== null ? { inspiration } : {}),
+      ...(exhaustion !== null ? { exhaustion } : {}),
+      conditions,
+      hp: { ...cur.hp, ...(tempHp !== null ? { temp: tempHp } : {}) },
+      hitDice: {
+        total: hd && typeof hd.total === 'string' ? hd.total.trim() : cur.hitDice.total,
+        used: hd && typeof hd.used === 'number' && Number.isFinite(hd.used) ? hd.used : cur.hitDice.used
+      },
+      deathSaves: {
+        ok: ds && typeof ds.ok === 'number' && Number.isFinite(ds.ok) ? ds.ok : cur.deathSaves.ok,
+        fail: ds && typeof ds.fail === 'number' && Number.isFinite(ds.fail) ? ds.fail : cur.deathSaves.fail
+      },
+      coins,
+      spellAbility: spellAbilityPatch,
+      slots,
+      attacks,
+      equipment,
+      features,
+      spells
+    })
+    setDnd(s.id, next)
+    return `Updated D&D sheet for ${s.title}: ${next.attacks.length} attacks, ${next.features.length} features, ${next.spells.length} spells, ${next.equipment.length} items, ${next.coins.gp} gp.`
+  }
+}
+
+export const CHARACTER_TOOLS: ToolDef[] = [updateStats, updateProficiencies, updateDnd, addStoryLog, setStoryWhere, addCharacterMemory, storyRecall, setCharacterRelationship, removeCharacterRelationship]

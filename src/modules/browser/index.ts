@@ -16,7 +16,7 @@ const MAX_IMAGE = 25 * 1024 * 1024
 
 
 function allowedSites(): string[] {
-  const raw = modules.list().find((m) => m.id === 'web')?.values.allowedSites
+  const raw = modules.valuesOf('web').allowedSites
   return String(raw ?? '')
     .split(',')
     .map((s) => s.trim().toLowerCase().replace(/^www\./, ''))

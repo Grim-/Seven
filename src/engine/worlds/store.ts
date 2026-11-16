@@ -118,6 +118,16 @@ class WorldStore extends EventEmitter {
       .sort((a, b) => a.name.localeCompare(b.name))
   }
 
+  allTypeKeys(): string[] {
+    if (!fs.existsSync(ROOT)) return []
+    const out = new Set<string>()
+    for (const d of fs.readdirSync(ROOT, { withFileTypes: true })) {
+      if (!d.isDirectory() || !this.exists(d.name)) continue
+      for (const k of Object.keys(this.schema(d.name).types)) out.add(k)
+    }
+    return [...out]
+  }
+
   meta(id: string): WorldMeta {
     const schema = this.schema(id)
     const m = this.manifest(id)

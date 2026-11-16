@@ -11,7 +11,7 @@ export function registerModuleKind(module: string, kind: Kind): void {
 }
 
 function moduleOn(module: string, ctx: KindContext): boolean {
-  if (modules.list().find((m) => m.id === module)?.state !== 'on') return false
+  if (!modules.isOn(module)) return false
   if (ctx.user || !ctx.agentId || ctx.agentId === '_any') return true
   return agentAccess.get(ctx.agentId)?.modules.includes(module) === true
 }

@@ -1,8 +1,8 @@
 import { CORE_MODULES } from '@shared/toolnames'
-import { Fragment, useMemo, useState } from 'react'
-import { Boxes, FileArchive, FolderOpen, Import, Plus, Power, Puzzle, RefreshCw, RotateCcw } from 'lucide-react'
-import type { ModuleInfo, ModuleState, ToolPermission } from '@shared/types'
-import { BackBar, Button, Field, Input, KindShell, Modal, Panel, SettingCard, SaveState, Select, StatusBadge, Textarea, Toggle, ViewHeader, useDraft, type ShellItem, type Tone } from '../components/ui'
+import { useEffect, useMemo, useState } from 'react'
+import { BookOpen, Boxes, FileArchive, FolderOpen, Import, Plus, Power, Puzzle, RefreshCw, SlidersHorizontal, Wrench } from 'lucide-react'
+import type { ModuleInfo, ModuleState } from '@shared/types'
+import { BackBar, Button, Field, Input, KindShell, Modal, Panel, SettingCard, SaveState, Select, ShellTabs, StatusBadge, Textarea, Toggle, ViewHeader, useDraft, type ShellItem, type Tone } from '../components/ui'
 import { engine, main } from '../lib/ipc'
 import { errorText } from '../lib/format'
 import { toast } from '../store/toasts'
@@ -10,10 +10,12 @@ import { useTools } from '../store/tools'
 import { ToolsetEditor } from '../components/tools/Toolsets'
 import { useToolsets } from '../store/toolsets'
 import { ToolFolders } from '../components/tools/ToolFolders'
+import { ModuleAdds } from '../components/tools/ModuleAdds'
+import { ToolApiList } from '../components/tools/ToolApiList'
+import { ModuleCustomEditor, ModuleGuideView } from '../components/tools/ModuleGuideAndEditor'
 import { useViewPlace } from '../lib/viewPlace'
 import { installZip } from '../components/tools/installZip'
 import { pickFolder } from '../components/ui/FileField'
-import { kindModuleLists } from '../registries/kinds'
 
 const STATE: Record<ModuleState, { label: string; tone: Tone }> = {
   on: { label: 'On', tone: 'ok' },
@@ -25,17 +27,7 @@ const STATE: Record<ModuleState, { label: string; tone: Tone }> = {
   'missing-dependency': { label: 'Needs another module', tone: 'warn' }
 }
 
-const PERMISSION_LABEL: Record<ToolPermission, string> = { none: 'never asks', ask: 'asks unless Trusted', always: 'always asks', custom: 'asks when needed' }
-
-function permissionOptions(def: ToolPermission): { value: string; label: string }[] {
-  const label = (p: ToolPermission, text: string) => (def === p ? `${text} (default)` : text)
-  return [
-    ...(def === 'custom' ? [{ value: 'custom', label: 'Default (asks when needed)' }] : []),
-    { value: 'none', label: label('none', 'Never asks') },
-    { value: 'ask', label: label('ask', 'Asks unless Trusted') },
-    { value: 'always', label: label('always', 'Always asks') }
-  ]
-}
+type DetailTab = 'overview' | 'guide' | 'customize'
 
 async function run<T>(label: string, task: Promise<T>): Promise<T | null> {
   try {
@@ -84,19 +76,18 @@ function SettingsForm({ module }: { module: ModuleInfo }) {
 
 function Detail({ module }: { module: ModuleInfo }) {
   const state = STATE[module.state]
-  const adds = [
-    ...module.adds,
-    ...kindModuleLists().flatMap((g) => {
-      const items = g.list.ofModule(module.id)
-      return items.length ? [{ label: g.label, items }] : []
-    })
-  ]
+  const [tab, setTab] = useState<DetailTab>('overview')
   const enable = () => void run('Could not switch on', engine('tools.enable', { id: module.id }))
+
+  useEffect(() => {
+    void useTools.getState().refresh()
+  }, [module.id])
+
   return (
     <Panel
       className="flex-1"
       title={module.name}
-      meta={`${module.id} · v${module.version}`}
+      meta={`${module.id} · v${module.version}${module.customized ? ' · customized' : ''}`}
       bodyClassName="flex flex-col gap-4 overflow-y-auto"
       actions={
         <>
@@ -134,17 +125,6 @@ function Detail({ module }: { module: ModuleInfo }) {
           ))}
         </div>
       )}
-      {adds.length > 0 && (
-        <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-[11.5px]">
-          <span className="col-span-2 uppercase tracking-[0.14em] text-faint">Adds</span>
-          {adds.map((a) => (
-            <Fragment key={a.label}>
-              <span className="text-accent-soft">{a.label}</span>
-              <span className="text-white/85">{a.items.join(' · ')}</span>
-            </Fragment>
-          ))}
-        </div>
-      )}
       {module.state === 'missing-dependency' && (
         <div className="flex flex-wrap items-center gap-2 border border-accent/40 bg-accent/[0.06] px-3 py-2 text-[12.5px] text-white/90">
           <span>Inactive until these are on: {module.missingDependencies.join(', ')}.</span>
@@ -171,116 +151,51 @@ function Detail({ module }: { module: ModuleInfo }) {
           </ul>
         </div>
       )}
-      {module.mcp && (
-        <div className="grid grid-cols-[120px_1fr] gap-y-1 font-mono text-[12px]">
-          <span className="text-faint">Transport</span>
-          <span className="text-white/90">{module.mcp.transport}</span>
-          <span className="text-faint">Server</span>
-          <span className="break-all text-white/90">{module.mcp.target}</span>
-          <span className="text-faint">Connection</span>
-          <span className="text-white/90">{module.mcp.status}</span>
-        </div>
-      )}
-      <div>
-        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Tools</div>
-          {module.tools.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1">
-              {module.tools.length > 1 &&
-                (['none', 'ask', 'always'] as const).map((p) => (
-                  <Button
-                    key={p}
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      void run('Could not update permissions', engine('tools.setModulePermission', { id: module.id, permission: p })).then((next) => {
-                        if (next) useTools.getState().setList(next)
-                      })
-                    }
-                  >
-                    All: {p === 'none' ? 'Never' : p === 'ask' ? 'Ask' : 'Always'}
-                  </Button>
-                ))}
-              {module.tools.some((t) => t.permission !== (t.defaultPermission ?? t.permission)) && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon={<RotateCcw />}
-                  onClick={() =>
-                    void run('Could not reset permissions', engine('tools.setModulePermission', { id: module.id, permission: null })).then((next) => {
-                      if (next) useTools.getState().setList(next)
-                    })
-                  }
-                >
-                  Reset
-                </Button>
-              )}
+
+      <ShellTabs
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'overview', label: 'API & Capabilities', icon: <Wrench />, count: module.tools.length },
+          { value: 'guide', label: 'Documentation', icon: <BookOpen /> },
+          { value: 'customize', label: module.customized ? 'Customize *' : 'Customize', icon: <SlidersHorizontal /> }
+        ]}
+      />
+
+      {tab === 'overview' && (
+        <div className="flex flex-col gap-4">
+          <ModuleAdds module={module} />
+          {module.mcp && (
+            <div className="grid grid-cols-[120px_1fr] gap-y-1 border border-line/40 bg-black/25 p-3 font-mono text-[12px]">
+              <span className="text-faint">Transport</span>
+              <span className="text-white/90">{module.mcp.transport}</span>
+              <span className="text-faint">Server</span>
+              <span className="break-all text-white/90">{module.mcp.target}</span>
+              <span className="text-faint">Connection</span>
+              <span className="text-white/90">{module.mcp.status}</span>
+            </div>
+          )}
+          <ToolApiList module={module} />
+          {module.settings.length > 0 && (
+            <div>
+              <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Settings</div>
+              <SettingsForm key={module.id} module={module} />
+            </div>
+          )}
+          {(module.actions ?? []).length > 0 && (
+            <div className="flex flex-col gap-2">
+              <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Actions</div>
+              {module.actions.map((a) => (
+                <ActionButton key={a.name} module={module} name={a.name} label={a.label} description={a.description} />
+              ))}
             </div>
           )}
         </div>
-        {module.tools.length === 0 ? (
-          <span className="text-[12.5px] text-dim">{module.state === 'on' ? 'No tools.' : 'Tools show here once the module is on.'}</span>
-        ) : (
-          <div className="flex flex-col divide-y divide-line/30 border border-line/40">
-            {module.tools.map((t) => {
-              const def = t.defaultPermission ?? t.permission
-              const overridden = t.permission !== def
-              return (
-                <div key={t.name} className="flex flex-col gap-1 px-3 py-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-[12.5px] font-semibold text-accent">{t.name}</span>
-                    <div className="ml-auto flex items-center gap-1.5">
-                      <div className="w-52 max-w-full">
-                        <Select
-                          aria-label={`Permission for ${t.name}`}
-                          value={t.permission}
-                          options={permissionOptions(def)}
-                          onChange={(v) => {
-                            const next = v as ToolPermission
-                            void run('Could not update permission', engine('tools.setPermission', { id: module.id, tool: t.name, permission: next === def ? null : next })).then((updated) => {
-                              if (updated) useTools.getState().setList(updated)
-                            })
-                          }}
-                          className={overridden ? 'h-7 border-accent/60 font-mono text-[11px] text-accent' : 'h-7 font-mono text-[11px] text-dim'}
-                        />
-                      </div>
-                      {overridden && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          icon={<RotateCcw />}
-                          title={`Reset to default (${PERMISSION_LABEL[def]})`}
-                          aria-label={`Reset ${t.name} permission to default`}
-                          onClick={() =>
-                            void run('Could not reset permission', engine('tools.setPermission', { id: module.id, tool: t.name, permission: null })).then((updated) => {
-                              if (updated) useTools.getState().setList(updated)
-                            })
-                          }
-                        />
-                      )}
-                    </div>
-                  </div>
-                  {t.description && <span className="line-clamp-2 text-[12px] text-dim">{t.description}</span>}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-      {module.settings.length > 0 && (
-        <div>
-          <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Settings</div>
-          <SettingsForm key={module.id} module={module} />
-        </div>
       )}
-      {(module.actions ?? []).length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Actions</div>
-          {module.actions.map((a) => (
-            <ActionButton key={a.name} module={module} name={a.name} label={a.label} description={a.description} />
-          ))}
-        </div>
-      )}
+
+      {tab === 'guide' && <ModuleGuideView module={module} />}
+
+      {tab === 'customize' && <ModuleCustomEditor module={module} />}
     </Panel>
   )
 }

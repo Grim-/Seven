@@ -8,7 +8,8 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { EventEmitter } from 'node:events'
 import type { JsonObjectSchema } from '../tools/schema'
-import type { ModuleInfo, ModuleSource, ModuleState, PageTypeInfo, ToolPermission, ToolsPrefs } from '@shared/types'
+import type { ModuleCustomizationPatch, ModuleInfo, ModuleSource, ModuleState, PageTypeInfo, ToolPermission, ToolsPrefs } from '@shared/types'
+import { toolApiDoc } from '../tools/signature'
 import { data } from '../data/hub'
 import type { SinglePage } from '../data/pages'
 import type { ToolDef } from '../tools/types'
@@ -29,8 +30,20 @@ const TRUST_FILE = path.join(dataRoot, 'tool-trust.json')
 const SETTINGS_FILE = path.join(dataRoot, 'tool-settings.json')
 const SECRETS_FILE = path.join(dataRoot, 'tool-secrets.json')
 const PERMISSIONS_FILE = path.join(dataRoot, 'tool-permissions.json')
+const CUSTOMIZATIONS_FILE = path.join(dataRoot, 'tool-customizations.json')
 
 type PermissionOverrides = Record<string, Record<string, ToolPermission>>
+
+interface ModuleCustomization {
+  name?: string
+  description?: string
+  prompt?: string
+  help?: string
+  remind?: string
+  toolDescriptions?: Record<string, string>
+}
+
+type ModuleCustomizations = Record<string, ModuleCustomization>
 
 type Values = Record<string, Record<string, unknown>>
 
@@ -113,7 +126,9 @@ export class ModuleRegistry extends EventEmitter {
   private prefs: ToolsPrefs = getToolsPrefs()
   private trust = readJson<Record<string, TrustRecord>>(TRUST_FILE, {})
   private overrides: PermissionOverrides = this.readOverrides()
+  private customizations: ModuleCustomizations = this.readCustomizations()
   private defaultPermissions = new WeakMap<ToolDef, ToolPermission>()
+  private defaultDescriptions = new WeakMap<ToolDef, string>()
   private values: Values = {}
   private secrets: Values = {}
   private valuesLocked = false
@@ -148,13 +163,46 @@ export class ModuleRegistry extends EventEmitter {
     writeJson(PERMISSIONS_FILE, this.overrides)
   }
 
+  private readCustomizations(): ModuleCustomizations {
+    const raw = readJson<Record<string, unknown>>(CUSTOMIZATIONS_FILE, {})
+    const out: ModuleCustomizations = {}
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out
+    for (const [modId, val] of Object.entries(raw)) {
+      if (!val || typeof val !== 'object' || Array.isArray(val)) continue
+      const r = val as Record<string, unknown>
+      const entry: ModuleCustomization = {}
+      if (typeof r.name === 'string' && r.name.trim()) entry.name = r.name.trim()
+      if (typeof r.description === 'string') entry.description = r.description
+      if (typeof r.prompt === 'string') entry.prompt = r.prompt
+      if (typeof r.help === 'string') entry.help = r.help
+      if (typeof r.remind === 'string') entry.remind = r.remind
+      if (r.toolDescriptions && typeof r.toolDescriptions === 'object' && !Array.isArray(r.toolDescriptions)) {
+        const descs: Record<string, string> = {}
+        for (const [toolName, desc] of Object.entries(r.toolDescriptions as Record<string, unknown>)) {
+          if (typeof desc === 'string') descs[toolName] = desc
+        }
+        if (Object.keys(descs).length) entry.toolDescriptions = descs
+      }
+      if (Object.keys(entry).length) out[modId] = entry
+    }
+    return out
+  }
+
+  private writeCustomizations(): void {
+    writeJson(CUSTOMIZATIONS_FILE, this.customizations)
+  }
+
   private registerPermissions(entry: Entry, tools: ToolDef[]): ToolDef[] {
     const m = entry.manifest
     const modOverrides = this.overrides[m.id] ?? {}
+    const modCustom = this.customizations[m.id]
     return tools.map((t) => {
       const base = this.defaultPermissions.get(t) ?? t.permission ?? m.toolPermissions[t.name] ?? m.permission
       this.defaultPermissions.set(t, base)
       t.permission = modOverrides[t.name] ?? base
+      const baseDesc = this.defaultDescriptions.get(t) ?? t.description
+      this.defaultDescriptions.set(t, baseDesc)
+      t.description = modCustom?.toolDescriptions?.[t.name] ?? baseDesc
       return t
     })
   }
@@ -715,6 +763,53 @@ export class ModuleRegistry extends EventEmitter {
     return this.list()
   }
 
+  async customize(id: string, patch: ModuleCustomizationPatch): Promise<ModuleInfo[]> {
+    const entry = this.require(id)
+    const current = this.customizations[id]
+    const next: ModuleCustomization = {
+      ...(current ?? {}),
+      ...(current?.toolDescriptions ? { toolDescriptions: { ...current.toolDescriptions } } : {})
+    }
+    if (patch.name !== undefined) {
+      const clean = (patch.name ?? '').trim()
+      if (!clean || clean === entry.manifest.name) delete next.name
+      else next.name = clean
+    }
+    const textFields: [keyof Pick<ModuleCustomizationPatch, 'description' | 'prompt' | 'help' | 'remind'>, string][] = [
+      ['description', entry.manifest.description],
+      ['prompt', entry.prompt],
+      ['help', entry.help],
+      ['remind', entry.remind]
+    ]
+    for (const [key, fallback] of textFields) {
+      const incoming = patch[key]
+      if (incoming === undefined) continue
+      if (incoming === null || incoming === fallback) delete next[key]
+      else next[key] = incoming
+    }
+    if (patch.toolDescriptions !== undefined) {
+      if (patch.toolDescriptions === null) {
+        delete next.toolDescriptions
+      } else {
+        const descs = { ...(next.toolDescriptions ?? {}) }
+        for (const [toolName, val] of Object.entries(patch.toolDescriptions)) {
+          const tool = entry.tools.find((t) => t.name === toolName)
+          const base = tool ? (this.defaultDescriptions.get(tool) ?? tool.description) : undefined
+          if (val === null || (base !== undefined && val === base)) delete descs[toolName]
+          else descs[toolName] = val
+        }
+        if (Object.keys(descs).length) next.toolDescriptions = descs
+        else delete next.toolDescriptions
+      }
+    }
+    if (Object.keys(next).length) this.customizations[id] = next
+    else delete this.customizations[id]
+    this.writeCustomizations()
+    entry.tools = this.registerPermissions(entry, entry.tools)
+    this.emitChanged()
+    return this.list()
+  }
+
   async create(input: { id: string; name: string; kind: 'tools' | 'mcp' }): Promise<ModuleInfo[]> {
     const id = input.id.trim().toLowerCase()
     if (!ID_PATTERN.test(id)) throw new Error('A tool id uses lower-case letters, numbers and -, starting with a letter, e.g. my-tools.')
@@ -871,7 +966,7 @@ export class ModuleRegistry extends EventEmitter {
 
   helpFor(id: string): string {
     const entry = this.entries.get(id)
-    return entry?.state === 'on' ? entry.help.trim() : ''
+    return entry?.state === 'on' ? (this.customizations[id]?.help ?? entry.help).trim() : ''
   }
 
   panelTab(id: string): string {
@@ -880,16 +975,33 @@ export class ModuleRegistry extends EventEmitter {
 
   remindFor(id: string): string {
     const entry = this.entries.get(id)
-    return entry?.state === 'on' ? entry.remind.trim() : ''
+    return entry?.state === 'on' ? (this.customizations[id]?.remind ?? entry.remind).trim() : ''
   }
 
   promptFor(id: string): string {
     const entry = this.entries.get(id)
-    return entry?.state === 'on' ? entry.prompt : ''
+    return entry?.state === 'on' ? (this.customizations[id]?.prompt ?? entry.prompt) : ''
   }
 
   manifest(id: string): Manifest | null {
     return this.entries.get(id)?.manifest ?? null
+  }
+
+  isOn(id: string): boolean {
+    return this.entries.get(id)?.state === 'on'
+  }
+
+  nameOf(id: string): string {
+    return this.customizations[id]?.name ?? this.entries.get(id)?.manifest.name ?? id
+  }
+
+  descriptionOf(id: string): string {
+    return this.customizations[id]?.description ?? this.entries.get(id)?.manifest.description ?? ''
+  }
+
+  valuesOf(id: string): Record<string, unknown> {
+    const entry = this.entries.get(id)
+    return entry ? this.settingValues(entry) : {}
   }
 
   list(): ModuleInfo[] {
@@ -898,10 +1010,29 @@ export class ModuleRegistry extends EventEmitter {
         const values = this.settingValues(e)
         for (const s of e.manifest.settings) if (s.secret && values[s.name]) values[s.name] = SECRET_MASK
         const mcp = e.manifest.mcp
+        const custom = this.customizations[key]
+        const customized = Boolean(
+          custom &&
+            (custom.name !== undefined ||
+              custom.description !== undefined ||
+              custom.prompt !== undefined ||
+              custom.help !== undefined ||
+              custom.remind !== undefined ||
+              (custom.toolDescriptions && Object.keys(custom.toolDescriptions).length > 0))
+        )
         return {
           id: key,
-          name: e.manifest.name,
-          description: e.manifest.description,
+          name: custom?.name ?? e.manifest.name,
+          defaultName: e.manifest.name,
+          description: custom?.description ?? e.manifest.description,
+          defaultDescription: e.manifest.description,
+          prompt: custom?.prompt ?? e.prompt,
+          defaultPrompt: e.prompt,
+          help: custom?.help ?? e.help,
+          defaultHelp: e.help,
+          remind: custom?.remind ?? e.remind,
+          defaultRemind: e.remind,
+          customized,
           version: e.manifest.version,
           kind: e.manifest.kind,
           source: e.source,
@@ -911,12 +1042,19 @@ export class ModuleRegistry extends EventEmitter {
           always: e.manifest.always,
           needsWorkspace: e.manifest.needsWorkspace,
           replacesBuiltin: e.replacesBuiltin,
-          tools: e.tools.map((t) => ({
-            name: t.name,
-            description: t.description,
-            permission: t.permission ?? 'custom',
-            defaultPermission: this.defaultPermissions.get(t) ?? t.permission ?? e.manifest.toolPermissions[t.name] ?? e.manifest.permission
-          })),
+          tools: e.tools.map((t) => {
+            const api = toolApiDoc(t)
+            return {
+              name: t.name,
+              description: t.description,
+              defaultDescription: this.defaultDescriptions.get(t) ?? t.description,
+              signature: api.signature,
+              params: api.params,
+              schema: api.schema,
+              permission: t.permission ?? 'custom',
+              defaultPermission: this.defaultPermissions.get(t) ?? t.permission ?? e.manifest.toolPermissions[t.name] ?? e.manifest.permission
+            }
+          }),
           settings: e.manifest.settings,
           actions: e.manifest.actions,
           panel: e.manifest.panel,

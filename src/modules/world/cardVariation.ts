@@ -1,5 +1,6 @@
 import type { JsonSchema } from '../../engine/tools/schema'
-import type { CheckSchema } from '../../engine/tools/checkSchema'
+import { LIVE_CHECKS, type CheckSchema } from '../../engine/tools/checkSchema'
+import { effectDefListSchema, normalizeEffectDefs } from '../../engine/tools/effectSchema'
 import { cardVariationDefs, type CardPlayContext, type CardPlayOutcome, type CardRaw } from '../../engine/cards/variations'
 import { rollFor } from '../../engine/actions'
 import { runEffects } from '../../engine/effects/run'
@@ -11,8 +12,11 @@ import { NO_ROLL } from '@shared/storyRolls'
 import { pickMadeText, type PickAnswer, type PickDecisionProps } from '@shared/pickDecision'
 import { isLater, laterDecisionText } from '@shared/uiLater'
 import { linkFor } from '@shared/text'
+import { toId } from '@shared/ids'
 import { effectsWords } from '@shared/game/effectWords'
 import type { EffectOutcome, ViewEvent } from '@shared/effects'
+import { triggerActionsStore } from '../../engine/triggerActions/store'
+import { ToolError } from '../../engine/tools/types'
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {})
 const keep = (old: unknown, keys: string[]): Record<string, unknown> => Object.fromEntries(keys.filter((k) => k in obj(old)).map((k) => [k, obj(old)[k]]))
@@ -22,20 +26,54 @@ const intOr = (v: unknown, cur: unknown, fallback = 0): number => (v === null ? 
 
 const EFFECTS = ['effects', 'passAction', 'failAction']
 
+function triggerActionRef(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined
+  if (v === null) return null
+  if (typeof v !== 'string' || !v.trim()) return null
+  const found = triggerActionsStore.get(toId(v))
+  if (!found) throw new ToolError(`No trigger action "${v}".`)
+  return found.id
+}
+
+function patchTriggerEffects(next: Record<string, unknown>, defaultEvent: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if ('effects' in next) out.effects = next.effects === null ? [] : normalizeEffectDefs(next.effects, defaultEvent)
+  if ('passAction' in next) out.passAction = triggerActionRef(next.passAction) ?? null
+  if ('failAction' in next) out.failAction = triggerActionRef(next.failAction) ?? null
+  if ('action' in next) out.action = triggerActionRef(next.action) ?? null
+  return out
+}
+
 function keepActionEffects(next: Record<string, unknown>, old: Record<string, unknown>): Record<string, unknown> {
   const prevChecks = list(old.checks)
-  const checks = 'checks' in next ? list(next.checks).map((c, i) => ({ ...obj(prevChecks[i]), ...defined(obj(c)), ...keep(prevChecks[i], EFFECTS) })) : prevChecks
-  return { ...old, ...defined(next), ...keep(old, EFFECTS), checks }
+  const checks =
+    'checks' in next
+      ? list(next.checks).map((c, i) => {
+          const curCheck = obj(c)
+          const oldCheck = obj(prevChecks[i])
+          return { ...oldCheck, ...keep(oldCheck, EFFECTS), ...defined(curCheck), ...patchTriggerEffects(curCheck, 'OnPass') }
+        })
+      : prevChecks
+  return { ...old, ...keep(old, EFFECTS), ...defined(next), ...patchTriggerEffects(next, 'OnPass'), checks }
 }
 
 function keepOptionEffects(next: Record<string, unknown>, old: Record<string, unknown>): Record<string, unknown> {
   const prevOptions = list(old.options)
-  const options = 'options' in next ? list(next.options).map((o, i) => (typeof o === 'string' ? { ...obj(prevOptions[i]), text: o, ...keep(prevOptions[i], ['effects', 'action']) } : { ...obj(prevOptions[i]), ...defined(obj(o)), ...keep(prevOptions[i], ['effects', 'action']) })) : prevOptions
+  const options =
+    'options' in next
+      ? list(next.options).map((o, i) => {
+          const oldOpt = obj(prevOptions[i])
+          if (typeof o === 'string') return { ...oldOpt, text: o, ...keep(oldOpt, ['effects', 'action']) }
+          const curOpt = obj(o)
+          return { ...oldOpt, ...keep(oldOpt, ['effects', 'action']), ...defined(curOpt), ...patchTriggerEffects(curOpt, CHOSEN_EVENT) }
+        })
+      : prevOptions
   return { ...old, ...defined(next), options }
 }
 
 function patchSide(was: unknown, d: Record<string, unknown>): Record<string, unknown> {
   const old = obj(was)
+  const patched = patchTriggerEffects(d, WIN_EVENT)
   return {
     ...old,
     ...keep(old, ['loses', 'effects', 'action', 'sheet']),
@@ -44,18 +82,78 @@ function patchSide(was: unknown, d: Record<string, unknown>): Record<string, unk
     against: 'against' in d ? (d.against === null ? '' : typeof d.against === 'string' ? d.against : String(old.against ?? '')) : String(old.against ?? ''),
     bonus: 'bonus' in d ? intOr(d.bonus, old.bonus) : intOr(undefined, old.bonus),
     sheet: old.sheet ?? null,
-    action: old.action ?? null
+    action: 'action' in patched ? patched.action : (old.action ?? null),
+    ...('effects' in patched ? { effects: patched.effects } : {})
   }
 }
 
-const check = (c: CheckSchema): JsonSchema => ({ type: 'object', properties: { against: { oneOf: [{ type: 'null' }, c(true)] }, difficulty: { type: ['number', 'null'] }, base: { type: ['number', 'null'] }, pass: { type: ['string', 'null'] }, fail: { type: ['string', 'null'] } } })
+const effectArraySchema = (c: CheckSchema) => ({ oneOf: [{ type: 'null' }, { type: 'array', items: effectDefListSchema(c === LIVE_CHECKS) }] }) as const
+
+const check = (c: CheckSchema): JsonSchema => ({
+  type: 'object',
+  properties: {
+    against: { oneOf: [{ type: 'null' }, c(true)] },
+    difficulty: { type: ['number', 'null'] },
+    base: { type: ['number', 'null'] },
+    pass: { type: ['string', 'null'] },
+    fail: { type: ['string', 'null'] },
+    passAction: { type: ['string', 'null'], description: 'Trigger action id on check pass' },
+    failAction: { type: ['string', 'null'], description: 'Trigger action id on check fail' },
+    effects: { ...effectArraySchema(c), description: 'Inline effects for this check (on: OnPass/OnFail)' }
+  }
+})
 
 const data = (c: CheckSchema): JsonSchema => ({
   type: 'object',
   properties: {
     mode: { enum: ['action', 'decision', 'opposed'] },
-    action: { oneOf: [{ type: 'null' }, { type: 'object', properties: { attempt: { type: 'string' }, needs: { enum: ['any', 'all'] }, checks: { type: 'array', items: check(c) }, pass: { type: 'string' }, fail: { type: 'string' } } }] },
-    decision: { oneOf: [{ type: 'null' }, { type: 'object', properties: { question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, own: { type: 'boolean' } } }] },
+    action: {
+      oneOf: [
+        { type: 'null' },
+        {
+          type: 'object',
+          properties: {
+            attempt: { type: 'string' },
+            needs: { enum: ['any', 'all'] },
+            checks: { type: 'array', items: check(c) },
+            pass: { type: 'string' },
+            fail: { type: 'string' },
+            passAction: { type: ['string', 'null'], description: 'Trigger action id on pass' },
+            failAction: { type: ['string', 'null'], description: 'Trigger action id on fail' },
+            effects: { ...effectArraySchema(c), description: 'Inline effects (on: OnPass/OnFail)' }
+          }
+        }
+      ]
+    },
+    decision: {
+      oneOf: [
+        { type: 'null' },
+        {
+          type: 'object',
+          properties: {
+            question: { type: 'string' },
+            options: {
+              type: 'array',
+              items: {
+                oneOf: [
+                  { type: 'string' },
+                  {
+                    type: 'object',
+                    properties: {
+                      text: { type: 'string' },
+                      action: { type: ['string', 'null'], description: 'Trigger action id when chosen' },
+                      effects: { ...effectArraySchema(c), description: 'Inline effects when chosen' }
+                    },
+                    required: ['text']
+                  }
+                ]
+              }
+            },
+            own: { type: 'boolean' }
+          }
+        }
+      ]
+    },
     opposed: {
       oneOf: [
         { type: 'null' },
@@ -66,8 +164,24 @@ const data = (c: CheckSchema): JsonSchema => ({
             does: { type: 'string', description: 'what winning means for whoever plays it' },
             against: c(false),
             bonus: { type: ['number', 'null'], description: 'if no sheet' },
+            action: { type: ['string', 'null'], description: 'Trigger action id on win/lose' },
+            effects: { ...effectArraySchema(c), description: 'Inline effects (on: OnWin/OnLose)' },
             dc: { type: ['number', 'null'], description: 'fixed, instead of versus' },
-            versus: { oneOf: [{ type: 'null' }, { type: 'object', properties: { name: { type: 'string' }, against: c(false), bonus: { type: ['number', 'null'] } } }] }
+            versus: {
+              oneOf: [
+                { type: 'null' },
+                {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    against: c(false),
+                    bonus: { type: ['number', 'null'] },
+                    action: { type: ['string', 'null'], description: 'Trigger action id for defender' },
+                    effects: { ...effectArraySchema(c), description: 'Inline effects for defender' }
+                  }
+                }
+              ]
+            }
           }
         }
       ]

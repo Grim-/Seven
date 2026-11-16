@@ -1,5 +1,26 @@
-import type { ToolDef } from '../../engine/tools/types'
-import { awardCharacterXp, setCharacterClass, setCharacterTrait, triggerStoryMoment } from './characters'
+import { BUFF_TEMPLATES, CHARACTER_TEMPLATES, CLASS_TEMPLATES, ITEM_TEMPLATES, TRAIT_TEMPLATES, defTypes } from '@shared/game/defs'
+import { toId } from '@shared/ids'
+import { getSheet } from '../../engine/library/sheets'
+import { ToolError, type ToolDef } from '../../engine/tools/types'
+import {
+  applyCharacterBuff,
+  awardCharacterXp,
+  changeResource,
+  equipCharacterItem,
+  giveItem,
+  inspectCharacterGame,
+  joinCharacter,
+  leaveCharacter,
+  removeCharacterBuff,
+  setCharacterClass,
+  setCharacterTrait,
+  takeItem,
+  triggerStoryMoment,
+  unequipCharacterSlot,
+  useAbility,
+  useCharacterItem
+} from './characters'
+import { gameDefs } from './store'
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
@@ -72,6 +93,23 @@ export const gameTools: ToolDef[] = [
       },
       required: ['sheet', 'action', 'classId']
     },
+    forAgent: () => {
+      const ids = gameDefs.list(CLASS_TEMPLATES).map((d) => d.id)
+      return {
+        params: {
+          type: 'object',
+          properties: {
+            sheet: { type: 'string', description: 'Character sheet id or name' },
+            action: { enum: ['add', 'remove', 'level', 'accept_offer', 'dismiss_offer'], description: 'Operation to perform' },
+            classId: ids.length ? { enum: ids, description: 'Class template id' } : { type: 'string', description: 'Class template id' },
+            level: { type: ['number', 'null'], description: 'Optional initial/target level' },
+            bypassConditions: { type: ['boolean', 'null'], description: 'Bypass unlock conditions (DM/override)' },
+            reason: { type: ['string', 'null'], description: 'Optional reason logged to the Story Sheet' }
+          },
+          required: ['sheet', 'action', 'classId']
+        }
+      }
+    },
     async execute(params) {
       const res = setCharacterClass(str(params.sheet), {
         action: str(params.action) as 'add' | 'remove' | 'level' | 'accept_offer' | 'dismiss_offer',
@@ -98,6 +136,22 @@ export const gameTools: ToolDef[] = [
         reason: { type: ['string', 'null'], description: 'Optional reason logged to the Story Sheet' }
       },
       required: ['sheet', 'action', 'traitId']
+    },
+    forAgent: () => {
+      const ids = gameDefs.list(TRAIT_TEMPLATES).map((d) => d.id)
+      return {
+        params: {
+          type: 'object',
+          properties: {
+            sheet: { type: 'string', description: 'Character sheet id or name' },
+            action: { enum: ['add', 'remove', 'reset'], description: 'Operation to perform' },
+            traitId: ids.length ? { enum: ids, description: 'Trait template id' } : { type: 'string', description: 'Trait template id' },
+            permanent: { type: ['boolean', 'null'], description: 'Keep this trait even if a granting class is lost' },
+            reason: { type: ['string', 'null'], description: 'Optional reason logged to the Story Sheet' }
+          },
+          required: ['sheet', 'action', 'traitId']
+        }
+      }
     },
     async execute(params) {
       const res = setCharacterTrait(str(params.sheet), {
@@ -139,6 +193,178 @@ export const gameTools: ToolDef[] = [
         ? ` Triggered ${res.offers.length} clutch unlock offer(s)${accepted.length ? ` (unlocked: ${accepted.join(', ')})` : ''}.`
         : ''
       return `Logged story moment (${res.logged} Story Sheet entry).${offerNote}`
+    }
+  },
+  {
+    name: 'character_game_state',
+    group: 'game',
+    needsWorkspace: false,
+    description: 'Inspect a character\'s full live Game RPG state: resources (HP/Mana/Stamina), stats, classes + pending offers, traits, inventory, equipped slots, active buffs, and usable abilities.',
+    params: {
+      type: 'object',
+      properties: {
+        sheet: { type: 'string', description: 'Character sheet id or name' }
+      },
+      required: ['sheet']
+    },
+    async execute(params) {
+      return inspectCharacterGame(str(params.sheet))
+    }
+  },
+  {
+    name: 'character_game',
+    group: 'game',
+    needsWorkspace: false,
+    description: 'Operate a character\'s live Game RPG components: join/leave the game, adjust Health/Mana/Stamina/resources, give/take/equip/unequip/use items, apply/remove buffs, or use abilities.',
+    params: {
+      type: 'object',
+      properties: {
+        sheet: { type: 'string', description: 'Character sheet id or name' },
+        action: {
+          enum: ['join', 'leave', 'resource', 'give_item', 'take_item', 'equip_item', 'unequip_slot', 'use_item', 'apply_buff', 'remove_buff', 'use_ability'],
+          description: 'Runtime operation'
+        },
+        templateId: { type: ['string', 'null'], description: 'Character template id for join (defaults to first template)' },
+        resourceId: { type: ['string', 'null'], description: 'Stat/resource id (e.g. health, mana, stamina)' },
+        amount: { type: ['number', 'null'], description: 'Delta (e.g. -10 or +15) for resource, or stack count for items/buffs' },
+        setValue: { type: ['number', 'null'], description: 'Exact target value for resource' },
+        itemId: { type: ['string', 'null'], description: 'Game item template id or name' },
+        gold: { type: ['number', 'null'], description: 'Gold delta for give_item' },
+        slot: { type: ['string', 'null'], description: 'Equipment slot id (e.g. mainHand, chest, bag)' },
+        buffId: { type: ['string', 'null'], description: 'Game buff template id for apply_buff/remove_buff' },
+        abilityId: { type: ['string', 'null'], description: 'Ability id, uid, or name for use_ability' },
+        target: { type: ['string', 'null'], description: 'Optional target character sheet id or name for use_item/use_ability' }
+      },
+      required: ['sheet', 'action']
+    },
+    forAgent: () => {
+      const tpls = gameDefs.list(CHARACTER_TEMPLATES).map((d) => d.id)
+      const items = gameDefs.list(ITEM_TEMPLATES).map((d) => d.id)
+      const buffs = gameDefs.list(BUFF_TEMPLATES).map((d) => d.id)
+      const resources = gameDefs.list('stat').filter((s) => (s as { group?: string }).group === 'resource').map((s) => s.id)
+      return {
+        params: {
+          type: 'object',
+          properties: {
+            sheet: { type: 'string', description: 'Character sheet id or name' },
+            action: {
+              enum: ['join', 'leave', 'resource', 'give_item', 'take_item', 'equip_item', 'unequip_slot', 'use_item', 'apply_buff', 'remove_buff', 'use_ability'],
+              description: 'Runtime operation'
+            },
+            templateId: tpls.length ? { enum: [...tpls, null], description: 'Character template id for join' } : { type: ['string', 'null'], description: 'Character template id for join' },
+            resourceId: resources.length ? { enum: [...resources, null], description: 'Resource stat id' } : { type: ['string', 'null'], description: 'Stat/resource id' },
+            amount: { type: ['number', 'null'], description: 'Delta for resource, or count for items' },
+            setValue: { type: ['number', 'null'], description: 'Exact target value for resource' },
+            itemId: items.length ? { enum: [...items, null], description: 'Item template id' } : { type: ['string', 'null'], description: 'Game item template id or name' },
+            gold: { type: ['number', 'null'], description: 'Gold delta for give_item' },
+            slot: { type: ['string', 'null'], description: 'Equipment slot id' },
+            buffId: buffs.length ? { enum: [...buffs, null], description: 'Buff template id' } : { type: ['string', 'null'], description: 'Game buff template id' },
+            abilityId: { type: ['string', 'null'], description: 'Ability id, uid, or name for use_ability' },
+            target: { type: ['string', 'null'], description: 'Optional target character sheet id or name' }
+          },
+          required: ['sheet', 'action']
+        }
+      }
+    },
+    async execute(params) {
+      const sheet = str(params.sheet)
+      const action = str(params.action)
+      const amount = typeof params.amount === 'number' && Number.isFinite(params.amount) ? params.amount : undefined
+      const handlers: Record<string, () => string> = {
+        join: () => {
+          const tpl = str(params.templateId) || gameDefs.list(CHARACTER_TEMPLATES)[0]?.id || 'adventurer'
+          joinCharacter(sheet, tpl)
+          return `${sheet} joined the game using template "${tpl}".`
+        },
+        leave: () => {
+          leaveCharacter(sheet)
+          return `${sheet} left the game.`
+        },
+        resource: () => {
+          const setVal = typeof params.setValue === 'number' && Number.isFinite(params.setValue) ? params.setValue : undefined
+          if (amount === undefined && setVal === undefined) throw new ToolError('Give amount or setValue for resource.')
+          const r = changeResource(sheet, { resourceId: str(params.resourceId) || 'health', delta: amount, setValue: setVal })
+          return `${sheet} ${r.label}: ${Math.round(r.from)} -> ${Math.round(r.to)}/${Math.round(r.max)}.`
+        },
+        give_item: () => {
+          const item = str(params.itemId)
+          const gold = typeof params.gold === 'number' && Number.isFinite(params.gold) ? Math.round(params.gold) : 0
+          if (!item && gold <= 0) throw new ToolError('Give itemId or positive gold for give_item.')
+          const res = giveItem(sheet, item, Math.max(1, Math.round(amount ?? 1)), gold)
+          return `Gave ${sheet}${res.given ? ` ${res.given}x ${item}` : ''}${res.gold ? ` ${res.gold} gold` : ''}.`
+        },
+        take_item: () => {
+          const item = str(params.itemId)
+          if (!item) throw new ToolError('Give itemId for take_item.')
+          const taken = takeItem(sheet, item, Math.max(1, Math.round(amount ?? 1)))
+          return `Took ${taken}x ${item} from ${sheet}.`
+        },
+        equip_item: () => {
+          const item = str(params.itemId)
+          if (!item) throw new ToolError('Give itemId for equip_item.')
+          return equipCharacterItem(sheet, item, str(params.slot) || undefined)
+        },
+        unequip_slot: () => {
+          const slot = str(params.slot)
+          if (!slot) throw new ToolError('Give slot for unequip_slot.')
+          return unequipCharacterSlot(sheet, slot)
+        },
+        use_item: () => {
+          const item = str(params.itemId)
+          if (!item) throw new ToolError('Give itemId for use_item.')
+          const targetSheet = str(params.target) ? getSheet(str(params.target)).id : undefined
+          return useCharacterItem(sheet, item, targetSheet)
+        },
+        apply_buff: () => {
+          const buff = str(params.buffId)
+          if (!buff) throw new ToolError('Give buffId for apply_buff.')
+          return applyCharacterBuff(sheet, buff)
+        },
+        remove_buff: () => {
+          const buff = str(params.buffId)
+          if (!buff) throw new ToolError('Give buffId for remove_buff.')
+          return removeCharacterBuff(sheet, buff)
+        },
+        use_ability: () => {
+          const ability = str(params.abilityId)
+          if (!ability) throw new ToolError('Give abilityId for use_ability.')
+          const targetId = str(params.target) ? getSheet(str(params.target)).id : null
+          return useAbility(sheet, ability, targetId, null, 0)
+        }
+      }
+      const fn = handlers[action]
+      if (!fn) throw new ToolError(`Unknown action "${action}".`)
+      return fn()
+    }
+  },
+  {
+    name: 'save_game_def',
+    group: 'game',
+    needsWorkspace: false,
+    description: 'Create or update any shared Game definition: class, trait, buff, item, stat, damage_type, check, slot, formula, clock, or character/creature template.',
+    params: {
+      type: 'object',
+      properties: {
+        type: { enum: defTypes().map((d) => d.type), description: 'Game definition kind' },
+        id: { type: ['string', 'null'], description: 'Existing id or omitted to create from name' },
+        name: { type: 'string', description: 'Display name' },
+        data: { type: 'object', properties: {}, additionalProperties: true, description: 'Definition fields matching that Game def schema (e.g. group, min, max, comps, icon, notes)' }
+      },
+      required: ['type', 'name']
+    },
+    async execute(params) {
+      const defKind = str(params.type)
+      const name = str(params.name)
+      const existing = str(params.id) ? gameDefs.find(defKind, str(params.id)) : gameDefs.find(defKind, name)
+      const extra = params.data && typeof params.data === 'object' && !Array.isArray(params.data) ? (params.data as Record<string, unknown>) : {}
+      const payload = {
+        ...(existing ?? {}),
+        ...extra,
+        id: existing?.id ?? (str(params.id) || toId(name)),
+        name
+      }
+      const saved = gameDefs.save(defKind, payload, existing?.id ?? null)
+      return `${existing ? 'Updated' : 'Created'} ${defKind} "${saved.name}" (${saved.id}).`
     }
   }
 ]

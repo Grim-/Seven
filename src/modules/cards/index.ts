@@ -5,16 +5,17 @@ import './promptVariation'
 import type { ModuleFactory, ModulePage, ModuleViewResult } from '../../engine/modules/sdk'
 import type { ToolContext, ToolDef } from '../../engine/tools/types'
 import { cleanSvg } from '@shared/svg'
-import { cardText, fieldId, readLayout, type CardLayout, type CardValue } from '@shared/cards'
+import { FIELD_TYPES, PLACES, cardText, fieldId, readLayout, type CardLayout, type CardValue } from '@shared/cards'
 import { actionText } from '@shared/actions'
 import { decisionText } from '@shared/decisions'
-import { totalOf, userSide, type DeckRef, type DeckEntry } from '@shared/cardDecks'
+import { agentSide, totalOf, userSide, type DeckOwner, type DeckRef, type DeckEntry } from '@shared/cardDecks'
 import { chatPlayer } from '@shared/types'
 import { data } from '../../engine/data/hub'
 import { vaultEvents } from '../../engine/util/secure'
 import { isVaultLocked } from '@shared/sealed'
 import { rollText } from '../../engine/library/kinds'
-import { addCard, takeCard } from '../../engine/cards/decks'
+import { getSheet } from '../../engine/library/sheets'
+import { addCard, addSet, deckCards, setDeckOwner, takeCard } from '../../engine/cards/decks'
 import { playCardForAgent } from '../../engine/cards/play'
 import { agentAccess } from '../../engine/agents/access'
 import { worlds } from '../../engine/worlds/store'
@@ -28,24 +29,38 @@ type Json = Record<string, unknown>
 
 const MOVED = 'setsMoved'
 
-const makeCardParams = (check: CheckSchema, variations: CardVariationDef[]): JsonObjectSchema => ({
-  type: 'object',
-  properties: {
-    card: { type: 'string', description: 'its name' },
-    variation: {
-      oneOf: [
-        { type: 'null' },
-        ...variations.map((v) => ({ type: 'object', properties: { type: { const: v.id }, data: v.remove ? { oneOf: [{ type: 'null' }, v.data(check)] } : v.data(check) }, required: ['type', 'data'] }))
-      ],
-      description: 'adds or replaces this one; data null removes it'
+const variationSchema = (check: CheckSchema, variations: CardVariationDef[]) =>
+  variations.map((v) => ({
+    type: 'object',
+    properties: {
+      type: { enum: [v.id], description: `Variation type: ${v.name} (${v.id})` },
+      data: v.remove ? { oneOf: [{ type: 'null' }, v.data(check)] } : v.data(check)
     },
-    text: { type: ['string', 'null'], description: 'flavour' },
-    art: { type: ['string', 'null'] },
-    color: { type: ['string', 'null'] },
-    layout: { type: ['string', 'null'] },
-    values: { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }, { type: 'array', items: { type: 'string' } }] } }] }
+    required: ['type', 'data']
+  }))
+
+const makeCardParams = (check: CheckSchema, variations: CardVariationDef[]): JsonObjectSchema => {
+  const oneVariation = variationSchema(check, variations)
+  return {
+    type: 'object',
+    properties: {
+      card: { type: 'string', description: 'its name' },
+      variation: {
+        oneOf: [{ type: 'null' }, ...oneVariation],
+        description: 'adds or replaces one variation; data null removes it'
+      },
+      variations: {
+        oneOf: [{ type: 'null' }, { type: 'array', items: { oneOf: oneVariation } }],
+        description: 'apply multiple variations in one call'
+      },
+      text: { type: ['string', 'null'], description: 'flavour' },
+      art: { type: ['string', 'null'] },
+      color: { type: ['string', 'null'] },
+      layout: { type: ['string', 'null'], description: 'Card layout name (defaults to "basic")' },
+      values: { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'null' }, { type: 'array', items: { type: 'string' } }] } }] }
+    }
   }
-})
+}
 const LINK = /^@[\w.:-]+?:"?(.+?)"?$/
 
 const factory: ModuleFactory = (sdk) =>
@@ -160,8 +175,11 @@ const factory: ModuleFactory = (sdk) =>
               const patchValues = raw.values && typeof raw.values === 'object' ? (layoutTitle ? this.checkValues(this.layout(layoutTitle), raw.values) : (() => { throw new sdk.ToolError('Set layout before setting card values.') })()) : {}
               if (layoutRef || 'values' in raw) next = { ...next, layout: layoutTitle, values: { ...prevValues, ...patchValues } }
             }
-            const v = raw.variation && typeof raw.variation === 'object' ? (raw.variation as Json) : null
-            if (v) {
+            const list: Json[] = [
+              ...(raw.variation && typeof raw.variation === 'object' ? [raw.variation as Json] : []),
+              ...(Array.isArray(raw.variations) ? raw.variations.filter((x): x is Json => Boolean(x && typeof x === 'object' && !Array.isArray(x))) : [])
+            ]
+            for (const v of list) {
               const def = liveCardVariations().find((d) => d.id === v.type)
               if (!def) throw new CardError(`No card variation "${String(v.type)}".`)
               if (v.data === null) {
@@ -262,6 +280,131 @@ const factory: ModuleFactory = (sdk) =>
           })
           ctx.viewEvents?.(played.outcome.view, played.card, played.world)
           return [`PLAYED ${linkFor('card', played.card)} [${played.mode}] -> ${played.target}`, ...played.outcome.lines, 'Play this out in your reply.'].join('\n')
+        }
+      })
+
+      add({
+        name: 'make_card_layout',
+        activity: () => 'making a card layout',
+        description: 'Create or update a card layout template defining custom typed fields and where they render on a card.',
+        params: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Layout name, e.g. Spell' },
+            color: { type: ['string', 'null'], description: 'Hex accent color, e.g. #2dd4bf' },
+            fields: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  label: { type: 'string' },
+                  type: { enum: [...FIELD_TYPES] },
+                  place: { enum: [...PLACES] },
+                  options: { type: ['array', 'null'], items: { type: 'string' }, description: 'Choice options when type is choice' }
+                },
+                required: ['label']
+              }
+            }
+          },
+          required: ['name', 'fields']
+        },
+        execute: async (params) => {
+          try {
+            const layout = cleanLayout(params)
+            const existing = this.pages.find('layout', layout.name)
+            const page = existing ? this.pages.save(existing.id, layout) : this.pages.create('layout', layout.name, layout)
+            return `${existing ? 'Updated' : 'Created'} card layout ${linkFor('card_layout', page.title)} with ${layout.fields.length} fields.`
+          } catch (err) {
+            this.fail(err)
+          }
+        }
+      })
+
+      add({
+        name: 'manage_deck',
+        activity: () => 'managing card deck',
+        description: 'Inspect or modify cards in your own deck ("self"), the user deck ("user"), a character sheet deck ("character"), or a named deck ("deck"): list contents, add/remove cards, deal a card set, or reassign deck owner.',
+        params: {
+          type: 'object',
+          properties: {
+            action: { enum: ['list', 'add_card', 'remove_card', 'deal_set', 'set_owner'], description: 'Operation to perform' },
+            side: { enum: ['self', 'user', 'character', 'deck'], description: 'Target deck holder (default "self")' },
+            sheet: { type: ['string', 'null'], description: 'Character sheet name/id when side is "character" (or ownerType is "character")' },
+            deck: { type: ['string', 'null'], description: 'Named deck page title/id when side is "deck" or action is "set_owner"' },
+            card: { type: ['string', 'null'], description: 'Card name for add_card/remove_card' },
+            set: { type: ['string', 'null'], description: 'Card set name for deal_set' },
+            count: { type: ['integer', 'null'], description: 'Card quantity (default 1)' },
+            ownerType: { enum: ['user', 'agent', 'character', 'none'], description: 'New owner kind for set_owner' },
+            ownerId: { type: ['string', 'null'], description: 'Agent or character id/name for set_owner' }
+          },
+          required: ['action']
+        },
+        execute: async (params, ctx) => {
+          const action = sdk.params.str(params, 'action')
+          const side = sdk.params.optStr(params, 'side') || 'self'
+          const count = Math.max(1, sdk.params.optInt(params, 'count') ?? 1)
+          const resolveRef = (): DeckRef => {
+            if (side === 'deck') {
+              const ref = sdk.params.str(params, 'deck')
+              return { deck: this.named('deck', ref, 'card deck').id }
+            }
+            if (side === 'character') {
+              const ref = sdk.params.str(params, 'sheet')
+              return { character: getSheet(ref).id }
+            }
+            if (side === 'user') {
+              return ctx.agentId ? this.chatDeck(ctx) : { user: true }
+            }
+            if (!ctx.agentId) throw new sdk.ToolError('Pass side ("user", "character", or "deck") outside an agent chat.')
+            const agent = agentAccess.get(ctx.agentId)
+            if (!agent) throw new sdk.ToolError('Agent not found.')
+            return agentSide(agent)
+          }
+
+          if (action === 'set_owner') {
+            const deckPage = this.named('deck', sdk.params.str(params, 'deck'), 'card deck')
+            const ownerType = sdk.params.str(params, 'ownerType')
+            const ownerId = sdk.params.optStr(params, 'ownerId') ?? sdk.params.optStr(params, 'sheet')
+            let owner: DeckOwner | null = null
+            if (ownerType === 'user') owner = { user: true }
+            else if (ownerType === 'agent') {
+              const targetAgent = ownerId ? agentAccess.list().find((a) => a.id === ownerId || a.name.toLowerCase() === ownerId.toLowerCase()) : ctx.agentId ? agentAccess.get(ctx.agentId) : null
+              if (!targetAgent) throw new sdk.ToolError(`No agent "${ownerId ?? ''}".`)
+              owner = { agent: targetAgent.id }
+            } else if (ownerType === 'character') {
+              if (!ownerId) throw new sdk.ToolError('Give ownerId or sheet when ownerType is "character".')
+              owner = { character: getSheet(ownerId).id }
+            }
+            setDeckOwner(deckPage.id, owner)
+            return `Updated owner of deck ${linkFor('card_deck', deckPage.title)} to ${ownerType}.`
+          }
+
+          const ref = resolveRef()
+          if (action === 'list') {
+            const entries = deckCards(ref)
+            if (!entries.length) return `Deck (${side}) is empty.`
+            return `Deck (${side}) cards (${totalOf(entries)} total): ${entries.map((e) => `${e.card} x${e.count}`).join(', ')}.`
+          }
+          if (action === 'add_card') {
+            const card = sdk.params.str(params, 'card')
+            const deckId = addCard(ref, card, count)
+            return `Added ${count}x ${linkFor('card', card)} to ${deckId}.`
+          }
+          if (action === 'remove_card') {
+            const card = sdk.params.str(params, 'card')
+            let removed = 0
+            for (let i = 0; i < count; i++) {
+              takeCard(ref, card)
+              removed++
+            }
+            return `Removed ${removed}x ${linkFor('card', card)} from deck (${side}).`
+          }
+          if (action === 'deal_set') {
+            const setPage = this.named('set', sdk.params.str(params, 'set'), 'card set')
+            addSet(ref, setPage.id)
+            return `Dealt card set ${linkFor('card_set', setPage.title)} into deck (${side}).`
+          }
+          throw new sdk.ToolError(`Unknown deck action "${action}".`)
         }
       })
     }

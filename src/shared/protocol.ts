@@ -52,6 +52,7 @@ import type {
   LibraryImport,
   EntryPreview,
   LibrarySection,
+  ModuleCustomizationPatch,
   ModuleInfo,
   ToolPermission,
   ToolsPrefs,
@@ -368,6 +369,8 @@ export interface EngineRequests {
   'tools.settings': Req<{ id: string; values: Record<string, unknown> }, ModuleInfo[]>
   'tools.setPermission': Req<{ id: string; tool: string; permission: ToolPermission | null }, ModuleInfo[]>
   'tools.setModulePermission': Req<{ id: string; permission: ToolPermission | null }, ModuleInfo[]>
+  'tools.customize': Req<{ id: string; patch: ModuleCustomizationPatch }, ModuleInfo[]>
+  'tools.guide': Req<{ id: string }, { markdown: string; live: boolean }>
   'tools.create': Req<{ id: string; name: string; kind: 'tools' | 'mcp' }, ModuleInfo[]>
   'tools.importMcp': Req<{ json: string }, { created: string[]; skipped: string[] }>
   'tools.installZip': Req<{ path: string; replace: boolean }, { installed: string | null; needsReplace: { id: string; name: string; from: string; to: string } | null }>
@@ -612,7 +615,8 @@ export const LONG_REQUESTS: ReadonlySet<EngineRequestName> = new Set<EngineReque
   'tools.importMcp',
   'tools.installZip',
   'tools.prefs.set',
-  'tools.action'
+  'tools.action',
+  'tools.customize'
 ])
 
 export interface MainRequests {

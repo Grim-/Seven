@@ -19,6 +19,7 @@ import { mapPacking, worldPacking } from '../../portability/kindPackers'
 import { ToolError } from '../../tools/types'
 import { triggerActionsStore } from '../../triggerActions/store'
 import { noteFailure } from '../../util/report'
+import { secure } from '../../util/secure'
 import { recall } from '../../worlds/ops'
 import { whoIsHere } from '../../worlds/presence'
 import { worlds } from '../../worlds/store'
@@ -260,7 +261,7 @@ export const placeKind: Kind = {
   actions: [],
   exportable: true,
   export: (id) => exportRecord(placeKind, id),
-  available: () => worlds.list().some((w) => Boolean(worlds.schema(w.id).types[PLACE_TYPE_KEY])),
+  available: () => (!secure.enabled || secure.unlocked) && worlds.allTypeKeys().includes(PLACE_TYPE_KEY),
   title(id) {
     const { world, key } = placeRef(id)
     try {

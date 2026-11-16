@@ -246,7 +246,7 @@ export const storyKind: Kind = {
   description: 'Storyteller runs: branching stories with acts, what is true in them, and where they stand',
   parts: ['summary'],
   actions: ['list_stories', 'start_story', 'load_story_context', 'checkpoint_story', 'record_facts', 'close_story', 'resume_story'],
-  available: () => modules.list().some((m) => m.id === 'storyteller' && m.state === 'on'),
+  available: () => modules.isOn('storyteller'),
   title: (id) => id,
   search(query, limit) {
     const q = query.toLowerCase()
@@ -297,7 +297,7 @@ export const scriptKind: Kind = {
   description: 'saved Python scripts and their last runs',
   parts: ['code', 'output'],
   actions: ['run_python', 'python_save'],
-  available: () => modules.list().some((m) => m.id === 'python' && m.state === 'on'),
+  available: () => modules.isOn('python'),
   title: (id) => scripts.find(id)?.name ?? id,
   search(query, limit) {
     const q = query.toLowerCase()

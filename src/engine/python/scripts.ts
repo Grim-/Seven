@@ -30,7 +30,7 @@ export interface RunHooks {
 }
 
 function settings(): Record<string, unknown> {
-  return modules.list().find((m) => m.id === 'python')?.values ?? {}
+  return modules.valuesOf('python')
 }
 
 let found: { cmd: string; args: string[]; key: string } | null = null

@@ -436,9 +436,33 @@ export interface Toolset {
   tools: string[]
 }
 
+export interface ToolParamDoc {
+  name: string
+  type: string
+  required: boolean
+  nullable: boolean
+  description: string
+  choices?: string[]
+  variants?: string[]
+  children?: ToolParamDoc[]
+}
+
+export interface ModuleCustomizationPatch {
+  name?: string | null
+  description?: string | null
+  prompt?: string | null
+  help?: string | null
+  remind?: string | null
+  toolDescriptions?: Record<string, string | null> | null
+}
+
 export interface ModuleToolInfo {
   name: string
   description: string
+  defaultDescription?: string
+  signature: string
+  params: ToolParamDoc[]
+  schema: Record<string, unknown>
   permission: ToolPermission
   defaultPermission?: ToolPermission
 }
@@ -452,7 +476,16 @@ export interface ModuleActionDef {
 export interface ModuleInfo {
   id: string
   name: string
+  defaultName: string
   description: string
+  defaultDescription: string
+  prompt: string
+  defaultPrompt: string
+  help: string
+  defaultHelp: string
+  remind: string
+  defaultRemind: string
+  customized: boolean
   version: string
   kind: ModuleKind
   source: ModuleSource

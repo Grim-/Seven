@@ -135,6 +135,26 @@ export function guideText(moduleId: string, agent: AgentProfile | null): string 
   return parts.join('\n\n')
 }
 
+export function moduleGuidePreview(moduleId: string): { markdown: string; live: boolean } {
+  const live = guideText(moduleId, null)
+  if (live) return { markdown: live, live: true }
+  const info = modules.list().find((m) => m.id === moduleId)
+  if (!info) return { markdown: '', live: false }
+  const parts = [`# ${guideTitle(info.name)}`]
+  if (info.description.trim()) parts.push(info.description.trim())
+  if (info.state === 'on') {
+    const prompt = filled(info.prompt, promptVars(null)).trim()
+    if (prompt) parts.push(prompt)
+    if (info.help.trim()) parts.push(`## More\n${info.help.trim()}`)
+    return { markdown: parts.join('\n\n'), live: true }
+  }
+  parts.push(`> This module is currently **${info.state}**. Switch it on to inspect live tool signatures and auto-generated tool API entries.`)
+  const prompt = filled(info.prompt, promptVars(null)).trim()
+  if (prompt) parts.push(prompt)
+  if (info.help.trim()) parts.push(`## More\n${info.help.trim()}`)
+  return { markdown: parts.join('\n\n'), live: false }
+}
+
 function guidesSection(tools: ToolDef[]): string {
   const on = new Map(guideModules().map((m) => [m.id, m.name]))
   const lines: string[] = []

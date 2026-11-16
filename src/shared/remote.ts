@@ -233,6 +233,8 @@ export const REMOTE_ENGINE: Record<EngineRequestName, RemoteLevelId> = {
   'tools.settings': 'admin',
   'tools.setPermission': 'admin',
   'tools.setModulePermission': 'admin',
+  'tools.customize': 'admin',
+  'tools.guide': 'chat',
   'tools.create': 'admin',
   'tools.importMcp': 'admin',
   'tools.action': 'admin',

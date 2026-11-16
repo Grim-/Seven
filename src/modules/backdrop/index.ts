@@ -36,7 +36,7 @@ function hexOrNone(value: unknown, what: string): string | null | undefined {
 const EFFECT_IDS = [...CORE_EFFECTS.map((e) => e.id), ...backgroundList().map((b) => b.id)]
 
 function backgroundsOn(): boolean {
-  return modules.list().some((m) => m.id === BACKGROUND_MODULE && m.state === 'on')
+  return modules.isOn(BACKGROUND_MODULE)
 }
 
 function effect(ref: string): string {

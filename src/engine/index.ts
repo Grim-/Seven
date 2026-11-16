@@ -1,7 +1,7 @@
 import { toId } from '@shared/ids'
 import { cleanElements } from '@shared/chatElements'
 import { allRepos, getRepo, saveRepo } from './library/repos'
-import { guideModules, guideText } from './chat/context'
+import { guideModules, guideText, moduleGuidePreview } from './chat/context'
 import { identity } from './user/identity'
 import { places } from './user/places'
 import { HUB_TOKEN, hubFileInfo, hubFiles, hubRepoFacts, searchHub } from './model/hub'
@@ -275,7 +275,7 @@ themes.on('changed', (list: Theme[]) => emit('themes.changed', list))
 avatars.on('changed', (list: Avatar[]) => emit('avatars.changed', list))
 themes.on('ambience', (sessionId: string, ambience: Ambience) => emit('ambience.changed', { sessionId, ambience }))
 themes.on('cue', (cue: AmbienceCue) => emit('ambience.cue', cue))
-data.setToolCheck((id) => modules.list().some((m) => m.id === id && m.state === 'on'))
+data.setToolCheck((id) => modules.isOn(id))
 toolsets.on('changed', (list: Toolset[]) => emit('toolsets.changed', { list }))
 worlds.on('changed', (id: string) => emit('worlds.changed', { id }))
 maps.on('changed', (id: string) => emit('maps.changed', { id }))
@@ -645,6 +645,8 @@ const handlers: Handlers = {
   'tools.settings': ({ id, values }) => modules.setSettings(id, values),
   'tools.setPermission': ({ id, tool, permission }) => modules.setToolPermission(id, tool, permission),
   'tools.setModulePermission': ({ id, permission }) => modules.setModulePermission(id, permission),
+  'tools.customize': ({ id, patch }) => modules.customize(id, patch),
+  'tools.guide': ({ id }) => moduleGuidePreview(id),
   'tools.create': (input) => modules.create(input),
   'tools.importMcp': ({ json }) => modules.importMcp(json),
   'tools.installZip': ({ path: file, replace }) => modules.installZip(file, replace),
