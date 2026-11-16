@@ -5,5 +5,14 @@
   "version": "1.0.0",
   "apiVersion": 1,
   "needsWorkspace": false,
-  "permission": "custom"
+  "permission": "custom",
+  "toolPermissions": {
+    "recall": "none",
+    "think": "none",
+    "reason": "none",
+    "remember": "custom",
+    "set_relationship": "custom",
+    "forget": "ask",
+    "remove_relationship": "ask"
+  }
 }

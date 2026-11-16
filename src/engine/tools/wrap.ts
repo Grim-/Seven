@@ -148,8 +148,9 @@ export async function runTool(tool: ToolDef, args: Record<string, unknown>, hook
     //   )
     // }
 
+    const toolPermissions = { ...permissions, toolPermission: tool.permission ?? 'custom' }
     if (tool.permission === 'ask' || tool.permission === 'always')
-      await gateTool(permissions, tool, args)
+      await gateTool(toolPermissions, tool, args)
 
     const run = () =>
       asActor({ agentId: hooks.agentId ?? null, sessionId: hooks.sessionId }, () => tool.execute(args, {
@@ -159,7 +160,7 @@ export async function runTool(tool: ToolDef, args: Record<string, unknown>, hook
         groups: hooks.groups ?? [],
         signal: hooks.signal,
         ui,
-        permissions,
+        permissions: toolPermissions,
         checkpoints: { save: hooks.checkpoint },
         output: (chunk) => hooks.output(part, chunk),
         budget: hooks.budget ?? null,

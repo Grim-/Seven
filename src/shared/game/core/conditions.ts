@@ -11,6 +11,7 @@ export interface ConditionContext {
   payload: Record<string, unknown>
   seed: string
   stat: (who: GameEntity, id: string) => number
+  flags?: Record<string, unknown>
 }
 
 type Check = (def: ConditionDef, ctx: ConditionContext) => boolean

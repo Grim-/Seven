@@ -1,7 +1,7 @@
 import { CORE_MODULES } from '@shared/toolnames'
 import { Fragment, useMemo, useState } from 'react'
-import { Boxes, FileArchive, FolderOpen, Import, Plus, Power, Puzzle, RefreshCw } from 'lucide-react'
-import type { ModuleInfo, ModuleState } from '@shared/types'
+import { Boxes, FileArchive, FolderOpen, Import, Plus, Power, Puzzle, RefreshCw, RotateCcw } from 'lucide-react'
+import type { ModuleInfo, ModuleState, ToolPermission } from '@shared/types'
 import { BackBar, Button, Field, Input, KindShell, Modal, Panel, SettingCard, SaveState, Select, StatusBadge, Textarea, Toggle, ViewHeader, useDraft, type ShellItem, type Tone } from '../components/ui'
 import { engine, main } from '../lib/ipc'
 import { errorText } from '../lib/format'
@@ -25,7 +25,17 @@ const STATE: Record<ModuleState, { label: string; tone: Tone }> = {
   'missing-dependency': { label: 'Needs another module', tone: 'warn' }
 }
 
-const PERMISSION_LABEL: Record<string, string> = { none: 'never asks', ask: 'asks unless Trusted', always: 'always asks', custom: 'asks when needed' }
+const PERMISSION_LABEL: Record<ToolPermission, string> = { none: 'never asks', ask: 'asks unless Trusted', always: 'always asks', custom: 'asks when needed' }
+
+function permissionOptions(def: ToolPermission): { value: string; label: string }[] {
+  const label = (p: ToolPermission, text: string) => (def === p ? `${text} (default)` : text)
+  return [
+    ...(def === 'custom' ? [{ value: 'custom', label: 'Default (asks when needed)' }] : []),
+    { value: 'none', label: label('none', 'Never asks') },
+    { value: 'ask', label: label('ask', 'Asks unless Trusted') },
+    { value: 'always', label: label('always', 'Always asks') }
+  ]
+}
 
 async function run<T>(label: string, task: Promise<T>): Promise<T | null> {
   try {
@@ -172,20 +182,88 @@ function Detail({ module }: { module: ModuleInfo }) {
         </div>
       )}
       <div>
-        <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Tools</div>
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Tools</div>
+          {module.tools.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1">
+              {module.tools.length > 1 &&
+                (['none', 'ask', 'always'] as const).map((p) => (
+                  <Button
+                    key={p}
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      void run('Could not update permissions', engine('tools.setModulePermission', { id: module.id, permission: p })).then((next) => {
+                        if (next) useTools.getState().setList(next)
+                      })
+                    }
+                  >
+                    All: {p === 'none' ? 'Never' : p === 'ask' ? 'Ask' : 'Always'}
+                  </Button>
+                ))}
+              {module.tools.some((t) => t.permission !== (t.defaultPermission ?? t.permission)) && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<RotateCcw />}
+                  onClick={() =>
+                    void run('Could not reset permissions', engine('tools.setModulePermission', { id: module.id, permission: null })).then((next) => {
+                      if (next) useTools.getState().setList(next)
+                    })
+                  }
+                >
+                  Reset
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
         {module.tools.length === 0 ? (
           <span className="text-[12.5px] text-dim">{module.state === 'on' ? 'No tools.' : 'Tools show here once the module is on.'}</span>
         ) : (
           <div className="flex flex-col divide-y divide-line/30 border border-line/40">
-            {module.tools.map((t) => (
-              <div key={t.name} className="flex flex-col gap-0.5 px-3 py-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[12.5px] font-semibold text-accent">{t.name}</span>
-                  <span className="ml-auto font-mono text-[10.5px] uppercase tracking-wider text-faint">{PERMISSION_LABEL[t.permission] ?? t.permission}</span>
+            {module.tools.map((t) => {
+              const def = t.defaultPermission ?? t.permission
+              const overridden = t.permission !== def
+              return (
+                <div key={t.name} className="flex flex-col gap-1 px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-[12.5px] font-semibold text-accent">{t.name}</span>
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <div className="w-52 max-w-full">
+                        <Select
+                          aria-label={`Permission for ${t.name}`}
+                          value={t.permission}
+                          options={permissionOptions(def)}
+                          onChange={(v) => {
+                            const next = v as ToolPermission
+                            void run('Could not update permission', engine('tools.setPermission', { id: module.id, tool: t.name, permission: next === def ? null : next })).then((updated) => {
+                              if (updated) useTools.getState().setList(updated)
+                            })
+                          }}
+                          className={overridden ? 'h-7 border-accent/60 font-mono text-[11px] text-accent' : 'h-7 font-mono text-[11px] text-dim'}
+                        />
+                      </div>
+                      {overridden && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<RotateCcw />}
+                          title={`Reset to default (${PERMISSION_LABEL[def]})`}
+                          aria-label={`Reset ${t.name} permission to default`}
+                          onClick={() =>
+                            void run('Could not reset permission', engine('tools.setPermission', { id: module.id, tool: t.name, permission: null })).then((updated) => {
+                              if (updated) useTools.getState().setList(updated)
+                            })
+                          }
+                        />
+                      )}
+                    </div>
+                  </div>
+                  {t.description && <span className="line-clamp-2 text-[12px] text-dim">{t.description}</span>}
                 </div>
-                {t.description && <span className="line-clamp-2 text-[12px] text-dim">{t.description}</span>}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

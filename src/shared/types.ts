@@ -1,8 +1,10 @@
 import type { ProblemPrefs } from './problems'
+import type { PortabilityPrefs } from './portability'
 import type { EntityRecord } from './game/core/GameEntity'
 import { isAssetId } from './ids'
 import type { DndStats } from './dnd'
 import type { Story, StoryMemory } from './story'
+import type { RelationshipEntry } from './relationships'
 import type { WorldBinding } from './world'
 import type { PickDecisionProps } from './pickDecision'
 import type { RolledDecisionProps } from './rolledDecision'
@@ -12,7 +14,7 @@ import type { MoodName } from './moods'
 import type { ChatElement } from './chatElements'
 export type ModelStatus = 'unloaded' | 'loading' | 'ready' | 'error'
 
-export type RemoteApi = 'openai' | 'anthropic'
+export type RemoteApi = 'openai' | 'anthropic' | 'google'
 
 export interface RemoteSpec {
   api: RemoteApi
@@ -438,6 +440,7 @@ export interface ModuleToolInfo {
   name: string
   description: string
   permission: ToolPermission
+  defaultPermission?: ToolPermission
 }
 
 export interface ModuleActionDef {
@@ -513,6 +516,7 @@ export interface AgentProfile {
   sheet?: string | null
   sheets?: string[] | null
   player?: string | null
+  relationships?: RelationshipEntry[]
   createdBy?: string | null
   createdAt: number
   updatedAt: number
@@ -1203,16 +1207,28 @@ export interface PanelTabInfo {
   icon: string
 }
 
+const PAGE_KIND_ALIASES: Record<string, string> = {
+  'cards:card': 'card',
+  'cards:deck': 'deck',
+  'cards:layout': 'card_layout',
+  'cards:set': 'card_set'
+}
+
+const PAGE_TYPE_FROM_KIND: Record<string, string> = Object.fromEntries(
+  Object.entries(PAGE_KIND_ALIASES).map(([type, kind]) => [kind, type])
+)
+
 export function pageKindOf(type: string | null | undefined): string {
-  return type ? type.replace(':', '.') : 'page'
+  if (!type) return 'page'
+  return PAGE_KIND_ALIASES[type] ?? type.replace(':', '.')
 }
 
 export function pageTypeOfKind(kind: string): string {
-  return kind.replace('.', ':')
+  return PAGE_TYPE_FROM_KIND[kind] ?? kind.replace('.', ':')
 }
 
 export function isPageTypeKind(kind: string): boolean {
-  return kind.includes('.')
+  return kind in PAGE_TYPE_FROM_KIND || kind.includes('.')
 }
 
 export interface PageTypeInfo {
@@ -1436,7 +1452,7 @@ export interface JournalEntry {
 
 export interface MindHit {
   id: string
-  source: 'memory' | 'journal'
+  source: 'memory' | 'journal' | 'relationship'
   ref: string
   at: number
   text: string
@@ -1495,6 +1511,7 @@ export interface CharacterSheet {
   save?: string
   story: Story
   mind?: CharacterMind | null
+  relationships?: RelationshipEntry[]
   image: string | null
   updatedAt: number
 }

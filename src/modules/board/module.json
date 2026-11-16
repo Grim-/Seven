@@ -4,5 +4,9 @@
   "description": "One board every agent shares across chats. Agents post messages for each other and read what others left; the latest few are shown to them when something new is posted.",
   "version": "1.0.0",
   "apiVersion": 1,
-  "permission": "none"
+  "permission": "none",
+  "toolPermissions": {
+    "add_message": "ask",
+    "read_messages": "none"
+  }
 }

@@ -10,7 +10,7 @@ import { findSlideshow, getSlideshow, slideshowIds, slideshowText } from './slid
 import { SLIDESHOW_TYPE } from '@shared/slideshow'
 import { customCommands } from '../commands/custom'
 import fs from 'node:fs'
-import { DEFAULT_LIBRARY_ACCESS, pageKindOf, type KindFlags, type KindInfo, type KindLinkActionInfo, type Thought, type ChatMessage, type LibraryAccess, type LibraryHit, type LibrarySection, type Page, type PageMeta, type WebLogEntry } from '@shared/types'
+import { DEFAULT_LIBRARY_ACCESS, pageKindOf, type CharacterSheet, type KindFlags, type KindInfo, type KindLinkActionInfo, type Thought, type ChatMessage, type LibraryAccess, type LibraryHit, type LibrarySection, type Page, type PageMeta, type WebLogEntry } from '@shared/types'
 import { readLines } from '../util/fs'
 import { minds } from '../mind/store'
 import { styles } from '../mind/styles'
@@ -33,6 +33,7 @@ import { data } from '../data/hub'
 import MiniSearch from 'minisearch'
 import type { PageTree } from '../data/pages'
 import { modules } from '../modules/registry'
+import { flattenText, matchesWhere, parseQuery, scoreDoc, type SearchField } from './query'
 import { skills } from '../skills'
 import { reminders } from '../reminders/store'
 import { worlds } from '../worlds/store'
@@ -132,6 +133,7 @@ function rollLinkActions(
 
 export interface Kind {
   kind: string
+  aliases?: string[]
   label: string
   plural: string
   icon: string
@@ -579,13 +581,26 @@ const fileKind: Kind = {
   title: (id) => data.assets.get(id).name,
   available: () => true,
   search(query, limit) {
-    const q = query.toLowerCase()
-    return data.assets
-      .list()
-      .filter((a) => !q || has(a.name, q) || has(a.description ?? '', q) || a.id === query)
-      .sort((a, b) => b.createdAt - a.createdAt)
+    const trimmed = query.trim()
+    const assets = data.assets.list().sort((a, b) => b.createdAt - a.createdAt)
+    if (!trimmed) return assets.slice(0, limit).map((a) => ({ kind: 'file', id: a.id, title: a.name, at: a.createdAt }))
+    return assets
+      .flatMap((a) => {
+        const m = scoreDoc(trimmed, {
+          title: a.name,
+          labels: ['file', 'files', a.kind],
+          fields: [
+            { name: 'Id', value: a.id },
+            { name: 'Kind', value: a.kind },
+            ...(a.description ? [{ name: 'Description', value: a.description }] : [])
+          ],
+          body: (a.areas ?? []).map((x) => `${x.name} ${x.note ?? ''}`).join(' ')
+        })
+        return m ? [{ kind: 'file', id: a.id, title: a.name, at: a.createdAt, ...(m.snippet ? { excerpt: m.snippet } : {}), _score: m.score }] : []
+      })
+      .sort((a, b) => b._score - a._score || (b.at ?? 0) - (a.at ?? 0))
       .slice(0, limit)
-      .map((a) => ({ kind: 'file', id: a.id, title: a.name, at: a.createdAt }))
+      .map(({ _score: _s, ...h }) => h)
   },
   resolve(ref) {
     if (data.assets.exists(ref)) return ref
@@ -723,20 +738,30 @@ const workoutEntryKind = workoutPageKind(WORKOUT, {
 })
 
 function worldHits(query: string, limit: number): KindHit[] {
-  const q = query.toLowerCase()
-  const out: KindHit[] = []
+  const trimmed = query.trim()
+  const out: (KindHit & { _score: number })[] = []
   for (const w of worlds.list()) {
     const schema = worlds.schema(w.id)
     for (const tk of Object.keys(schema.types)) {
+      const noun = schema.types[tk]?.noun ?? tk
+      const plural = schema.types[tk]?.plural ?? tk
       for (const [key, e] of Object.entries(worlds.entities(w.id, tk, false))) {
-        const text = JSON.stringify(e).toLowerCase()
-        if (q && !key.includes(q) && !text.includes(q)) continue
-        out.push({ kind: 'world', id: `${w.id}/${tk}/${key}`, title: key })
-        if (out.length >= limit) return out
+        const id = `${w.id}/${tk}/${key}`
+        if (!trimmed) {
+          out.push({ kind: 'world', id, title: key, _score: 1 })
+          if (out.length >= limit) return out.map(({ _score: _s, ...h }) => h)
+          continue
+        }
+        const fields = Object.entries(e).map(([name, v]) => ({ name, value: plainValue(v) }))
+        const m = scoreDoc(trimmed, { title: key, labels: ['world', noun, plural, w.name], fields })
+        if (m) out.push({ kind: 'world', id, title: key, ...(m.snippet ? { excerpt: m.snippet } : {}), _score: m.score })
       }
     }
   }
   return out
+    .sort((a, b) => b._score - a._score)
+    .slice(0, limit)
+    .map(({ _score: _s, ...h }) => h)
 }
 
 const worldLine = (w: { types: { count: number; plural: string }[] }) => w.types.map((t) => `${t.count} ${t.plural}`).join(', ')
@@ -1758,11 +1783,22 @@ const agentKind: Kind = {
   available: () => true,
   title: (id) => agentAccess.get(id)?.name ?? id,
   search(query, limit, ctx) {
-    const q = query.toLowerCase()
-    return visibleAgents(ctx)
-      .filter((a) => !q || has(a.name, q) || has(a.description, q) || has(a.systemPrompt, q))
+    const trimmed = query.trim()
+    const visible = visibleAgents(ctx)
+    if (!trimmed) return visible.slice(0, limit).map((a) => ({ kind: 'agent', id: a.id, title: a.name, at: a.updatedAt }))
+    return visible
+      .flatMap((a) => {
+        const m = scoreDoc(trimmed, {
+          title: a.name,
+          labels: ['agent', 'agents', ...(a.roleplay ? ['roleplay'] : [])],
+          fields: [{ name: 'Description', value: a.description }],
+          body: a.systemPrompt
+        })
+        return m ? [{ kind: 'agent', id: a.id, title: a.name, at: a.updatedAt, ...(m.snippet ? { excerpt: m.snippet } : {}), _score: m.score }] : []
+      })
+      .sort((a, b) => b._score - a._score)
       .slice(0, limit)
-      .map((a) => ({ kind: 'agent', id: a.id, title: a.name, at: a.updatedAt }))
+      .map(({ _score: _s, ...h }) => h)
   },
   line: (id, ctx) => {
     const a = visibleAgents(ctx).find((x) => x.id === id)
@@ -2112,12 +2148,22 @@ const repoKind: Kind = {
   available: () => true,
   title: (id) => getRepo(id).title,
   search(query, limit) {
-    const q = query.toLowerCase()
-    return repoIds()
-      .map((m) => getRepo(m.id))
-      .filter((r) => !q || has(r.title, q) || r.tags.some((t) => has(t, q)))
+    const trimmed = query.trim()
+    const all = repoIds().map((m) => getRepo(m.id))
+    if (!trimmed) return all.slice(0, limit).map((r) => ({ kind: 'repo', id: r.id, title: r.title, at: r.updatedAt }))
+    return all
+      .flatMap((r) => {
+        const m = scoreDoc(trimmed, {
+          title: r.title,
+          tags: r.tags,
+          labels: ['repo', 'repos'],
+          body: r.values.join(' ')
+        })
+        return m ? [{ kind: 'repo', id: r.id, title: r.title, at: r.updatedAt, ...(m.snippet ? { excerpt: m.snippet } : {}), _score: m.score }] : []
+      })
+      .sort((a, b) => b._score - a._score)
       .slice(0, limit)
-      .map((r) => ({ kind: 'repo', id: r.id, title: r.title, at: r.updatedAt }))
+      .map(({ _score: _s, ...h }) => h)
   },
   resolve: (ref) => findRepo(ref),
   line: (id) => repoLine(getRepo(id)),
@@ -2132,6 +2178,48 @@ const repoKind: Kind = {
   linkActions: rollLinkActions((id) => rollRepo(id))
 }
 
+
+function sheetStructuredFields(s: CharacterSheet): KindField[] {
+  const seen = new Set(s.fields.map((f) => f.toLowerCase()))
+  const custom = s.fields.map((f) => ({ name: f, text: s.values[f] ?? '' }))
+  for (const [k, v] of Object.entries(s.values)) if (!seen.has(k.toLowerCase()) && v.trim()) custom.push({ name: k, text: v })
+  const extra: KindField[] = []
+  if (s.dnd) {
+    if (s.dnd.race.trim()) extra.push({ name: 'Race', text: s.dnd.race })
+    if (s.dnd.cls.trim()) extra.push({ name: 'Class', text: s.dnd.cls })
+    if (s.dnd.background.trim()) extra.push({ name: 'Background', text: s.dnd.background })
+    if (s.dnd.alignment.trim()) extra.push({ name: 'Alignment', text: s.dnd.alignment })
+    extra.push({ name: 'Level', text: String(s.dnd.level) })
+  }
+  if (s.faction?.trim()) extra.push({ name: 'Faction', text: s.faction })
+  extra.push({ name: 'Where now', text: s.story.where })
+  return [...custom, ...extra]
+}
+
+function sheetSearchDoc(s: CharacterSheet): { title: string; labels: string[]; fields: SearchField[]; body: string } {
+  const fields: SearchField[] = sheetStructuredFields(s)
+    .filter((f) => f.text.trim())
+    .map((f) => ({ name: f.name, value: f.text }))
+  const bodyParts: string[] = []
+  if (s.dnd?.features.length) bodyParts.push(s.dnd.features.map((f) => `${f.name} ${f.text}`).join(' '))
+  if (s.story.sessions.length) bodyParts.push(s.story.sessions.map((x) => `${x.title} ${x.summary ?? ''} ${x.notes}`).join(' '))
+  const memories = s.mind?.memories ?? []
+  if (memories.length) {
+    bodyParts.push(
+      memories
+        .filter((m) => m.category !== 'secret')
+        .map((m) => [m.summary, m.detail ?? '', (m.tags ?? []).join(' ')].filter(Boolean).join(' '))
+        .join(' ')
+    )
+  }
+  if (s.relationships?.length) {
+    for (const r of s.relationships) {
+      const rel = [r.target, r.role, r.stance, r.category, r.notes].filter(Boolean).join(' ')
+      if (rel) fields.push({ name: 'Relationship', value: rel })
+    }
+  }
+  return { title: s.title, labels: ['character', 'characters', 'sheet'], fields, body: bodyParts.join(' ') }
+}
 
 const sheetKind: Kind = {
   presents: { chat: true, widget: ENTRY_WIDGET },
@@ -2152,19 +2240,21 @@ const sheetKind: Kind = {
   available: () => true,
   title: (id) => getSheet(id).title,
   search(query, limit) {
-    const q = query.toLowerCase()
-    return sheetIds()
-      .map((m) => getSheet(m.id))
-      .filter((s) => !q || has(s.title, q) || Object.values(s.values).some((v) => has(v, q)))
+    const trimmed = query.trim()
+    const sheets = sheetIds().map((m) => getSheet(m.id))
+    if (!trimmed) return sheets.slice(0, limit).map((s) => ({ kind: 'sheet', id: s.id, title: s.title, at: s.updatedAt }))
+    return sheets
+      .flatMap((s) => {
+        const m = scoreDoc(trimmed, sheetSearchDoc(s))
+        return m ? [{ kind: 'sheet', id: s.id, title: s.title, at: s.updatedAt, ...(m.snippet ? { excerpt: m.snippet } : {}), _score: m.score }] : []
+      })
+      .sort((a, b) => b._score - a._score || (b.at ?? 0) - (a.at ?? 0))
       .slice(0, limit)
-      .map((s) => ({ kind: 'sheet', id: s.id, title: s.title, at: s.updatedAt }))
+      .map(({ _score: _s, ...h }) => h)
   },
   resolve: (ref) => findSheet(ref),
   line: (id) => sheetLine(getSheet(id)),
-  fields: (id) => {
-    const s = getSheet(id)
-    return [...s.fields.map((f) => ({ name: f, text: s.values[f] ?? '' })), { name: 'Where now', text: s.story.where }]
-  },
+  fields: (id) => sheetStructuredFields(getSheet(id)),
   card(id, ctx) {
     return this.export!(id, ctx).markdown
   },
@@ -2497,13 +2587,27 @@ export function timelineRows(limit: number, ctx: KindContext = USER): TimelineRo
     .map((s) => ({ kind: s.kind.kind, id: s.id, title: s.title, icon: s.kind.icon, label: s.kind.label, what: eventWhat(s.event, ctx), at: s.event.last }))
 }
 
+const ADDON_ALIASES: Record<string, string[]> = {
+  'cards:card': ['cards.card'],
+  'cards:deck': ['cards.deck'],
+  'cards:layout': ['cards.layout', 'layout'],
+  'cards:set': ['cards.set', 'set'],
+  'storyteller:template': ['template', 'story_template'],
+  'storyteller:poi': ['poi'],
+  'storyteller:tale': ['tale'],
+  'weather:forecast': ['weather', 'forecast']
+}
+
 function addonKinds(): Kind[] {
   return modules.pageTypes().map(({ module, spec }) => {
     const type = `${module}:${spec.type}`
     const info = modules.list().find((m) => m.id === module)
     const kind = pageKindOf(type)
+    const aliases = ADDON_ALIASES[type]
     return {
       kind,
+      ...(aliases ? { aliases } : {}),
+      family: 'page:addon',
       presents: { chat: true, widget: ENTRY_WIDGET },
       ...pagePacking(),
       label: spec.label,
@@ -2524,12 +2628,19 @@ function addonKinds(): Kind[] {
       title: (id) => data.pages.get(id).title,
       available: () => true,
       search(query, limit) {
-        const q = query.toLowerCase()
-        return data.pages
-          .ofType(type)
-          .filter((p) => !q || has(p.title, q) || has(p.summary, q))
+        const trimmed = query.trim()
+        const metas = data.pages.ofType(type)
+        if (!trimmed) return metas.slice(0, limit).map((p) => ({ kind, id: p.id, title: p.title, at: p.updatedAt }))
+        return metas
+          .flatMap((p) => {
+            const fullPage = type === 'cards:deck' ? null : data.pages.get(p.id)
+            const body = [p.summary, ...(fullPage ? [fullPage.body, flattenText(fullPage.data)] : [])].filter(Boolean).join(' ')
+            const m = scoreDoc(trimmed, { title: p.title, labels: [spec.label, spec.plural, kind], body })
+            return m ? [{ kind, id: p.id, title: p.title, at: p.updatedAt, ...(m.snippet ? { excerpt: m.snippet } : {}), _score: m.score }] : []
+          })
+          .sort((a, b) => b._score - a._score || (b.at ?? 0) - (a.at ?? 0))
           .slice(0, limit)
-          .map((p) => ({ kind, id: p.id, title: p.title, at: p.updatedAt }))
+          .map(({ _score: _s, ...h }) => h)
       },
       resolve(ref) {
         return data.pages.find(ref, (p) => p.type === type)?.id ?? null
@@ -2741,15 +2852,27 @@ function tagged(hits: KindHit[]): KindHit[] {
 }
 
 function fuzzyHits(k: Kind, all: KindHit[], text: string, limit: number, ctx: KindContext): KindHit[] {
-  if (!all.length || !text.trim()) return []
-  const index = new MiniSearch<{ i: number; title: string; summary: string; tags: string }>({
-    idField: 'i',
-    fields: ['title', 'summary', 'tags'],
-    searchOptions: { boost: { title: 3, tags: 2 }, prefix: (term) => term.length > 2, fuzzy: (term) => (term.length > 3 ? 0.2 : false), combineWith: 'OR' }
+  const { clauses, exclude } = parseQuery(text)
+  const searchTerms = clauses.flatMap((c) => c.include).join(' ').trim()
+  if (!all.length || !searchTerms) return []
+  const docs = all.map((h, i) => {
+    const fieldsText = k.fields ? k.fields(h.id, ctx).map((f) => `${f.name}: ${f.text}`).join(' ') : ''
+    return { i, title: h.title, summary: k.line(h.id, ctx), tags: (h.tags ?? []).join(' '), fields: fieldsText }
   })
-  index.addAll(all.map((h, i) => ({ i, title: h.title, summary: k.line(h.id, ctx), tags: (h.tags ?? []).join(' ') })))
+  const index = new MiniSearch<{ i: number; title: string; summary: string; tags: string; fields: string }>({
+    idField: 'i',
+    fields: ['title', 'summary', 'tags', 'fields'],
+    searchOptions: { boost: { title: 3, tags: 2, fields: 2 }, prefix: (term) => term.length > 2, fuzzy: (term) => (term.length > 3 ? 0.2 : false), combineWith: 'OR' }
+  })
+  index.addAll(docs)
   return index
-    .search(text)
+    .search(searchTerms)
+    .filter((r) => {
+      if (!exclude.length) return true
+      const d = docs[r.id as number]
+      const hay = `${d.title} ${d.summary} ${d.tags} ${d.fields}`.toLowerCase()
+      return !exclude.some((ex) => hay.includes(ex))
+    })
     .slice(0, limit)
     .map((r) => all[r.id as number])
 }
@@ -2774,9 +2897,13 @@ function searchKind(k: Kind, query: string, limit: number, ctx: KindContext): Ki
     const near = fuzzyHits(k, tagged(k.search('', 10_000, ctx)), text, limit, ctx).filter((h) => !seen.has(h.id))
     return [...out, ...near].slice(0, limit)
   }
-  return tagged(k.search(text, 10_000, ctx))
-    .filter((h) => tags.every((t) => h.tags?.includes(t)))
-    .slice(0, limit)
+  const hasTags = (h: KindHit) => tags.every((t) => h.tags?.includes(t))
+  const direct = tagged(k.search(text, 10_000, ctx)).filter(hasTags)
+  if (!text.trim() || direct.length >= limit) return direct.slice(0, limit)
+  const seen = new Set(direct.map((h) => h.id))
+  const pool = tagged(k.search('', 10_000, ctx)).filter((h) => !seen.has(h.id) && hasTags(h))
+  const near = fuzzyHits(k, pool, text, limit - direct.length, ctx)
+  return [...direct, ...near].slice(0, limit)
 }
 
 export function entriesTagged(tag: string, ctx: KindContext = USER): { kind: Kind; id: string }[] {
@@ -2857,12 +2984,79 @@ export function kindNamed(name: string, ctx: KindContext = USER): Kind | undefin
 
 function kindFor(name: string, ctx: KindContext): Kind | undefined {
   const n = name.trim().toLowerCase()
-  return kinds(ctx).find((k) => k.kind === n || k.label.toLowerCase() === n || k.plural.toLowerCase() === n)
+  return kinds(ctx).find((k) => k.kind === n || k.aliases?.includes(n) || k.label.toLowerCase() === n || k.plural.toLowerCase() === n)
 }
 
-export function find(query: string, kindName: string | null, limit = 15, ctx: KindContext = USER): Hit[] {
-  const list = kindName ? [kindFor(kindName, ctx)].filter((k): k is Kind => Boolean(k)) : kinds(ctx)
-  if (kindName && !list.length) throw new ToolError(`There is no kind "${kindName}". Set kind to one of: ${kinds(ctx).map((k) => k.kind).join(', ')}, or leave it empty to search every kind.`)
+export interface FindOptions {
+  query?: string | null
+  kind?: string | string[] | null
+  tags?: string[] | null
+  where?: Record<string, string> | null
+  limit?: number | null
+  offset?: number | null
+}
+
+export interface FindResult {
+  hits: Hit[]
+  total: number
+  offset: number
+  limit: number
+}
+
+function resolveKindList(kindName: string | string[] | null | undefined, ctx: KindContext): Kind[] {
+  const names = Array.isArray(kindName) ? kindName.map((s) => String(s).trim()).filter(Boolean) : typeof kindName === 'string' && kindName.trim() ? [kindName.trim()] : []
+  if (!names.length) return kinds(ctx)
+  const seen = new Set<string>()
+  const out: Kind[] = []
+  for (const name of names) {
+    const resolved = kindFor(name, ctx)
+    if (!resolved) throw new ToolError(`There is no kind "${name}". Set kind to one of: ${kinds(ctx).map((k) => k.kind).join(', ')}, or leave it empty to search every kind.`)
+    if (seen.has(resolved.kind)) continue
+    seen.add(resolved.kind)
+    out.push(resolved)
+  }
+  return out
+}
+
+export function findPage(opts: FindOptions, ctx: KindContext = USER): FindResult {
+  const list = resolveKindList(opts.kind, ctx)
+  const tagTerms = Array.isArray(opts.tags) ? opts.tags.map((t) => `#${String(t).replace(/^#/, '').trim()}`).filter((t) => t.length > 1) : []
+  const textQuery = opts.query?.trim() ?? ''
+  const query = [textQuery, ...tagTerms].filter(Boolean).join(' ')
+  const where = opts.where && Object.keys(opts.where).length ? opts.where : null
+  const focused = Boolean(opts.kind && (!Array.isArray(opts.kind) || opts.kind.length > 0)) || Boolean(where)
+  const rawLimit = typeof opts.limit === 'number' && Number.isFinite(opts.limit) ? Math.floor(opts.limit) : query || focused ? 25 : 8
+  const limit = Math.max(1, Math.min(100, rawLimit))
+  const offset = typeof opts.offset === 'number' && Number.isFinite(opts.offset) ? Math.max(0, Math.floor(opts.offset)) : 0
+  const perKindCap = !query && !focused && offset === 0 ? limit : 10_000
+  const matches: { k: Kind; h: KindHit; rank: number }[] = []
+  for (const k of list) {
+    let rawHits: KindHit[]
+    try {
+      rawHits = searchKind(k, query, perKindCap, ctx)
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not search a kind')
+      continue
+    }
+    rawHits.forEach((h, idx) => {
+      if (where) {
+        const fields = k.fields?.(h.id, ctx).map((f) => ({ name: f.name, value: f.text })) ?? []
+        if (!matchesWhere(where, { title: h.title, tags: h.tags, fields })) return
+      }
+      const crossScore =
+        list.length > 1 && textQuery
+          ? (scoreDoc(textQuery, { title: h.title, tags: h.tags, labels: [k.label, k.plural, k.kind], body: h.excerpt ?? '' })?.score ?? 0)
+          : 0
+      matches.push({ k, h, rank: crossScore * 1000 - idx })
+    })
+  }
+  if (list.length > 1 && textQuery) matches.sort((a, b) => b.rank - a.rank)
+  const paged = matches.slice(offset, offset + limit).map(({ k, h }) => ({ ...h, summary: k.line(h.id, ctx) }))
+  return { hits: paged, total: matches.length, offset, limit }
+}
+
+export function find(query: string, kindName: string | string[] | null, limit = 15, ctx: KindContext = USER): Hit[] {
+  const list = resolveKindList(kindName, ctx)
   const hits: Hit[] = []
   for (const k of list) {
     try {

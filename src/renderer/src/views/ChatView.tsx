@@ -10,7 +10,7 @@ import { CinemaChat } from './chat/CinemaChat'
 import { ChatViewSwitcherModal } from './chat/ChatViewSwitcherModal'
 import { useCinema } from '../lib/cinema'
 import { useChatViewSwitcher } from '../lib/chatViewMode'
-import { matchesKeybind } from '../store/keybinds'
+import { isTypingTarget, matchesKeybind } from '../store/keybinds'
 
 export function ChatView() {
   const conv = useConversation()
@@ -24,9 +24,8 @@ export function ChatView() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.repeat) return
       if (!matchesKeybind('chat.cycleMode', e)) return
-      const target = e.target as HTMLElement | null
       const open = useChatViewSwitcher.getState().open
-      if (!open && target?.closest('input, textarea, select, [contenteditable]')) return
+      if (!open && isTypingTarget(e)) return
       if (document.querySelector('[role="dialog"]')) return
       e.preventDefault()
       toggleViewSwitcher()

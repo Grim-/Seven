@@ -50,7 +50,7 @@ function newDeck(title: string, deck: CardDeckData): string {
 
 export function cardName(ref: string): string {
   const page = data.pages.find(ref, (p) => p.type === CARD_TYPE)
-  if (!page) throw new ToolError(`There is no card "${ref}". Make it with cards_card first.`)
+  if (!page) throw new ToolError(`There is no card "${ref}". Make it with make_card first.`)
   return page.title
 }
 

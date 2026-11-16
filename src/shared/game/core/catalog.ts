@@ -55,5 +55,6 @@ export interface Catalog {
   slot(id: string): SlotDef | null
   slots(): SlotDef[]
   template(kind: string, id: string): ComponentDef | null
+  templates?(kind: string): Record<string, ComponentDef>
   entity(kind: string, id: string): Template | null
 }

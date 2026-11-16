@@ -57,8 +57,12 @@ async function picture(raw: unknown, id: string, ctx: ToolContext): Promise<stri
     throw new ToolError(`No file ${value}. Give a file id from the user's attachments, or a path in your workspace or a linked folder.`)
   }
   if (!/^https:\/\//i.test(value)) throw new ToolError('Give value as an https link to a picture, e.g. https://example.com/plank.png.')
-  const ok = await ctx.ui.ask('confirm', { message: `Download the picture at ${value} for exercise ${id}?`, confirmLabel: 'Download', cancelLabel: 'Cancel' })
-  if (ok !== true) throw new ToolError('The user did not allow downloading that picture. Carry on without it, or ask the user for a picture.')
+  const p = ctx.permissions.toolPermission
+  const alreadyAsked = p === 'always' || (p === 'ask' && ctx.permissions.mode !== 'trusted')
+  if (p !== 'none' && !alreadyAsked) {
+    const ok = await ctx.ui.ask('confirm', { message: `Download the picture at ${value} for exercise ${id}?`, confirmLabel: 'Download', cancelLabel: 'Cancel' })
+    if (ok !== true) throw new ToolError('The user did not allow downloading that picture. Carry on without it, or ask the user for a picture.')
+  }
   let res: Response
   try {
     res = await fetch(value, { signal: ctx.signal })

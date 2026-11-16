@@ -10,6 +10,7 @@ import { serviceKeys } from './model/keys'
 import { getSheet, saveSheet, setSheetFaction, sheetIds } from './library/sheets'
 import { customCommands } from './commands/custom'
 import type { EngineRequestName, EngineRequests, EngineWireRequest, Events } from '@shared/protocol'
+import type { AgentProfile } from '@shared/types'
 import { ModelRegistry } from './model/registry'
 import { ModelHost } from './model/host'
 import { llamaLimits, serverBuild, serverDevices } from './model/server/install'
@@ -70,7 +71,7 @@ import { ChatSearch } from './search'
 import { linkedFolders } from './folders/store'
 import { reminders } from './reminders/store'
 import { exportToFolder } from './library/folderExport'
-import { apiTest } from './model/apiChat'
+import { apiProbe, apiTest, listRemoteModels } from './model/apiChat'
 import { timeline } from './timeline/store'
 import { routines } from './routines/store'
 import { observeData } from './timeline/record'
@@ -109,7 +110,7 @@ import { agentFolders, liveFolder, removeFolderTree } from './agents/folders'
 import { currentActor } from './timeline/actor'
 import { compendium } from '../modules/dnd/compendium'
 import { gameDefs } from '../modules/game/store'
-import { changeCreatureHealth, changeHealth as changeGameHealth, characterMisfits, giveItem, takeItem, joinCharacter, leaveCharacter, saveCharacter, tickCharacters, useAbility } from '../modules/game/characters'
+import { awardCharacterXp, changeCreatureHealth, changeHealth as changeGameHealth, characterMisfits, giveItem, takeItem, joinCharacter, leaveCharacter, onEntityMoved, saveCharacter, tickCharacters, triggerStoryMoment, useAbility } from '../modules/game/characters'
 import { saves } from './worlds/saves'
 import './worlds/sheetTokens'
 import { resolveTokens } from './worlds/tokenSources'
@@ -128,6 +129,7 @@ import { resolveThings } from '../modules/core/things'
 import './data/glances'
 import './data/htmlWidget'
 import './data/characterStatsWidget'
+import './cards/drawerWidget'
 import './present/widget'
 import './library/partWidget'
 import { ifMissing, noteFailure, report, reportError, setProblemSink } from './util/report'
@@ -326,6 +328,10 @@ routines.start({
 })
 const chatSearch = new ChatSearch(sessions, () => agents.list())
 minds.setup({ modelPath: (id) => (models.has(id) ? models.get(id).path : null) })
+minds.useRelationships((id) => agents.find(id)?.relationships ?? [])
+agents.on('relationships', (agent: AgentProfile) => {
+  void minds.syncRelationships(agent.id, agent.relationships ?? []).catch((err: unknown) => noteFailure(err, 'memory', `Could not index ${agent.name}'s relationships`))
+})
 minds.on('changed', (agentId) => emit('mind.changed', { agentId }))
 minds.on('indexing', (progress) => emit('mind.indexing', progress))
 styles.on('changed', (list) => emit('styles.changed', list))
@@ -369,6 +375,8 @@ const handlers: Handlers = {
   'models.state': () => host.getState(),
   'models.remote.save': (input) => models.saveRemote(input),
   'models.remote.test': ({ id }) => apiTest(models.remoteTarget(id)),
+  'models.remote.probe': (input) => apiProbe(models.previewRemoteTarget(input)),
+  'models.remote.models': (input) => listRemoteModels(models.previewRemoteTarget({ ...input, model: '', contextSize: null })),
   'models.load': ({ id }) => {
     if (models.isRemote(id)) throw new Error('Remote models are not loaded here. Give an agent this model in Agents and it is used when that agent replies.')
     models.assertRunnable(id)
@@ -634,6 +642,8 @@ const handlers: Handlers = {
   'tools.disable': ({ id }) => modules.disable(id),
   'tools.reload': ({ id }) => modules.reload(id),
   'tools.settings': ({ id, values }) => modules.setSettings(id, values),
+  'tools.setPermission': ({ id, tool, permission }) => modules.setToolPermission(id, tool, permission),
+  'tools.setModulePermission': ({ id, permission }) => modules.setModulePermission(id, permission),
   'tools.create': (input) => modules.create(input),
   'tools.importMcp': ({ json }) => modules.importMcp(json),
   'tools.installZip': ({ path: file, replace }) => modules.installZip(file, replace),
@@ -712,6 +722,9 @@ const handlers: Handlers = {
   'game.changeCreatureHealth': ({ world, uid, delta }) => changeCreatureHealth(world, uid, delta),
   'effects.run': (req) => runEffects(req),
   'game.useAbility': ({ sheet, ability, target, at, distance }) => useAbility(sheet, ability, target, at, distance),
+  'game.awardXp': ({ sheet, amount, classId, reason }) => awardCharacterXp(sheet, { amount, classId, reason }),
+  'game.onMove': (req) => onEntityMoved(req),
+  'game.storyTrigger': ({ sheet, tag, summary, detail, flags }) => triggerStoryMoment(sheet, { tag, summary, detail, flags }),
   'saves.markUsed': ({ id, trigger, flag }) => saves.markUsed(id, trigger, flag),
   'saves.setFlag': ({ id, flag }) => saves.setFlag(id, flag),
   'saves.writeClock': ({ id, clockId, clock }) => saves.writeClock(id, clockId, clock),

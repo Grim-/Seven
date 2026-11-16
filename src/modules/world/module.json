@@ -4,8 +4,18 @@
   "description": "Puts the agent in a world: read records, change its own, search, and use the shared board. With authoring tools, agents can also create, edit, or delete world records and attach interactive actions and decisions.",
   "version": "1.1.0",
   "apiVersion": 1,
-  "permission": "custom",
+  "permission": "ask",
   "toolPermissions": {
+    "world_recall": "none",
+    "world_search": "none",
+    "world_board": "none",
+    "world_remember": "ask",
+    "world_post": "ask",
+    "world_create": "ask",
+    "world_set_property": "ask",
+    "world_add_action": "ask",
+    "world_add_decision": "ask",
+    "world_entries": "ask",
     "world_delete": "ask"
   }
 }

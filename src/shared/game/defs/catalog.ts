@@ -19,6 +19,7 @@ export function catalogFrom(data: CatalogData): Catalog {
     slot: (id) => slots.get(id) ?? null,
     slots: () => data.slots,
     template: (kind, id) => data.templates[kind]?.[id] ?? null,
+    templates: (kind) => data.templates[kind] ?? {},
     entity: (kind, id) => data.entities[kind]?.[id] ?? null
   }
 }

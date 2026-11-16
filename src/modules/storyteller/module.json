@@ -4,7 +4,20 @@
   "description": "Runs procedurally seeded, branching stories from templates: Seven keeps the structure (acts, rolled scenarios, what's true about the world), the model writes the prose. It rolls from your repos (in Data); story templates and POIs are its own kinds, and a library folder of JSON files can add more. Story runs are kept in the vault.",
   "version": "1.0.0",
   "apiVersion": 1,
-  "permission": "custom",
+  "permission": "none",
+  "toolPermissions": {
+    "list_stories": "none",
+    "start_story": "none",
+    "load_story_context": "none",
+    "checkpoint_story": "none",
+    "record_facts": "none",
+    "close_story": "none",
+    "resume_story": "none",
+    "add_story_template": "ask",
+    "update_story_template": "ask",
+    "add_branching_story": "ask",
+    "update_branching_story": "ask"
+  },
   "settings": [
     {
       "name": "libraryFolder",

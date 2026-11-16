@@ -273,6 +273,7 @@ export interface PlaceVisitor {
   game?: EntityRecord | null
   gameRules?: string
   faction?: string | null
+  hidden?: boolean
   agent: string | null
 }
 

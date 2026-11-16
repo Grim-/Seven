@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownAZ, ArrowDownWideNarrow, ArrowUpNarrowWide, Clock, Cloud, Copy, Cpu, Download, FilePlus, FolderOpen, Folders, Layers, PlugZap, Power, Search, Star, Trash2 } from 'lucide-react'
-import type { ModelEntry, ModelKind, RemoteApi } from '@shared/types'
+import { ArrowDownAZ, ArrowDownWideNarrow, ArrowUpNarrowWide, Clock, Cloud, Copy, Cpu, Download, FilePlus, FolderOpen, Folders, Layers, Power, Search, Star, Trash2 } from 'lucide-react'
+import type { ModelEntry, ModelKind } from '@shared/types'
+import { presetForSpec, remoteHostLabel } from '@shared/remoteModels'
 import { modelTraitSet } from '@shared/modelParams'
 import { useProjector } from '../components/models/useProjector'
 import { MODEL_KINDS, type HubModel } from '@shared/types'
@@ -11,20 +12,19 @@ import { MTP_NOTE, modelTraits } from '../components/models/ModelTraits'
 import { modelFilters } from '../components/models/modelFilters'
 import { applyFilters, useFilterValues } from '../lib/propertyFilters'
 import { useViewPlace } from '../lib/viewPlace'
-import { BackBar, Button, Fact, FactGrid, FilterBar, Input, KindShell, Modal, NumberField, Panel, SegmentBar, SaveState, Select, SettingCard, SettingRow, StatusBadge, ShellTabs, TraitChips, ViewHeader, openMenu, useAutosavedState, type ShellItem, type ShellSort } from '../components/ui'
+import { BackBar, Button, Fact, FactGrid, FilterBar, KindShell, SegmentBar, Select, SettingCard, StatusBadge, ShellTabs, TraitChips, ViewHeader, openMenu, type ShellItem, type ShellSort } from '../components/ui'
 import { isRunnable, modelBytes, useModels } from '../store/models'
 import { engine, main } from '../lib/ipc'
 import { errorText, formatBytes } from '../lib/format'
 import { toast } from '../store/toasts'
 import { ModelFolders } from './ModelFolders'
 import { ModelSettings } from '../components/models/settings/ModelSettings'
-import { RemoteParams } from '../components/models/settings/RemoteParams'
+import { AddRemoteModal, RemoteModelDetail } from '../components/models/RemoteModels'
 import { TemplateField } from '../components/models/settings/TemplateField'
 import { ProjectorField } from '../components/models/settings/ProjectorField'
 import { ArgsBox } from '../components/models/settings/ArgsBox'
 import { useModelConfig, type ModelConfigState } from '../components/models/settings/useModelConfig'
 import { failed, copyText } from '../lib/notify'
-import { useBusy } from '../lib/useBusy'
 import { noteFailure } from '../store/problems'
 
 type Tab = 'all' | 'favourites' | 'remote' | ModelKind
@@ -54,139 +54,6 @@ function useActions() {
   const drop = (m: ModelEntry) => void remove(m.id).catch(failed('Remove failed'))
   const star = (m: ModelEntry) => void setFavourite(m.id, !m.favourite)
   return { toggle, useForSearch, showFolder, copyPath, drop, star }
-}
-
-const API_OPTIONS: { value: RemoteApi; label: string }[] = [
-  { value: 'openai', label: 'OpenAI-compatible' },
-  { value: 'anthropic', label: 'Anthropic' }
-]
-
-interface RemoteDraft {
-  name: string
-  api: RemoteApi
-  baseUrl: string
-  model: string
-  key: string
-  contextSize: number
-}
-
-function RemoteFields({ draft, onChange, keySaved }: { draft: RemoteDraft; onChange: (d: RemoteDraft) => void; keySaved: boolean }) {
-  const set = (patch: Partial<RemoteDraft>) => onChange({ ...draft, ...patch })
-  return (
-    <div className="flex flex-col">
-      <SettingRow label="Name" hint="What Seven calls it.">
-        <Input value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder="Work GPT" />
-      </SettingRow>
-      <SettingRow label="API" hint="OpenAI-compatible covers OpenAI, OpenRouter, LM Studio, Ollama and most others.">
-        <Select value={draft.api} options={API_OPTIONS} onChange={(v) => set({ api: v as RemoteApi })} className="h-8 w-72 text-[12.5px]" />
-      </SettingRow>
-      <SettingRow label="Address" hint={draft.api === 'openai' ? 'Empty for OpenAI itself. Otherwise the base URL, e.g. https://openrouter.ai/api/v1 or http://192.168.1.20:1234/v1.' : "Empty for Anthropic itself, or a compatible endpoint's base URL."}>
-        <Input value={draft.baseUrl} onChange={(e) => set({ baseUrl: e.target.value })} placeholder={draft.api === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com'} />
-      </SettingRow>
-      <SettingRow label="Model" hint="The provider's own name for it.">
-        <Input value={draft.model} onChange={(e) => set({ model: e.target.value })} placeholder={draft.api === 'openai' ? 'gpt-4.1-mini' : 'claude-sonnet-4-5'} />
-      </SettingRow>
-      <SettingRow label="Key" hint={keySaved ? 'A key is saved in the vault. Type a new one to replace it.' : 'Kept in the vault, encrypted once the vault is set up. Leave empty for servers that need none.'}>
-        <Input type="password" autoComplete="off" value={draft.key} onChange={(e) => set({ key: e.target.value })} placeholder={keySaved ? 'saved' : 'sk-...'} />
-      </SettingRow>
-      <SettingRow label="Context size" hint="Tokens, from the provider.">
-        <NumberField value={draft.contextSize} onChange={(v) => v !== undefined && set({ contextSize: v })} min={2048} max={2000000} step={1024} className="h-8 w-40 text-[12.5px]" />
-      </SettingRow>
-    </div>
-  )
-}
-
-function writeRemote(id: string | null, d: RemoteDraft, keepKey: boolean): Promise<ModelEntry> {
-  return engine('models.remote.save', { id, name: d.name, api: d.api, baseUrl: d.baseUrl.trim() || null, model: d.model, key: keepKey && !d.key ? null : d.key, contextSize: d.contextSize })
-}
-
-async function saveRemote(id: string | null, d: RemoteDraft, keepKey: boolean): Promise<ModelEntry | null> {
-  try {
-    const saved = await writeRemote(id, d, keepKey)
-    toast.success('Remote model saved', saved.name)
-    return saved
-  } catch (err) {
-    toast.error('Could not save it', errorText(err))
-    return null
-  }
-}
-
-function AddRemote({ onClose, onAdded }: { onClose: () => void; onAdded: (id: string) => void }) {
-  const [draft, setDraft] = useState<RemoteDraft>({ name: '', api: 'openai', baseUrl: '', model: '', key: '', contextSize: 32768 })
-  const add = async () => {
-    const m = await saveRemote(null, draft, false)
-    if (!m) return
-    onAdded(m.id)
-    onClose()
-  }
-  return (
-    <Modal
-      open
-      title="Add a remote model"
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" icon={<Cloud />} disabled={!draft.name.trim() || !draft.model.trim()} onClick={() => void add()}>
-            Add
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-3">
-        <p className="text-[12.5px] text-dim">A model that runs somewhere else. Agents that use it send their chats there, so only give it to agents whose data can leave this machine.</p>
-        <RemoteFields draft={draft} onChange={setDraft} keySaved={false} />
-      </div>
-    </Modal>
-  )
-}
-
-function RemoteDetail({ model }: { model: ModelEntry }) {
-  const actions = useActions()
-  const spec = model.remote!
-  const autosave = useAutosavedState<RemoteDraft>({ name: model.name, api: spec.api, baseUrl: spec.baseUrl ?? '', model: spec.model, key: '', contextSize: 32768 }, (d) => writeRemote(model.id, d, true), { when: (d) => Boolean(d.name.trim() && d.model.trim()) })
-  const draft = autosave.value
-  const [testing, run] = useBusy()
-  useEffect(() => {
-    void useModels
-      .getState()
-      .getConfig(model.id)
-      .then((c) => autosave.reset({ ...autosave.value, contextSize: Number(c.contextSize) || 32768 }))
-      .catch(noteFailure('models', 'Could not read the model settings'))
-  }, [model.id])
-  const test = () =>
-    run(async () => {
-      await autosave.flush()
-      toast.success('It answered', await engine('models.remote.test', { id: model.id }))
-    }, 'Test failed')
-  return (
-    <Panel className="min-w-0 flex-1" bodyClassName="flex flex-col gap-5 overflow-y-auto p-4 [&>*]:shrink-0">
-      <div className="flex items-start gap-3">
-        <h2 className="min-w-0 flex-1 break-all font-mono text-[15px] font-bold leading-snug text-white">{model.name}</h2>
-        <StatusBadge tone="warn">Remote</StatusBadge>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <SaveState status={autosave.status} error={autosave.error} />
-        <Button variant="secondary" icon={<PlugZap />} disabled={testing} title="Send a tiny message to check it works" onClick={() => void test()}>
-          {testing ? 'Testing...' : 'Test'}
-        </Button>
-        <Button variant="ghost" icon={<Trash2 />} onClick={() => actions.drop(model)}>
-          Remove
-        </Button>
-      </div>
-      <p className="text-[12.5px] text-dim">
-        Give it to an agent in Agents. That agent's chats, and anything it reads to answer, are sent to {spec.baseUrl ?? (spec.api === 'anthropic' ? 'Anthropic' : 'OpenAI')}.
-      </p>
-      <RemoteFields
-        draft={draft}
-        keySaved={spec.hasKey}
-        onChange={autosave.set}
-      />
-      <RemoteParams modelId={model.id} />
-    </Panel>
-  )
 }
 
 function ModelFacts({ model }: { model: ModelEntry }) {
@@ -402,16 +269,19 @@ export function ModelsView() {
         .map((m) => {
           const loaded = host.modelId === m.id && host.status === 'ready'
           const loading = host.modelId === m.id && host.status === 'loading'
-          const what = m.remote ? `${m.remote.api === 'anthropic' ? 'Anthropic' : 'OpenAI-compatible'} · ${m.remote.model}` : [m.info ? MODEL_KINDS[m.info.kind].label : null, m.info?.architecture].filter(Boolean).join(' · ')
+          const remotePreset = m.remote ? presetForSpec(m.remote.api, m.remote.baseUrl) : null
+          const what = m.remote
+            ? `${remotePreset?.label ?? m.remote.api} · ${m.remote.model}`
+            : [m.info ? MODEL_KINDS[m.info.kind].label : null, m.info?.architecture].filter(Boolean).join(' · ')
           return {
             key: m.id,
             title: m.name,
             subtitle: `${m.favourite ? '★ ' : ''}${what}`,
-            excerpt: m.remote ? undefined : m.path,
-            icon: m.remote ? <Cloud className="h-4 w-4" /> : <Cpu className="h-4 w-4" />,
-            tag: loaded ? 'LOADED' : loading ? 'LOADING' : m.remote ? 'REMOTE' : (m.info ? MODEL_KINDS[m.info.kind].label : 'GGUF').toUpperCase(),
+            excerpt: m.remote ? `${remoteHostLabel(m.remote.api, m.remote.baseUrl)} · ${m.remote.hasKey ? 'Key saved' : 'No key set'}` : m.path,
+            icon: m.remote ? <Cloud className="h-4 w-4 text-teal" /> : <Cpu className="h-4 w-4" />,
+            tag: loaded ? 'LOADED' : loading ? 'LOADING' : m.remote ? (remotePreset?.label ?? m.remote.api).toUpperCase() : (m.info ? MODEL_KINDS[m.info.kind].label : 'GGUF').toUpperCase(),
             traits: m.remote ? [] : modelTraits(m.info, modelBytes(m)),
-            aside: m.remote ? 'remote' : undefined,
+            aside: m.remote ? (m.remote.hasKey ? 'key ok' : 'no key') : undefined,
             updatedAt: m.lastUsedAt
           }
         }),
@@ -458,7 +328,7 @@ export function ModelsView() {
   const tabs: { value: Tab; label: string }[] = [
     { value: 'all', label: `All ${counts.all}` },
     { value: 'favourites', label: `Favourites ${counts.favourites}` },
-    ...(counts.remote ? [{ value: 'remote' as Tab, label: `Remote ${counts.remote}` }] : []),
+    { value: 'remote', label: `Remote ${counts.remote}` },
     ...(Object.keys(MODEL_KINDS) as ModelKind[]).filter((k) => MODEL_KINDS[k].always || counts[k]).map((k) => ({ value: k as Tab, label: `${MODEL_KINDS[k].plural} ${counts[k]}` }))
   ]
 
@@ -485,7 +355,7 @@ export function ModelsView() {
         }
       />
       {folders && <ModelFolders className="shrink-0" />}
-      {addingRemote && <AddRemote onClose={() => setAddingRemote(false)} onAdded={open} />}
+      {addingRemote && <AddRemoteModal onClose={() => setAddingRemote(false)} onAdded={open} />}
       {host.status === 'error' && host.error && <div className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3.5 py-2.5 font-mono text-[12px] text-alert">{host.error}</div>}
       <DownloadsCard />
       {hub ? (
@@ -496,7 +366,16 @@ export function ModelsView() {
       ) : current ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           <BackBar onBack={() => setSelected(null)} kind="Models" />
-          {current.remote ? <RemoteDetail key={current.id} model={current} /> : <ModelDetail key={current.id} model={current} />}
+          {current.remote ? (
+            <RemoteModelDetail
+              key={current.id}
+              model={current}
+              onRemove={() => actions.drop(current)}
+              onToggleFavourite={() => actions.star(current)}
+            />
+          ) : (
+            <ModelDetail key={current.id} model={current} />
+          )}
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-2.5">
@@ -519,7 +398,14 @@ export function ModelsView() {
             const m = byId.get(item.key)
             if (m) menu(e, m)
           }}
-          empty={list.length ? 'Nothing here for this tab and these filters.' : 'Add a model folder (Folders), or add a single GGUF file.'}
+          adds={tab === 'remote' ? [{ label: 'Connect remote model', icon: <Cloud />, onClick: () => setAddingRemote(true) }] : undefined}
+          empty={
+            tab === 'remote'
+              ? 'No remote models connected yet. Click "Add remote" to connect Google Gemini, OpenAI, Anthropic, OpenRouter, or a local server.'
+              : list.length
+                ? 'Nothing here for this tab and these filters.'
+                : 'Add a model folder (Folders), or add a single GGUF file.'
+          }
         />
         </div>
       )}

@@ -14,6 +14,7 @@ import { userSection } from '../user/identity'
 import { styles } from '../mind/styles'
 import { agentDeckSummary } from '../cards/decks'
 import { linkFor } from '@shared/text'
+import { formatRelationshipsMarkdown } from '@shared/relationships'
 
 const ROLEPLAY = [
   '## Reply format',
@@ -69,6 +70,13 @@ function reasoningDirective(agent: AgentProfile, tools: ToolDef[]): string {
 
 function memorySection(memoryText: string): string {
   return memoryText.trim() ? `## Pinned memories\nYour own, private to you. Find the rest with recall; things every agent should know live in pages.\n\n${memoryText.trim()}` : ''
+}
+
+function agentRelationshipsSection(agent: AgentProfile): string {
+  const rels = agent.relationships ?? []
+  if (!rels.length) return ''
+  const text = formatRelationshipsMarkdown(rels, { pinnedOnly: true, recallTool: 'recall' })
+  return text ? `## Your relationships\n${text}` : ''
 }
 
 function filled(text: string, vars: Record<string, string>): string {
@@ -140,7 +148,7 @@ function guidesSection(tools: ToolDef[]): string {
 }
 
 export function buildInstructions(agent: AgentProfile, tools: ToolDef[], memoryText = ''): string {
-  if (!tools.length) return [characterOf(agent), agent.systemPrompt, userSection(), agent.roleplay ? ROLEPLAY : '', reasoningDirective(agent, tools), memorySection(memoryText)].filter(Boolean).join('\n\n')
+  if (!tools.length) return [characterOf(agent), agent.systemPrompt, agentRelationshipsSection(agent), userSection(), agent.roleplay ? ROLEPLAY : '', reasoningDirective(agent, tools), memorySection(memoryText)].filter(Boolean).join('\n\n')
   const env = [`- Operating system: ${os.type()} (${process.platform})`]
   const folders = linkedFolders.forAgent(agent.id)
   if (tools.some((t) => t.needsWorkspace)) {
@@ -173,6 +181,7 @@ export function buildInstructions(agent: AgentProfile, tools: ToolDef[], memoryT
   sections.push(placesGuide(tools))
   if (tools.some((t) => t.name === 'world_recall')) sections.push(worldGuide(agent.world, tools.some((t) => t.name === 'world_create')))
   if (tools.some((t) => t.name === 'play_card')) sections.push(agentDeckSummary(agent))
+  sections.push(agentRelationshipsSection(agent))
   sections.push(guidesSection(tools))
   sections.push(memorySection(memoryText))
   return sections.filter(Boolean).join('\n\n')

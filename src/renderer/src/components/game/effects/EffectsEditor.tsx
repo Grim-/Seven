@@ -11,7 +11,7 @@ import { SectionTag } from '../SectionTag'
 import { hostLanes, hostTries, pieceChoices } from './pieces'
 import { nodesAt, parseKey } from './tree'
 import { useEffectsEditing } from './useEffectsEditing'
-import { matchesKeybind } from '../../../store/keybinds'
+import { isTypingTarget, matchesKeybind } from '../../../store/keybinds'
 import './tokens'
 
 const NO_LANES: EffectLane[] = [{ event: 'OnUse', label: 'When it happens' }]
@@ -19,7 +19,7 @@ const NO_LANES: EffectLane[] = [{ event: 'OnUse', label: 'When it happens' }]
 function useKeys(scope: EffectsScope): (e: KeyboardEvent) => void {
   return (e) => {
     if (!e.currentTarget.contains(e.target as Node)) return
-    if ((e.target as HTMLElement).closest('input, textarea, select, [contenteditable]')) return
+    if (isTypingTarget(e)) return
     if (e.key === 'Escape' && (scope.adding || scope.selected)) {
       scope.setAdding(null)
       scope.select(null)

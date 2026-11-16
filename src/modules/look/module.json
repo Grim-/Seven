@@ -4,6 +4,6 @@
   "description": "Lets the agent react with moods and little effects on its avatar, and change its own picture and colours (asks first).",
   "version": "1.0.0",
   "apiVersion": 1,
-  "permission": "custom",
-  "toolPermissions": { "react": "none", "set_avatar": "ask", "set_theme": "ask" }
+  "permission": "ask",
+  "toolPermissions": { "react": "none", "set_avatar": "ask", "set_theme": "ask", "create_avatar": "ask", "change_avatar": "ask" }
 }

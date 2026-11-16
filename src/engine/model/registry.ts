@@ -5,6 +5,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import { MODEL_KINDS, type ChatTemplate, type ModelConfig, type ModelConfigResult, type ModelEntry, type ModelInfo, type ModelKind, type RemoteApi } from '@shared/types'
+import { REMOTE_APIS } from '@shared/remoteModels'
 import { paths } from '../util/paths'
 import { remoteKeys } from './keys'
 import type { ApiTarget } from './apiChat'
@@ -269,8 +270,10 @@ export class ModelRegistry extends EventEmitter {
     const name = input.name.trim().slice(0, 80)
     const model = input.model.trim()
     if (!name) throw new Error('Give it a name')
-    if (!model) throw new Error("Give the provider's model name, e.g. gpt-4.1 or claude-sonnet-4-5")
-    if (input.api !== 'openai' && input.api !== 'anthropic') throw new Error('Pick the API it speaks: OpenAI-compatible or Anthropic.')
+    if (!model) throw new Error("Give the provider's model name, e.g. gemini-2.5-flash, gpt-4.1-mini, or claude-sonnet-4-5")
+    if (!REMOTE_APIS.some((a) => a.id === input.api)) {
+      throw new Error(`Pick a supported API: ${REMOTE_APIS.map((a) => a.label).join(', ')}.`)
+    }
     const baseUrl = input.baseUrl?.trim() ? input.baseUrl.trim().replace(/\/+$/, '') : null
     if (baseUrl && !/^https?:\/\/\S+$/i.test(baseUrl)) throw new Error('The address must start with http:// or https://')
     const existing = input.id ? this.data.models.find((m) => m.id === input.id && m.remote) : undefined
@@ -282,6 +285,20 @@ export class ModelRegistry extends EventEmitter {
     if (input.contextSize) this.data.configs[id] = normalize({ ...this.ownConfig(id), contextSize: input.contextSize })
     this.changed()
     return this.list().find((m) => m.id === id)!
+  }
+
+  previewRemoteTarget(input: { id?: string | null; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null }): ApiTarget {
+    if (!REMOTE_APIS.some((a) => a.id === input.api)) throw new Error('Unsupported remote API.')
+    const baseUrl = input.baseUrl?.trim() ? input.baseUrl.trim().replace(/\/+$/, '') : null
+    if (baseUrl && !/^https?:\/\/\S+$/i.test(baseUrl)) throw new Error('The address must start with http:// or https://')
+    const savedKey = input.id ? remoteKeys.get(input.id) : null
+    const rawKey = input.key !== null && input.key.trim() ? input.key.trim() : savedKey
+    return {
+      id: input.id ?? '__probe__',
+      spec: { api: input.api, baseUrl, model: input.model.trim(), hasKey: Boolean(rawKey) },
+      key: rawKey ?? null,
+      contextSize: input.contextSize || 32768
+    }
   }
 
   remoteTarget(id: string): ApiTarget {

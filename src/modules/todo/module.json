@@ -4,5 +4,5 @@
   "description": "A task list per chat that the agent keeps while it works through longer jobs. You see it above the message box and can tick items yourself.",
   "version": "1.0.0",
   "apiVersion": 1,
-  "permission": "custom"
+  "permission": "none"
 }

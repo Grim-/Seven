@@ -145,6 +145,16 @@ export abstract class Component implements SignalSource {
     return out
   }
 
+  modifyIncomingDamage(amount: number, hit: { type: string; cause: string; source: GameEntity | null }): number {
+    let out = amount
+    for (const c of this.comps) out = c.modifyIncomingDamage(out, hit)
+    return out
+  }
+
+  isInvisible(): boolean {
+    return this.comps.some((c) => c.isInvisible())
+  }
+
   protected saveState(): Record<string, unknown> {
     return {}
   }

@@ -190,6 +190,24 @@ export function useKeybindLabel(id: string): string {
   return useKeybinds((s) => s.bindings[id]?.display ?? DEF_MAP.get(id)?.defaultSpec.display ?? 'Unbound')
 }
 
+const FUNCTION_KEY = /^F([1-9]|1\d|2[0-4])$/
+
+export function isFunctionKey(code: string): boolean {
+  return FUNCTION_KEY.test(code)
+}
+
+/**
+ * True when focus is inside a text/form input and the key should go to typing rather than triggering a keybind.
+ * Function keys (F1-F24) do not insert characters and remain active even while an input is focused.
+ */
+export function isTypingTarget(e: Pick<KeyboardEvent, 'target' | 'code'>): boolean {
+  if (isFunctionKey(e.code)) return false
+  const el = e.target
+  if (!(el instanceof HTMLElement)) return false
+  if (el.isContentEditable) return true
+  return Boolean(el.closest('input, textarea, select'))
+}
+
 export function matchesKeybind(id: string, e: Pick<KeyboardEvent, 'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>): boolean {
   const spec = getKeybind(id)
   if (!spec.code) return false

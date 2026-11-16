@@ -125,7 +125,7 @@ function pagesOf(value: unknown, legacyView: unknown, panel: unknown, id: string
   return [{ type: id.replace(/-/g, '_'), label: label(src.label, name), plural: label(src.label, name), description: '', icon: typeof src.icon === 'string' ? src.icon.trim() : '', view: file, widget: null, parts: { view: file }, single: true, panel: places.includes('panel'), group: null, rollable: false, actions: [] }]
 }
 
-const PERMISSIONS: ToolPermission[] = ['none', 'ask', 'always', 'custom']
+export const PERMISSIONS: ToolPermission[] = ['none', 'ask', 'always', 'custom']
 
 export const ID_PATTERN = /^[a-z][a-z0-9-]{0,47}$/
 

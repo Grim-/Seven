@@ -8,7 +8,7 @@ import { GamePortrait, HudButton } from '../../../game/ui'
 import { useLive } from '../../../lib/useLive'
 import { engine } from '../../../lib/ipc'
 import { cn } from '../../../lib/cn'
-import { matchesKeybind } from '../../../store/keybinds'
+import { isTypingTarget, matchesKeybind } from '../../../store/keybinds'
 import { useGameplaySettings } from '../settings/gameplaySettingsStore'
 
 interface TargetHudProps {
@@ -25,9 +25,6 @@ interface TargetHudProps {
   onEngageCombat?: () => void
   className?: string
 }
-
-const typing = (t: EventTarget | null) =>
-  t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
 
 export function TargetHud({
   target,
@@ -51,7 +48,7 @@ export function TargetHud({
   // Hotkeys: Esc (Clear Target), T (Talk), A (Approach), C (Inspect), F (Attack/Engage)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.repeat || typing(e.target)) return
+      if (e.defaultPrevented || e.repeat || isTypingTarget(e)) return
       const cancelCode = useGameplaySettings.getState().settings.keybinds.cancel?.code ?? 'Escape'
       const inspectCode = useGameplaySettings.getState().settings.keybinds.sheet?.code ?? 'KeyC'
       if (e.code === cancelCode && !e.ctrlKey && !e.metaKey && !e.altKey) {

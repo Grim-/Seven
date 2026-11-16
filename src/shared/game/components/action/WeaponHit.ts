@@ -49,7 +49,11 @@ export class WeaponHit extends ActionPiece {
       hits++
     }
     const to = health.get()
-    this.report(event, { hits, from, to }, `${entryLink(ITEM_TEMPLATES, item.id)} hit ${event.target.named} ${hits === 1 ? 'once' : `${hits} times`} for ${from - to} (${from} → ${to} HP)${health.isDead ? `; ${event.target.named} is down` : ''}.`)
+    const dealt = from - to
+    if (!event.nonTriggering && dealt > 0) {
+      event.user.emit('OnHit', { target: event.target.uid, damage: dealt, type: String(weapon.params.damageType), action: item.id, chainDepth: (event.chainDepth ?? 0) + 1 })
+    }
+    this.report(event, { hits, from, to }, `${entryLink(ITEM_TEMPLATES, item.id)} hit ${event.target.named} ${hits === 1 ? 'once' : `${hits} times`} for ${dealt} (${from} → ${to} HP)${health.isDead ? `; ${event.target.named} is down` : ''}.`)
     this.next(event)
   }
 

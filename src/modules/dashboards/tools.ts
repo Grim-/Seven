@@ -277,7 +277,7 @@ const tabletop: ToolDef = {
       things: {
         type: ['array', 'null'],
         items: { type: 'string' },
-        description: 'Optional links (like @sheet:vesper, @cards.card:fireball) or file paths to place onto the active SurfaceTop.'
+        description: 'Optional links (like @sheet:vesper, @card:fireball) or file paths to place onto the active SurfaceTop.'
       }
     }
   },

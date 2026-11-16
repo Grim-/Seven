@@ -1,12 +1,24 @@
 import { Plus, X } from 'lucide-react'
-import { Button } from '../../ui'
+import { Button, ChipInput } from '../../ui'
+import { useKnownGameTags } from '../useGameSuggestions'
 import { paramEditor, registerParamEditor, type ParamEditorProps } from './registry'
 
 function ListEdit({ spec, value, onChange }: ParamEditorProps) {
+  const knownTags = useKnownGameTags()
   const list = Array.isArray(value) ? value : []
   const of = spec.of
-  const item = of ? paramEditor(of.kind) : null
-  if (!of || !item) return <span className="text-[12px] text-faint">This list can't be edited here yet.</span>
+  if (!of) {
+    return (
+      <ChipInput
+        value={list.map(String).filter(Boolean)}
+        suggestions={knownTags}
+        onChange={(next) => onChange(next)}
+        placeholder="Pick existing or type new…"
+      />
+    )
+  }
+  const item = paramEditor(of.kind)
+  if (!item) return <span className="text-[12px] text-faint">This list can't be edited here yet.</span>
   return (
     <div className="flex flex-col gap-1.5">
       {list.map((entry, i) => (
@@ -24,4 +36,4 @@ function ListEdit({ spec, value, onChange }: ParamEditorProps) {
   )
 }
 
-registerParamEditor('list', { Editor: ListEdit })
+registerParamEditor('list', { Editor: ListEdit, wide: true })

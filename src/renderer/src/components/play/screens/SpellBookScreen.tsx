@@ -16,7 +16,7 @@ import {
   Search,
   Sparkle
 } from 'lucide-react'
-import { usableAbilities, type Ability } from '@shared/game/components'
+import { Classes, Traits, usableAbilities, type Ability, type Trait } from '@shared/game/components'
 import { EmptyState, openMenu } from '../../ui'
 import { cn } from '../../../lib/cn'
 import { gameTime } from '../../game/character/panels/time'
@@ -183,26 +183,44 @@ function getSpellLore(name: string, damage?: string, reach?: number) {
 function SpellBookScreen(props: ScreenProps) {
   const { entity, act, visitor, catalog } = props
   const all = usableAbilities(entity)
-  const [selectedUid, setSelectedUid] = useState<string | null>(all[0]?.uid ?? null)
-  const [search, setSearch] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'spells' | 'items'>('all')
+  const traits = entity.comp(Traits)?.held ?? []
+  const heldClasses = entity.comp(Classes)?.held ?? []
+  const classTitleOf = (classId: string) =>
+    heldClasses.find((c) => c.id === classId)?.title || String(catalog.template('game_class', classId)?.label || classId)
 
-  const selectedAbility = all.find((a) => a.uid === selectedUid) ?? all[0] ?? null
+  const [selectedUid, setSelectedUid] = useState<string | null>(all[0]?.uid ?? traits[0]?.uid ?? null)
+  const [search, setSearch] = useState('')
+  const [filterType, setFilterType] = useState<'all' | 'spells' | 'items' | 'traits'>('all')
 
   const filteredAbilities = useMemo(() => {
+    if (filterType === 'traits') return []
     return all.filter((a) => {
       const name = String(a.params.label || a.id).toLowerCase()
-      if (search && !name.includes(search.toLowerCase())) return false
+      const src = String(a.params.sourceClass || '').toLowerCase()
+      if (search && !name.includes(search.toLowerCase()) && !src.includes(search.toLowerCase())) return false
       if (filterType === 'spells' && a.item) return false
       if (filterType === 'items' && !a.item) return false
       return true
     })
   }, [all, search, filterType])
 
-  if (!all.length) {
+  const filteredTraits = useMemo(() => {
+    if (filterType === 'spells' || filterType === 'items') return []
+    const q = search.trim().toLowerCase()
+    if (!q) return traits
+    return traits.filter((t) => {
+      const haystack = `${t.title} ${String(t.params.description || '')} ${t.sourceClass} ${String(t.params.signal || '')}`.toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [traits, search, filterType])
+
+  const selectedTrait: Trait | null = traits.find((t) => t.uid === selectedUid) ?? null
+  const selectedAbility = selectedTrait ? null : (all.find((a) => a.uid === selectedUid) ?? (!traits.length ? all[0] : all[0] ?? null))
+
+  if (!all.length && !traits.length) {
     return (
       <EmptyState title="Nothing to use">
-        This character knows no abilities or spells, and nothing they wear or carry gives any.
+        This character knows no abilities, spells, or traits, and nothing they wear or carry gives any.
       </EmptyState>
     )
   }
@@ -296,14 +314,14 @@ function SpellBookScreen(props: ScreenProps) {
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-cyan" />
               <span className="font-mono text-[11.5px] font-bold uppercase tracking-[0.16em] text-cyan">
-                Known Spells & Inscribed Abilities
+                Known Spells, Abilities & Traits
               </span>
-              <span className="font-mono text-[10.5px] text-faint">({all.length})</span>
+              <span className="font-mono text-[10.5px] text-faint">({all.length + traits.length})</span>
             </div>
 
             {/* Filter Pills */}
             <div className="flex items-center gap-1">
-              {(['all', 'spells', 'items'] as const).map((t) => (
+              {(['all', 'spells', 'items', 'traits'] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -315,7 +333,7 @@ function SpellBookScreen(props: ScreenProps) {
                       : 'border border-line/40 bg-black/40 text-faint hover:text-white'
                   )}
                 >
-                  {t === 'all' ? 'All' : t === 'spells' ? 'Spells' : 'Gear'}
+                  {t === 'all' ? 'All' : t === 'spells' ? 'Spells' : t === 'items' ? 'Gear' : 'Traits'}
                 </button>
               ))}
             </div>
@@ -451,11 +469,80 @@ function SpellBookScreen(props: ScreenProps) {
                         from {itemName(a.item)}
                       </span>
                     )}
+                    {Boolean(a.params.sourceClass) && (
+                      <span className={cn('border border-cyan/40 bg-cyan/10 px-1.5 py-0.5 font-mono text-[9.5px] font-bold uppercase text-cyan', !a.item && 'ml-auto')}>
+                        {classTitleOf(String(a.params.sourceClass))}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
             )
           })}
+
+          {filteredTraits.length > 0 && (
+            <div className="flex flex-col gap-2 pt-2 border-t border-line/40">
+              <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-purple">
+                Active & Innate Traits ({filteredTraits.length})
+              </div>
+              {filteredTraits.map((t) => {
+                const active = t.isActive()
+                const sig = String(t.params.signal || '')
+                const maxUses = Number(t.params.maxUses ?? 0)
+                const isSelected = selectedTrait?.uid === t.uid
+                return (
+                  <div
+                    key={t.uid}
+                    onClick={() => setSelectedUid(t.uid)}
+                    className={cn(
+                      'flex items-start gap-3 border p-3 cursor-pointer transition-all',
+                      isSelected
+                        ? 'border-purple bg-purple/[0.1] shadow-[0_0_14px_rgba(192,132,252,0.22)]'
+                        : 'border-line/50 bg-black/40 hover:border-line-bright hover:bg-white/[0.02]',
+                      !active && 'opacity-60'
+                    )}
+                  >
+                    <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center border', active ? 'border-purple/60 bg-purple/15 text-purple' : 'border-line/40 bg-black/60 text-faint')}>
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-[13px] text-white truncate">{t.title}</span>
+                        <span className={cn('border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase', active ? 'border-ok/40 bg-ok/15 text-ok' : 'border-line/50 bg-black/50 text-faint')}>
+                          {t.exhausted ? 'Exhausted' : t.cooldownLeft > 0 ? gameTime(t.cooldownLeft) : active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      {Boolean(t.params.description) && (
+                        <p className="text-[11.5px] text-dim line-clamp-2">{String(t.params.description)}</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-1.5 font-mono text-[9.5px]">
+                        {t.sourceClass && (
+                          <span className="border border-cyan/40 bg-cyan/10 px-1.5 py-0.5 font-bold uppercase text-cyan">
+                            {classTitleOf(t.sourceClass)}
+                          </span>
+                        )}
+                        {sig && (
+                          <span className="border border-purple/40 bg-purple/10 px-1.5 py-0.5 text-purple">
+                            Trigger: {sig}
+                          </span>
+                        )}
+                        {maxUses > 0 && (
+                          <span className="border border-line/50 bg-line/15 px-1.5 py-0.5 text-dim">
+                            Uses: {Math.max(0, maxUses - t.uses)}/{maxUses}
+                          </span>
+                        )}
+                        {t.isPermanent && (
+                          <span className="border border-accent/40 bg-accent/10 px-1.5 py-0.5 text-accent uppercase">
+                            Permanent
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -483,6 +570,11 @@ function SpellBookScreen(props: ScreenProps) {
                 <span className={cn('font-mono text-[11px] font-semibold uppercase mt-0.5', selTheme.color)}>
                   {selTheme.school}
                 </span>
+                {Boolean(selectedAbility.params.sourceClass) && (
+                  <span className="font-mono text-[10px] text-cyan mt-0.5">
+                    Granted by class {classTitleOf(String(selectedAbility.params.sourceClass))}
+                  </span>
+                )}
                 {selectedAbility.item && (
                   <span className="font-mono text-[10px] text-purple mt-0.5">
                     Granted by {itemName(selectedAbility.item)}
@@ -540,9 +632,58 @@ function SpellBookScreen(props: ScreenProps) {
               </div>
             )}
           </div>
+        ) : selectedTrait ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start gap-3.5 border-b border-line/50 pb-3">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center border border-purple/50 bg-purple/10 text-purple">
+                <Sparkles className="h-7 w-7" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[17px] font-bold text-white tracking-wide truncate">{selectedTrait.title}</span>
+                <span className="font-mono text-[11px] font-semibold uppercase text-purple mt-0.5">
+                  {selectedTrait.isActive() ? 'Active Trait' : 'Inactive Trait'}
+                </span>
+                {selectedTrait.sourceClass && (
+                  <span className="font-mono text-[10px] text-cyan mt-0.5">
+                    Granted by class {classTitleOf(selectedTrait.sourceClass)}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+              <div className="border border-line/40 bg-black/50 p-2 flex flex-col gap-0.5">
+                <span className="text-[9.5px] uppercase tracking-wider text-faint">Trigger</span>
+                <span className="font-bold text-white">{String(selectedTrait.params.signal || 'Passive')}</span>
+              </div>
+              <div className="border border-line/40 bg-black/50 p-2 flex flex-col gap-0.5">
+                <span className="text-[9.5px] uppercase tracking-wider text-faint">Uses</span>
+                <span className="font-bold text-cyan">
+                  {Number(selectedTrait.params.maxUses ?? 0) > 0
+                    ? `${Math.max(0, Number(selectedTrait.params.maxUses) - selectedTrait.uses)}/${Number(selectedTrait.params.maxUses)}`
+                    : 'Unlimited'}
+                </span>
+              </div>
+            </div>
+            {Boolean(selectedTrait.params.description) && (
+              <div className="flex flex-col gap-2 border border-line/40 bg-black/40 p-3">
+                <span className="font-mono text-[10.5px] font-bold uppercase tracking-wider text-dim">
+                  Trait Rules
+                </span>
+                <p className="text-[12.5px] leading-relaxed text-white/85">
+                  {String(selectedTrait.params.description)}
+                </p>
+              </div>
+            )}
+            {selectedTrait.cooldownLeft > 0 && (
+              <div className="flex items-center gap-2 border border-line/40 bg-black/50 px-3 py-2 text-[11.5px] text-dim">
+                <Clock className="h-4 w-4 text-faint" />
+                <span>Cooling down: {gameTime(selectedTrait.cooldownLeft)}</span>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-faint text-[12px]">
-            No spell selected.
+            No spell or trait selected.
           </div>
         )}
 

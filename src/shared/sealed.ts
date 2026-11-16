@@ -438,7 +438,7 @@ export class SecureFs {
 
 export const WINDOW_STATE_FILE = 'window-state.json'
 
-export const PLAIN_FILES = new Set(['settings.json', 'vault.json', 'models.json', 'tools-prefs.json', 'tool-trust.json', 'context-prefs.json', 'vault-prefs.json', 'folders.json', 'reminder-times.json', 'toolsets.json', 'tool-settings.json', WINDOW_STATE_FILE])
+export const PLAIN_FILES = new Set(['settings.json', 'vault.json', 'models.json', 'tools-prefs.json', 'tool-trust.json', 'tool-permissions.json', 'context-prefs.json', 'vault-prefs.json', 'folders.json', 'reminder-times.json', 'toolsets.json', 'tool-settings.json', WINDOW_STATE_FILE])
 export const PLAIN_DIRS = ['agents/', 'tools/', 'logs/', 'sandbox/', 'moduledata/python/env/']
 
 export function isPlainRel(rel: string): boolean {

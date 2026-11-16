@@ -3,6 +3,7 @@ import type { DndStats } from './dnd'
 import type { ExportChoice, ExportInfo } from './exporting'
 import type { Slideshow, SlideshowData } from './slideshow'
 import type { Story } from './story'
+import type { RelationshipEntry } from './relationships'
 import type { Routine, RoutineDraft } from './routines'
 import type { TimelineRow } from './timeline'
 import type { WorldChanges, WorldEntity, WorldMeta, WorldPost, WorldSchema } from './world'
@@ -19,6 +20,7 @@ import type { StoredMapObject } from './game/mapObjects'
 import type { StoredTriggerAction } from './game/triggerActions'
 import type { StoredLootTable, ResolvedLootDrop } from './game/lootTables'
 import type { Problem, ProblemReport } from './problems'
+import type { RemoteModelInfo } from './remoteModels'
 import type {
   KindInfo,
   KindLinkActionInfo,
@@ -40,6 +42,7 @@ import type {
   EntryPreview,
   LibrarySection,
   ModuleInfo,
+  ToolPermission,
   ToolsPrefs,
   WidgetInfo,
   SystemStats,
@@ -167,6 +170,8 @@ export interface EngineRequests {
   'models.add': Req<{ path: string }, ModelEntry>
   'models.remote.save': Req<{ id: string | null; name: string; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null }, ModelEntry>
   'models.remote.test': Req<{ id: string }, string>
+  'models.remote.probe': Req<{ id?: string | null; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null }, { ok: boolean; reply?: string; error?: string; models: RemoteModelInfo[] }>
+  'models.remote.models': Req<{ id?: string | null; api: RemoteApi; baseUrl: string | null; key: string | null }, RemoteModelInfo[]>
   'models.remove': Req<{ id: string }, boolean>
   'models.state': Req<void, ModelHostState>
   'models.load': Req<{ id: string }, ModelHostState>
@@ -350,6 +355,8 @@ export interface EngineRequests {
   'tools.disable': Req<{ id: string }, ModuleInfo[]>
   'tools.reload': Req<{ id: string }, ModuleInfo[]>
   'tools.settings': Req<{ id: string; values: Record<string, unknown> }, ModuleInfo[]>
+  'tools.setPermission': Req<{ id: string; tool: string; permission: ToolPermission | null }, ModuleInfo[]>
+  'tools.setModulePermission': Req<{ id: string; permission: ToolPermission | null }, ModuleInfo[]>
   'tools.create': Req<{ id: string; name: string; kind: 'tools' | 'mcp' }, ModuleInfo[]>
   'tools.importMcp': Req<{ json: string }, { created: string[]; skipped: string[] }>
   'tools.installZip': Req<{ path: string; replace: boolean }, { installed: string | null; needsReplace: { id: string; name: string; from: string; to: string } | null }>
@@ -410,6 +417,9 @@ export interface EngineRequests {
   'game.changeCreatureHealth': Req<{ world: string; uid: string; delta: number }, { from: number; to: number }>
   'effects.run': Req<EffectRun, EffectOutcome>
   'game.useAbility': Req<{ sheet: string; ability: string; target: string | null; at: { x: number; y: number } | null; distance: number }, string>
+  'game.awardXp': Req<{ sheet: string; amount: number; classId?: string; reason?: string }, { gained: number; level: number; xp: number; classUpdated: number }>
+  'game.onMove': Req<{ sheet?: string; world?: string; token?: string; distance?: number }, { triggered: string[] }>
+  'game.storyTrigger': Req<{ sheet: string; tag?: string; summary: string; detail?: string; flags?: Record<string, unknown> }, { logged: number }>
   'saves.markUsed': Req<{ id: string; trigger: string; flag: string }, GameSave>
   'saves.setFlag': Req<{ id: string; flag: string }, GameSave>
   'saves.writeClock': Req<{ id: string; clockId: string; clock: ClockState }, GameSave>
@@ -466,7 +476,7 @@ export interface EngineRequests {
   'repos.list': Req<void, RepoEntry[]>
   'repos.get': Req<{ id: string }, RepoEntry>
   'repos.save': Req<{ id: string | null; title: string; tags: string[]; scope: 'use' | 'run'; values: string[] }, RepoEntry>
-  'sheets.save': Req<{ id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story; mind?: CharacterMind | null }, CharacterSheet>
+  'sheets.save': Req<{ id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story; mind?: CharacterMind | null; relationships?: RelationshipEntry[] }, CharacterSheet>
   'sheets.setFaction': Req<{ id: string; faction: string | null }, CharacterSheet>
   'library.rollText': Req<{ text: string }, { text: string; rolled: { token: string; value: string; error?: string }[] }>
   'library.remove': Req<{ entry: string }, boolean>

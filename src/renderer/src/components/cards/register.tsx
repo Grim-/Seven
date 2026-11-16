@@ -20,15 +20,23 @@ const ChatDecks = lazy(() => import('./ChatDecks').then((m) => ({ default: m.Cha
 export function registerCards(): void {
   registerChatElement(CARD_PLAY, { View: CardPlayRecord, covers: (data) => (data.hidden === true ? 'hide' : 'fold') })
   const addon = kindUi('page:addon')
-  registerKindUi('cards.card', {
+  const cardUi = {
     ...addon,
     moduleLists: [{ label: 'Card variation', list: cardVariations }],
     variations: cardVariations,
     present: { ...addon.present, Screen: CardScreen, Chat: CardChat, Stage: CardStage, Face: LiveCard }
-  })
-  registerKindUi('cards.set', { ...addon, present: { ...addon.present, Screen: SetScreen, Chat: CountCards, Stage: CountCards } })
-  registerKindUi('cards.deck', { ...addon, present: { ...addon.present, Screen: DeckScreen, Chat: CountCards, Stage: CountCards } })
-  registerKindUi('cards.layout', { ...addon, present: { ...addon.present, Screen: LayoutScreen } })
+  }
+  const setUi = { ...addon, present: { ...addon.present, Screen: SetScreen, Chat: CountCards, Stage: CountCards } }
+  const deckUi = { ...addon, present: { ...addon.present, Screen: DeckScreen, Chat: CountCards, Stage: CountCards } }
+  const layoutUi = { ...addon, present: { ...addon.present, Screen: LayoutScreen } }
+  registerKindUi('card', cardUi)
+  registerKindUi('card_set', setUi)
+  registerKindUi('deck', deckUi)
+  registerKindUi('card_layout', layoutUi)
+  registerKindUi('cards.card', cardUi)
+  registerKindUi('cards.set', setUi)
+  registerKindUi('cards.deck', deckUi)
+  registerKindUi('cards.layout', layoutUi)
   registerSideTab({
     id: 'cards',
     label: 'Decks',
@@ -46,7 +54,7 @@ export function registerCards(): void {
 
 function CardChat({ id }: EntrySurfaceProps) {
   const insideSlate = useContext(InsideSlateContext)
-  if (insideSlate) return <CardScreen kind="cards.card" id={id} select={(sel) => sel && showInData(sel)} />
+  if (insideSlate) return <CardScreen kind="card" id={id} select={(sel) => sel && showInData(sel)} />
   return <LiveCard id={id} className="w-56" />
 }
 

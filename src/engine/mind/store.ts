@@ -3,6 +3,7 @@ import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { JournalEntry, Memory, MindHit, MindIndexing, MindOverview, MindPrefs, Thought } from '@shared/types'
+import { relationshipRagText, type RelationshipEntry } from '@shared/relationships'
 import { appendLine, newId, readJson, readLines, writeJson, writeLines } from '../util/fs'
 import { dataRoot } from '../util/paths'
 import { secure, vaultEvents } from '../util/secure'
@@ -131,6 +132,7 @@ export class Minds {
   private locks = new Map<string, Promise<unknown>>()
   private listeners: { [K in keyof Events]: Events[K][] } = { changed: [], indexing: [], pinned: [] }
   private modelPath: (id: string) => string | null = () => null
+  private relationshipsOf: (agentId: string) => RelationshipEntry[] = () => []
 
   constructor() {
     vaultEvents.on('locked', () => this.loaded.clear())
@@ -145,6 +147,28 @@ export class Minds {
     this.modelPath = opts.modelPath
     this.applyPrefs()
     if (!secure.enabled) void this.backfillAll()
+  }
+
+  useRelationships(fn: (agentId: string) => RelationshipEntry[]): void {
+    this.relationshipsOf = fn
+  }
+
+  async syncRelationships(agentId: string, entries: RelationshipEntry[]): Promise<void> {
+    const existing = new Set(
+      readLines<Chunk>(this.file(agentId, 'index.jsonl'))
+        .filter((c) => c.source === 'relationship')
+        .map((c) => `${c.ref}:${c.version ?? ''}`)
+    )
+    let added = false
+    for (const rel of entries) {
+      if (existing.has(`${rel.id}:${rel.updatedAt}`)) continue
+      const text = relationshipRagText(rel)
+      if (!text) continue
+      await this.addChunks(agentId, 'relationship', rel.id, text, rel.updatedAt, rel.updatedAt)
+      added = true
+    }
+    this.loaded.delete(agentId)
+    if (!added) this.changed(agentId)
   }
 
   on<K extends keyof Events>(event: K, fn: Events[K]): void {
@@ -367,9 +391,14 @@ export class Minds {
     if (cached) return cached
     const chunks = readLines<Chunk>(this.file(agentId, 'index.jsonl'))
     const memories = new Map(this.memories(agentId).map((m) => [m.id, m.updatedAt]))
+    const relVersions = new Map(this.relationshipsOf(agentId).map((r) => [r.id, r.updatedAt]))
     const vectors = chunks.map((c) => decodeVec(c.vec))
     const tokens = chunks.map((c) => tokenize(c.text))
-    const active = chunks.map((c) => c.source !== 'memory' || memories.get(c.ref) === c.version)
+    const active = chunks.map((c) => {
+      if (c.source === 'memory') return memories.get(c.ref) === c.version
+      if (c.source === 'relationship') return relVersions.get(c.ref) === c.version
+      return true
+    })
     const df = new Map<string, number>()
     let total = 0
     tokens.forEach((t, i) => {

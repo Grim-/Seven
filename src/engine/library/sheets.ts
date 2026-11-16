@@ -4,7 +4,8 @@ import path from 'node:path'
 import type { CharacterMind, CharacterSheet } from '@shared/types'
 import type { EntityRecord } from '@shared/game/core/GameEntity'
 import { cleanDnd, dndLine, dndRoleplay, dndText, type DndStats } from '@shared/dnd'
-import { cleanMemories, cleanStory, mindMemoriesText, storyText, type Story } from '@shared/story'
+import { cleanRelationships, formatRelationshipsMarkdown, type RelationshipEntry } from '@shared/relationships'
+import { cleanMemories, cleanStory, mindMemoriesText, storyHasContent, storyText, type Story } from '@shared/story'
 import { data } from '../data/hub'
 import { dataRoot } from '../util/paths'
 import { copyPath } from '../util/fs'
@@ -23,6 +24,7 @@ interface SheetData {
   save: string
   story: Story
   mind: CharacterMind | null
+  relationships?: RelationshipEntry[]
 }
 
 function gameRecord(raw: unknown): EntityRecord | null {
@@ -54,12 +56,13 @@ function cleanMind(raw: unknown, legacyStory?: unknown): CharacterMind | null {
 }
 
 function clean(raw: unknown): SheetData {
-  const d = (raw && typeof raw === 'object' ? raw : {}) as { fields?: unknown; values?: unknown; dnd?: unknown; game?: unknown; gameRules?: unknown; faction?: unknown; save?: unknown; story?: unknown; mind?: unknown }
+  const d = (raw && typeof raw === 'object' ? raw : {}) as { fields?: unknown; values?: unknown; dnd?: unknown; game?: unknown; gameRules?: unknown; faction?: unknown; save?: unknown; story?: unknown; mind?: unknown; relationships?: unknown }
   const fields = Array.isArray(d.fields) ? [...new Set(d.fields.map((f) => String(f).trim()).filter(Boolean))] : [...SHEET_FIELDS]
   const values: Record<string, string> = {}
   if (d.values && typeof d.values === 'object') for (const [k, v] of Object.entries(d.values as Record<string, unknown>)) if (typeof v === 'string') values[k] = v
   const faction = typeof d.faction === 'string' ? d.faction.trim() || null : null
-  return { fields, values, dnd: d.dnd ? cleanDnd(d.dnd) : null, game: gameRecord(d.game), gameRules: typeof d.gameRules === 'string' ? d.gameRules : '', faction, save: typeof d.save === 'string' ? d.save : '', story: cleanStory(d.story, d.dnd), mind: cleanMind(d.mind, d.story) }
+  const relationships = cleanRelationships(d.relationships)
+  return { fields, values, dnd: d.dnd ? cleanDnd(d.dnd) : null, game: gameRecord(d.game), gameRules: typeof d.gameRules === 'string' ? d.gameRules : '', faction, save: typeof d.save === 'string' ? d.save : '', story: cleanStory(d.story, d.dnd), mind: cleanMind(d.mind, d.story), ...(relationships.length ? { relationships } : {}) }
 }
 
 function adoptDnd(): void {
@@ -142,7 +145,7 @@ export function onWhereChange(fn: (sheet: string, where: string) => void): void 
   whereWatchers.push(fn)
 }
 
-export function saveSheet(input: { id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story; mind?: CharacterMind | null }): CharacterSheet {
+export function saveSheet(input: { id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story; mind?: CharacterMind | null; relationships?: RelationshipEntry[] }): CharacterSheet {
   const title = input.title.trim()
   if (!title) throw new Error('Give the character a name, e.g. Mira.')
   if (input.id) {
@@ -166,7 +169,8 @@ export function saveSheet(input: { id: string | null; title: string; fields: str
       faction: input.faction === undefined ? current.faction : input.faction,
       save: current.save,
       story,
-      mind: input.mind === undefined ? current.mind : input.mind
+      mind: input.mind === undefined ? current.mind : input.mind,
+      relationships: input.relationships === undefined ? current.relationships : input.relationships
     })
     if (title !== page.title) data.pages.write({ ref: page.id, title })
     data.pages.setData(page.id, value)
@@ -181,7 +185,8 @@ export function saveSheet(input: { id: string | null; title: string; fields: str
     gameRules: input.gameRules ?? '',
     faction: input.faction ?? null,
     story: input.story,
-    mind: input.mind ?? null
+    mind: input.mind ?? null,
+    relationships: input.relationships
   })
   const page = data.pages.create({ title, type: SHEET_TYPE, data: value })
   return getSheet(page.id)
@@ -205,6 +210,11 @@ export function setStory(ref: string, story: Story): CharacterSheet {
 export function setMind(ref: string, mind: CharacterMind | null): CharacterSheet {
   const s = getSheet(ref)
   return saveSheet({ id: s.id, title: s.title, fields: s.fields, values: s.values, mind })
+}
+
+export function setSheetRelationships(ref: string, relationships: RelationshipEntry[]): CharacterSheet {
+  const s = getSheet(ref)
+  return saveSheet({ id: s.id, title: s.title, fields: s.fields, values: s.values, relationships })
 }
 
 export function setSheetFaction(ref: string, faction: string | null): CharacterSheet {
@@ -255,10 +265,14 @@ export function sheetMarkdown(ref: string, roleplay = false): string {
     const text = section(s)
     if (text) parts.push(text)
   }
+  if (s.relationships?.length) {
+    const relText = formatRelationshipsMarkdown(s.relationships, { pinnedOnly: true, recallTool: 'story_recall' })
+    if (relText) parts.push(`## Relationships\n${relText}`)
+  }
   if (s.mind?.memories?.length) {
     const memText = mindMemoriesText(s.mind.memories)
     if (memText) parts.push(`## Mind\n${memText}`)
   }
-  if (s.story.where || s.story.threads.length || s.story.sessions.length) parts.push(`## Story\n${storyText(s.story, roleplay)}`)
+  if (storyHasContent(s.story)) parts.push(`## Story\n${storyText(s.story, roleplay)}`)
   return parts.join('\n\n')
 }

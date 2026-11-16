@@ -1,8 +1,18 @@
 import { dayKey } from './timeline'
 import { referencePattern } from './text'
+import { linkTagOf, searchRelationships, type RelationshipEntry } from './relationships'
 
 export const STORY_PHASES = ['session', 'recent', 'backstory'] as const
 export type StoryPhase = (typeof STORY_PHASES)[number]
+
+export const STORY_THREAD_KINDS = ['arc', 'goal', 'mystery', 'bond', 'threat'] as const
+export type StoryThreadKind = (typeof STORY_THREAD_KINDS)[number]
+
+export const STORY_THREAD_STATUSES = ['active', 'waiting', 'resolved', 'dropped'] as const
+export type StoryThreadStatus = (typeof STORY_THREAD_STATUSES)[number]
+
+export const STORY_ENTRY_KINDS = ['scene', 'interaction', 'milestone', 'downtime'] as const
+export type StoryEntryKind = (typeof STORY_ENTRY_KINDS)[number]
 
 export const STORY_MEMORY_CATEGORIES = ['memory', 'backstory', 'recent', 'relationship', 'secret'] as const
 export type StoryMemoryCategory = (typeof STORY_MEMORY_CATEGORIES)[number]
@@ -27,19 +37,34 @@ export interface StorySession {
   title: string
   notes: string
   phase?: StoryPhase
+  kind?: StoryEntryKind
   summary?: string
+  outcome?: string
   where?: string
   who?: string[]
   tags?: string[]
+  pinned?: boolean
 }
 
 export interface StoryThread {
+  id?: string
   text: string
   done: boolean
+  kind?: StoryThreadKind
+  status?: StoryThreadStatus
+  detail?: string
+  who?: string[]
+  where?: string
+  pinned?: boolean
+  updatedAt?: string
 }
 
 export interface Story {
   where: string
+  doing?: string
+  goal?: string
+  mood?: string
+  backstorySummary?: string
   threads: StoryThread[]
   sessions: StorySession[]
 }
@@ -51,7 +76,7 @@ export interface StoryRef {
 }
 
 export interface StoryRecallHit {
-  kind: 'memory' | 'log'
+  kind: 'memory' | 'log' | 'relationship' | 'thread'
   id: string
   label: string
   summary: string
@@ -128,6 +153,47 @@ function cleanPhase(raw: unknown): StoryPhase {
   return typeof raw === 'string' && (STORY_PHASES as readonly string[]).includes(raw) ? (raw as StoryPhase) : 'session'
 }
 
+function cleanThreadKind(raw: unknown): StoryThreadKind | undefined {
+  return typeof raw === 'string' && (STORY_THREAD_KINDS as readonly string[]).includes(raw) ? (raw as StoryThreadKind) : undefined
+}
+
+function cleanThreadStatus(raw: unknown, done: boolean): StoryThreadStatus {
+  if (typeof raw === 'string' && (STORY_THREAD_STATUSES as readonly string[]).includes(raw)) return raw as StoryThreadStatus
+  return done ? 'resolved' : 'active'
+}
+
+function cleanEntryKind(raw: unknown): StoryEntryKind | undefined {
+  return typeof raw === 'string' && (STORY_ENTRY_KINDS as readonly string[]).includes(raw) ? (raw as StoryEntryKind) : undefined
+}
+
+export function newThread(input: Partial<StoryThread> & { text: string }): StoryThread {
+  const status = cleanThreadStatus(input.status, input.done === true)
+  return {
+    id: input.id?.trim() || `thr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    text: input.text.trim(),
+    done: status === 'resolved' || status === 'dropped',
+    kind: input.kind ?? 'arc',
+    status,
+    ...(input.detail?.trim() ? { detail: input.detail.trim() } : {}),
+    ...(input.who?.length ? { who: input.who } : {}),
+    ...(input.where?.trim() ? { where: input.where.trim() } : {}),
+    ...(input.pinned ? { pinned: true } : {}),
+    updatedAt: dayKey(Date.now())
+  }
+}
+
+export function storyHasContent(s: Story): boolean {
+  return Boolean(
+    s.where.trim() ||
+      s.doing?.trim() ||
+      s.goal?.trim() ||
+      s.mood?.trim() ||
+      s.backstorySummary?.trim() ||
+      s.threads.length ||
+      s.sessions.length
+  )
+}
+
 function cleanCategory(raw: unknown): StoryMemoryCategory {
   return typeof raw === 'string' && (STORY_MEMORY_CATEGORIES as readonly string[]).includes(raw) ? (raw as StoryMemoryCategory) : 'memory'
 }
@@ -180,14 +246,47 @@ function fromOldLog(dnd: Record<string, unknown>): Story {
 export function cleanStory(raw: unknown, oldDnd?: unknown): Story {
   if (!raw || typeof raw !== 'object') return oldDnd && typeof oldDnd === 'object' ? fromOldLog(oldDnd as Record<string, unknown>) : blankStory()
   const s = raw as Record<string, unknown>
+  const doing = text(s.doing).trim() || undefined
+  const goal = text(s.goal).trim() || undefined
+  const mood = text(s.mood).trim() || undefined
+  const backstorySummary = text(s.backstorySummary).trim() || undefined
   return {
     where: text(s.where),
+    ...(doing ? { doing } : {}),
+    ...(goal ? { goal } : {}),
+    ...(mood ? { mood } : {}),
+    ...(backstorySummary ? { backstorySummary } : {}),
     threads: list(s.threads)
-      .map((t) => ({ text: text(t.text).trim(), done: t.done === true }))
-      .filter((t) => t.text),
+      .map((t, i): StoryThread | null => {
+        const title = text(t.text).trim()
+        if (!title) return null
+        const status = cleanThreadStatus(t.status, t.done === true)
+        const done = status === 'resolved' || status === 'dropped'
+        const kind = cleanThreadKind(t.kind)
+        const detail = text(t.detail).trim() || undefined
+        const who = cleanTags(t.who)
+        const where = text(t.where).trim() || undefined
+        const id = text(t.id).trim() || `thr_${i}`
+        const updatedAt = text(t.updatedAt).trim() || undefined
+        return {
+          id,
+          text: title,
+          done,
+          ...(kind ? { kind } : {}),
+          ...(status !== 'active' ? { status } : {}),
+          ...(detail ? { detail } : {}),
+          ...(who ? { who } : {}),
+          ...(where ? { where } : {}),
+          ...(t.pinned === true ? { pinned: true } : {}),
+          ...(updatedAt ? { updatedAt } : {})
+        }
+      })
+      .filter((t): t is StoryThread => t !== null),
     sessions: list(s.sessions).map((x, i) => {
       const phase = cleanPhase(x.phase)
+      const kind = cleanEntryKind(x.kind)
       const summary = text(x.summary).trim() || undefined
+      const outcome = text(x.outcome).trim() || undefined
       const where = text(x.where).trim() || undefined
       const who = cleanTags(x.who)
       const tags = cleanTags(x.tags)
@@ -197,10 +296,13 @@ export function cleanStory(raw: unknown, oldDnd?: unknown): Story {
         title: text(x.title),
         notes: text(x.notes),
         ...(phase !== 'session' ? { phase } : {}),
+        ...(kind ? { kind } : {}),
         ...(summary ? { summary } : {}),
+        ...(outcome ? { outcome } : {}),
         ...(where ? { where } : {}),
         ...(who ? { who } : {}),
-        ...(tags ? { tags } : {})
+        ...(tags ? { tags } : {}),
+        ...(x.pinned === true ? { pinned: true } : {})
       }
     })
   }
@@ -213,25 +315,65 @@ function trimSnippet(body: string, limit = 260): string {
 }
 
 function sessionSummaryLine(s: StorySession, n: number): string {
+  const kind = s.kind && s.kind !== 'scene' ? `${s.kind} · ` : ''
   const phase = s.phase && s.phase !== 'session' ? `${s.phase} · ` : ''
-  const head = `${phase}Log #${n}${s.title ? `: ${s.title}` : ''}${s.date ? ` (${s.date})` : ''}`
+  const head = `${phase}${kind}Log #${n}${s.title ? `: ${s.title}` : ''}${s.date ? ` (${s.date})` : ''}`
   const meta = [s.where ? `@${s.where}` : '', s.who?.length ? `with ${s.who.join(', ')}` : ''].filter(Boolean).join(' · ')
-  const snippet = s.summary?.trim() || trimSnippet(s.notes, 280) || 'No notes.'
-  const truncated = !s.summary?.trim() && s.notes.replace(/\s+/g, ' ').trim().length > 280
-  return `- [${head}${meta ? ` · ${meta}` : ''}] ${snippet} (${s.id}${truncated ? ', truncated' : ''})`
+  const snippet = s.summary?.trim() || trimSnippet(s.notes, 240) || 'No notes.'
+  const outcome = s.outcome?.trim() ? ` -> Outcome: ${trimSnippet(s.outcome, 120)}` : ''
+  const truncated = !s.summary?.trim() && s.notes.replace(/\s+/g, ' ').trim().length > 240
+  return `- [${head}${meta ? ` · ${meta}` : ''}] ${snippet}${outcome} (${s.id}${truncated ? ', truncated' : ''})`
+}
+
+function threadLine(t: StoryThread): string {
+  const status = cleanThreadStatus(t.status, t.done)
+  const meta = [t.kind ?? 'arc', status !== 'active' ? status : '', t.where ? `@${t.where}` : '', t.who?.length ? `with ${t.who.join(', ')}` : ''].filter(Boolean).join(' · ')
+  const note = t.detail?.trim() ? ` — ${trimSnippet(t.detail, 140)}` : ''
+  return `- [${meta}] ${t.text}${note}`
 }
 
 export function storyText(story: Story, roleplay = false): string {
-  const open = story.threads.filter((t) => !t.done).map((t) => `- ${t.text}`)
+  const nowLines = [
+    story.where ? `Where: ${story.where}` : '',
+    story.doing ? `Doing right now: ${story.doing}` : '',
+    story.goal ? `Current focus: ${story.goal}` : '',
+    story.mood ? `State / stakes: ${story.mood}` : ''
+  ].filter(Boolean)
+
+  const activeThreads = story.threads.filter((t) => {
+    const st = cleanThreadStatus(t.status, t.done)
+    return st === 'active' || (st === 'waiting' && t.pinned)
+  })
+  const closedThreadCount = story.threads.length - activeThreads.length
+
+  const backstory = story.sessions.filter((s) => s.phase === 'backstory')
+  const pinnedBackstory = backstory.filter((s) => s.pinned)
+  const chronicle = story.sessions.filter((s) => s.phase !== 'backstory')
+
   const recentCount = roleplay ? 1 : 2
-  const shown = story.sessions.slice(-recentCount)
-  const earlierCount = Math.max(0, story.sessions.length - shown.length)
+  const recentShown = chronicle.slice(-recentCount)
+  const pinnedChronicle = chronicle.slice(0, Math.max(0, chronicle.length - recentShown.length)).filter((s) => s.pinned)
+  const earlierChronicleCount = Math.max(0, chronicle.length - recentShown.length - pinnedChronicle.length)
+
   const parts = [
-    `Now: ${story.where || 'not set'}`,
-    open.length ? `Open threads:\n${open.join('\n')}` : '',
-    shown.length ? `Latest story log:\n${shown.map((s) => sessionSummaryLine(s, story.sessions.indexOf(s) + 1)).join('\n')}` : '',
-    earlierCount
-      ? `Earlier story logs: ${earlierCount} archived log(s). Relevant logs surface automatically; call story_recall to search or read full notes by id.`
+    nowLines.length ? nowLines.join('\n') : 'Where: not set',
+    story.backstorySummary?.trim() ? `Core backstory: ${trimSnippet(story.backstorySummary, 420)}` : '',
+    pinnedBackstory.length
+      ? `Pinned backstory:\n${pinnedBackstory.map((s) => sessionSummaryLine(s, story.sessions.indexOf(s) + 1)).join('\n')}`
+      : '',
+    activeThreads.length
+      ? `Active story threads:\n${activeThreads.slice(0, roleplay ? 6 : 10).map(threadLine).join('\n')}${closedThreadCount ? `\n(${closedThreadCount} waiting/resolved thread(s) searchable via story_recall)` : ''}`
+      : closedThreadCount
+        ? `Story threads: ${closedThreadCount} resolved/archived (searchable via story_recall).`
+        : '',
+    pinnedChronicle.length
+      ? `Pinned key scenes:\n${pinnedChronicle.map((s) => sessionSummaryLine(s, story.sessions.indexOf(s) + 1)).join('\n')}`
+      : '',
+    recentShown.length
+      ? `Latest story log:\n${recentShown.map((s) => sessionSummaryLine(s, story.sessions.indexOf(s) + 1)).join('\n')}`
+      : '',
+    earlierChronicleCount || backstory.length > pinnedBackstory.length
+      ? `Archived story: ${earlierChronicleCount} earlier scene(s), ${backstory.length - pinnedBackstory.length} backstory chapter(s). Relevant snippets surface automatically; call story_recall to search or read full notes by id.`
       : ''
   ]
   return parts.filter(Boolean).join('\n\n')
@@ -281,10 +423,10 @@ export function storyRefs(story: Story): StoryRef[] {
       found.set(key, hit)
     }
   }
-  scan(story.where, null)
-  story.threads.forEach((t) => scan(t.text, null))
+  scan([story.where, story.doing ?? '', story.goal ?? '', story.mood ?? '', story.backstorySummary ?? ''].join('\n'), null)
+  story.threads.forEach((t) => scan([t.text, t.detail ?? '', t.where ?? '', ...(t.who ?? [])].join('\n'), null))
   story.sessions.forEach((s, i) => {
-    scan([s.title, s.summary ?? '', s.where ?? '', ...(s.who ?? []), s.notes].join('\n'), i + 1)
+    scan([s.title, s.summary ?? '', s.outcome ?? '', s.where ?? '', ...(s.who ?? []), s.notes].join('\n'), i + 1)
   })
   return [...found.values()]
 }
@@ -365,11 +507,52 @@ function sessionToHit(s: StorySession, index: number, score: number): StoryRecal
   }
 }
 
-export function storyHitById(story: Story, id: string, memories: StoryMemory[] = []): StoryRecallHit | null {
+function relationshipToHit(r: RelationshipEntry, score: number): StoryRecallHit {
+  const aff = typeof r.affinity === 'number' ? ` ${r.affinity >= 0 ? `+${r.affinity}` : r.affinity}` : ''
+  const link = r.ref ? ` (${linkTagOf(r.ref)})` : ''
+  const role = r.role ? ` — ${r.role}` : ''
+  const note = r.notes ? `: ${r.notes}` : ''
+  return {
+    kind: 'relationship',
+    id: r.id,
+    label: `relationship · ${r.category} · ${r.stance}${aff}`,
+    summary: `${r.target}${link}${role}${note}`,
+    detail: [r.notes, r.secret ? `Secret: ${r.secret}` : ''].filter(Boolean).join('\n\n'),
+    where: r.category === 'place' ? (r.ref ? linkTagOf(r.ref) : r.target) : '',
+    who: r.category === 'person' ? [r.target] : [],
+    tags: r.tags ?? [],
+    when: '',
+    pinned: r.pinned === true,
+    score
+  }
+}
+
+function threadToHit(t: StoryThread, index: number, score: number): StoryRecallHit {
+  const status = cleanThreadStatus(t.status, t.done)
+  return {
+    kind: 'thread',
+    id: t.id ?? `thr_${index}`,
+    label: `thread · ${t.kind ?? 'arc'} · ${status}`,
+    summary: t.text,
+    detail: t.detail ?? '',
+    where: t.where ?? '',
+    who: t.who ?? [],
+    tags: [],
+    when: t.updatedAt ?? '',
+    pinned: t.pinned === true,
+    score
+  }
+}
+
+export function storyHitById(story: Story, id: string, memories: StoryMemory[] = [], relationships: RelationshipEntry[] = []): StoryRecallHit | null {
   const needle = id.trim()
   if (!needle) return null
+  const rel = relationships.find((r) => r.id === needle)
+  if (rel) return relationshipToHit(rel, 100)
   const mem = memories.find((m) => m.id === needle)
   if (mem) return memoryToHit(mem, 100)
+  const thrIdx = story.threads.findIndex((t, i) => (t.id ?? `thr_${i}`) === needle)
+  if (thrIdx >= 0) return threadToHit(story.threads[thrIdx], thrIdx, 100)
   const idx = story.sessions.findIndex((s) => s.id === needle)
   if (idx >= 0) return sessionToHit(story.sessions[idx], idx, 100)
   return null
@@ -391,7 +574,7 @@ export function formatStorySnippet(hit: StoryRecallHit, sheetTitle?: string): st
 export function searchStoryItems(
   story: Story,
   query: string,
-  opts?: { category?: string; where?: string; includePinned?: boolean; memories?: StoryMemory[] }
+  opts?: { category?: string; where?: string; includePinned?: boolean; memories?: StoryMemory[]; relationships?: RelationshipEntry[] }
 ): StoryRecallHit[] {
   const terms = queryTerms(query)
   const whereFilter = opts?.where ? normalizeText(opts.where).trim() : ''
@@ -431,6 +614,27 @@ export function searchStoryItems(
       scoreField(terms, s.summary ?? '', 5, 2) +
       scoreField(terms, s.notes, 2, 1)
     if (score > 0) hits.push(sessionToHit(s, i, score))
+  }
+
+  if (!catFilter || catFilter === 'all' || catFilter === 'thread') {
+    for (let i = 0; i < story.threads.length; i++) {
+      const t = story.threads[i]
+      if (!includePinned && t.pinned) continue
+      if (whereFilter && !normalizeText(t.where ?? '').includes(whereFilter)) continue
+      if (!terms.length) {
+        hits.push(threadToHit(t, i, t.done ? 0.5 : 2))
+        continue
+      }
+      const metaText = [t.where ?? '', ...(t.who ?? []), t.kind ?? ''].join(' ')
+      const score = scoreField(terms, metaText, 6, 3) + scoreField(terms, t.text, 5, 2) + scoreField(terms, t.detail ?? '', 2, 1)
+      if (score > 0) hits.push(threadToHit(t, i, score))
+    }
+  }
+
+  if (!catFilter || catFilter === 'all' || catFilter === 'relationship') {
+    for (const { entry, score } of searchRelationships(opts?.relationships ?? [], query, { includePinned, where: opts?.where ?? null })) {
+      hits.push(relationshipToHit(entry, score))
+    }
   }
 
   return hits.sort((a, b) => b.score - a.score)

@@ -20,7 +20,7 @@ function highlight(text: string, query: string): ReactNode {
   return text.split(re).map((part, i) => (i % 2 ? <mark key={i} className="bg-accent/25 text-white">{part}</mark> : part))
 }
 
-const SOURCE: Record<string, string> = { journal: 'Journal', memory: 'Memory' }
+const SOURCE: Record<string, string> = { journal: 'Journal', memory: 'Memory', relationship: 'Relationship' }
 
 export function SearchResults({ query, onOpenChat }: { query: string; onOpenChat: (id: string) => void }) {
   const agents = useAgents((s) => s.list)

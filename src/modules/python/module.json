@@ -11,7 +11,7 @@
   },
   "toolPermissions": {
     "run_python": "ask",
-    "python_save": "none",
+    "python_save": "ask",
     "python_files": "none"
   },
   "settings": [

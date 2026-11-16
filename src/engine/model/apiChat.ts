@@ -1,7 +1,9 @@
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ChatHistoryItem, FunctionCallItem as ChatModelFunctionCall, ModelItem as ChatModelResponse, SegmentItem as ChatModelSegment } from '../chat/items'
-import type { RemoteSpec, ServerTimings, ToolChoiceMode } from '@shared/types'
+import type { RemoteApi, RemoteSpec, ServerTimings, ToolChoiceMode } from '@shared/types'
+import { classifyRemoteModel, normalizeGoogleBase, remoteApiMeta, sortRemoteModels, type RemoteModelInfo } from '@shared/remoteModels'
+import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
 import { data } from '../data/hub'
@@ -48,6 +50,7 @@ interface Call {
   id: string
   name: string
   args: string
+  thoughtSignature?: string
 }
 
 interface Round {
@@ -77,14 +80,32 @@ function schemaOf(params: unknown): Record<string, unknown> {
 
 function friendly(err: unknown, target: ApiTarget): Error {
   const status = (err as { status?: number })?.status
-  const where = target.local ? 'llama-server' : (target.spec.baseUrl ?? (target.spec.api === 'anthropic' ? 'Anthropic' : 'OpenAI'))
+  const where = target.local ? 'llama-server' : (target.spec.baseUrl ?? remoteApiMeta(target.spec.api).defaultHost)
   const raw = err instanceof Error ? err.message : String(err)
-  if (status === 401 || status === 403) return new Error(`${where} refused the key for ${target.spec.model}. Check it in Models.`)
-  if (status === 404) return new Error(`${where} has no model called "${target.spec.model}". Check the model name in Models.`)
+  const detail = raw && !raw.startsWith(`HTTP ${status}`) ? ` (${raw})` : ''
+  if (status === 401 || status === 403) return new Error(`${where} refused the key for ${target.spec.model}.${detail} Check it in Models.`)
+  if (status === 404) return new Error(`${where} has no accessible model called "${target.spec.model}".${detail} Check the model name or click Fetch list in Models.`)
   if (status === 429) return new Error(`${where} is rate limiting: wait a moment and try again. (${raw})`)
   if (status === 400 && /context|too long|maximum.*tokens/i.test(raw)) return new Error(`The conversation is too long for ${target.spec.model}. Summarise the chat or start a new one. (${raw})`)
   if (!status && /fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|network/i.test(raw)) return new Error(`Can't reach ${where}. Check the address and that it's online.`)
   return new Error(`${where}: ${raw}`)
+}
+
+async function readHttpError(res: Response): Promise<Error> {
+  const raw = await res.text()
+  let message = res.statusText || `HTTP ${res.status}`
+  if (raw.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw) as { error?: { message?: string } } | null
+      if (parsed?.error?.message) message = parsed.error.message
+    } catch (err) {
+      noteFailure(err, 'models', 'Could not parse remote provider error JSON')
+      message = raw.slice(0, 300)
+    }
+  } else if (raw.trim()) {
+    message = raw.slice(0, 300)
+  }
+  return Object.assign(new Error(message), { status: res.status })
 }
 
 class ThinkSplitter {
@@ -121,12 +142,17 @@ class ThinkSplitter {
   }
 }
 
-function imagePart(ref: string): OpenAI.Chat.ChatCompletionContentPartImage | null {
+function imageBytes(ref: string): { mime: string; data: string } | null {
   const meta = data.assets.metaFor(ref)
-  if (meta) return meta.kind === 'image' ? { type: 'image_url', image_url: { url: `data:${meta.mime};base64,${data.assets.readBytes(meta).toString('base64')}` } } : null
+  if (meta) return meta.kind === 'image' ? { mime: meta.mime, data: data.assets.readBytes(meta).toString('base64') } : null
   if (!path.isAbsolute(ref) || !fs.existsSync(ref)) return null
   const { mime, kind } = classify(ref)
-  return kind === 'image' ? { type: 'image_url', image_url: { url: `data:${mime};base64,${fs.readFileSync(ref).toString('base64')}` } } : null
+  return kind === 'image' ? { mime, data: fs.readFileSync(ref).toString('base64') } : null
+}
+
+function imagePart(ref: string): OpenAI.Chat.ChatCompletionContentPartImage | null {
+  const img = imageBytes(ref)
+  return img ? { type: 'image_url', image_url: { url: `data:${img.mime};base64,${img.data}` } } : null
 }
 
 function openaiMessages(items: ChatHistoryItem[], known: Set<string>, vision: boolean, thinking: boolean): OpenAI.Chat.ChatCompletionMessageParam[] {
@@ -148,7 +174,21 @@ function openaiMessages(items: ChatHistoryItem[], known: Set<string>, vision: bo
     let calls: { id: string; call: ChatModelFunctionCall }[] = []
     const flush = () => {
       if (!text && !calls.length) return
-      out.push({ role: 'assistant', content: text || null, ...(thinking && thought ? { reasoning_content: thought } : {}), ...(calls.length ? { tool_calls: calls.map((c) => ({ id: c.id, type: 'function' as const, function: { name: c.call.name, arguments: JSON.stringify(c.call.params ?? {}) } })) } : {}) } as OpenAI.Chat.ChatCompletionMessageParam)
+      out.push({
+        role: 'assistant',
+        content: text || null,
+        ...(thinking && thought ? { reasoning_content: thought } : {}),
+        ...(calls.length
+          ? {
+              tool_calls: calls.map((c) => ({
+                id: c.id,
+                type: 'function' as const,
+                function: { name: c.call.name, arguments: JSON.stringify(c.call.params ?? {}) },
+                ...(c.call.thoughtSignature ? { extra_content: { google: { thought_signature: c.call.thoughtSignature } } } : {})
+              }))
+            }
+          : {})
+      } as OpenAI.Chat.ChatCompletionMessageParam)
       for (const c of calls) out.push({ role: 'tool', tool_call_id: c.id, content: resultText(c.call.result) })
       text = ''
       thought = ''
@@ -292,6 +332,8 @@ async function openaiRound(target: ApiTarget, items: ChatHistoryItem[], o: Promp
       if (tc.id) call.id = tc.id
       if (tc.function?.name) call.name += tc.function.name
       if (tc.function?.arguments) call.args += tc.function.arguments
+      const sig = (tc as { extra_content?: { google?: { thought_signature?: unknown } } }).extra_content?.google?.thought_signature
+      if (typeof sig === 'string' && sig) call.thoughtSignature = sig
       o.onFunctionCallParamsChunk?.({ callIndex: tc.index, functionName: call.name, paramsChunk: tc.function?.arguments ?? '', done: false })
     }
   }
@@ -348,6 +390,287 @@ async function anthropicRound(target: ApiTarget, items: ChatHistoryItem[], o: Pr
   return round
 }
 
+const GOOGLE_BUDGET = new Map<'low' | 'medium' | 'high', number>([
+  ['low', 1024],
+  ['medium', 8192],
+  ['high', 24576]
+])
+
+const GOOGLE_LEVEL = new Map<'low' | 'medium' | 'high', string>([
+  ['low', 'LOW'],
+  ['medium', 'MEDIUM'],
+  ['high', 'HIGH']
+])
+
+interface GoogleContent {
+  role: 'user' | 'model'
+  parts: Record<string, unknown>[]
+}
+
+function googleMessages(items: ChatHistoryItem[], known: Set<string>, vision: boolean): { system: string; contents: GoogleContent[] } {
+  const system: string[] = []
+  const contents: GoogleContent[] = []
+  const push = (role: 'user' | 'model', part: Record<string, unknown>) => {
+    const last = contents[contents.length - 1]
+    if (last && last.role === role) last.parts.push(part)
+    else contents.push({ role, parts: [part] })
+  }
+  for (const item of items) {
+    if (item.type === 'system') {
+      if (item.text) system.push(typeof item.text === 'string' ? item.text : String(item.text))
+      continue
+    }
+    if (item.type === 'user') {
+      if (item.text) push('user', { text: item.text })
+      if (vision) {
+        for (const ref of imagesIn(item)) {
+          const img = imageBytes(ref)
+          if (img) push('user', { inlineData: { mimeType: img.mime, data: img.data } })
+        }
+      }
+      continue
+    }
+    let toolResponses: Record<string, unknown>[] = []
+    const flushResponses = () => {
+      for (const p of toolResponses) push('user', p)
+      toolResponses = []
+    }
+    for (const r of item.response) {
+      if (typeof r === 'string') {
+        if (toolResponses.length) flushResponses()
+        if (r) push('model', { text: r })
+      } else if (r.type === 'functionCall') {
+        if (known.has(r.name)) {
+          const args = r.params && typeof r.params === 'object' && !Array.isArray(r.params) ? r.params : {}
+          push('model', {
+            functionCall: { name: r.name, args },
+            ...(r.thoughtSignature ? { thoughtSignature: r.thoughtSignature } : {})
+          })
+          toolResponses.push({ functionResponse: { name: r.name, response: { output: resultText(r.result) } } })
+        } else {
+          flushResponses()
+          push('user', { text: `[${r.name}] ${resultText(r.result)}` })
+        }
+      }
+    }
+    flushResponses()
+  }
+  if (!contents.length || contents[0].role === 'model') contents.unshift({ role: 'user', parts: [{ text: '(continue)' }] })
+  return { system: system.join('\n\n'), contents }
+}
+
+function googleThinkingConfig(model: string, effort: PromptOptions['effort']): Record<string, unknown> | undefined {
+  if (!effort) return undefined
+  if (/^gemini-2\.5/i.test(model)) return { thinkingBudget: GOOGLE_BUDGET.get(effort) ?? 1024, includeThoughts: true }
+  if (/^gemini-[3-9]/i.test(model)) return { thinkingLevel: GOOGLE_LEVEL.get(effort) ?? 'LOW', includeThoughts: true }
+  return undefined
+}
+
+function googleToolConfig(choice: ToolChoiceMode | undefined, fns: Record<string, Handler>): Record<string, unknown> | undefined {
+  if (!choice || choice === 'auto') return undefined
+  if (choice === 'none') return { functionCallingConfig: { mode: 'NONE' } }
+  if (choice === 'force_reason' && fns['reason']) return { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: ['reason'] } }
+  return { functionCallingConfig: { mode: 'ANY' } }
+}
+
+async function googleRound(target: ApiTarget, items: ChatHistoryItem[], o: PromptOptions): Promise<Round> {
+  const key = target.key?.trim()
+  if (!key) throw Object.assign(new Error('Google Gemini requires an API key from Google AI Studio.'), { status: 401 })
+  const base = normalizeGoogleBase(target.spec.baseUrl)
+  const model = target.spec.model.replace(/^models\//i, '')
+  const url = `${base}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
+  const fns = o.functions ?? {}
+  const { system, contents } = googleMessages(items, new Set(Object.keys(fns)), target.vision === true)
+  const declarations = Object.entries(fns).map(([name, f]) => ({
+    name,
+    description: f.description ?? '',
+    parametersJsonSchema: schemaOf(f.params)
+  }))
+  const thinkingConfig = googleThinkingConfig(model, o.effort)
+  const toolConfig = declarations.length ? googleToolConfig(o.toolChoice, fns) : undefined
+  const generationConfig: Record<string, unknown> = {
+    ...(o.temperature !== undefined ? { temperature: o.temperature } : {}),
+    ...(o.topP !== undefined ? { topP: o.topP } : {}),
+    ...(o.maxTokens ? { maxOutputTokens: o.maxTokens } : {}),
+    ...(thinkingConfig ? { thinkingConfig } : {})
+  }
+  const body: Record<string, unknown> = {
+    contents,
+    ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+    ...(declarations.length ? { tools: [{ functionDeclarations: declarations }] } : {}),
+    ...(toolConfig ? { toolConfig } : {}),
+    ...(Object.keys(generationConfig).length ? { generationConfig } : {})
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify(body),
+    signal: o.signal
+  })
+  if (!res.ok) throw await readHttpError(res)
+
+  const round: Round = { text: '', thought: '', calls: [], input: 0, output: 0 }
+  const reader = res.body?.getReader()
+  if (!reader) return round
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  const handlePayload = (payload: string) => {
+    const trimmed = payload.trim()
+    if (!trimmed || trimmed === '[DONE]') return
+    const dataChunk = JSON.parse(trimmed) as {
+      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number }
+      candidates?: Array<{
+        content?: {
+          parts?: Array<{
+            text?: string
+            thought?: boolean
+            thoughtSignature?: string
+            functionCall?: { id?: string; name?: string; args?: Record<string, unknown> }
+          }>
+        }
+      }>
+    }
+    if (dataChunk.usageMetadata) {
+      if (typeof dataChunk.usageMetadata.promptTokenCount === 'number') round.input = dataChunk.usageMetadata.promptTokenCount
+      const cand = dataChunk.usageMetadata.candidatesTokenCount ?? 0
+      const th = dataChunk.usageMetadata.thoughtsTokenCount ?? 0
+      if (cand || th) round.output = cand + th
+    }
+    for (const part of dataChunk.candidates?.[0]?.content?.parts ?? []) {
+      if (part.thought && typeof part.text === 'string' && part.text) {
+        round.thought += part.text
+        o.onResponseChunk?.({ type: 'segment', segmentType: 'thought', text: part.text })
+      } else if (typeof part.text === 'string' && part.text) {
+        round.text += part.text
+        o.onResponseChunk?.({ text: part.text })
+      }
+      if (part.functionCall?.name) {
+        round.calls.push({
+          id: part.functionCall.id || `call_${round.calls.length}`,
+          name: part.functionCall.name,
+          args: JSON.stringify(part.functionCall.args ?? {}),
+          ...(typeof part.thoughtSignature === 'string' && part.thoughtSignature ? { thoughtSignature: part.thoughtSignature } : {})
+        })
+      }
+    }
+  }
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split(/\r?\n/)
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      if (line.startsWith('data:')) handlePayload(line.slice(5))
+    }
+  }
+  if (buffer.startsWith('data:')) handlePayload(buffer.slice(5))
+  return round
+}
+
+const ROUND_HANDLERS = new Map<RemoteApi, (target: ApiTarget, items: ChatHistoryItem[], o: PromptOptions) => Promise<Round>>([
+  ['openai', openaiRound],
+  ['anthropic', anthropicRound],
+  ['google', googleRound]
+])
+
+async function listGoogleModels(baseUrl: string | null, key: string | null): Promise<RemoteModelInfo[]> {
+  const cleanKey = key?.trim()
+  if (!cleanKey) throw Object.assign(new Error('Enter a Google Gemini API key before fetching models.'), { status: 401 })
+  const base = normalizeGoogleBase(baseUrl)
+  type RawGoogleModel = {
+    name?: string
+    displayName?: string
+    description?: string
+    inputTokenLimit?: number
+    outputTokenLimit?: number
+    thinking?: boolean
+    supportedGenerationMethods?: string[]
+  }
+  const collected: RemoteModelInfo[] = []
+  let pageToken: string | undefined
+  for (let page = 0; page < 10; page++) {
+    const qs = new URLSearchParams({ pageSize: '1000' })
+    if (pageToken) qs.set('pageToken', pageToken)
+    const res = await fetch(`${base}/models?${qs.toString()}`, { headers: { 'x-goog-api-key': cleanKey } })
+    if (!res.ok) throw await readHttpError(res)
+    const body = (await res.json()) as { models?: RawGoogleModel[]; nextPageToken?: string }
+    for (const m of body.models ?? []) {
+      if (m.supportedGenerationMethods && !m.supportedGenerationMethods.includes('generateContent')) continue
+      const id = (m.name ?? '').replace(/^models\//, '').trim()
+      if (!id) continue
+      collected.push({
+        id,
+        ...(m.displayName ? { label: m.displayName } : {}),
+        ...(m.description ? { description: m.description } : {}),
+        ...(typeof m.inputTokenLimit === 'number' && m.inputTokenLimit > 0 ? { context: m.inputTokenLimit } : {}),
+        ...(typeof m.outputTokenLimit === 'number' && m.outputTokenLimit > 0 ? { outputLimit: m.outputTokenLimit } : {}),
+        ...(typeof m.thinking === 'boolean' ? { thinking: m.thinking } : {}),
+        category: classifyRemoteModel(id, m.thinking)
+      })
+    }
+    pageToken = body.nextPageToken
+    if (!pageToken) break
+  }
+  return sortRemoteModels(collected)
+}
+
+async function listAnthropicModels(baseUrl: string | null, key: string | null): Promise<RemoteModelInfo[]> {
+  const cleanKey = key?.trim()
+  if (!cleanKey) throw Object.assign(new Error('Enter an Anthropic API key before fetching models.'), { status: 401 })
+  const base = (baseUrl || remoteApiMeta('anthropic').defaultBaseUrl).replace(/\/+$/, '')
+  const res = await fetch(`${base}/v1/models?limit=1000`, {
+    headers: { 'x-api-key': cleanKey, 'anthropic-version': '2023-06-01' }
+  })
+  if (!res.ok) throw await readHttpError(res)
+  const body = (await res.json()) as { data?: Array<{ id?: string; display_name?: string }> }
+  return sortRemoteModels(
+    (body.data ?? [])
+      .filter((m) => Boolean(m.id))
+      .map((m) => ({
+        id: m.id!,
+        ...(m.display_name ? { label: m.display_name } : {}),
+        category: classifyRemoteModel(m.id!)
+      }))
+  )
+}
+
+async function listOpenAiModels(baseUrl: string | null, key: string | null): Promise<RemoteModelInfo[]> {
+  const client = new OpenAI({ apiKey: key || 'none', ...(baseUrl ? { baseURL: baseUrl } : {}) })
+  const list = await client.models.list()
+  return sortRemoteModels(
+    list.data
+      .filter((m) => Boolean(m.id))
+      .map((m) => {
+        const extra = m as unknown as Record<string, unknown>
+        const label = typeof extra.name === 'string' && extra.name !== m.id ? extra.name : undefined
+        const description = typeof extra.description === 'string' ? extra.description : undefined
+        const ctx = num(extra.context_length) ?? num(extra.max_context_length) ?? undefined
+        return {
+          id: m.id,
+          ...(label ? { label } : {}),
+          ...(description ? { description } : {}),
+          ...(ctx ? { context: ctx } : {}),
+          category: classifyRemoteModel(m.id)
+        }
+      })
+  )
+}
+
+const MODEL_LISTERS = new Map<RemoteApi, (baseUrl: string | null, key: string | null) => Promise<RemoteModelInfo[]>>([
+  ['google', listGoogleModels],
+  ['anthropic', listAnthropicModels],
+  ['openai', listOpenAiModels]
+])
+
+export async function listRemoteModels(target: { spec: Pick<RemoteSpec, 'api' | 'baseUrl'>; key: string | null }): Promise<RemoteModelInfo[]> {
+  const lister = MODEL_LISTERS.get(target.spec.api) ?? listOpenAiModels
+  return lister(target.spec.baseUrl, target.key)
+}
+
 export class ApiChat {
   disposed = false
   capped = false
@@ -385,7 +708,8 @@ export class ApiChat {
 
   private async round(o: PromptOptions): Promise<Round> {
     try {
-      const r = this.target.spec.api === 'anthropic' ? await anthropicRound(this.target, this.items, o) : await openaiRound(this.target, this.items, o)
+      const handler = ROUND_HANDLERS.get(this.target.spec.api) ?? openaiRound
+      const r = await handler(this.target, this.items, o)
       const input = r.input || estimate(this.items)
       const output = r.output || estimate(r.text + r.thought + r.calls.map((c) => c.args).join(''))
       this.usage.input += input
@@ -443,7 +767,14 @@ export class ApiChat {
             }
           }
         }
-        reply.response.push({ type: 'functionCall', name: call.name, description: fn?.description, params, result } satisfies ChatModelFunctionCall)
+        reply.response.push({
+          type: 'functionCall',
+          name: call.name,
+          description: fn?.description,
+          params,
+          result,
+          ...(call.thoughtSignature ? { thoughtSignature: call.thoughtSignature } : {})
+        } satisfies ChatModelFunctionCall)
         if (o.signal?.aborted) break
       }
       const shown = o.takeImages?.() ?? []
@@ -467,4 +798,13 @@ export async function apiComplete(target: ApiTarget, system: string, prompt: str
 export async function apiTest(target: ApiTarget): Promise<string> {
   const { text } = await apiComplete(target, 'Reply with one short sentence.', 'Say hello.', { maxTokens: 64 })
   return text.trim() || '(an empty reply, but it answered)'
+}
+
+export async function apiProbe(target: ApiTarget): Promise<{ ok: boolean; reply?: string; error?: string; models: RemoteModelInfo[] }> {
+  const [testRes, listRes] = await Promise.allSettled([apiTest(target), listRemoteModels(target)])
+  const models = listRes.status === 'fulfilled' ? listRes.value : []
+  if (listRes.status === 'rejected') noteFailure(listRes.reason, 'models', 'Could not list remote models while probing')
+  if (testRes.status === 'fulfilled') return { ok: true, reply: testRes.value, models }
+  const err = testRes.reason
+  return { ok: false, error: err instanceof Error ? err.message : String(err), models }
 }

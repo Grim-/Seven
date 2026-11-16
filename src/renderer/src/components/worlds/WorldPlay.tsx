@@ -32,7 +32,7 @@ import {
 import { SavePicker } from '../play/SavePicker'
 import { useCurrentSave } from '../play/useSaves'
 import { useTriggerPlay } from '../play/triggers/useTriggerPlay'
-import { matchesKeybind } from '../../store/keybinds'
+import { isTypingTarget, matchesKeybind } from '../../store/keybinds'
 import { useGameplaySettings } from '../play/settings/gameplaySettingsStore'
 import '../play/triggers'
 import { useWorldViewHost } from '../play/viewActs'
@@ -323,9 +323,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
   useEffect(() => {
     if (!token || token.visitor.sheet === player) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.repeat) return
-      const t = e.target
-      if (t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return
+      if (e.defaultPrevented || e.repeat || isTypingTarget(e)) return
 
       const cancelCode = useGameplaySettings.getState().settings.keybinds.cancel?.code ?? 'Escape'
       const sheetCode = useGameplaySettings.getState().settings.keybinds.sheet?.code ?? 'KeyC'

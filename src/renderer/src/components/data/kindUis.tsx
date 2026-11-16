@@ -80,7 +80,7 @@ import { SETUP_GROUP, registerKindUi, type KindMenuContext, type KindScreenProps
 import { registerStoryteller } from '../storyteller/register'
 import { registerCards } from '../cards/register'
 import './sheet/mind/facet'
-import './sheet/story/facet'
+import './sheet/relations/facet'
 import './sheet/dnd/status'
 import '../play/roleplayCard'
 import { registerDecisions } from '../decisions/register'

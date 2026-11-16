@@ -11,7 +11,7 @@ import {
   FlaskConical,
   Scroll
 } from 'lucide-react'
-import { Equipment, Inventory, Item, usableAbilities, type Ability } from '@shared/game/components'
+import { Classes, Equipment, Inventory, Item, usableAbilities, type Ability } from '@shared/game/components'
 import { GameEntity, type Catalog } from '@shared/game/core'
 import type { PlaceVisitor } from '@shared/maps'
 import { cn } from '../../../lib/cn'
@@ -231,6 +231,10 @@ function ActiveBar({
 
         if (slot.kind === 'ability') {
           const a = abilities.find((x) => x.uid === slot.uid || x.id === slot.id)
+          const sourceClassId = String(a?.params.sourceClass || '')
+          const sourceClassTitle = sourceClassId
+            ? entity.comp(Classes)?.byId(sourceClassId)?.title || String(catalog.template('game_class', sourceClassId)?.label || sourceClassId)
+            : ''
           const ready = a ? a.canUse({ user: entity, target: entity, at: null, distance: 0 }) : 'not available'
           const cooling = a ? a.cooling > 0 : false
           const rows = a
@@ -241,6 +245,11 @@ function ActiveBar({
             : []
           const body = (
             <span className="flex min-w-48 flex-col gap-1.5">
+              {sourceClassTitle && (
+                <span className="font-mono text-[11px] text-cyan">
+                  from class {sourceClassTitle}
+                </span>
+              )}
               {a?.item && (
                 <span className="font-mono text-[11px] text-purple">
                   from {String(a.item.params.label || a.item.id)}

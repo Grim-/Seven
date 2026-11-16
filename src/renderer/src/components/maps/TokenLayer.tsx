@@ -33,6 +33,8 @@ function Token({ token, handlers, mapSize }: { token: MapToken; handlers: TokenH
   )
   const shift = drag.live ? { x: drag.live.delta.x / zoom, y: drag.live.delta.y / zoom } : { x: 0, y: 0 }
   const v = token.visitor
+  const isMine = v.sheet === handlers.mine
+  if (v.hidden && !isMine && !handlers.onMove) return null
   const vfxRef = useVfx<HTMLSpanElement>([`token:${v.token}`, v.sheet ? `sheet:${v.sheet}` : null, v.agent ? `agent:${v.agent}` : null])
   return (
     <div
@@ -44,7 +46,11 @@ function Token({ token, handlers, mapSize }: { token: MapToken; handlers: TokenH
       onClick={(e) => !handlers.onMove && handlers.onPick?.(token, e)}
       onContextMenu={(e) => handlers.onMenu?.(token, e)}
       style={{ left: token.at.x + shift.x, top: token.at.y + shift.y, width: px, transform: `scale(${1 / zoom}) translate(-50%, -50%)` }}
-      className={cn('pointer-events-auto absolute flex flex-col items-center gap-1 [transform-origin:0_0]', handlers.onMove ? 'cursor-grab' : 'cursor-pointer')}
+      className={cn(
+        'pointer-events-auto absolute flex flex-col items-center gap-1 [transform-origin:0_0]',
+        handlers.onMove ? 'cursor-grab' : 'cursor-pointer',
+        v.hidden && 'opacity-40'
+      )}
     >
       <span ref={vfxRef} style={{ width: px, height: px }}>
         <SheetPortrait image={v.image} usedBy={`The map token ${showName(v.name)}`} className={cn('h-full w-full border-2 shadow-[0_4px_14px_rgba(0,0,0,0.7)]', v.sheet === handlers.mine ? 'border-accent' : v.agent ? 'border-purple' : 'border-cyan')} />

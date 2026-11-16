@@ -12,10 +12,19 @@ interface TemplateSpec {
 }
 
 const NAMED = new Set(['id', 'label'])
+const TEMPLATE_HIDDEN = new Set(['id', 'label', 'description', 'sourceClass', 'permanent'])
 
-import { ABILITY_TEMPLATES, BUFF_TEMPLATES, CHARACTER_TEMPLATES, CREATURE_TEMPLATES, ITEM_TEMPLATES } from '../templateKinds'
+import {
+  ABILITY_TEMPLATES,
+  BUFF_TEMPLATES,
+  CHARACTER_TEMPLATES,
+  CLASS_TEMPLATES,
+  CREATURE_TEMPLATES,
+  ITEM_TEMPLATES,
+  TRAIT_TEMPLATES
+} from '../templateKinds'
 
-export { ABILITY_TEMPLATES, BUFF_TEMPLATES, CHARACTER_TEMPLATES, CREATURE_TEMPLATES, ITEM_TEMPLATES }
+export { ABILITY_TEMPLATES, BUFF_TEMPLATES, CHARACTER_TEMPLATES, CLASS_TEMPLATES, CREATURE_TEMPLATES, ITEM_TEMPLATES, TRAIT_TEMPLATES }
 
 const pieces = (list: unknown): number => (Array.isArray(list) ? list.length : 0)
 
@@ -28,7 +37,7 @@ export function templateKindOf(rootType: string): string | null {
 function componentTemplate(spec: TemplateSpec & { root: string; pieces: string }): void {
   const Class = componentClass(spec.root)
   if (!Class) throw new Error(`No component type ${spec.root} for ${spec.type}`)
-  const own = Object.fromEntries(Object.entries(Class.PARAMS).filter(([key]) => !NAMED.has(key)))
+  const own = Object.fromEntries(Object.entries(Class.PARAMS).filter(([key]) => !TEMPLATE_HIDDEN.has(key)))
   roots.set(spec.root, spec.type)
   registerDefType({
     ...spec,
@@ -37,7 +46,8 @@ function componentTemplate(spec: TemplateSpec & { root: string; pieces: string }
     addTo: (data, def) => {
       const { comps, ...values } = def.values
       const named = Object.fromEntries([...NAMED].filter((key) => key in Class.PARAMS).map((key) => [key, key === 'id' ? def.id : def.name]))
-      ;(data.templates[spec.type] ??= {})[def.id] = { type: spec.root, ...values, ...named, comps: comps as ComponentDef[] }
+      const desc = 'description' in Class.PARAMS && def.notes ? { description: def.notes } : {}
+      ;(data.templates[spec.type] ??= {})[def.id] = { type: spec.root, ...values, ...desc, ...named, comps: comps as ComponentDef[] }
     }
   })
 }
@@ -64,7 +74,101 @@ componentTemplate({
   starter: [
     { id: 'poisoned', name: 'Poisoned', notes: '1 poison damage every 10 minutes for an hour. Stacks up to 3 times.', values: { duration: 3600, potency: 1, maxStacks: 3, comps: [{ type: 'buff.damageOverTime', damageType: 'poison', perHit: 1, every: 600 }] } },
     { id: 'well_fed', name: 'Well fed', notes: '+2 most Health for 6 hours.', values: { duration: 21600, comps: [{ type: 'buff.statBonus', stat: 'health', amount: 2 }] } },
-    { id: 'shielded', name: 'Shielded', notes: '+2 Armour for a minute.', values: { duration: 60, comps: [{ type: 'buff.statBonus', stat: 'armour', amount: 2 }] } }
+    { id: 'shielded', name: 'Shielded', notes: '+2 Armour for a minute.', values: { duration: 60, comps: [{ type: 'buff.statBonus', stat: 'armour', amount: 2 }] } },
+    {
+      id: 'static_charge',
+      name: 'Static Charge',
+      notes: 'Your next hit discharges 5 lightning damage.',
+      values: {
+        duration: 30,
+        tags: ['lightning'],
+        comps: [
+          {
+            type: 'reaction',
+            id: 'discharge_lightning',
+            signal: 'OnHit',
+            target: 'triggerTarget',
+            comps: [
+              { type: 'action.removeBuff', on: 'OnUse', who: 'caster', buff: 'static_charge', count: 1 },
+              { type: 'action.damage', on: 'OnUse', who: 'target', amount: '5', damageType: 'lightning' }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+})
+
+componentTemplate({
+  type: TRAIT_TEMPLATES,
+  label: 'Trait',
+  plural: 'Traits',
+  icon: 'sparkles',
+  description: 'innate passive traits: static stat/filter/visibility pieces or signal-reactive effects that run on game events',
+  root: 'trait',
+  pieces: 'Passive pieces (Stat bonus, Damage filter, Invisible), abilities, or reactive action pieces triggered by a signal.',
+  starter: [
+    {
+      id: 'static_stride',
+      name: 'Static Stride',
+      notes: '50% chance whenever you move to charge with Static Charge (+5 lightning damage on your next hit).',
+      values: {
+        signal: 'OnMove',
+        target: 'self',
+        chance: 50,
+        tags: ['lightning'],
+        comps: [{ type: 'action.applyBuff', on: 'OnUse', who: 'caster', buff: 'static_charge' }]
+      }
+    },
+    {
+      id: 'phoenix_rebirth',
+      name: 'Phoenix Rebirth',
+      notes: 'Upon fatal damage, revives once at 50% Health and consumes this trait.',
+      values: {
+        signal: 'OnBeforeDeath',
+        target: 'self',
+        maxUses: 1,
+        consume: 'remove',
+        tags: ['fire', 'rebirth'],
+        comps: [{ type: 'action.revive', on: 'OnUse', who: 'caster', fraction: 0.5 }]
+      }
+    },
+    {
+      id: 'stone_hide',
+      name: 'Stone Hide',
+      notes: 'Ignores all incoming hit damage under 5.',
+      values: {
+        tags: ['resilient'],
+        comps: [{ type: 'buff.damageFilter', mode: 'under', amount: 5 }]
+      }
+    },
+    {
+      id: 'unseen',
+      name: 'Unseen',
+      notes: 'Turns this entity or map object invisible while active.',
+      values: {
+        tags: ['stealth'],
+        comps: [{ type: 'buff.invisible' }]
+      }
+    },
+    {
+      id: 'arcane_focus',
+      name: 'Arcane Focus',
+      notes: '+15 max Mana while active.',
+      values: {
+        tags: ['arcane'],
+        comps: [{ type: 'buff.statBonus', stat: 'mana', amount: 15 }]
+      }
+    },
+    {
+      id: 'battle_grit',
+      name: 'Battle Grit',
+      notes: '+10 max Health while active.',
+      values: {
+        tags: ['martial'],
+        comps: [{ type: 'buff.statBonus', stat: 'health', amount: 10 }]
+      }
+    }
   ]
 })
 
@@ -79,7 +183,10 @@ componentTemplate({
   starter: [
     { id: 'cure_wounds', name: 'Cure Wounds', notes: 'Heals someone you touch.', values: { cost: { mana: 4 }, range: 5, comps: [{ type: 'action.heal', on: 'OnUse', amount: '1d8 + 3' }] } },
     { id: 'fire_bolt', name: 'Fire Bolt', notes: 'A mote of fire at one creature. Costs nothing.', values: { range: 120, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d10', damageType: 'fire' }] } },
-    { id: 'guiding_bolt', name: 'Guiding Bolt', notes: 'A flash of radiant light. Skeletons take double.', values: { cost: { mana: 4 }, range: 120, comps: [{ type: 'action.damage', on: 'OnUse', amount: '4d6', damageType: 'radiant' }] } }
+    { id: 'guiding_bolt', name: 'Guiding Bolt', notes: 'A flash of radiant light. Skeletons take double.', values: { cost: { mana: 4 }, range: 120, comps: [{ type: 'action.damage', on: 'OnUse', amount: '4d6', damageType: 'radiant' }] } },
+    { id: 'unarmed_strike', name: 'Unarmed Strike', notes: 'Fallback melee strike when no weapon is equipped.', values: { range: 5, unarmedOnly: true, comps: [{ type: 'action.damage', on: 'OnUse', amount: 'max(1, 1 + floor((user.str - 10) / 2))', damageType: 'bludgeoning' }] } },
+    { id: 'claws', name: 'Claws', notes: 'Two slashing claw strikes (multi-attack).', values: { range: 5, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d6 + floor((user.str - 10) / 2)', times: 2, damageType: 'slashing' }] } },
+    { id: 'bite', name: 'Bite', notes: 'Heavy piercing bite.', values: { range: 5, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d10 + floor((user.str - 10) / 2)', damageType: 'piercing' }] } }
   ]
 })
 
@@ -112,15 +219,20 @@ entityTemplate({
     {
       id: 'adventurer',
       name: 'Adventurer',
-      notes: 'Stats, Health, Stamina, Mana, buffs, a spell book, a 20-stack inventory, and equipment with the starter slots (belt slots come from the Belt slots stat).',
+      notes: 'Stats, Health, Stamina, Mana, buffs, an unarmed strike + spell book, a 20-stack inventory, and equipment with the starter slots (belt slots come from the Belt slots stat).',
       values: {
         components: [
           { type: 'stats', base: {} },
+          { type: 'progression', level: 1, xp: 0, curve: 'standard' },
+          { type: 'tags', values: [] },
+          { type: 'skills', ranks: {} },
+          { type: 'traits' },
+          { type: 'classes' },
           { type: 'health', stat: 'health' },
           { type: 'resource', stat: 'stamina' },
           { type: 'resource', stat: 'mana' },
           { type: 'buffs' },
-          { type: 'abilities' },
+          { type: 'abilities', comps: [{ type: 'ability', id: 'unarmed_strike', label: 'Unarmed Strike', range: 5, unarmedOnly: true, comps: [{ type: 'action.damage', on: 'OnUse', amount: 'max(1, 1 + floor((user.str - 10) / 2))', damageType: 'bludgeoning' }] }] },
           { type: 'inventory', slots: 20 },
           { type: 'equipment' }
         ]
@@ -159,6 +271,25 @@ entityTemplate({
           { type: 'health', stat: 'health' },
           { type: 'buffs' },
           { type: 'abilities', comps: [{ type: 'ability', id: 'bite', label: 'Bite', range: 5, comps: [{ type: 'action.damage', on: 'OnUse', amount: '2d4 + 2', damageType: 'piercing' }] }] }
+        ]
+      }
+    },
+    {
+      id: 'tiger',
+      name: 'Tiger',
+      notes: 'Has two innate attacks: a single Bite and a 2× Claws multi-attack.',
+      values: {
+        components: [
+          { type: 'stats', base: { health: 37, armour: 12, str: 17, dex: 15, con: 14, speed: 40 } },
+          { type: 'health', stat: 'health' },
+          { type: 'buffs' },
+          {
+            type: 'abilities',
+            comps: [
+              { type: 'ability', id: 'bite', label: 'Bite', range: 5, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d10 + 3', damageType: 'piercing' }] },
+              { type: 'ability', id: 'claws', label: 'Claws', range: 5, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d8 + 3', times: 2, damageType: 'slashing' }] }
+            ]
+          }
         ]
       }
     }

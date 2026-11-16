@@ -7,7 +7,7 @@ import type { JsonSchema } from '../../engine/tools/schema'
 import type { CollectionRecord, FieldChange, FieldType, Page, ViewRef } from '@shared/types'
 import { FIELD_TYPES, hitDetail, pageKindOf } from '@shared/types'
 import { data } from '../../engine/data/hub'
-import { canSee, entryId, generatedTitle, find as libraryFind, insideText, itemsView, kinds, entryView, linkView, partView, resolveEntry, rollEntry, setTags, textView, type KindContext } from '../../engine/library/kinds'
+import { canSee, entryId, findPage, generatedTitle, insideText, itemsView, kinds, entryView, linkView, partView, resolveEntry, rollEntry, setTags, textView, type KindContext } from '../../engine/library/kinds'
 import { tags as tagStore } from '../../engine/library/tags'
 import { resolveIncludes } from '../../engine/library/includes'
 import { ToolError, optStr, str, type ToolContext, type ToolDef, type ToolScope } from '../../engine/tools/types'
@@ -47,36 +47,50 @@ const find: ToolDef = {
   command: true,
   group: 'core',
   needsWorkspace: false,
-  description: 'Search the library. No query lists the newest of each kind.',
+  description: 'Search the library. Supports OR / |, -exclude, "exact phrase", #tag, kind lists, field filters (where), and offset pagination. No query lists the newest of each kind.',
   params: {
     type: 'object',
     properties: {
-      query: { type: ['string', 'null'], description: 'Words to look for; #word matches a tag' },
-      kind: { type: ['string', 'null'], description: 'Only this kind, e.g. page or file' },
-      tags: { oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'string' } }], description: 'Only entries with all these tags' }
+      query: { type: ['string', 'null'], description: 'Words to look for; supports OR / | (e.g. "demon OR fiend OR devil"), -exclude, "exact phrase", and #tag' },
+      kind: { oneOf: [{ type: 'null' }, { type: 'string' }, { type: 'array', items: { type: 'string' } }], description: 'Only this kind or list of kinds, e.g. "sheet" or ["sheet", "place"]' },
+      tags: { oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'string' } }], description: 'Only entries with all these tags' },
+      where: { oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { type: 'string' } }], description: 'Field filters (case-insensitive), e.g. {"Gender": "female", "Race": "tiefling OR demon"}' },
+      limit: { type: ['integer', 'null'], description: 'Max results per page (1-100; default 25 when filtering)' },
+      offset: { type: ['integer', 'null'], description: 'Skip this many matches to read the next page' }
     }
   },
   async execute(params, ctx) {
-    const wanted = Array.isArray(params.tags) ? params.tags.map((t) => `#${String(t).replace(/^#/, '').trim()}`).filter((t) => t.length > 1) : []
-    const query = [optStr(params, 'query')?.trim() ?? '', ...wanted].filter(Boolean).join(' ')
+    const wanted = Array.isArray(params.tags) ? params.tags.map((t) => String(t).replace(/^#/, '').trim()).filter(Boolean) : []
+    const words = optStr(params, 'query')?.trim() ?? null
+    const kind = Array.isArray(params.kind) ? params.kind.map(String).filter(Boolean) : optStr(params, 'kind')
+    const rawWhere = params.where && typeof params.where === 'object' && !Array.isArray(params.where) ? (params.where as Record<string, unknown>) : null
+    const where = rawWhere
+      ? Object.fromEntries(Object.entries(rawWhere).filter(([, v]) => typeof v === 'string' && v.trim()).map(([k, v]) => [k, String(v)]))
+      : null
+    const limit = typeof params.limit === 'number' && Number.isFinite(params.limit) ? params.limit : null
+    const offset = typeof params.offset === 'number' && Number.isFinite(params.offset) ? params.offset : null
     const kctx = { agentId: ctx.agentId }
-    const kind = optStr(params, 'kind')
-    const hits = libraryFind(query, kind, query ? 15 : 8, kctx)
+    const { hits, total, offset: at, limit: _lim } = findPage({ query: words, kind, tags: wanted, where, limit, offset }, kctx)
     const listed = (found: typeof hits) => found.map((h) => `${h.kind} ${hitId(h, kctx)}${hitDetail(h) ? ` — ${hitDetail(h)}` : ''}${h.tags?.length ? ` #${h.tags.join(' #')}` : ''}`).join('\n')
     if (!hits.length) {
-      const words = optStr(params, 'query')?.trim() ?? ''
+      if (at > 0 && total > 0) return { text: `No more matches at offset ${at} (total ${total}).`, empty: true }
       if (wanted.length) {
-        const loose = libraryFind(words, kind, words ? 15 : 8, kctx)
-        if (loose.length) return `Nothing has all of the tags ${wanted.join(' ')}. Without tags, ${words ? `"${words}"` : 'the library'} matches:\n${listed(loose)}\nUse one of these, or call find again with tags null.`
+        const loose = findPage({ query: words, kind, where, limit: 15 }, kctx).hits
+        if (loose.length) return `Nothing has all of the tags ${wanted.map((t) => `#${t}`).join(' ')}. Without tags, ${words ? `"${words}"` : 'the library'} matches:\n${listed(loose)}\nUse one of these, or call find again with tags null.`
       }
-      if (kind && words) {
-        const anyKind = libraryFind(words, null, 15, kctx)
-        if (anyKind.length) return `Nothing of kind ${kind} matches "${words}". In other kinds it matches:\n${listed(anyKind)}\nUse one of these, or call find again with kind null.`
+      if (where && Object.keys(where).length) {
+        const loose = findPage({ query: words, kind, tags: wanted, limit: 15 }, kctx).hits
+        if (loose.length) return `Nothing matches all field filters (${Object.entries(where).map(([k, v]) => `${k}=${v}`).join(', ')}). Without where, it matches:\n${listed(loose)}\nUse one of these, or adjust where.`
       }
-      if (!query) return { text: kind ? `There are no entries of kind ${kind} yet. Call find with kind null to search everything.` : 'The library is empty. add_page makes a page.', empty: true }
-      return { text: `Nothing matches "${words || query}". Try one or two different words, or call find with query null to list the newest entries.`, empty: true }
+      if (kind && (words || (where && Object.keys(where).length))) {
+        const anyKind = findPage({ query: words, tags: wanted, where, limit: 15 }, kctx).hits
+        if (anyKind.length) return `Nothing of that kind matches "${words ?? ''}". In other kinds it matches:\n${listed(anyKind)}\nUse one of these, or call find again with kind null.`
+      }
+      if (!words && !wanted.length && !where) return { text: kind ? `There are no entries of that kind yet. Call find with kind null to search everything.` : 'The library is empty. add_page makes a page.', empty: true }
+      return { text: `Nothing matches "${words ?? ''}". Try OR alternatives (e.g. "demon OR fiend"), broaden where, or call find with query null to list the newest entries.`, empty: true }
     }
-    return listed(hits)
+    const pageNote = total > at + hits.length || at > 0 ? `\nShowing ${at + 1}–${at + hits.length} of ${total}.${total > at + hits.length ? ` Call find with offset ${at + hits.length} for the rest.` : ''}` : ''
+    return `${listed(hits)}${pageNote}`
   }
 }
 

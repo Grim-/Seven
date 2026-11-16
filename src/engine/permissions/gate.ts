@@ -1,4 +1,4 @@
-import type { ApprovalAnswer, ApprovalProps, PermissionMode, PermissionRules, ShellInfo } from '@shared/types'
+import type { ApprovalAnswer, ApprovalProps, PermissionMode, PermissionRules, ShellInfo, ToolPermission } from '@shared/types'
 import { ToolBlocked } from '../tools/types'
 import { matchesAllowRule, matchesDenyRule } from './command'
 import { matchesProtected } from './paths'
@@ -23,8 +23,13 @@ export interface PermissionContext {
   rules: PermissionRules
   grants: SessionGrants
   shell: ShellInfo | null
+  toolPermission?: ToolPermission
   ask: (props: ApprovalProps) => Promise<ApprovalAnswer>
   blocked: (reason: string) => void
+}
+
+export function shouldRunCustomGate(ctx: PermissionContext): boolean {
+  return (ctx.toolPermission ?? 'custom') === 'custom'
 }
 
 const DENIED_BY_USER = (note: string | null) =>
@@ -46,6 +51,7 @@ export interface WriteRequest {
 }
 
 export async function gateWrite(ctx: PermissionContext, req: WriteRequest): Promise<void> {
+  if (!shouldRunCustomGate(ctx)) return
   const protectedBy = matchesProtected(req.relPath, ctx.rules.protect)
   const title = req.action === 'edit' ? `Edit ${req.relPath}` : `Write ${req.relPath}`
   if (req.toolsFolder) {
@@ -98,6 +104,7 @@ export async function gateCommand(ctx: PermissionContext, command: string): Prom
       'matched a deny rule'
     )
   }
+  if (!shouldRunCustomGate(ctx)) return
   if (ctx.grants.commands.has(command)) return
   if (ctx.mode === 'trusted') return
   if (matchesAllowRule(command, ctx.rules.allow)) return
@@ -118,6 +125,7 @@ export async function gateCommand(ctx: PermissionContext, command: string): Prom
 }
 
 export async function gateRemember(ctx: PermissionContext, file: string, text: string): Promise<void> {
+  if (!shouldRunCustomGate(ctx)) return
   if (ctx.grants.remember) return
   const answer = await approve(ctx, {
     action: 'remember',
@@ -138,7 +146,7 @@ export async function gateRemember(ctx: PermissionContext, file: string, text: s
 
 export async function gateTool(ctx: PermissionContext, tool: { name: string; group: string; permission?: string }, args: Record<string, unknown>): Promise<void> {
   const always = tool.permission === 'always'
-  if (ctx.grants.tools?.has(tool.name)) return
+  if (!always && ctx.grants.tools?.has(tool.name)) return
   if (!always && ctx.mode === 'trusted') return
   const answer = await approve(ctx, {
     action: 'tool',
@@ -149,9 +157,9 @@ export async function gateTool(ctx: PermissionContext, tool: { name: string; gro
     shell: null,
     patch: null,
     details: JSON.stringify(args, null, 2),
-    sessionLabel: `Allow ${tool.name} for this chat`
+    sessionLabel: always ? null : `Allow ${tool.name} for this chat`
   })
-  if (answer.decision === 'session') {
+  if (answer.decision === 'session' && !always) {
     ctx.grants.tools ??= new Set()
     ctx.grants.tools.add(tool.name)
   }

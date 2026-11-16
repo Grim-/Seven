@@ -83,7 +83,14 @@ export function useMapTokens({ world, use, places, player, editing, save, onSele
     onMove: (token, at) => {
       setStanding(token, { ...(use.stand[token] ?? NONE), at })
       const t = tokens.find((x) => x.visitor.token === token)
-      if (t) tokenSourceUi(t.visitor.source)?.moved?.(context(t), at)
+      if (t) {
+        tokenSourceUi(t.visitor.source)?.moved?.(context(t), at)
+        if (!editing && t.visitor.game) {
+          void engine('game.onMove', { sheet: t.visitor.sheet || undefined, world, token: t.visitor.token, distance: 5 }).catch(
+            failed('Could not run move triggers')
+          )
+        }
+      }
     }
   }
   const placeSheet = (sheet: string, at: Point) => {

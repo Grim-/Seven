@@ -146,7 +146,7 @@ const PLAY_ROLEPLAY: Record<string, (card: CardRaw, ctx: CardPlayContext) => Pro
       options: dec.options.map((o) => ({ text: o.text, roll: NO_ROLL, action: o.action ?? null })),
       own: dec.own,
       character: ctx.target.sheetId,
-      from: linkFor('cards.card', ctx.cardName)
+      from: linkFor('card', ctx.cardName)
     }
     const answer = (await ctx.tool.ui.ask('decide', props)) as PickAnswer
     if (isLater(answer)) {

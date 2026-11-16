@@ -16,11 +16,15 @@ export interface EffectLane {
   label: string
 }
 
+export const MAX_CHAIN_DEPTH = 4
+
 export interface UseContext {
   user: GameEntity
   target: GameEntity | null
   at: Point | null
   distance: number
+  chainDepth?: number
+  nonTriggering?: boolean
   collect?: (result: EffectResult) => void
   runStored?: (id: string, event: ActionEvent) => boolean
   view?: (event: ViewEvent) => void

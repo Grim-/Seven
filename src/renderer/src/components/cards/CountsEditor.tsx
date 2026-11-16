@@ -35,7 +35,7 @@ export function CountsEditor({ pageId, title, start, what, extra }: { pageId: st
   }
   const menu = (e: MouseEvent, card: string) => {
     const meta = metaOf(card)
-    if (meta) entryMenuAt(e, 'cards.card', meta.id, card, items(card))
+    if (meta) entryMenuAt(e, 'card', meta.id, card, items(card))
     else openMenu(e, showName(card), items(card))
   }
   return (

@@ -12,5 +12,5 @@ sheetFacets.add({
   has: (_sheet, draft) => draft.dnd !== null,
   attach: (draft) => ({ ...draft, dnd: blankDnd(), fields: withPersona(draft.fields) }),
   opensFirst: (draft) => draft.dnd !== null && !draft.fields.some((f) => draft.values[f]?.trim()),
-  Tab: ({ draft, change, open }) => <DndTab dnd={draft.dnd} onChange={(dnd) => change({ ...draft, dnd, fields: dnd && !draft.dnd ? withPersona(draft.fields) : draft.fields })} story={draft.story} onStory={(story) => change({ ...draft, story })} onOpenStory={() => open('story')} />
+  Tab: ({ draft, change, open }) => <DndTab dnd={draft.dnd} onChange={(dnd) => change({ ...draft, dnd, fields: dnd && !draft.dnd ? withPersona(draft.fields) : draft.fields })} story={draft.story} onStory={(story) => change({ ...draft, story })} onOpenStory={() => open('sheet')} />
 })

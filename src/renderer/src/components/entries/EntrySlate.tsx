@@ -14,7 +14,7 @@ import { showInPanel, slateSurfaceMenuItems } from '../data/showInPanel'
 import { openMenu } from '../ui'
 import { pinToChatTable } from '../chat/tabletopStore'
 import { useEscapeLayer } from '../../lib/escape'
-import { matchesKeybind, useKeybindLabel } from '../../store/keybinds'
+import { isTypingTarget, matchesKeybind, useKeybindLabel } from '../../store/keybinds'
 import { cn } from '../../lib/cn'
 
 interface SlateRect {
@@ -49,8 +49,7 @@ function findHoveredSlateId(): string | null {
 
 function onFocusKeyDown(e: KeyboardEvent): void {
   if (e.defaultPrevented || e.repeat) return
-  const t = e.target
-  if (t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return
+  if (isTypingTarget(e)) return
   if (!matchesKeybind('tabletop.focusSlate', e)) return
   if (document.querySelector('[role="dialog"], [data-seven-menu]')) return
 

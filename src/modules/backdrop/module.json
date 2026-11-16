@@ -4,5 +4,10 @@
   "description": "Lets the agent set the mood of a chat (theme, sky, mood light, background, music from your sound files), play one-off cues (a sound, a flash, a shake), and make or edit themes. Volume and muting are always yours, on the bottom bar.",
   "version": "1.0.0",
   "apiVersion": 1,
-  "permission": "custom"
+  "permission": "none",
+  "toolPermissions": {
+    "ambience": "none",
+    "cue": "none",
+    "theme_save": "ask"
+  }
 }

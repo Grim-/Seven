@@ -23,11 +23,16 @@ export class Health extends Resource {
     const entity = this.entity
     const type = entity?.catalog.damageType(hit.type)
     const formula = entity?.catalog.formula('damage')
-    if (!entity || !type || !formula) return amount
-    const resist = entity.comp(Stats)?.value(type.resistedBy) ?? 0
-    const scale = type.scalesWith ? (hit.source?.comp(Stats)?.value(type.scalesWith) ?? 0) : 0
-    const vars: Record<string, number> = { power: amount, resist, scalestat: scale, floor: hit.continuous ? 0 : 1 }
-    return Math.max(0, evaluate(formula, { value: (name) => vars[name] }))
+    const resolved =
+      !entity || !type || !formula
+        ? amount
+        : (() => {
+            const resist = entity.comp(Stats)?.value(type.resistedBy) ?? 0
+            const scale = type.scalesWith ? (hit.source?.comp(Stats)?.value(type.scalesWith) ?? 0) : 0
+            const vars: Record<string, number> = { power: amount, resist, scalestat: scale, floor: hit.continuous ? 0 : 1 }
+            return Math.max(0, evaluate(formula, { value: (name) => vars[name] }))
+          })()
+    return Math.max(0, entity ? entity.modifyIncomingDamage(resolved, hit) : resolved)
   }
 
   damage(amount: number, hit: Hit): number {
@@ -56,6 +61,8 @@ export class Health extends Resource {
 
   kill(cause: string | null): void {
     if (this.dead) return
+    this.entity?.emit('OnBeforeDeath', { cause })
+    if (this.dead || this.get() > 0) return
     this.dead = true
     this.cause = cause
     this.set(0)
@@ -63,11 +70,11 @@ export class Health extends Resource {
   }
 
   revive(fraction: number): void {
-    if (!this.dead) return
+    if (!this.dead && this.get() > 0) return
     this.dead = false
     this.cause = null
-    this.set(this.max() * fraction)
-    this.entity?.emit('OnRevived', {})
+    this.set(Math.max(1, this.max() * fraction))
+    this.entity?.emit('OnRevived', { fraction })
   }
 
   tickSim(seconds: number): void {

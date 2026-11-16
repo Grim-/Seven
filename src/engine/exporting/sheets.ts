@@ -1,6 +1,6 @@
 import type { ExportBlock, ExportPart } from '@shared/exporting'
 import { dndText } from '@shared/dnd'
-import { storyText } from '@shared/story'
+import { storyHasContent, storyText } from '@shared/story'
 import { entryId, entryMarkdown, type CompendiumKind } from '@shared/compendium'
 import { getSheet } from '../library/sheets'
 import { compendium } from '../../modules/dnd/compendium'
@@ -22,7 +22,7 @@ function sheetPart(ctx: EntryCtx): ExportPart {
 
 function storyPart(ctx: EntryCtx): ExportPart {
   const s = getSheet(ctx.id)
-  const has = s.story.where || s.story.threads.length || s.story.sessions.length
+  const has = storyHasContent(s.story)
   return { heading: 'Story', blocks: [has ? { md: storyText(s.story) } : { p: 'No story yet.' }], json: s.story }
 }
 

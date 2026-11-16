@@ -35,6 +35,18 @@ export function AgentChat({ id }: EntrySurfaceProps) {
         <AgentAvatar agent={agent} size={54} />
         <div className="flex min-w-0 flex-col gap-1.5">
           {agent.description && <Markdown text={agent.description} className="text-[12.5px] text-dim" />}
+          {(agent.relationships?.length ?? 0) > 0 && (
+            <span className="font-mono text-[10.5px] text-teal/85">
+              {agent.relationships!.length} relationship{agent.relationships!.length === 1 ? '' : 's'}
+              {agent.relationships!.some((r) => r.pinned)
+                ? ` · ${agent.relationships!
+                    .filter((r) => r.pinned)
+                    .slice(0, 3)
+                    .map((r) => `${r.target} (${r.stance})`)
+                    .join(', ')}`
+                : ''}
+            </span>
+          )}
           <TraitChips traits={modules} />
           <span className="font-mono text-[11px] text-faint">{model}</span>
         </div>

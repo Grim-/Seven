@@ -1,5 +1,6 @@
 import { agentSheets, type AgentProfile } from '@shared/types'
 import { formatStorySnippet, searchStoryItems, type StoryRecallHit } from '@shared/story'
+import { agentAccess } from '../agents/access'
 import { findSheet, getSheet } from '../library/sheets'
 import { minds } from './store'
 
@@ -17,7 +18,7 @@ export function characterRecallBlock(agent: AgentProfile, prompt: string): strin
     const id = findSheet(ref)
     if (!id) continue
     const sheet = getSheet(id)
-    const hits = searchStoryItems(sheet.story, prompt, { memories: sheet.mind?.memories ?? [], includePinned: false })
+    const hits = searchStoryItems(sheet.story, prompt, { memories: sheet.mind?.memories ?? [], relationships: sheet.relationships ?? [], includePinned: false })
     for (const hit of hits.slice(0, 4)) {
       collected.push({ sheetTitle: sheet.title, hit })
     }
@@ -32,15 +33,24 @@ export function characterRecallBlock(agent: AgentProfile, prompt: string): strin
 
 export async function recallBlock(agentId: string, prompt: string): Promise<string> {
   if (prompt.trim().length < 3) return ''
-  const hits = await minds.search(agentId, prompt, 10, ['memory'])
+  const hits = await minds.search(agentId, prompt, 10, ['memory', 'relationship'])
+  const pinnedRels = new Set((agentAccess.get(agentId)?.relationships ?? []).filter((r) => r.pinned).map((r) => r.id))
   const seen = new Set<string>()
   const lines: string[] = []
   for (const h of hits) {
-    if (seen.has(h.ref) || lines.length >= 4) continue
-    seen.add(h.ref)
-    const m = minds.memory(agentId, h.ref)
-    if (!m || m.pinned) continue
-    lines.push(`- ${m.text.replace(/\s*\n\s*/g, ' ')} (${m.id})`)
+    const key = `${h.source}:${h.ref}`
+    if (seen.has(key) || lines.length >= 4) continue
+    seen.add(key)
+    if (h.source === 'memory') {
+      const m = minds.memory(agentId, h.ref)
+      if (!m || m.pinned) continue
+      lines.push(`- ${m.text.replace(/\s*\n\s*/g, ' ')} (${m.id})`)
+      continue
+    }
+    if (h.source === 'relationship') {
+      if (pinnedRels.has(h.ref)) continue
+      lines.push(`- relationship: ${h.text.replace(/\s*\n\s*/g, ' ')} (${h.ref})`)
+    }
   }
-  return lines.length ? `\n\n[From your memory, maybe relevant:]\n${lines.join('\n')}` : ''
+  return lines.length ? `\n\n[From your memory & relationships, maybe relevant:]\n${lines.join('\n')}` : ''
 }

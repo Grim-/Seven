@@ -1,6 +1,6 @@
 import { noteFailure } from '../util/report'
 import { notFound } from '@shared/errors'
-import { matchSnippet, referencePattern } from '@shared/text'
+import { referencePattern } from '@shared/text'
 import { FOLDER_TYPE, idSegment, stripRef, toId } from '@shared/ids'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -10,6 +10,7 @@ import { copyPath, readJson, readText, removePath, renamePath, writeJson } from 
 import { DirIndex } from '../util/dirIndex'
 import { LIMITS } from '../limits'
 import { DataError, cleanFields, coerce, compare, matches, slug, validateValues } from './validate'
+import { scoreDoc } from '../library/query'
 
 export interface WriteContext {
   checkpoint?: (absPath: string, previous: Buffer | null) => void
@@ -1026,21 +1027,20 @@ export class PageStore {
   }
 
   search(text: string, limit = 20): PageHit[] {
-    const needle = text.trim().toLowerCase()
+    const trimmed = text.trim()
     const pages = this.all()
-    if (!needle) return pages.slice(0, limit).map((p) => ({ id: p.id, title: p.title, snippet: summaryOf(p.body) }))
+    if (!trimmed) return pages.slice(0, limit).map((p) => ({ id: p.id, title: p.title, snippet: summaryOf(p.body) }))
     const hits: (PageHit & { score: number })[] = []
     for (const p of pages) {
-      let score = 0
-      if (p.title.toLowerCase().includes(needle)) score += 10
-      let snippet = matchSnippet(p.body, needle)
-      if (snippet) score += 3
-      const record = p.records.find((r) => Object.values(r.values).some((v) => (Array.isArray(v) ? v.join(' ') : String(v ?? '')).toLowerCase().includes(needle)))
-      if (record) {
-        score += 2
-        if (!snippet) snippet = `item ${record.id} ${JSON.stringify(record.values)}`.slice(0, 160)
-      }
-      if (score) hits.push({ id: p.id, title: p.title, snippet, score })
+      const fields = p.records.flatMap((r) =>
+        Object.entries(r.values).map(([name, v]) => ({
+          name,
+          value: Array.isArray(v) ? v.join(' ') : String(v ?? '')
+        }))
+      )
+      const matched = scoreDoc(trimmed, { title: p.title, labels: ['page', 'pages'], fields, body: p.body })
+      if (!matched) continue
+      hits.push({ id: p.id, title: p.title, snippet: matched.snippet || summaryOf(p.body), score: matched.score })
     }
     return hits
       .sort((a, b) => b.score - a.score)

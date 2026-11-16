@@ -5,7 +5,14 @@
   "version": "1.0.0",
   "apiVersion": 1,
   "needsWorkspace": false,
-  "permission": "none",
+  "permission": "ask",
+  "toolPermissions": {
+    "make_card": "ask",
+    "make_card_set": "ask",
+    "give_card": "ask",
+    "take_card": "ask",
+    "play_card": "ask"
+  },
   "kinds": [
     {
       "type": "layout",

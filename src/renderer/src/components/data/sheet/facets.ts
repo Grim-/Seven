@@ -2,7 +2,7 @@ import type { ComponentType } from 'react'
 import type { CharacterSheet } from '@shared/types'
 import { moduleList, type ModuleEntry } from '@shared/moduleList'
 
-export type SheetDraft = Pick<CharacterSheet, 'title' | 'fields' | 'values' | 'dnd' | 'story' | 'mind'>
+export type SheetDraft = Pick<CharacterSheet, 'title' | 'fields' | 'values' | 'dnd' | 'story' | 'mind' | 'relationships'>
 
 export interface FacetProps {
   sheet: CharacterSheet

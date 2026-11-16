@@ -1,4 +1,6 @@
 import { Plus, X } from 'lucide-react'
+import { ChipInput } from '../../../ui'
+import { useKnownGameTags } from '../../useGameSuggestions'
 import { EffectTokenButton, EffectTokenText } from '../EffectTokenButton'
 import { registerEffectToken, type TokenEditProps, type TokenProps } from './registry'
 
@@ -6,8 +8,9 @@ const listOf = (value: unknown): unknown[] => (Array.isArray(value) ? value : []
 
 function Text({ spec, value }: TokenProps) {
   const list = listOf(value)
-  if (!list.length || !spec.of) return <>none</>
+  if (!list.length) return <>none</>
   const of = spec.of
+  if (!of) return <>{list.map(String).filter(Boolean).join(', ') || 'none'}</>
   return (
     <>
       {list.map((item, i) => (
@@ -21,9 +24,19 @@ function Text({ spec, value }: TokenProps) {
 }
 
 function Edit({ spec, value, onChange }: TokenEditProps) {
+  const knownTags = useKnownGameTags()
   const list = listOf(value)
   const of = spec.of
-  if (!of) return <span className="text-[12px] text-faint">This list can't be edited here yet.</span>
+  if (!of) {
+    return (
+      <ChipInput
+        value={list.map(String).filter(Boolean)}
+        suggestions={knownTags}
+        onChange={(next) => onChange(next)}
+        placeholder="Pick existing or type new…"
+      />
+    )
+  }
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {list.map((item, i) => (

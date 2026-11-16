@@ -8,6 +8,7 @@ import { modules } from '../../engine/modules/registry'
 import { data } from '../../engine/data/hub'
 import { logWeb } from '../../engine/weblog'
 import { linkFor } from '@shared/text'
+import { shouldRunCustomGate } from '../../engine/permissions/gate'
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 Seven'
 const MAX_PAGE = 3 * 1024 * 1024
@@ -44,7 +45,7 @@ async function approve(ctx: ToolContext, url: URL, what: string): Promise<WebLog
     throw new ToolError('Addresses on this computer or the local network are not allowed. Use a public web address instead.')
   }
   const list = allowedSites()
-  if (allowed(url.hostname, list)) return 'auto'
+  if (allowed(url.hostname, list) || !shouldRunCustomGate(ctx.permissions)) return 'auto'
   const answer = (await ctx.ui.ask('form', {
     title: `${what}?`,
     message: `The agent wants to ${what.toLowerCase()} from ${url.href}`,

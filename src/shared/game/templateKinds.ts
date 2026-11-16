@@ -1,6 +1,8 @@
 export const CHARACTER_TEMPLATES = 'game_character'
 export const BUFF_TEMPLATES = 'game_buff'
 export const ABILITY_TEMPLATES = 'game_ability'
+export const TRAIT_TEMPLATES = 'game_trait'
+export const CLASS_TEMPLATES = 'game_class'
 export const ITEM_TEMPLATES = 'game_item'
 export const CREATURE_TEMPLATES = 'game_creature'
 export const DAMAGE_TYPES = 'damage_type'

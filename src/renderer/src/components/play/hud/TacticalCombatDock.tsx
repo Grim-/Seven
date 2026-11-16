@@ -12,7 +12,7 @@ import { useGameState } from '../state/gameStateStore'
 import { useDialogue } from '../dialogue/dialogueStore'
 import { defaultDialogueTree } from '@shared/game/dialogue'
 import { cn } from '../../../lib/cn'
-import { matchesKeybind } from '../../../store/keybinds'
+import { isTypingTarget, matchesKeybind } from '../../../store/keybinds'
 
 interface TacticalCombatDockProps {
   battle: BattleState
@@ -46,8 +46,7 @@ export function TacticalCombatDock({
   useEffect(() => {
     if (!isPlayerTurn) return
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target
-      if (t instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return
+      if (isTypingTarget(e)) return
 
       if (e.key === '1' || matchesKeybind('tactical.targetAttack', e)) {
         if (targetCombatant && !economy.actionUsed) {

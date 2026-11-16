@@ -1,19 +1,8 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
-import {
-  Swords,
-  Shield,
-  Shirt,
-  FlaskConical,
-  Scroll,
-  Sparkles,
-  Zap,
-  Flame,
-  Droplets,
-  Package
-} from 'lucide-react'
 import { hideTip, showTip } from '../../components/ui/TooltipHost'
 import { cn } from '../../lib/cn'
 import { ACTION_DRAG_MIME, setCompactDragGhost, type ActionDragPayload } from '../../components/play/hud/actionSlots'
+import { getGameVisual } from './gameVisuals'
 
 const MIME = 'application/x-seven-item'
 
@@ -26,38 +15,6 @@ export interface SlotItem {
   uid: string
   label: string
   count: number
-}
-
-function getItemVisual(label: string) {
-  const l = label.toLowerCase()
-  if (l.includes('potion') || l.includes('elixir') || l.includes('flask') || l.includes('draught') || l.includes('brew')) {
-    return { Icon: FlaskConical, color: 'text-emerald-400', border: 'border-emerald-500/50', glow: 'shadow-[inset_0_0_8px_rgba(52,211,153,0.2)]' }
-  }
-  if (l.includes('scroll') || l.includes('tome') || l.includes('parchment') || l.includes('grimoire') || l.includes('book')) {
-    return { Icon: Scroll, color: 'text-purple-400', border: 'border-purple-500/50', glow: 'shadow-[inset_0_0_8px_rgba(192,132,252,0.2)]' }
-  }
-  if (l.includes('sword') || l.includes('blade') || l.includes('dagger') || l.includes('axe') || l.includes('bow') || l.includes('staff') || l.includes('mace') || l.includes('weapon')) {
-    return { Icon: Swords, color: 'text-amber-400', border: 'border-amber-500/50', glow: 'shadow-[inset_0_0_8px_rgba(245,158,11,0.2)]' }
-  }
-  if (l.includes('shield') || l.includes('buckler') || l.includes('ward')) {
-    return { Icon: Shield, color: 'text-cyan', border: 'border-cyan/50', glow: 'shadow-[inset_0_0_8px_rgba(102,252,241,0.2)]' }
-  }
-  if (l.includes('armor') || l.includes('mail') || l.includes('plate') || l.includes('leather') || l.includes('robe') || l.includes('chest') || l.includes('vest')) {
-    return { Icon: Shirt, color: 'text-sky-400', border: 'border-sky-500/50', glow: 'shadow-[inset_0_0_8px_rgba(56,189,248,0.2)]' }
-  }
-  if (l.includes('ring') || l.includes('amulet') || l.includes('gem') || l.includes('crystal') || l.includes('charm') || l.includes('relic')) {
-    return { Icon: Sparkles, color: 'text-cyan', border: 'border-cyan/50', glow: 'shadow-[inset_0_0_8px_rgba(102,252,241,0.2)]' }
-  }
-  if (l.includes('fire') || l.includes('flame') || l.includes('torch')) {
-    return { Icon: Flame, color: 'text-amber-400', border: 'border-amber-500/50', glow: 'shadow-[inset_0_0_8px_rgba(245,158,11,0.2)]' }
-  }
-  if (l.includes('water') || l.includes('ice') || l.includes('frost')) {
-    return { Icon: Droplets, color: 'text-sky-400', border: 'border-sky-500/50', glow: 'shadow-[inset_0_0_8px_rgba(56,189,248,0.2)]' }
-  }
-  if (l.includes('lightning') || l.includes('spark') || l.includes('shock')) {
-    return { Icon: Zap, color: 'text-yellow-400', border: 'border-yellow-500/50', glow: 'shadow-[inset_0_0_8px_rgba(250,204,21,0.2)]' }
-  }
-  return { Icon: Package, color: 'text-white/80', border: 'border-line/60', glow: 'shadow-[inset_0_0_8px_rgba(255,255,255,0.05)]' }
 }
 
 export function ItemSlot({
@@ -88,7 +45,7 @@ export function ItemSlot({
   className?: string
 }) {
   const [over, setOver] = useState(false)
-  const visual = item ? getItemVisual(item.label) : null
+  const visual = item ? getGameVisual(item.label, '', 'item') : null
   const ItemIcon = visual?.Icon
 
   return (

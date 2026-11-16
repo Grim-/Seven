@@ -23,14 +23,14 @@ import {
   Radio,
   Layers
 } from 'lucide-react'
-import { Equipment, Inventory, Item, usableAbilities, type Ability } from '@shared/game/components'
+import { Classes, Equipment, Inventory, Item, Traits, usableAbilities, type Ability, type Trait } from '@shared/game/components'
 import { GameEntity, type Catalog } from '@shared/game/core'
 import type { PlaceVisitor } from '@shared/maps'
 import { useGameState } from '../state/gameStateStore'
 import { useDialogue } from '../dialogue/dialogueStore'
 import { defaultDialogueTree, combatParleyDialogueTree } from '@shared/game/dialogue'
 import { useGameplaySettings } from '../settings/gameplaySettingsStore'
-import { matchesKeybind } from '../../../store/keybinds'
+import { isTypingTarget, matchesKeybind } from '../../../store/keybinds'
 import { useLatest } from '../../../game/react/useLatest'
 import { hideTip, showTip } from '../../ui/TooltipHost'
 import { openMenu } from '../../ui'
@@ -54,8 +54,6 @@ import { cn } from '../../../lib/cn'
 import { noteFailure } from '../../../store/problems'
 import { readStored, writeStored } from '../../../lib/stored'
 
-const typing = (t: EventTarget | null) =>
-  t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
 const name = (a: Ability) => String(a.params.label || a.id)
 
 function getSlotTheme(rawName: string) {
@@ -180,6 +178,11 @@ export function TacticalActionDeck({
     return usableAbilities(entity)
   }, [entity])
 
+  const heldClasses = useMemo(() => entity?.comp(Classes)?.held ?? [], [entity])
+  const traits = useMemo<Trait[]>(() => entity?.comp(Traits)?.held ?? [], [entity])
+  const classTitleOf = (classId: string) =>
+    heldClasses.find((c) => c.id === classId)?.title || String(catalog?.template('game_class', classId)?.label || classId)
+
   const allItems = useMemo(() => {
     if (!entity) return []
     return [
@@ -188,8 +191,12 @@ export function TacticalActionDeck({
     ]
   }, [entity])
 
-  // Derive class label dynamically from sheet line (e.g. "Cleric", "Wizard", "Rogue")
+  // Derive class label dynamically from held classes first, falling back to sheet line
   const dynamicClassName = useMemo(() => {
+    const active = heldClasses.filter((c) => c.isActive())
+    if (active.length === 1) return active[0].title.toUpperCase()
+    if (active.length > 1) return `${active[0].title.toUpperCase()} +${active.length - 1}`
+    if (heldClasses.length > 0) return heldClasses[0].title.toUpperCase()
     if (visitor?.line) {
       const raw = visitor.line.split(',')[0] ?? ''
       const words = raw.split(' ')
@@ -202,7 +209,7 @@ export function TacticalActionDeck({
       if (found) return found.toUpperCase()
     }
     return 'CLASS'
-  }, [visitor?.line])
+  }, [heldClasses, visitor?.line])
 
   // Active buffs & conditions from visitor dnd stats
   const activeConditions = useMemo(() => {
@@ -312,7 +319,7 @@ export function TacticalActionDeck({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.repeat || typing(e.target)) return
+      if (e.defaultPrevented || e.repeat || isTypingTarget(e)) return
       const k = e.key.toLowerCase()
 
       if (k === '1' || matchesKeybind('tactical.targetAttack', e)) {
@@ -429,6 +436,54 @@ export function TacticalActionDeck({
         className
       )}
     >
+      {/* OPTIONAL PASSIVE TRAITS DRAWER (SHOWN WHEN PASSIVES TAB IS SELECTED) */}
+      {activeCategory === 'PASSIVES' && (
+        <div className="mb-1 flex flex-wrap items-center gap-1 border border-line/70 bg-black/95 px-2 py-1.5 text-[9.5px]">
+          <span className="mr-1 font-bold uppercase tracking-wider text-purple">Traits</span>
+          {traits.length === 0 ? (
+            <span className="text-faint">No innate or class traits active.</span>
+          ) : (
+            traits.map((t) => {
+              const active = t.isActive()
+              const sig = String(t.params.signal || '')
+              const maxUses = Number(t.params.maxUses ?? 0)
+              const classTitle = t.sourceClass ? classTitleOf(t.sourceClass) : ''
+              const tipBody = (
+                <span className="flex min-w-44 flex-col gap-1.5">
+                  {Boolean(t.params.description) && <span className="text-[11px] text-dim">{String(t.params.description)}</span>}
+                  {classTitle && <span className="font-mono text-[10px] text-cyan">from class {classTitle}</span>}
+                  <RowList
+                    rows={[
+                      ...(maxUses > 0 ? [{ label: 'Uses', value: `${Math.max(0, maxUses - t.uses)}/${maxUses}` }] : []),
+                      ...t.tooltipRows(),
+                      ...t.comps.flatMap((c) => c.tooltipRows())
+                    ]}
+                  />
+                </span>
+              )
+              return (
+                <span
+                  key={t.uid}
+                  onMouseEnter={(e) => showTip(e.currentTarget, t.title, tipBody, 'top')}
+                  onMouseLeave={() => hideTip('component')}
+                  className={cn(
+                    'inline-flex items-center gap-1 border px-1.5 py-0.5 font-mono text-[9px] transition-colors',
+                    active ? 'border-purple/50 bg-purple/10 text-white' : 'border-line/40 bg-black/60 text-faint opacity-60'
+                  )}
+                >
+                  <Sparkles className={cn('h-2.5 w-2.5', active ? 'text-purple' : 'text-faint')} />
+                  <span className="font-semibold">{t.title}</span>
+                  {classTitle && <span className="text-[8px] uppercase text-cyan">[{classTitle}]</span>}
+                  {sig && <span className="text-[8px] text-dim">{sig}</span>}
+                  {t.cooldownLeft > 0 && <span className="text-[8px] text-alert">{gameTime(t.cooldownLeft)}</span>}
+                  {t.exhausted && <span className="text-[8px] text-alert">USED</span>}
+                </span>
+              )
+            })
+          )}
+        </div>
+      )}
+
       {/* 1. TOP SHELF: RESOURCE TELEMETRY, SPELL MATRIX & ACTIVE BUFF DOCK */}
       <div className="flex h-7 items-center justify-between border border-line/70 border-b-0 bg-black/95 px-2.5 text-[10px]">
         {/* LEFT: ACTION ECONOMY STATUS PIPS */}
@@ -751,7 +806,9 @@ export function TacticalActionDeck({
 
             if (slot.kind === 'ability') {
               const a = abilities.find((x) => x.uid === slot.uid || x.id === slot.id)
-              const ready = a && entity ? a.canUse({ user: entity, target: entity, at: null, distance: 0 }) : 'unavailable'
+              const sourceClass = String(a?.params.sourceClass || '')
+              const sourceClassTitle = sourceClass ? classTitleOf(sourceClass) : ''
+              const ready = a && entity ? a.canUse({ user: entity, target: entity, at: null, distance: 0 }) : 'restricted or unavailable'
               const cooling = a ? a.cooling > 0 : false
               const rows = a && catalog
                 ? [
@@ -761,6 +818,11 @@ export function TacticalActionDeck({
                 : []
               const body = (
                 <span className="flex min-w-44 flex-col gap-1.5">
+                  {sourceClassTitle && (
+                    <span className="font-mono text-[10px] text-cyan">
+                      from class {sourceClassTitle}
+                    </span>
+                  )}
                   {a?.item && (
                     <span className="font-mono text-[10px] text-purple">
                       from {String(a.item.params.label || a.item.id)}
@@ -814,7 +876,16 @@ export function TacticalActionDeck({
                   )}
                 >
                   <Icon className="h-4 w-4 transition-transform group-hover:scale-110" />
-                  
+
+                  {sourceClassTitle && !cooling && (
+                    <span
+                      className="absolute bottom-0.5 left-0.5 border border-cyan/40 bg-black/85 px-0.5 text-[6.5px] font-bold uppercase text-cyan leading-none"
+                      title={`Class ability: ${sourceClassTitle}`}
+                    >
+                      {sourceClassTitle.slice(0, 3)}
+                    </span>
+                  )}
+
                   {/* UPCAST / TIER INDICATOR BADGE (+) */}
                   {isUpcastable && (
                     <span

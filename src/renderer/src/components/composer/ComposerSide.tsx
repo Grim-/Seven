@@ -32,7 +32,7 @@ export function ComposerSide({ onAdd }: { onAdd: (texts: string[]) => void }) {
         {tab === 'cards' && (
           <FaceGrid scale={0.7}>
             {cards.map((c) => (
-              <button key={c.id} type="button" draggable onDragStart={(e) => dragEntries(e, [c.id])} onClick={() => onAdd([entryLink('cards.card', c.id)])} title="Put on the paper" className="text-left">
+              <button key={c.id} type="button" draggable onDragStart={(e) => dragEntries(e, [c.id])} onClick={() => onAdd([entryLink('card', c.id)])} title="Put on the paper" className="text-left">
                 <LiveCard id={c.id} />
               </button>
             ))}

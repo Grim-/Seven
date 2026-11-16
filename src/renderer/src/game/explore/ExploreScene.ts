@@ -63,6 +63,15 @@ const FOLLOW_EDGE = 0.25
 const NIGHT_DARKNESS = 0.55
 const NIGHT_COLOUR = '#05070f'
 
+const MIN_VISIBLE_OVERLAP = 48
+
+function isViewVisible(view: View, area: { w: number; h: number }, screen: { width: number; height: number }): boolean {
+  if (!(view.zoom > 0) || area.w <= 0 || area.h <= 0 || screen.width <= 0 || screen.height <= 0) return false
+  const overlapX = Math.min(screen.width, view.x + area.w * view.zoom) - Math.max(0, view.x)
+  const overlapY = Math.min(screen.height, view.y + area.h * view.zoom) - Math.max(0, view.y)
+  return overlapX >= Math.min(MIN_VISIBLE_OVERLAP, area.w * view.zoom) && overlapY >= Math.min(MIN_VISIBLE_OVERLAP, area.h * view.zoom)
+}
+
 export class ExploreScene implements Scene {
   readonly root = new Container()
   readonly events = new EventBus<ExploreEvents>()
@@ -98,8 +107,9 @@ export class ExploreScene implements Scene {
 
   enter(engine: GameEngine): void {
     this.engine = engine
-    engine.camera.setArea(mapArea(this.data.map))
-    if (this.start) engine.camera.set(this.start)
+    const area = mapArea(this.data.map)
+    engine.camera.setArea(area)
+    if (this.start && isViewVisible(this.start, area, engine.app.screen)) engine.camera.set(this.start)
     else engine.camera.fit(false)
     this.areas = new PlaceAreas(engine)
     this.marker = new MoveMarker(engine)
@@ -373,16 +383,22 @@ export class ExploreScene implements Scene {
     const seen = new Set<string>()
     for (const token of this.data.tokens) {
       const sheet = token.visitor.sheet
+      const isMine = sheet === this.data.mine
+      const visible = !token.visitor.hidden || isMine
       seen.add(sheet)
       const border = this.tokenLook(token.visitor)
       const known = this.tokens.get(sheet)
       if (known) {
         known.setBorder(border)
         known.setBars(this.barsOf(token))
+        known.root.visible = visible
+        known.root.alpha = token.visitor.hidden ? 0.45 : 1
         known.update(token)
         continue
       }
       const view = new TokenView(this.engine, token, { base, smallest: TOKEN_SMALLEST, label: true, border })
+      view.root.visible = visible
+      view.root.alpha = token.visitor.hidden ? 0.45 : 1
       view.setBars(this.barsOf(token))
       this.engine.input.bind(view.root, {
         tap: (hit) => {

@@ -17,6 +17,7 @@ import { SheetHeader } from './SheetHeader'
 import { failed } from '../../../lib/notify'
 import { cn } from '../../../lib/cn'
 import { sheetFacets, type SheetDraft, type SheetFacet } from './facets'
+import { StoryTab } from './story/StoryTab'
 import { useModuleList } from '../../../registries/useModuleList'
 
 type Draft = SheetDraft
@@ -33,7 +34,8 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
       values: start.values,
       dnd: start.dnd,
       story: start.story,
-      mind: start.mind ?? null
+      mind: start.mind ?? null,
+      relationships: start.relationships ?? []
     },
     (d) =>
       engine('sheets.save', {
@@ -43,7 +45,8 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
         values: d.values,
         dnd: d.dnd,
         story: d.story,
-        mind: d.mind ?? null
+        mind: d.mind ?? null,
+        relationships: d.relationships ?? []
       })
   )
   const sheet = saver.value
@@ -88,11 +91,11 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
           }
 
           const diffTabs: string[] = []
-          if (diffFields.length > 0 || prev.title !== fresh.title) diffTabs.push(CORE)
+          if (diffFields.length > 0 || prev.title !== fresh.title || JSON.stringify(prev.story ?? null) !== JSON.stringify(fresh.story ?? null)) diffTabs.push(CORE)
           if (JSON.stringify(prev.dnd ?? null) !== JSON.stringify(fresh.dnd ?? null)) diffTabs.push('dnd')
           if (JSON.stringify(prevLive.game ?? null) !== JSON.stringify(fresh.game ?? null)) diffTabs.push('game')
-          if (JSON.stringify(prev.story ?? null) !== JSON.stringify(fresh.story ?? null)) diffTabs.push('story')
           if (JSON.stringify(prev.mind ?? null) !== JSON.stringify(fresh.mind ?? null)) diffTabs.push('mind')
+          if (JSON.stringify(prev.relationships ?? []) !== JSON.stringify(fresh.relationships ?? [])) diffTabs.push('relations')
           const imageChanged = prevLive.image !== fresh.image
 
           if (diffTabs.length === 0 && !imageChanged) return
@@ -105,7 +108,8 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
             values: fresh.values,
             dnd: fresh.dnd,
             story: fresh.story,
-            mind: fresh.mind ?? null
+            mind: fresh.mind ?? null,
+            relationships: fresh.relationships ?? []
           })
 
           if (diffFields.length > 0 || diffTabs.length > 0) {
@@ -183,15 +187,26 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
     )
   }
 
-  const sheetTab = (
-    <>
+  const profileCards = (
+    <section className="flex flex-col gap-2.5 border border-line/45 bg-black/40 p-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/35 pb-2">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-accent">
+            Character Profile &amp; Persona
+          </span>
+          <span className="border border-ok/40 bg-ok/10 px-1.5 py-0.5 font-mono text-[9.5px] uppercase text-ok">
+            Always in prompt
+          </span>
+        </div>
+        <span className="font-mono text-[11px] text-dim">{sheet.fields.length} cards · #random supported</span>
+      </div>
       {adding && <AddFieldBar fields={sheet.fields} kept={kept} onAdd={add} onClose={() => setAdding(false)} />}
       <div
         className={cn(
           'grid gap-2.5',
           compact
-            ? 'grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] pt-2'
-            : 'grid-cols-[repeat(auto-fill,minmax(28rem,1fr))] gap-3 p-4'
+            ? 'grid-cols-[repeat(auto-fill,minmax(16rem,1fr))]'
+            : 'grid-cols-[repeat(auto-fill,minmax(22rem,1fr))]'
         )}
       >
         {sheet.fields.map((field, i) => (
@@ -216,7 +231,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
         </button>
       </div>
       {kept.length > 0 && !adding && (
-        <div className={cn('flex flex-wrap items-center gap-2 text-[12px] text-dim', compact ? 'pt-2' : 'px-5 pb-4')}>
+        <div className="flex flex-wrap items-center gap-2 text-[12px] text-dim">
           Off the sheet, text kept:
           {kept.map((h) => (
             <button
@@ -229,7 +244,20 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
           ))}
         </div>
       )}
-    </>
+    </section>
+  )
+
+  const sheetTab = (
+    <StoryTab
+      sheet={liveSheet}
+      story={sheet.story}
+      mind={sheet.mind}
+      profile={profileCards}
+      compact={compact}
+      onChange={(story) => change({ ...sheet, story })}
+      onMindChange={(mind) => change({ ...sheet, mind })}
+      onOpenFacet={setTab}
+    />
   )
   const shows = (f: SheetFacet) => !f.has || f.has(liveSheet, sheet) || opened.includes(f.id)
   const shown = (facets ?? []).filter(shows)

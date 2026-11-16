@@ -8,7 +8,7 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { EventEmitter } from 'node:events'
 import type { JsonObjectSchema } from '../tools/schema'
-import type { ModuleInfo, ModuleSource, ModuleState, PageTypeInfo, ToolsPrefs } from '@shared/types'
+import type { ModuleInfo, ModuleSource, ModuleState, PageTypeInfo, ToolPermission, ToolsPrefs } from '@shared/types'
 import { data } from '../data/hub'
 import type { SinglePage } from '../data/pages'
 import type { ToolDef } from '../tools/types'
@@ -16,7 +16,7 @@ import { dataRoot } from '../util/paths'
 import { readJson, writeJson } from '../util/fs'
 import { secure, vaultEvents } from '../util/secure'
 import { isVaultLocked } from '@shared/sealed'
-import { ID_PATTERN, parseManifest, type Manifest } from './manifest'
+import { ID_PATTERN, PERMISSIONS, parseManifest, type Manifest } from './manifest'
 import { contributionsOf } from './contributions'
 import { installZip, type ZipInstallResult } from './install'
 import { sdk, type ModuleFactory, type ModulePage, type ModuleTool, type ToolModule } from './sdk'
@@ -28,6 +28,9 @@ import { getToolsPrefs, saveToolsPrefs } from './prefs'
 const TRUST_FILE = path.join(dataRoot, 'tool-trust.json')
 const SETTINGS_FILE = path.join(dataRoot, 'tool-settings.json')
 const SECRETS_FILE = path.join(dataRoot, 'tool-secrets.json')
+const PERMISSIONS_FILE = path.join(dataRoot, 'tool-permissions.json')
+
+type PermissionOverrides = Record<string, Record<string, ToolPermission>>
 
 type Values = Record<string, Record<string, unknown>>
 
@@ -109,6 +112,8 @@ export class ModuleRegistry extends EventEmitter {
   private entries = new Map<string, Entry>()
   private prefs: ToolsPrefs = getToolsPrefs()
   private trust = readJson<Record<string, TrustRecord>>(TRUST_FILE, {})
+  private overrides: PermissionOverrides = this.readOverrides()
+  private defaultPermissions = new WeakMap<ToolDef, ToolPermission>()
   private values: Values = {}
   private secrets: Values = {}
   private valuesLocked = false
@@ -121,6 +126,36 @@ export class ModuleRegistry extends EventEmitter {
       const pending = this.valuesLocked || this.secretsLocked
       this.readValues()
       if (pending) void this.reloadOn()
+    })
+  }
+
+  private readOverrides(): PermissionOverrides {
+    const raw = readJson<Record<string, unknown>>(PERMISSIONS_FILE, {})
+    const out: PermissionOverrides = {}
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out
+    for (const [modId, tools] of Object.entries(raw)) {
+      if (!tools || typeof tools !== 'object' || Array.isArray(tools)) continue
+      const clean: Record<string, ToolPermission> = {}
+      for (const [toolName, perm] of Object.entries(tools as Record<string, unknown>)) {
+        if (PERMISSIONS.includes(perm as ToolPermission)) clean[toolName] = perm as ToolPermission
+      }
+      if (Object.keys(clean).length) out[modId] = clean
+    }
+    return out
+  }
+
+  private writeOverrides(): void {
+    writeJson(PERMISSIONS_FILE, this.overrides)
+  }
+
+  private registerPermissions(entry: Entry, tools: ToolDef[]): ToolDef[] {
+    const m = entry.manifest
+    const modOverrides = this.overrides[m.id] ?? {}
+    return tools.map((t) => {
+      const base = this.defaultPermissions.get(t) ?? t.permission ?? m.toolPermissions[t.name] ?? m.permission
+      this.defaultPermissions.set(t, base)
+      t.permission = modOverrides[t.name] ?? base
+      return t
     })
   }
 
@@ -411,7 +446,7 @@ export class ModuleRegistry extends EventEmitter {
       } else {
         const templates = entry.manifest.presentations.map((p) => templateTool(entry.manifest.id, entry.dir, p))
         if (templates.length && entry.source !== 'builtin' && !fs.existsSync(path.join(entry.dir, entry.manifest.entry))) {
-          entry.tools = templates
+          entry.tools = this.registerPermissions(entry, templates)
           entry.state = 'on'
           return
         }
@@ -435,7 +470,7 @@ export class ModuleRegistry extends EventEmitter {
         const unknown = entry.manifest.pages.flatMap((p) => p.actions.filter((a) => !defined.has(a)).map((a) => `${a} (on ${p.type})`))
         if (unknown.length) throw new Error(`module.json lists actions the module doesn't define: ${unknown.join(', ')}. Add the tools in define() or take them out of "actions".`)
         entry.instance = instance
-        entry.tools = tools
+        entry.tools = this.registerPermissions(entry, tools)
       }
       entry.state = 'on'
     } catch (err) {
@@ -453,7 +488,7 @@ export class ModuleRegistry extends EventEmitter {
       values,
       () => {
         if (entry.mcp !== conn) return
-        entry.tools = conn.moduleTools().map((t) => this.toolFrom(entry, t))
+        entry.tools = this.registerPermissions(entry, conn.moduleTools().map((t) => this.toolFrom(entry, t)))
         this.checkClashes()
         this.emitChanged()
       },
@@ -469,7 +504,7 @@ export class ModuleRegistry extends EventEmitter {
     try {
       await Promise.race([conn.connect(), new Promise((_, reject) => setTimeout(() => reject(new Error('The server did not answer within 60 seconds. Check "command" (or "url") in its module.json, then reload it.')), 60_000))])
       if (entry.mcp !== conn) return
-      entry.tools = conn.moduleTools().map((t) => this.toolFrom(entry, t))
+      entry.tools = this.registerPermissions(entry, conn.moduleTools().map((t) => this.toolFrom(entry, t)))
       entry.state = 'on'
       this.checkClashes()
     } catch (err) {
@@ -641,6 +676,41 @@ export class ModuleRegistry extends EventEmitter {
       writeJson(SECRETS_FILE, this.secrets)
     }
     if (entry.state === 'on' || entry.state === 'error') return this.reload(id)
+    this.emitChanged()
+    return this.list()
+  }
+
+  async setToolPermission(id: string, toolName: string, permission: ToolPermission | null): Promise<ModuleInfo[]> {
+    const entry = this.require(id)
+    if (permission !== null && !PERMISSIONS.includes(permission)) throw new Error(`Invalid tool permission "${String(permission)}".`)
+    const target = entry.tools.find((t) => t.name === toolName)
+    if (!target) throw notFound(new Error(`Tool "${toolName}" was not found.`))
+    const base = this.defaultPermissions.get(target) ?? entry.manifest.toolPermissions[toolName] ?? entry.manifest.permission
+    if (permission === 'custom' && base !== 'custom') throw new Error(`Only tools with a built-in approval gate can use custom permission.`)
+    const next = { ...(this.overrides[id] ?? {}) }
+    if (permission === null) delete next[toolName]
+    else next[toolName] = permission
+    if (Object.keys(next).length) this.overrides[id] = next
+    else delete this.overrides[id]
+    this.writeOverrides()
+    entry.tools = this.registerPermissions(entry, entry.tools)
+    this.emitChanged()
+    return this.list()
+  }
+
+  async setModulePermission(id: string, permission: ToolPermission | null): Promise<ModuleInfo[]> {
+    const entry = this.require(id)
+    if (permission !== null && permission !== 'none' && permission !== 'ask' && permission !== 'always') {
+      throw new Error(`Module permission must be none, ask, always, or null to reset.`)
+    }
+    if (permission === null) {
+      delete this.overrides[id]
+    } else {
+      if (!entry.tools.length) throw new Error(`Switch ${entry.manifest.name} on before changing tool permissions.`)
+      this.overrides[id] = Object.fromEntries(entry.tools.map((t) => [t.name, permission]))
+    }
+    this.writeOverrides()
+    entry.tools = this.registerPermissions(entry, entry.tools)
     this.emitChanged()
     return this.list()
   }
@@ -841,7 +911,12 @@ export class ModuleRegistry extends EventEmitter {
           always: e.manifest.always,
           needsWorkspace: e.manifest.needsWorkspace,
           replacesBuiltin: e.replacesBuiltin,
-          tools: e.tools.map((t) => ({ name: t.name, description: t.description, permission: t.permission ?? 'custom' })),
+          tools: e.tools.map((t) => ({
+            name: t.name,
+            description: t.description,
+            permission: t.permission ?? 'custom',
+            defaultPermission: this.defaultPermissions.get(t) ?? t.permission ?? e.manifest.toolPermissions[t.name] ?? e.manifest.permission
+          })),
           settings: e.manifest.settings,
           actions: e.manifest.actions,
           panel: e.manifest.panel,

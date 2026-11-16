@@ -1,4 +1,5 @@
 import { ToolError, optInt, optStr, str, type ToolDef } from '../../engine/tools/types'
+import { gateTool, shouldRunCustomGate } from '../../engine/permissions/gate'
 import { reminders } from '../../engine/reminders/store'
 import { parseMoment } from '../../engine/util/when'
 import type { ReminderRepeat } from '@shared/types'
@@ -61,13 +62,17 @@ const setReminder: ToolDef = {
     const run = params.action === 'run'
     const sessionId = run && params.chat === 'new' ? null : ctx.sessionId
     const described = describeWhen(when, repeat)
-    if (run) {
-      const ok = await ctx.ui.ask('confirm', {
-        message: `Allow a scheduled task? At ${described}, the agent will start a turn${sessionId ? ' in this chat' : ' in a new chat'} with: "${message}". It follows the usual approvals.`,
-        confirmLabel: 'Allow',
-        cancelLabel: 'Deny'
-      })
-      if (ok !== true) throw new ToolError('The user did not allow this scheduled task. Do not set it again unless they ask; to just remind them, use action remind.')
+    if (shouldRunCustomGate(ctx.permissions)) {
+      if (run) {
+        const ok = await ctx.ui.ask('confirm', {
+          message: `Allow a scheduled task? At ${described}, the agent will start a turn${sessionId ? ' in this chat' : ' in a new chat'} with: "${message}". It follows the usual approvals.`,
+          confirmLabel: 'Allow',
+          cancelLabel: 'Deny'
+        })
+        if (ok !== true) throw new ToolError('The user did not allow this scheduled task. Do not set it again unless they ask; to just remind them, use action remind.')
+      } else if (ctx.permissions.mode === 'ask') {
+        await gateTool(ctx.permissions, { name: 'set_reminder', group: 'reminders', permission: 'ask' }, params)
+      }
     }
     const r = reminders.add({ agentId: ctx.agentId, sessionId, kind: run ? 'run' : 'remind', text: message, repeat, at: when })
     return `${run ? 'Scheduled task' : 'Reminder'} set (${r.id}) for ${described}.`

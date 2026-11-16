@@ -15,6 +15,7 @@ export interface FunctionCallItem {
   description?: string
   params: unknown
   result: unknown
+  thoughtSignature?: string
   startsNewChunk?: boolean
 }
 

@@ -1,9 +1,16 @@
 {
   "id": "game",
   "name": "Game",
-  "description": "The rules data the world game runs on: stats (attributes, the maximum of Health, Stamina and Mana, combat numbers, resists), damage types, rule formulas and clocks. Starts with a starter set you change to fit your game.",
+  "description": "The rules data the world game runs on: stats (attributes, combat numbers, resists), damage types, rule formulas, clocks, traits, and classes. Starts with a starter set you change to fit your game.",
   "version": "1.0.0",
   "apiVersion": 1,
-  "permission": "none",
-  "tools": false
+  "needsWorkspace": false,
+  "permission": "ask",
+  "tools": true,
+  "toolPermissions": {
+    "award_xp": "ask",
+    "set_character_class": "ask",
+    "set_character_trait": "ask",
+    "story_trigger": "ask"
+  }
 }

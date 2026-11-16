@@ -171,7 +171,7 @@ const factory: ModuleFactory = (sdk) =>
             }
             const card = cleanCard(next)
             const page = existing ? this.pages.save(existing.id, card) : this.pages.create('card', card.name, card)
-            return `${existing ? 'Changed' : 'Made'} ${linkFor('cards.card', page.title)}.`
+            return `${existing ? 'Changed' : 'Made'} ${linkFor('card', page.title)}.`
           } catch (err) {
             this.fail(err)
           }
@@ -193,10 +193,10 @@ const factory: ModuleFactory = (sdk) =>
           try {
             const set = cleanSet(params)
             const missing = this.missingCards(set.cards)
-            if (missing.length) throw new sdk.ToolError(`These are not cards yet: ${missing.join(', ')}. Make them with cards_card first.`)
+            if (missing.length) throw new sdk.ToolError(`These are not cards yet: ${missing.join(', ')}. Make them with make_card first.`)
             const existing = this.pages.find('set', set.name)
             const page = existing ? this.pages.save(existing.id, set) : this.pages.create('set', set.name, set)
-            return `${existing ? 'Changed' : 'Made'} the card set ${linkFor('cards.set', page.title)} with ${totalOf(set.cards)} cards.`
+            return `${existing ? 'Changed' : 'Made'} the card set ${linkFor('card_set', page.title)} with ${totalOf(set.cards)} cards.`
           } catch (err) {
             this.fail(err)
           }
@@ -214,7 +214,7 @@ const factory: ModuleFactory = (sdk) =>
           if (!card) throw new sdk.ToolError('Give card (a card name) or repo (a repo of card names).')
           const count = Math.max(1, sdk.params.optInt(params, 'count') ?? 1)
           addCard(this.chatDeck(ctx), card, count)
-          return `The user gains ${count > 1 ? `${count}× ` : ''}${linkFor('cards.card', card)}.`
+          return `The user gains ${count > 1 ? `${count}× ` : ''}${linkFor('card', card)}.`
         }
       })
 
@@ -226,7 +226,7 @@ const factory: ModuleFactory = (sdk) =>
         execute: async (params, ctx) => {
           const card = sdk.params.str(params, 'card')
           takeCard(this.chatDeck(ctx), card)
-          return `The user loses ${linkFor('cards.card', card)}.`
+          return `The user loses ${linkFor('card', card)}.`
         }
       })
 
@@ -261,7 +261,7 @@ const factory: ModuleFactory = (sdk) =>
             }
           })
           ctx.viewEvents?.(played.outcome.view, played.card, played.world)
-          return [`PLAYED ${linkFor('cards.card', played.card)} [${played.mode}] -> ${played.target}`, ...played.outcome.lines, 'Play this out in your reply.'].join('\n')
+          return [`PLAYED ${linkFor('card', played.card)} [${played.mode}] -> ${played.target}`, ...played.outcome.lines, 'Play this out in your reply.'].join('\n')
         }
       })
     }
@@ -300,8 +300,8 @@ const factory: ModuleFactory = (sdk) =>
       if (type !== 'set') return null
       const set = cleanSet({ name: page.title, ...((page.data as Json | null) ?? {}) })
       const pile = set.cards.flatMap((c) => Array.from({ length: c.count }, () => c.card))
-      if (!pile.length) throw new sdk.ToolError(`The card set ${set.name} has no cards yet. Add some with cards_set first.`)
-      return drawn(pile, count).map((name) => linkFor('cards.card', name))
+      if (!pile.length) throw new sdk.ToolError(`The card set ${set.name} has no cards yet. Add some with make_card_set first.`)
+      return drawn(pile, count).map((name) => linkFor('card', name))
     }
 
     pageText(type: string, page: ModulePage): string {

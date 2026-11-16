@@ -4,6 +4,7 @@ import { isAssetId } from '@shared/ids'
 import { CORE_MODULES } from '@shared/toolnames'
 import type { WorldBinding } from '@shared/world'
 import { cleanAvatarRef } from '@shared/avatars'
+import { cleanRelationships, type RelationshipEntry } from '@shared/relationships'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
@@ -133,6 +134,7 @@ function cleanLibrary(input: unknown): LibraryAccess {
 }
 
 function cleanLoaded(agent: AgentProfile, priv: boolean): AgentProfile {
+  const relationships = cleanRelationships(agent.relationships)
   return {
     ...agent,
     sampling: cleanSampling(agent.sampling),
@@ -142,6 +144,7 @@ function cleanLoaded(agent: AgentProfile, priv: boolean): AgentProfile {
     context: cleanContext(agent.context),
     look: cleanLook((agent as { look?: unknown }).look),
     library: cleanLibrary(agent.library),
+    ...(relationships.length ? { relationships } : { relationships: undefined }),
     private: priv
   }
 }
@@ -252,6 +255,10 @@ export class AgentRegistry extends EventEmitter {
     })
   }
 
+  find(id: string): AgentProfile | null {
+    return this.agents.get(id) ?? null
+  }
+
   get(id: string): AgentProfile {
     const agent = this.agents.get(id)
     if (!agent) throw notFound(new Error('That agent no longer exists. Pick another one in Agents.'))
@@ -296,6 +303,7 @@ export class AgentRegistry extends EventEmitter {
         ? (draft.sheets ?? [])
         : existing?.sheets ?? (draft.sheet ? [draft.sheet] : existing?.sheet ? [existing.sheet] : []),
       player: (draft.player === undefined ? existing?.player : draft.player) || null,
+      relationships: cleanRelationships(draft.relationships === undefined ? existing?.relationships : draft.relationships),
       mindAuto: cleanMindAuto(draft.mindAuto === undefined ? existing?.mindAuto : draft.mindAuto),
       remindEvery: cleanRemindEvery(draft.remindEvery === undefined ? existing?.remindEvery : draft.remindEvery),
       maxToolRounds: cleanMaxToolRounds(draft.maxToolRounds === undefined ? existing?.maxToolRounds : draft.maxToolRounds),
@@ -316,6 +324,21 @@ export class AgentRegistry extends EventEmitter {
     if (existing && (existing.private === true) !== agent.private) removePath(this.file(agent.id, existing.private === true))
     timeline.record({ kind: 'agent', entry: agent.id, action: existing ? 'changed' : 'made' })
     this.emit('changed', this.list())
+    if (JSON.stringify(existing?.relationships ?? []) !== JSON.stringify(agent.relationships ?? [])) {
+      this.emit('relationships', agent)
+    }
+    return agent
+  }
+
+  setRelationships(id: string, list: RelationshipEntry[]): AgentProfile {
+    const existing = this.get(id)
+    if (existing.private && !secure.unlocked) throw new Error('Unlock the vault to change a vault agent')
+    const relationships = cleanRelationships(list)
+    const agent: AgentProfile = { ...existing, relationships, updatedAt: Date.now() }
+    this.write(agent)
+    timeline.record({ kind: 'agent', entry: agent.id, action: 'changed' })
+    this.emit('changed', this.list())
+    this.emit('relationships', agent)
     return agent
   }
 

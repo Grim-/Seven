@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react'
 import { ListRow } from './ListRow'
 import { cn } from '../../lib/cn'
-import { matchesKeybind } from '../../store/keybinds'
+import { isTypingTarget, matchesKeybind } from '../../store/keybinds'
 
 export interface BrowserSection {
   id: string
@@ -40,7 +40,7 @@ export function SettingsBrowser({
   const search = useRef<HTMLInputElement>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!matchesKeybind('app.settingsSearch', e) || (e.target as HTMLElement | null)?.closest('input, textarea, [contenteditable="true"]')) return
+      if (!matchesKeybind('app.settingsSearch', e) || isTypingTarget(e)) return
       e.preventDefault()
       search.current?.focus()
     }

@@ -77,6 +77,21 @@ export class Buff extends Component {
   }
 }
 
+export abstract class PassiveHost extends Component {
+  abstract get strength(): number
+
+  isActive(): boolean {
+    return true
+  }
+}
+
+export function isPassiveHost(value: unknown): value is PassiveHost {
+  if (value instanceof PassiveHost) return true
+  if (!(value instanceof Component)) return false
+  const candidate = value as Partial<PassiveHost>
+  return typeof candidate.strength === 'number' && typeof candidate.isActive === 'function'
+}
+
 export abstract class BuffPiece extends Component {
   static readonly SENTENCE: string = ''
   static readonly GROUP: EffectGroup | null = null
@@ -86,15 +101,25 @@ export abstract class BuffPiece extends Component {
   readonly finite: boolean = false
 
   canApply(host: Component | GameEntity): true | string {
-    return host instanceof Buff ? true : 'a buff piece belongs inside a buff'
+    return host instanceof Buff || isPassiveHost(host) ? true : 'a buff piece belongs inside a buff or trait'
   }
 
   get buff(): Buff | null {
     return this.parent instanceof Buff ? this.parent : null
   }
 
+  get passiveHost(): Buff | PassiveHost | null {
+    if (this.parent instanceof Buff || isPassiveHost(this.parent)) return this.parent
+    return null
+  }
+
+  get isHostActive(): boolean {
+    return isPassiveHost(this.parent) ? this.parent.isActive() : true
+  }
+
   get strength(): number {
-    return this.buff?.strength ?? 1
+    if (!this.isHostActive) return 0
+    return this.passiveHost?.strength ?? 1
   }
 
   isDone(): boolean {

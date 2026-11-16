@@ -85,10 +85,25 @@ export class GameEntity implements SignalSource {
     return out
   }
 
+  modifyIncomingDamage(amount: number, hit: { type: string; cause: string; source: GameEntity | null }): number {
+    let out = amount
+    for (const c of this.comps) out = c.modifyIncomingDamage(out, hit)
+    return out
+  }
+
+  isInvisible(): boolean {
+    return this.comps.some((c) => c.isInvisible())
+  }
+
   start(): void {
     if (this.live) return
     this.live = true
     for (const c of this.comps) c.attach()
+  }
+
+  destroy(): void {
+    if (this.live) this.emit('OnDestroy', {})
+    this.stop()
   }
 
   stop(): void {
@@ -111,6 +126,10 @@ export class GameEntity implements SignalSource {
   }
 }
 
+export function isEntityVisible(entity: GameEntity | null | undefined): boolean {
+  return !entity?.isInvisible()
+}
+
 export function spawn(template: Template, catalog: Catalog): GameEntity {
   const entity = new GameEntity(crypto.randomUUID(), template.ref, template.name, catalog)
   for (const def of template.components) {
@@ -118,5 +137,6 @@ export function spawn(template: Template, catalog: Catalog): GameEntity {
     if (comp) entity.add(comp)
   }
   entity.start()
+  entity.emit('OnSpawn', {})
   return entity
 }

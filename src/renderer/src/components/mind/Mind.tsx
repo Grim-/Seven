@@ -279,7 +279,7 @@ function SearchTab({ agentId }: { agentId: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex gap-2">
-        <Input autoFocus placeholder="Search memories and journal, the way recall does" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void run()} className="flex-1" />
+        <Input autoFocus placeholder="Search memories, relationships and journal, the way recall does" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void run()} className="flex-1" />
         <Button variant="primary" icon={<Search />} disabled={busy || !query.trim()} onClick={() => void run()}>
           {busy ? 'Searching…' : 'Search'}
         </Button>

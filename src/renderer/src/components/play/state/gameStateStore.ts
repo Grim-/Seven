@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import type { Point } from '@shared/shapes'
+import { engine } from '../../../lib/ipc'
+import { failed } from '../../../lib/notify'
 import {
   type GameStateContext,
   transitionGameState
@@ -207,6 +209,9 @@ export const useGameState = create<GameEngineStore>((set, get) => ({
     const nextQueue = current.queue.map((c) => (c.id === activeActor.id ? { ...c, at } : c))
     const withMove = spendMove({ ...current, queue: nextQueue }, distanceFeet)
     set({ battle: withMove })
+    if (activeActor.sheet) {
+      void engine('game.onMove', { sheet: activeActor.sheet, distance: distanceFeet }).catch(failed('Could not trigger move traits'))
+    }
   },
 
   attackTarget: (targetId, attackName) => {

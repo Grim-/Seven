@@ -1,6 +1,23 @@
 import { componentClass, type ComponentDef } from './registry'
 
-export type ParamKind = 'number' | 'text' | 'choice' | 'formula' | 'template' | 'list' | 'flag' | 'values' | 'components' | 'storedAction' | 'entry'
+export type ParamKind =
+  | 'number'
+  | 'text'
+  | 'choice'
+  | 'formula'
+  | 'template'
+  | 'list'
+  | 'flag'
+  | 'values'
+  | 'components'
+  | 'storedAction'
+  | 'entry'
+  | 'signal'
+  | 'gameTag'
+  | 'storyFlag'
+  | 'conditions'
+  | 'classRewards'
+  | 'clutchTriggers'
 
 export interface ParamSpec {
   kind: ParamKind
@@ -32,6 +49,9 @@ function clean(spec: ParamSpec, raw: unknown): unknown {
   if (spec.kind === 'flag') return raw === true
   if (spec.kind === 'formula' && typeof raw === 'number' && Number.isFinite(raw)) return String(raw)
   if (spec.kind === 'components') return cleanComponents(raw)
+  if (spec.kind === 'conditions') return Array.isArray(raw) ? raw.filter((item) => item && typeof item === 'object' && !Array.isArray(item) && typeof (item as Record<string, unknown>).type === 'string') : spec.default
+  if (spec.kind === 'classRewards') return Array.isArray(raw) ? raw.filter((item) => item && typeof item === 'object' && !Array.isArray(item)) : spec.default
+  if (spec.kind === 'clutchTriggers') return Array.isArray(raw) ? raw.filter((item) => item && typeof item === 'object' && !Array.isArray(item)) : spec.default
   if (spec.kind === 'values') return raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.fromEntries(Object.entries(raw).filter(([, v]) => typeof v === 'number' && Number.isFinite(v))) : spec.default
   if (spec.kind === 'choice') return typeof raw === 'string' && spec.choices?.includes(raw) ? raw : spec.default
   if (spec.kind === 'list') return Array.isArray(raw) ? raw.map((item) => (spec.of ? clean(spec.of, item) : item)) : spec.default

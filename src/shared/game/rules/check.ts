@@ -44,13 +44,13 @@ function scope(entity: GameEntity | null, faces: DieFace[], die: DieRoller) {
 }
 
 export function checkBonus(entity: GameEntity, check: CheckDef): number {
-  return evaluate(check.bonus, scope(entity, [], () => 0))
+  return evaluate(check.bonus, scope(entity, [], () => 0)) + entity.modifyStat('check', check.id, 0)
 }
 
 export function rollCheck(entity: GameEntity, check: CheckDef, die: DieRoller): CheckRoll {
   const faces: DieFace[] = []
   const roll = evaluate(check.dice, scope(null, faces, die))
-  const bonus = evaluate(check.bonus, scope(entity, faces, die))
+  const bonus = evaluate(check.bonus, scope(entity, faces, die)) + entity.modifyStat('check', check.id, 0)
   return { check: check.id, label: check.label, faces, roll, bonus, total: roll + bonus }
 }
 

@@ -1,8 +1,8 @@
 import { CORE_MODULES, currentToolName } from '@shared/toolnames'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, FolderOpen, MessageSquarePlus, Plus, Shapes, Trash2, X } from 'lucide-react'
 import { KindAccess } from '../components/agents/KindAccess'
-import { DEFAULT_CONTEXT, DEFAULT_LIBRARY_ACCESS, PERMISSION_MODES, type ChatAccess, SAMPLING_KEYS, type AgentDraft, type AgentProfile, type PermissionMode, type PromptCost } from '@shared/types'
+import { agentSheets, DEFAULT_CONTEXT, DEFAULT_LIBRARY_ACCESS, PERMISSION_MODES, type ChatAccess, SAMPLING_KEYS, type AgentDraft, type AgentProfile, type CharacterSheet, type PermissionMode, type PromptCost } from '@shared/types'
 import { BackBar, Button, Field, Input, KindShell, Modal, NumberField, Panel, Select, Slider, Toggle, ViewHeader, useAutosave, MakeOrSaved } from '../components/ui'
 import { engine, main } from '../lib/ipc'
 import { DEFAULT_AGENT_ID, useAgents } from '../store/agents'
@@ -27,10 +27,13 @@ import { useData } from '../store/data'
 import { useKindInfos } from '../lib/kinds'
 import { ThinkingSelect } from '../components/chat/ThinkingSelect'
 import { ToolChoiceSelect } from '../components/chat/ToolChoiceSelect'
-import { useViewPlace } from '../lib/viewPlace'
+import { useViewPlace, setViewPlace } from '../lib/viewPlace'
+import { useApp } from '../store/app'
+import { presetForSpec, remoteHostLabel } from '@shared/remoteModels'
 import { noteFailure } from '../store/problems'
 import { readStored, writeStored } from '../lib/stored'
 import { OwnerDeck } from '../components/cards/OwnerDeck'
+import { RelationshipsTable, type InheritedRelationships } from '../components/relationships/RelationshipsTable'
 
 const BLANK: AgentDraft = { name: 'New agent', description: '', modelId: null, systemPrompt: '', sampling: {}, workspace: null, modules: [...CORE_MODULES, 'ui'], permissionMode: 'ask' }
 
@@ -63,7 +66,9 @@ function toDraft(agent: AgentProfile): AgentDraft {
     remindEvery: agent.remindEvery,
     maxToolRounds: agent.maxToolRounds,
     sheet: agent.sheet ?? null,
+    sheets: agent.sheets ? [...agent.sheets] : undefined,
     player: agent.player ?? null,
+    relationships: [...(agent.relationships ?? [])],
     library: { ...DEFAULT_LIBRARY_ACCESS, ...agent.library, hidden: [...(agent.library?.hidden ?? [])] }
   }
 }
@@ -220,12 +225,46 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
   const cost = usePromptCost(draft)
   const ctx = { ...DEFAULT_CONTEXT, ...draft.context }
   const setContext = (patch: Partial<typeof ctx>) => change({ ...draft, context: { ...draft.context, ...patch } })
+  const sheetIdsKey = agentSheets(draft).join(',')
+  const [inheritedRelations, setInheritedRelations] = useState<InheritedRelationships[]>([])
+
+  useEffect(() => {
+    const ids = agentSheets(draft)
+    if (!ids.length) {
+      setInheritedRelations([])
+      return
+    }
+    let alive = true
+    void Promise.all(
+      ids.map((id) =>
+        engine('sheets.get', { id }).catch((err: unknown) => {
+          noteFailure('agents', 'Could not load bound character relationships')(err)
+          return null
+        })
+      )
+    ).then((loaded) => {
+      if (!alive) return
+      const sheets = loaded.filter((s): s is CharacterSheet => Boolean(s))
+      setInheritedRelations(
+        sheets.map((s) => ({
+          id: s.id,
+          title: s.title,
+          items: s.relationships ?? [],
+          onOpen: () => openEntry('sheet', s.id)
+        }))
+      )
+    })
+    return () => {
+      alive = false
+    }
+  }, [sheetIdsKey])
 
   const modelOptions = useMemo(
     () => [{ value: '', label: 'Whichever model is loaded' }, ...models.filter(isRunnable).map((m) => ({ value: m.id, label: m.remote ? `${m.name} (remote: its chats leave this machine)` : m.name }))],
     [models]
   )
   const missingModel = draft.modelId && !models.some((m) => m.id === draft.modelId)
+  const selectedRemote = draft.modelId ? models.find((m) => m.id === draft.modelId && m.remote) ?? null : null
 
   const doSave = () =>
     save(draft).then(
@@ -282,6 +321,28 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
         <Field label="Model" error={missingModel ? 'That model is no longer registered.' : null} hint="Loaded automatically when a chat with this agent starts.">
           <Select value={draft.modelId ?? ''} options={modelOptions} onChange={(v) => change({ ...draft, modelId: v || null })} />
         </Field>
+        {selectedRemote?.remote && (
+          <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 border border-line/50 border-l-2 border-l-accent bg-black/40 px-3 py-2 text-[12px]">
+            <div className="min-w-0">
+              <span className="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-accent">
+                Remote · {presetForSpec(selectedRemote.remote.api, selectedRemote.remote.baseUrl).label}
+              </span>
+              <div className="truncate font-mono text-[11px] text-dim">
+                {remoteHostLabel(selectedRemote.remote.api, selectedRemote.remote.baseUrl)} · {selectedRemote.remote.model} · {selectedRemote.remote.hasKey ? 'Key saved' : 'No key set'}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setViewPlace('models.selected', selectedRemote.id)
+                useApp.getState().setView('models')
+              }}
+            >
+              Configure remote
+            </Button>
+          </div>
+        )}
         {maker && (
           <div className="col-span-2 border border-accent/40 bg-accent/5 px-3 py-2 text-[12.5px] text-white/85">
             Made by {maker}. It only gets the tools and permissions you give it here.
@@ -331,6 +392,23 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
               </div>
             )}
           </EditorSection>
+
+        <EditorSection
+          id="relationships"
+          title="Relationships"
+          summary={
+            (draft.relationships?.length ?? 0) > 0
+              ? `${draft.relationships?.length} tracked (${(draft.relationships ?? []).filter((r) => r.pinned).length} pinned)`
+              : 'People, places, things, factions and concepts'
+          }
+          isNew={!draft.id}
+        >
+          <RelationshipsTable
+            items={draft.relationships ?? []}
+            inherited={inheritedRelations}
+            onChange={(relationships) => change({ ...draft, relationships })}
+          />
+        </EditorSection>
 
         {draft.id && (
           <EditorSection id="cards" title="Cards" summary="Its own deck" isNew={false}>
@@ -586,9 +664,27 @@ export function AgentsView() {
     useAgents.setState({ focus: null })
   }, [focus, agents])
 
+  const lastServerRelsRef = useRef<string | null>(null)
   useEffect(() => {
-    if (draft?.id && !agents.some((a) => a.id === draft.id)) setDraft(null)
-  }, [agents, draft])
+    if (!draft?.id) {
+      lastServerRelsRef.current = null
+      return
+    }
+    const fresh = agents.find((a) => a.id === draft.id)
+    if (!fresh) {
+      setDraft(null)
+      return
+    }
+    const serverJson = JSON.stringify(fresh.relationships ?? [])
+    if (lastServerRelsRef.current === null) {
+      lastServerRelsRef.current = serverJson
+      return
+    }
+    if (serverJson !== lastServerRelsRef.current) {
+      lastServerRelsRef.current = serverJson
+      setDraftState((prev) => (prev && prev.id === fresh.id ? { ...prev, relationships: [...(fresh.relationships ?? [])] } : prev))
+    }
+  }, [agents, draft?.id])
 
   const newAgent = () => {
     showKinds(false)
