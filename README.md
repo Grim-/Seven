@@ -57,14 +57,19 @@ You can run your own local chat and image models on your hardware, or just plug 
 
 ## What Next
 1: You can export and import almost anything from and to Seven as Seven cards, simply dragging the card onto seven or placing it in Your_seven_install/resources/ is enough to get them imported.
+
 2: Be sure to explore all the various different kinds, they all serve a purpose and a function and often kinds make use of other kinds.
+
 3: Check the tools and create your own agent, and avatar.
+
 4: You can click the various image fields such as a character sheet and if you have sd-server installed and set up (you need to use the download and find a proper image generation model) it can directly pass in the character sheet fields generate the image and assign it.
 
 
 ## Roadmap
 ** Much more thorough themeing support
+
 ** Experimental 2D top down RPG implementation
+
 ** Improving the data modelling and tools for agents and roleplay.
 
 Note : Seven will always be free and open source, a donation link *may* be added a later date but is *neve*r required and is *never mentioned anywhere inside the application*.
