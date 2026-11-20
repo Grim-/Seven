@@ -17,19 +17,23 @@ import type { Story } from './story'
 import type { RelationshipEntry } from './relationships'
 import type { Routine, RoutineDraft } from './routines'
 import type { TimelineRow } from './timeline'
-import type { WorldChanges, WorldEntity, WorldMeta, WorldPost, WorldSchema } from './world'
+import type { WorldChanges, WorldEntity, WorldLaunch, WorldMeta, WorldPost, WorldSchema } from './world'
+import type { ResolvedWorldEvent, WorldEvent, WorldEventStatus } from './game/worldEvents'
 import type { JourneyEntry, JourneyKind, MapData, MapListing, PlaceVisitor, TokenVisitor, WorldMapUse } from './maps'
 import type { Action, ActionResult } from './actions'
 import type { ChatElement } from './chatElements'
-import type { EffectOutcome, EffectRun, ViewEvent } from './effects'
+import type { EffectOutcome, EffectRun, EffectTargetRef, ViewEvent } from './effects'
 import type { Decision } from './decisions'
 import type { CardSwap, DeckOwner, DeckRef } from './cardDecks'
 import type { Ambience, AmbienceCue, Theme } from './theme'
 import type { Avatar, AvatarInput } from './avatars'
 import type { StoredFaction } from './game/factions'
+import type { ResolvedAttribution } from './types'
 import type { StoredMapObject } from './game/mapObjects'
 import type { StoredTriggerAction } from './game/triggerActions'
 import type { StoredLootTable, ResolvedLootDrop } from './game/lootTables'
+import type { Almanac, AlmanacEntry, SessionSceneBinding } from './almanac'
+import type { BattleSide } from './game/state/battle'
 import type { Problem, ProblemReport } from './problems'
 import type { RemoteModelInfo } from './remoteModels'
 import type {
@@ -92,9 +96,6 @@ import type {
   PairingInfo,
   ProjectorChoice,
   ModelFacts,
-  OverlayMode,
-  OverlayPanel,
-  OverlayState,
   WidgetLayout,
   WidgetSource,
   ViewOptions,
@@ -117,6 +118,14 @@ import type {
   ModelKind,
   HubModel,
   HubFile,
+  HubFamily,
+  ImageCompanions,
+  ImageEditRequest,
+  ImageGenerateRequest,
+  ImageHistoryEntry,
+  ImageHostState,
+  ImageModelConfig,
+  GeneratedImageResult,
   ModelInfo,
   DownloadItem,
   ThinkingLevel,
@@ -156,7 +165,7 @@ import type { EntityRecord } from './game/core/GameEntity'
 import type { Point } from './shapes'
 import type { BlueprintRow, BlueprintSource } from './game/blueprints'
 import type { ClockState } from './game/core/clock'
-import type { GameSave, SaveMeta, WorldSaves } from './game/save'
+import type { GameSave, SaveCreateOptions, SaveMeta, WorldSaves } from './game/save'
 import type { StoredDecision } from './storedDecision'
 import type { StoredAction } from './storedAction'
 
@@ -167,14 +176,26 @@ export interface EngineRequests {
   crash: Req<void, boolean>
   'models.list': Req<void, ModelEntry[]>
   'models.scan': Req<{ folders: string[] }, ModelEntry[]>
-  'hub.search': Req<{ query: string }, HubModel[]>
-  'hub.files': Req<{ repo: string }, HubFile[]>
+  'hub.search': Req<{ query: string; family?: HubFamily }, HubModel[]>
+  'hub.files': Req<{ repo: string; family?: HubFamily }, HubFile[]>
   'hub.fileInfo': Req<{ repo: string; file: string }, ModelInfo>
   'hub.repoFacts': Req<{ repo: string; updatedAt: number | null }, ModelInfo | null>
   'hub.token.has': Req<void, boolean>
   'hub.token.set': Req<{ token: string | null }, boolean>
   'downloads.list': Req<void, DownloadItem[]>
-  'downloads.start': Req<{ repo: string; file: string; name: string; folder: string; total: number }, DownloadItem[]>
+  'downloads.start': Req<
+    {
+      repo: string
+      file: string
+      name: string
+      folder: string
+      total: number
+      files?: import('./types').DownloadBundleFile[]
+      imageConfig?: Partial<ImageModelConfig>
+      targetModelId?: string
+    },
+    DownloadItem[]
+  >
   'downloads.pause': Req<{ id: string }, DownloadItem[]>
   'downloads.resume': Req<{ id: string }, DownloadItem[]>
   'downloads.cancel': Req<{ id: string }, DownloadItem[]>
@@ -192,18 +213,35 @@ export interface EngineRequests {
   'models.favourite': Req<{ id: string; on: boolean }, ModelEntry[]>
   'models.kind': Req<{ id: string; kind: ModelKind | null }, ModelEntry[]>
   'system.stats': Req<void, SystemStats>
+  'credits.list': Req<void, ResolvedAttribution[]>
   'models.params': Req<void, ParamDef[]>
   'models.config.get': Req<{ id: string }, ModelConfig>
   'models.config.set': Req<{ id: string; patch: ModelConfig }, ModelConfigResult>
   'models.config.reset': Req<{ id: string }, ModelConfigResult>
   'models.projector.get': Req<{ id: string }, ProjectorChoice>
   'models.projector.set': Req<{ id: string; projector: string | null }, ProjectorChoice>
+  'models.imageConfig.get': Req<{ id: string }, ImageModelConfig>
+  'models.imageConfig.set': Req<{ id: string; patch: Partial<ImageModelConfig> }, ImageModelConfig>
+  'models.imageConfig.reset': Req<{ id: string }, ImageModelConfig>
+  'models.imageConfig.autoMatch': Req<{ id: string }, ImageModelConfig>
+  'models.imageCompanions': Req<void, ImageCompanions>
+  'image.status': Req<void, ImageHostState>
+  'image.load': Req<{ id: string }, ImageHostState>
+  'image.unload': Req<void, ImageHostState>
+  'image.generate': Req<ImageGenerateRequest, GeneratedImageResult>
+  'image.edit': Req<ImageEditRequest, GeneratedImageResult>
+  'image.cancel': Req<void, boolean>
+  'image.history.list': Req<void, ImageHistoryEntry[]>
+  'image.history.remove': Req<{ id: string }, ImageHistoryEntry[]>
+  'image.history.clear': Req<void, ImageHistoryEntry[]>
   'models.template.get': Req<{ id: string }, ChatTemplate>
   'models.template.set': Req<{ id: string; choice: ChatTemplate }, ChatTemplate>
   'agents.list': Req<void, AgentProfile[]>
   'agents.get': Req<{ id: string }, AgentProfile>
   'agents.save': Req<AgentDraft, AgentProfile>
   'agents.delete': Req<{ id: string; folder: 'keep' | 'delete' }, boolean>
+  'agents.presets': Req<{ role?: string }, { id: string; moduleId: string; role: string; name: string; description: string; installed: boolean }[]>
+  'agents.ensurePreset': Req<{ id: string }, AgentProfile>
   'sessions.list': Req<void, SessionMeta[]>
   'sessions.create': Req<{ agentId: string }, SessionMeta>
   'sessions.open': Req<{ id: string }, SessionSnapshot>
@@ -259,7 +297,14 @@ export interface EngineRequests {
   'worlds.changes': Req<{ id: string; type: string; layer?: 'template' | 'play' }, Record<string, WorldChanges>>
   'maps.list': Req<void, MapListing[]>
   'worlds.setPlayer': Req<{ id: string; sheet: string | null }, WorldMeta>
+  'worldEvents.list': Req<{ worldId?: string | null } | void, ResolvedWorldEvent[]>
+  'worldEvents.get': Req<{ id: string; worldId?: string | null }, ResolvedWorldEvent>
+  'worldEvents.save': Req<{ event: WorldEvent; previousId?: string | null }, WorldEvent>
+  'worldEvents.delete': Req<{ id: string }, boolean>
+  'worldEvents.setStatus': Req<{ id: string; status: WorldEventStatus; worldId?: string | null }, ResolvedWorldEvent>
+  'worldEvents.resolve': Req<{ id: string; worldId?: string | null; outcomeId?: string | null; transcriptSummary?: string | null }, ResolvedWorldEvent>
   'worlds.setTags': Req<{ id: string; tags: string[] }, WorldMeta>
+  'worlds.setLaunch': Req<{ id: string; launch: Partial<WorldLaunch> }, WorldMeta>
   'actions.roll': Req<{ action: Action; character: string | null; pick?: number | null; world?: string | null; deck?: DeckRef | null }, ActionResult>
   'decisions.roll': Req<{ decision: Decision }, Decision>
   'decks.find': Req<{ ref: DeckRef; make?: boolean }, { deck: string | null }>
@@ -278,6 +323,7 @@ export interface EngineRequests {
   'maps.create': Req<{ name: string }, MapData>
   'maps.save': Req<{ map: MapData }, MapData>
   'maps.import': Req<{ path: string; map: string | null }, MapData>
+  'maps.ensureDefaultTileset': Req<void, AssetMeta | null>
   'worlds.maps': Req<{ id: string }, WorldMapUse[]>
   'worlds.useMap': Req<{ id: string; map: string }, WorldMapUse[]>
   'worlds.dropMap': Req<{ id: string; map: string }, WorldMapUse[]>
@@ -304,6 +350,48 @@ export interface EngineRequests {
   'triggerActions.delete': Req<{ id: string }, boolean>
   'lootTables.list': Req<void, StoredLootTable[]>
   'lootTables.get': Req<{ id: string }, StoredLootTable | null>
+  'almanacs.list': Req<void, Almanac[]>
+  'almanacs.get': Req<{ id: string }, Almanac | null>
+  'almanacs.save': Req<{ almanac: Partial<Almanac> & { title?: string }; previousId?: string | null }, Almanac>
+  'almanacs.delete': Req<{ id: string }, boolean>
+  'almanacs.advanceClock': Req<{ id: string; deltaSeconds?: number; absoluteTime?: number }, Almanac>
+  'almanacs.recordEntry': Req<{ id: string; entry: Partial<AlmanacEntry> }, { almanac: Almanac; entry: AlmanacEntry }>
+  'almanacs.archiveChat': Req<
+    {
+      almanacId: string
+      sessionId: string
+      title?: string
+      summary?: string
+      outcome?: string
+      secret?: string
+      notes?: string
+      where?: string
+      who?: string[]
+      threadIds?: string[]
+      worldTime?: number | null
+      deleteChat?: boolean
+    },
+    { almanac: Almanac; entry: AlmanacEntry }
+  >
+  'sessions.setScene': Req<{ id: string; scene: SessionSceneBinding | null }, SessionMeta>
+  'sessions.setDmMode': Req<{ id: string; on: boolean }, SessionMeta>
+  'sessions.bindGameplay': Req<
+    {
+      sessionId?: string
+      agentId?: string
+      worldId: string
+      saveId?: string | null
+      mapId?: string | null
+      placeKey?: string | null
+      playerSheet?: string | null
+      title?: string
+    },
+    SessionMeta
+  >
+  'sessions.detachGameplay': Req<{ id: string }, SessionMeta>
+  'sessions.rolloverGameplay': Req<{ id: string }, SessionMeta>
+  'sessions.startMetaScene': Req<{ worldId: string; eventId: string; agentId?: string }, SessionMeta>
+  'sessions.activeForWorld': Req<{ worldId: string; saveId?: string | null }, SessionMeta | null>
   'lootTables.save': Req<{ table: StoredLootTable; previousId?: string | null }, StoredLootTable>
   'lootTables.delete': Req<{ id: string }, boolean>
   'lootTables.roll': Req<{ id: string }, ResolvedLootDrop>
@@ -313,6 +401,7 @@ export interface EngineRequests {
   'server.stop': Req<void, ModelHostState>
   'server.restart': Req<void, ModelHostState>
   'server.build': Req<void, ServerBuild | null>
+  'install.helpers': Req<void, { id: string; title: string; about: string }[]>
   'install.state': Req<{ helper: string }, InstallHelperState>
   'install.check': Req<{ helper: string }, InstallHelperState>
   'install.choices': Req<{ helper: string; tag: string }, InstallChoice[]>
@@ -406,12 +495,14 @@ export interface EngineRequests {
   'game.joinCharacter': Req<{ sheet: string; template: string }, EntityRecord>
   'game.saveCharacter': Req<{ sheet: string; record: EntityRecord }, EntityRecord>
   'game.leaveCharacter': Req<{ sheet: string }, boolean>
-  'game.tickCharacters': Req<{ sheets: string[]; seconds: number }, number>
+  'saves.advance': Req<{ id: string; seconds: number; source: string; sheets: string[] }, GameSave>
+  'saves.shortRest': Req<{ id: string; sheets: string[]; hitDice: Record<string, number> }, GameSave>
+  'saves.longRest': Req<{ id: string; sheets: string[] }, GameSave>
   'saves.list': Req<{ world: string }, WorldSaves>
   'saves.all': Req<void, SaveMeta[]>
   'saves.get': Req<{ id: string }, GameSave>
   'saves.current': Req<{ world: string }, GameSave | null>
-  'saves.create': Req<{ world: string; name: string; copy: boolean }, GameSave>
+  'saves.create': Req<{ world: string; name: string; copy: boolean; options?: SaveCreateOptions }, GameSave>
   'saves.select': Req<{ world: string; id: string }, GameSave>
   'saves.rename': Req<{ id: string; name: string }, GameSave>
   'saves.remove': Req<{ id: string }, boolean>
@@ -422,6 +513,7 @@ export interface EngineRequests {
   'saves.spawnCreature': Req<{ world: string; map: string; creature: EntityRecord; faction: string; at: Point }, GameSave>
   'saves.updateCreature': Req<{ world: string; creature: EntityRecord; faction?: string }, GameSave>
   'saves.spawnBlueprint': Req<{ world: string; map: string; source: string; id: string; name: string; faction: string; at: Point }, GameSave>
+  'worlds.wakeSpawners': Req<{ world: string; map: string; entering?: boolean }, GameSave | null>
   'blueprints.sources': Req<void, BlueprintSource[]>
   'blueprints.search': Req<{ source: string; query: string; limit: number }, BlueprintRow[]>
   'game.misfits': Req<{ sheet: string }, string[]>
@@ -430,7 +522,16 @@ export interface EngineRequests {
   'game.changeHealth': Req<{ sheet: string; delta: number }, { from: number; to: number }>
   'game.changeCreatureHealth': Req<{ world: string; uid: string; delta: number }, { from: number; to: number }>
   'effects.run': Req<EffectRun, EffectOutcome>
-  'game.useAbility': Req<{ sheet: string; ability: string; target: string | null; at: { x: number; y: number } | null; distance: number }, string>
+  'game.useAbility': Req<{ sheet: string; ability: string; target: EffectTargetRef | null; world: string | null; at: { x: number; y: number } | null; distance: number }, string>
+  'game.useItem': Req<{ sheet: string; item: string; target: EffectTargetRef | null; world: string | null; at: { x: number; y: number } | null }, string>
+  'battle.start': Req<{ world: string; map: string; initiatorId: string; targetIds: string[] }, GameSave>
+  'battle.join': Req<{ world: string; entries: { id: string; kind: 'sheet' | 'creature'; side?: BattleSide }[] }, GameSave>
+  'battle.endTurn': Req<{ world: string }, GameSave>
+  'battle.move': Req<{ world: string; actorId: string; at: Point }, GameSave>
+  'battle.parley': Req<{ world: string; targetId: string; mode: 'truce' | 'recruit'; checkId?: string }, GameSave>
+  'battle.flee': Req<{ world: string }, GameSave>
+  'battle.end': Req<{ world: string }, GameSave>
+  'battle.stepAi': Req<{ world: string }, GameSave>
   'game.awardXp': Req<{ sheet: string; amount: number; classId?: string; reason?: string }, { gained: number; level: number; xp: number; classUpdated: number }>
   'game.onMove': Req<{ sheet?: string; world?: string; token?: string; distance?: number }, { triggered: string[] }>
   'game.storyTrigger': Req<{ sheet: string; tag?: string; summary: string; detail?: string; flags?: Record<string, unknown> }, { logged: number }>
@@ -531,6 +632,8 @@ export interface EngineRequests {
   'export.build': Req<ExportChoice, { title: string; text: string }>
   'library.exportFolder': Req<{ entries: string[]; kind: string | null; tag: string | null; target: 'obsidian' | 'markdown'; dir: string }, { folder: string; files: number; attachments: number; skipped: string[] }>
   'data.pages.list': Req<void, PageMeta[]>
+  'data.kindFolders.list': Req<void, { kind: string; label: string; plural: string; folder: string }[]>
+  'data.kindFolders.set': Req<{ kind: string; folder: string }, Record<string, string>>
   'data.pages.get': Req<{ id: string }, Page>
   'data.pages.find': Req<{ id: string }, Page | null>
   'data.pages.create': Req<{ title: string; body: string; fields: FieldDef[]; type: string | null; parent?: string | null }, Page>
@@ -589,6 +692,9 @@ export type CodedErrorWire = { [ERROR_MARKER]: { code: string; message: string; 
 export const LONG_REQUESTS: ReadonlySet<EngineRequestName> = new Set<EngineRequestName>([
   'models.load',
   'models.remote.test',
+  'image.load',
+  'image.generate',
+  'image.edit',
   'install.check',
   'install.start',
   'install.activate',
@@ -647,7 +753,6 @@ export interface MainRequests {
   'folder.open': Req<{ path: string }, void>
   'present.page': Req<{ html: string }, string>
   'settings.get': Req<void, Settings>
-  'overlay.resetPosition': Req<void, void>
   'vault.status': Req<void, VaultStatus>
   'vault.setup': Req<{ passphrase: string }, VaultStatus>
   'vault.unlock': Req<{ passphrase: string }, VaultStatus>
@@ -657,13 +762,6 @@ export interface MainRequests {
   'app.show': Req<{ sessionId: string | null }, void>
   'app.quit': Req<void, void>
   'engine.status': Req<void, EngineStatus>
-  'overlay.isExpanded': Req<void, boolean>
-  'overlay.state': Req<void, OverlayState>
-  'overlay.setMode': Req<{ mode: OverlayMode; panel?: OverlayPanel | null; items?: number; focus?: boolean }, OverlayState>
-  'overlay.setExpanded': Req<{ expanded: boolean; focus: boolean }, boolean>
-  'overlay.dragStart': Req<void, void>
-  'overlay.dragEnd': Req<void, void>
-  'hotkey.set': Req<{ accelerator: string }, { ok: boolean; error: string | null }>
   'network.status': Req<void, NetworkStatus>
   'network.set': Req<{ on?: boolean; settings?: Partial<NetworkSettings> }, NetworkStatus>
   'network.password.suggest': Req<void, string>
@@ -742,8 +840,6 @@ export interface Events {
   'problem.new': { problem: Problem; shown: boolean }
   'window.maximized': boolean
   'settings.changed': Settings
-  'overlay.expanded': boolean
-  'overlay.state': OverlayState
   'app.focusSession': { sessionId: string }
   'page.changed': { id: string; meta: PageMeta | null }
   'workout.changed': Record<string, never>
@@ -754,9 +850,11 @@ export interface Events {
   'decisions.changed': Record<string, never>
   'storyActions.changed': Record<string, never>
   'factions.changed': Record<string, never>
+  'worldEvents.changed': Record<string, never>
   'mapObjects.changed': Record<string, never>
   'triggerActions.changed': Record<string, never>
   'lootTables.changed': Record<string, never>
+  'almanacs.changed': Record<string, never>
   'themes.changed': Theme[]
   'avatars.changed': Avatar[]
   'ambience.changed': { sessionId: string; ambience: Ambience }
@@ -770,6 +868,9 @@ export interface Events {
   'tools.changed': ModuleInfo[]
   'agent.reaction': AgentReaction
   'context.compacted': { sessionId: string; trimmed: number; summarised: number }
+  'image.changed': ImageHostState
+  'image.history.changed': ImageHistoryEntry[]
+  'credits.changed': Record<string, never>
 }
 
 export type EventName = keyof Events

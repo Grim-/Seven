@@ -45,6 +45,10 @@ export function toId(raw: string): string {
     .join('/')
 }
 
+export function compactId(raw: string): string {
+  return idSegment(stripRef(raw)).replace(/[_.-]+/g, '')
+}
+
 export function showName(id: string): string {
   return id.replace(/_/g, ' ')
 }

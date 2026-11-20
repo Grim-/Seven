@@ -5,6 +5,7 @@ import { DraftAgentSelect } from '../../components/chat/DraftAgentSelect'
 import { RecentChats } from '../../components/chat/RecentChats'
 import { ChatSettings } from '../../components/chat/ChatSettings'
 import { ContextMeter, InstructionsBanner } from '../../components/chat/ContextMeter'
+import { ChatViewModeButton } from '../../components/chat/ChatViewModeButton'
 import { threadProps, useOpenChat } from '../../components/chat/useOpenChat'
 import { LookBackground, lookVars } from '../../components/agents/look'
 import { BackdropButton, ChatBackdrop, ChatsBackdrop } from '../../components/backdrop/Backdrop'
@@ -37,7 +38,10 @@ export function CinemaChat({ onLeave }: { onLeave: () => void }) {
         <AgentPresence agent={agent} sessionId={conv.sessionId} size="hero" eyebrow={active?.title ?? 'New chat'}>
           <div className="mb-1 flex shrink-0 flex-col items-end gap-2">
             {!active && <DraftAgentSelect conv={conv} agentId={agentId} className="h-7 w-44 text-[12px]" />}
-            <ContextMeter />
+            <div className="flex items-center gap-2">
+              <ChatViewModeButton />
+              <ContextMeter />
+            </div>
           </div>
         </AgentPresence>
         <div className="relative flex min-h-0 flex-1 flex-col">

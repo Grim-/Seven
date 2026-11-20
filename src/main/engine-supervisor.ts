@@ -18,11 +18,14 @@ import { dataDir } from './paths'
 const REQUEST_TIMEOUT_MS = 30000
 const MAX_BACKOFF_MS = 5000
 
+const SERVER_IMAGES = ['"llama-server.exe"', '"sd-server.exe"']
+
 function endServers(pids: number[]): void {
   if (process.platform !== 'win32') return
   for (const pid of pids) {
     execFile('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], { windowsHide: true }, (err, stdout) => {
-      if (!err && stdout.toLowerCase().includes('"llama-server.exe"')) execFile('taskkill', ['/PID', String(pid), '/F'], { windowsHide: true }, () => undefined)
+      const lower = err ? '' : stdout.toLowerCase()
+      if (SERVER_IMAGES.some((img) => lower.includes(img))) execFile('taskkill', ['/PID', String(pid), '/F'], { windowsHide: true }, () => undefined)
     })
   }
 }

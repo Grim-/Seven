@@ -1,4 +1,5 @@
 import type { ShellViewProps } from './shellTypes'
+import { Pressable } from './Pressable'
 import { ShellAddTile, ShellSweep, asideOf, enterStyle, shellState } from './ShellParts'
 import { TraitChips } from './TraitChips'
 
@@ -8,11 +9,18 @@ export function ShellTiles({ items, adds, bind, scale }: ShellViewProps) {
       {items.map((item, i) => {
         const b = bind(item)
         return (
-          <button key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i, b.props.style)} className="shell-slate shell-enter group flex-col">
+          <Pressable key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i, b.props.style)} className="shell-slate shell-enter group cursor-pointer flex-col text-left">
             <ShellSweep />
             <span className="flex items-center justify-between gap-2 border-b border-line/40 px-2 py-1 font-mono text-[9.5px] font-bold tracking-[0.16em]">
               <span className="truncate text-accent-soft">{item.tag ?? ''}</span>
-              {asideOf(item) && <span className="shrink-0 font-normal text-faint">{asideOf(item)}</span>}
+              <span className="flex shrink-0 items-center gap-1.5">
+                {asideOf(item) && <span className="font-normal text-faint">{asideOf(item)}</span>}
+                {item.action && (
+                  <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                    {item.action}
+                  </span>
+                )}
+              </span>
             </span>
             <span className="shell-art aspect-[4/3] w-full">{item.thumb ?? item.tile ?? <span className="flex h-full w-full items-center justify-center [&_svg]:h-[42%] [&_svg]:w-[42%]">{item.icon}</span>}</span>
             <span className="truncate px-2 pt-1.5 font-mono text-[11.5px] font-semibold uppercase tracking-[0.06em] text-white">
@@ -26,7 +34,7 @@ export function ShellTiles({ items, adds, bind, scale }: ShellViewProps) {
                 <TraitChips traits={item.traits} />
               </span>
             ) : null}
-          </button>
+          </Pressable>
         )
       })}
       {adds.map((a) => (

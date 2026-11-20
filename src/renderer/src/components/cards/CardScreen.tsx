@@ -1,10 +1,11 @@
-import { useContext, useState } from 'react'
+import { useContext, useMemo, useState } from 'react'
 import { showName } from '@shared/ids'
 import { PLACE_LABELS, readValues, type CardField, type CardValue } from '@shared/cards'
 import { AlertBox, ColorRow, Field, SaveState, Select, Toggle, VariationTabs, type FaceSlot } from '../ui'
 import { useModuleList } from '../../registries/useModuleList'
 import type { KindScreenProps } from '../../registries/kinds'
 import { useModulePageState } from '../../lib/modulePage'
+import { cardImageContext, useRegisterImageContext } from '../../lib/imagePromptContext'
 import { InsideSlateContext } from '../entries/EntryCard'
 import { AddonPage, AddonTitle } from '../data/AddonPage'
 import { inSlot, placeFor } from './CardFace'
@@ -67,9 +68,38 @@ function Editor({ pageId, title, start }: { pageId: string; title: string; start
   const [picked, setPicked] = useState<FaceSlot | null>(null)
   const set = (patch: Record<string, unknown>) => saver.set((c) => ({ ...c, ...patch }))
   const setValue = (field: string, value: CardValue) => saver.set((c) => ({ ...c, values: { ...readValues(c.values), [field]: value } }))
+  const artField = layout?.fields.find((f) => f.place === 'art' && f.type === 'picture') ?? null
+  const artValue = artField ? (typeof card.values[artField.id] === 'string' ? (card.values[artField.id] as string) : '') : ''
+  const rawArt = typeof card.raw.art === 'string' ? card.raw.art : ''
+  const hasAnyArt = Boolean(artValue || rawArt)
+  const clearCardArt = () => {
+    if (artField && artValue) setValue(artField.id, '')
+    if (rawArt) set({ art: null })
+  }
   const here = layout && picked ? layout.fields.filter((f) => inSlot(f, picked)) : []
   const offCard = layout ? layout.fields.filter((f) => f.place === 'none') : []
   const edit = layout ? { picked, hint: (slot: FaceSlot) => PLACE_LABELS[placeFor(slot)], onSlot: (slot: FaceSlot) => setPicked(slot) } : undefined
+  const cardContext = useMemo(() => {
+    const formatValue = (v: CardValue): string =>
+      Array.isArray(v) ? v.filter(Boolean).join(', ') : typeof v === 'string' || typeof v === 'number' ? String(v).trim() : ''
+    const fields: { label: string; text: string }[] = []
+    if (layout) {
+      for (const f of layout.fields) {
+        if (f.type === 'picture') continue
+        const text = formatValue(card.values[f.id] ?? null)
+        if (text) fields.push({ label: f.label || f.id, text })
+      }
+    } else {
+      for (const [k, v] of Object.entries(card.values)) {
+        const text = formatValue(v)
+        if (text) fields.push({ label: k, text })
+      }
+    }
+    if (card.happens || card.prompt) fields.push({ label: 'What happens', text: card.happens || card.prompt })
+    if (card.instructions) fields.push({ label: 'Instructions', text: card.instructions })
+    return cardImageContext(showName(title) || 'Card', fields)
+  }, [title, layout, card.values, card.happens, card.prompt, card.instructions])
+  useRegisterImageContext(cardContext)
   return (
     <div className="flex flex-col gap-3">
       {!insideSlate ? (
@@ -86,6 +116,15 @@ function Editor({ pageId, title, start }: { pageId: string; title: string; start
           <Select value={card.layout ?? ''} options={[{ value: '', label: 'No layout' }, ...layouts.map((p) => ({ value: p.title, label: showName(p.title) }))]} onChange={(v) => set({ layout: v || null })} className="h-8 text-[12.5px]" />
           <ColorRow value={card.color} onChange={(color) => set({ color })} allowNone />
           <CardOf card={card} layout={layout} edit={edit} className="w-full" />
+          {hasAnyArt && (
+            <button
+              type="button"
+              onClick={clearCardArt}
+              className="self-start font-mono text-[10.5px] uppercase tracking-wider text-dim hover:text-alert cursor-pointer"
+            >
+              × Clear card art
+            </button>
+          )}
           {!layout && (card.layout ? <AlertBox>There is no card layout called {showName(card.layout)} any more. Pick another layout.</AlertBox> : <div className="text-[12.5px] text-dim">{layouts.length ? 'Pick a layout to fill in this card.' : 'Make a card layout first (New page → Card layout), then pick it here.'}</div>)}
           {layout && !picked && <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Click a part of the card to fill it</span>}
           {layout && picked && (here.length ? <Values label={PLACE_LABELS[placeFor(picked)]} hint={picked === 'body' ? 'Flavour text. The prompt is added under it on the card.' : undefined} fields={here} values={card.values} onChange={setValue} /> : <span className="text-[12.5px] text-dim">This layout puts nothing here. Add a field here on the layout.</span>)}

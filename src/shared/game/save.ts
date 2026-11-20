@@ -1,7 +1,9 @@
 import type { ClockState } from './core/clock'
 import type { EntityRecord } from './core/GameEntity'
-import { cleanStand, type JourneyEntry, type Standing } from '../maps'
+import { cleanStand, type CreatureDisposition, type JourneyEntry, type Standing } from '../maps'
 import type { WorldPost } from '../world'
+import { cleanBattleRecord, type BattleRecord } from './state/battle'
+import { cleanWorldEventRuntime, type WorldEventRuntime } from './worldEvents'
 
 export interface SaveCharacter {
   game: EntityRecord | null
@@ -10,14 +12,36 @@ export interface SaveCharacter {
 
 export interface SaveCreature extends EntityRecord {
   faction: string
+  disposition?: CreatureDisposition
 }
 
 export type SaveRecord = Record<string, unknown> | null
+
+export interface SaveLoadoutOverride {
+  classId?: string | null
+  abilities?: string[]
+  items?: string[]
+  buffs?: string[]
+}
+
+export interface SaveCreateOptions {
+  player?: string | null
+  companions?: string[]
+  startingMap?: string | null
+  startingPlace?: string | null
+  startingTime?: number
+  premise?: string
+  incitingIncident?: string
+  tone?: string
+  openingActionIds?: string[]
+  loadout?: Record<string, SaveLoadoutOverride>
+}
 
 export interface GameSave {
   id: string
   name: string
   world: string
+  almanacId?: string
   createdAt: number
   updatedAt: number
   clockId: string
@@ -25,6 +49,8 @@ export interface GameSave {
   creatures: SaveCreature[]
   flags: Record<string, string | number | boolean>
   used: string[]
+  /** Sheet IDs belonging to the player's actual party (player + recruited companions). NPCs in `characters` are NOT in `party`. */
+  party?: string[]
   characters: Record<string, SaveCharacter>
   stand: Record<string, Record<string, Standing>>
   records: Record<string, Record<string, SaveRecord>>
@@ -32,12 +58,16 @@ export interface GameSave {
   board: WorldPost[]
   placed: Record<string, EntityRecord>
   thingFlags: Record<string, Record<string, string | number | boolean>>
+  longRestAt?: number
+  battle?: BattleRecord | null
+  eventStates?: Record<string, WorldEventRuntime>
 }
 
 export interface SaveMeta {
   id: string
   name: string
   world: string
+  almanacId?: string
   updatedAt: number
   time: number
   characters: string[]
@@ -54,7 +84,7 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 export function cleanClockState(raw: unknown): ClockState {
   const c = obj(raw)
-  return { time: Math.max(0, num(c.time, 0)), ticks: Math.max(0, Math.floor(num(c.ticks, 0))), speed: num(c.speed, 1) > 0 ? num(c.speed, 1) : 1, paused: c.paused === true, carry: Math.max(0, num(c.carry, 0)) }
+  return { time: Math.max(0, num(c.time, 0)) }
 }
 
 const isRecord = (c: unknown): c is EntityRecord => Boolean(c) && typeof c === 'object' && typeof (c as EntityRecord).uid === 'string' && Array.isArray((c as EntityRecord).comps)
@@ -88,13 +118,35 @@ export function cleanSave(raw: unknown, id: string): GameSave {
     id,
     name: typeof v.name === 'string' && v.name.trim() ? v.name.trim() : id,
     world: str(v.world),
+    ...(str(v.almanacId) ? { almanacId: str(v.almanacId) } : {}),
     createdAt: num(v.createdAt, 0),
     updatedAt: num(v.updatedAt, 0),
     clockId: str(v.clockId),
     clock: cleanClockState(v.clock),
-    creatures: Array.isArray(v.creatures) ? v.creatures.filter(isRecord).map((c) => ({ ...c, faction: str(obj(c).faction) })) : [],
+    ...(typeof v.longRestAt === 'number' ? { longRestAt: v.longRestAt } : {}),
+    ...(cleanBattleRecord(v.battle) ? { battle: cleanBattleRecord(v.battle) } : {}),
+    ...(v.eventStates && typeof v.eventStates === 'object' && !Array.isArray(v.eventStates)
+      ? {
+          eventStates: Object.fromEntries(
+            Object.entries(v.eventStates as Record<string, unknown>)
+              .map(([k, val]) => [k, cleanWorldEventRuntime(val)] as const)
+              .filter((e): e is [string, WorldEventRuntime] => Boolean(e[1]))
+          )
+        }
+      : {}),
+    creatures: Array.isArray(v.creatures)
+      ? v.creatures.filter(isRecord).map((c) => {
+          const disp = str(obj(c).disposition)
+          return {
+            ...c,
+            faction: str(obj(c).faction),
+            ...(disp === 'hostile' || disp === 'neutral' || disp === 'friendly' ? { disposition: disp as CreatureDisposition } : {})
+          }
+        })
+      : [],
     flags,
     used: Array.isArray(v.used) ? v.used.filter((u): u is string => typeof u === 'string') : [],
+    ...(Array.isArray(v.party) ? { party: v.party.filter((p): p is string => typeof p === 'string' && Boolean(p.trim())) } : {}),
     characters: cleanCharacters(v.characters),
     stand: Object.fromEntries(Object.entries(obj(v.stand)).map(([map, s]) => [map, cleanStand(s)])),
     records: cleanRecords(v.records),
@@ -106,5 +158,13 @@ export function cleanSave(raw: unknown, id: string): GameSave {
 }
 
 export function saveMeta(save: GameSave): SaveMeta {
-  return { id: save.id, name: save.name, world: save.world, updatedAt: save.updatedAt, time: save.clock.time, characters: Object.keys(save.characters) }
+  return {
+    id: save.id,
+    name: save.name,
+    world: save.world,
+    ...(save.almanacId ? { almanacId: save.almanacId } : {}),
+    updatedAt: save.updatedAt,
+    time: save.clock.time,
+    characters: Object.keys(save.characters)
+  }
 }

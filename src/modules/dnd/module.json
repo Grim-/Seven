@@ -5,5 +5,16 @@
   "version": "1.0.0",
   "apiVersion": 1,
   "permission": "none",
-  "tools": false
+  "tools": false,
+  "attributions": [
+    {
+      "id": "dnd-srd-51",
+      "name": "D&D 5e SRD 5.1",
+      "category": "Game Data",
+      "license": "CC-BY-4.0",
+      "url": "https://dnd.wizards.com/resources/systems-reference-document",
+      "usedFor": "Bundled 5e compendium data (spells, classes, species, monsters, equipment, conditions, and features) in the D&D module.",
+      "attribution": "This work includes material taken from the System Reference Document 5.1 (\"SRD 5.1\") by Wizards of the Coast LLC and available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License available at https://creativecommons.org/licenses/by/4.0/legalcode.\n\nStructured data sourced via 5e-bits/5e-database (MIT) and dnd-data by Nick Aschenbach (MIT)."
+    }
+  ]
 }

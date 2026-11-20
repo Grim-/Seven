@@ -1,4 +1,4 @@
-import { ExternalLink, Eraser, FolderOpen, MapPin, MessageSquarePlus, PenLine, Pencil, Play, Plus, Trash2, X } from 'lucide-react'
+import { Dices, ExternalLink, Eraser, FolderOpen, MapPin, MessageSquarePlus, PenLine, Pencil, Play, Plus, Trash2, X } from 'lucide-react'
 import { showName } from '@shared/ids'
 import { placeId, type PlaceVisitor } from '@shared/maps'
 import { PLACE_TYPE_KEY, type WorldEntity } from '@shared/world'
@@ -8,6 +8,7 @@ import { failed } from '../../lib/notify'
 import { openEntry } from '../../lib/library'
 import { openSevenLink } from '../../lib/links'
 import { startChatItems } from '../../views/data/entryMenu'
+import { startDmChatWith } from '../../lib/conversation'
 import { placeName } from './placeShapes'
 import { newPlayItems, placePlay } from '../play/playHolder'
 
@@ -44,6 +45,7 @@ export function placeItems(c: PlaceItemsContext): MenuItem[] {
   return [
     ...(c.onStart ? [{ label: 'Start here', icon: <Play />, onSelect: c.onStart }] : []),
     { label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(`@place:${c.placeKey}`, c.here.flatMap((v) => (v.agent ? [v.agent] : []))) },
+    { label: 'Start DM chat here', icon: <Dices />, children: startChatItems(`@place:${c.placeKey}`, c.here.flatMap((v) => (v.agent ? [v.agent] : [])), startDmChatWith) },
     ...newPlayItems(placePlay(c.world, c.placeKey, c.places[c.placeKey] ?? {}, c.player, c.here.flatMap((v) => (v.agent ? [v.agent] : [])))),
     { label: 'New place inside', icon: <Plus />, onSelect: c.onNewInside },
     { label: c.shaped ? 'Redraw shape' : 'Draw shape', icon: <PenLine />, onSelect: c.onDraw },

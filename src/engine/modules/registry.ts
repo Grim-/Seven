@@ -25,6 +25,7 @@ import { toGrammarSchema } from './schema'
 import { McpConnection } from './mcp'
 import { builtinSources, readHelp, readRemind, type BuiltinSource } from './builtins'
 import { getToolsPrefs, saveToolsPrefs } from './prefs'
+import { registerAttributions, unregisterAttributionsByPrefix } from '../credits'
 
 const TRUST_FILE = path.join(dataRoot, 'tool-trust.json')
 const SETTINGS_FILE = path.join(dataRoot, 'tool-settings.json')
@@ -164,7 +165,13 @@ export class ModuleRegistry extends EventEmitter {
   }
 
   private readCustomizations(): ModuleCustomizations {
-    const raw = readJson<Record<string, unknown>>(CUSTOMIZATIONS_FILE, {})
+    let raw: Record<string, unknown>
+    try {
+      raw = readJson<Record<string, unknown>>(CUSTOMIZATIONS_FILE, {})
+    } catch (err) {
+      if (isVaultLocked(err)) return {}
+      throw err
+    }
     const out: ModuleCustomizations = {}
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out
     for (const [modId, val] of Object.entries(raw)) {
@@ -377,6 +384,8 @@ export class ModuleRegistry extends EventEmitter {
     for (const entry of this.entries.values()) await this.evaluate(entry)
     await this.settleDependencies()
     this.checkClashes()
+    unregisterAttributionsByPrefix('module:')
+    registerAttributions([...this.entries.values()].flatMap((e) => e.manifest.attributions))
     this.watch()
     this.emitChanged()
   }
@@ -385,7 +394,7 @@ export class ModuleRegistry extends EventEmitter {
     if (entry.state === 'error' && entry.error?.startsWith('module.json')) return
     const record = this.trust[entry.manifest.id]
     if (entry.source === 'builtin') {
-      if (record && !record.enabled) {
+      if (record ? !record.enabled : entry.manifest.defaultOff) {
         entry.state = 'off'
         return
       }
@@ -646,7 +655,11 @@ export class ModuleRegistry extends EventEmitter {
         entry.hash = fresh.hash
         entry.files = fresh.files
         this.trust[id] = { hash: fresh.hash, files: fresh.files, enabled: true }
-      } else delete this.trust[id]
+      } else if (entry.manifest.defaultOff) {
+        this.trust[id] = { hash: '', files: {}, enabled: true }
+      } else {
+        delete this.trust[id]
+      }
       this.saveTrust()
       await this.unload(entry)
       await this.evaluate(entry)

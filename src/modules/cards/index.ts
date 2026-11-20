@@ -1,6 +1,7 @@
 import type { JsonObjectSchema } from '../../engine/tools/schema'
-import { ANY_CHECK, LIVE_CHECKS, type CheckSchema } from '../../engine/tools/checkSchema'
-import { cardVariationDefs, liveCardVariations, type CardVariationDef } from '../../engine/cards/variations'
+import { CARD_VARIATION_SCOPE, cardVariationDefs, liveCardVariations, type CardVariationDef } from '../../engine/cards/variations'
+import { checkKeys } from '../../engine/tools/schemaSources'
+import { moduleOnForAgent } from '../../engine/modules/isOn'
 import './promptVariation'
 import type { ModuleFactory, ModulePage, ModuleViewResult } from '../../engine/modules/sdk'
 import type { ToolContext, ToolDef } from '../../engine/tools/types'
@@ -29,29 +30,23 @@ type Json = Record<string, unknown>
 
 const MOVED = 'setsMoved'
 
-const variationSchema = (check: CheckSchema, variations: CardVariationDef[]) =>
-  variations.map((v) => ({
-    type: 'object',
-    properties: {
-      type: { enum: [v.id], description: `Variation type: ${v.name} (${v.id})` },
-      data: v.remove ? { oneOf: [{ type: 'null' }, v.data(check)] } : v.data(check)
-    },
-    required: ['type', 'data']
-  }))
-
-const makeCardParams = (check: CheckSchema, variations: CardVariationDef[]): JsonObjectSchema => {
-  const oneVariation = variationSchema(check, variations)
+const makeCardParams = (variations: CardVariationDef[]): JsonObjectSchema => {
   return {
     type: 'object',
     properties: {
       card: { type: 'string', description: 'its name' },
       variation: {
-        oneOf: [{ type: 'null' }, ...oneVariation],
-        description: 'adds or replaces one variation; data null removes it'
-      },
-      variations: {
-        oneOf: [{ type: 'null' }, { type: 'array', items: { oneOf: oneVariation } }],
-        description: 'apply multiple variations in one call'
+        oneOf: [
+          { type: 'null' },
+          {
+            type: 'object',
+            properties: {
+              type: { enum: variations.map((v) => v.id) },
+              data: { type: ['object', 'null'], description: `fields: inspect_schema(${CARD_VARIATION_SCOPE}, <type>); null removes it` }
+            },
+            required: ['type', 'data']
+          }
+        ]
       },
       text: { type: ['string', 'null'], description: 'flavour' },
       art: { type: ['string', 'null'] },
@@ -152,9 +147,9 @@ const factory: ModuleFactory = (sdk) =>
         name: 'make_card',
         activity: () => 'making a card',
         description: 'Make or change a card. variation adds or replaces one of its variations; call again for another. layout: a card layout name, basic if unsure; values: its fields by name. art: a short glyph or an <svg>.',
-        params: makeCardParams(ANY_CHECK, cardVariationDefs.all()),
-        forAgent: () => ({ params: makeCardParams(LIVE_CHECKS, liveCardVariations()) }),
-        execute: async (params) => {
+        params: makeCardParams(cardVariationDefs.all()),
+        forAgent: (scope) => ({ params: makeCardParams(cardVariationDefs.on((m) => moduleOnForAgent(m, scope.agentId))) }),
+        execute: async (params, ctx) => {
           try {
             const raw = params as Json
             const name = sdk.params.str(params, 'card')
@@ -175,17 +170,18 @@ const factory: ModuleFactory = (sdk) =>
               const patchValues = raw.values && typeof raw.values === 'object' ? (layoutTitle ? this.checkValues(this.layout(layoutTitle), raw.values) : (() => { throw new sdk.ToolError('Set layout before setting card values.') })()) : {}
               if (layoutRef || 'values' in raw) next = { ...next, layout: layoutTitle, values: { ...prevValues, ...patchValues } }
             }
-            const list: Json[] = [
-              ...(raw.variation && typeof raw.variation === 'object' ? [raw.variation as Json] : []),
-              ...(Array.isArray(raw.variations) ? raw.variations.filter((x): x is Json => Boolean(x && typeof x === 'object' && !Array.isArray(x))) : [])
-            ]
-            for (const v of list) {
-              const def = liveCardVariations().find((d) => d.id === v.type)
+            const v = raw.variation && typeof raw.variation === 'object' && !Array.isArray(raw.variation) ? (raw.variation as Json) : null
+            if (v) {
+              const def = cardVariationDefs.on((m) => moduleOnForAgent(m, ctx.agentId)).find((d) => d.id === v.type)
               if (!def) throw new CardError(`No card variation "${String(v.type)}".`)
               if (v.data === null) {
                 if (!def.remove) throw new CardError(`A card always has ${def.name}.`)
                 next = def.remove(next)
-              } else next = def.apply(next, (v.data as Json) ?? {})
+              } else {
+                const given = v.data && typeof v.data === 'object' && !Array.isArray(v.data) ? (v.data as Json) : {}
+                checkKeys(CARD_VARIATION_SCOPE, def.id, given)
+                next = def.apply(next, given)
+              }
             }
             const card = cleanCard(next)
             const page = existing ? this.pages.save(existing.id, card) : this.pages.create('card', card.name, card)

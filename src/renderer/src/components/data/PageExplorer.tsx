@@ -1,9 +1,11 @@
-import { useEffect, useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { BookOpen, File, FilePlus, FileText, Folder, FolderPlus, Upload } from 'lucide-react'
 import { FOLDER_TYPE, showName } from '@shared/ids'
 import { pageKindOf, type AssetMeta, type PageMeta } from '@shared/types'
 import { KindShell, TileIcon, openMenu, type ShellItem } from '../ui'
 import { ancestorsOf, useData } from '../../store/data'
+import { engine, on } from '../../lib/ipc'
+import { onLibraryChange } from '../../lib/library'
 import { AssetMedia } from '../pictures/AssetMedia'
 import { KindIcon } from '../../lib/library'
 import { askNewFolder, folderNewItems, newPageMenu, renamePage, usePageTypes } from './PageView'
@@ -25,6 +27,17 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMe
   const pages = useData((s) => s.pages)
   const assets = useData((s) => s.assets)
   const types = usePageTypes()
+  const [tagMap, setTagMap] = useState<Record<string, string[]>>({})
+  useEffect(() => {
+    const load = () => void engine('tags.map').then(setTagMap).catch(() => undefined)
+    load()
+    const offTags = on('tags.changed', load)
+    const offLib = onLibraryChange(load)
+    return () => {
+      offTags()
+      offLib()
+    }
+  }, [])
   const { byId, kids, files, filesById, counts } = useMemo(() => {
     const byId = new Map(pages.map((p) => [p.id, p]))
     const counts = new Map<string, number>()
@@ -63,9 +76,10 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMe
 
   const items: ShellItem[] = kids.map((p) => {
     const isFolder = p.type === FOLDER_TYPE
+    const pKind = pageKindOf(p.type)
     const type = p.type ? types.find((t) => t.id === p.type) : undefined
     const inside = counts.get(p.id) ?? 0
-    const Face = p.type ? presentOf(pageKindOf(p.type)).Face : undefined
+    const Face = p.type ? presentOf(pKind).Face : undefined
     return {
       key: p.id,
       title: showName(p.title),
@@ -76,6 +90,8 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMe
       face: Face ? <Face id={p.id} /> : undefined,
       updatedAt: p.updatedAt,
       tag: isFolder ? 'DIR' : (type?.label ?? 'Page').toUpperCase(),
+      kind: pKind,
+      tags: tagMap[`${pKind}/${p.id}`],
       group: isFolder ? 0 : 1,
       target: isFolder
     }
@@ -89,6 +105,8 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMe
       icon: <File className="h-4 w-4" />,
       tile: <TileIcon shape="file" label={ext} />,
       tag: ext,
+      kind: a.kind,
+      tags: tagMap[`file/${a.id}`],
       thumb: VIEWABLE.includes(a.kind) ? <AssetMedia id={a.id} className="h-full w-full" /> : undefined,
       updatedAt: a.createdAt,
       group: 2

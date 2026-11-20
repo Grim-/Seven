@@ -11,7 +11,10 @@ import { WorldBoard } from './Board'
 import { SchemaEditor } from './SchemaEditor'
 import { WorldMaps } from '../maps/WorldMaps'
 import { WorldEntities } from './WorldEntities'
+import { WorldOpening } from './WorldOpening'
+import { WorldPlaces } from './WorldPlaces'
 import { useApp } from '../../store/app'
+import { useTools } from '../../store/tools'
 import { setWhere } from '../maps/placeActions'
 import { SheetSelect } from '../data/sheet/SheetSelect'
 import { ShellTabs } from '../ui'
@@ -80,9 +83,12 @@ function SchemaJson({ world }: { world: WorldMeta }) {
 
 export function WorldsPanel({ initial = null }: { initial?: string | null }) {
   const list = useWorlds()
+  const playEnabled = useTools((s) => s.list.some((m) => m.id === 'play' && m.state === 'on'))
   const [first, firstType, firstKey] = (initial ?? '').split('/')
   const [selected, setSelected] = useState<string | null>(first || null)
-  const [tab, setTab] = useState<'maps' | 'entities' | 'board' | 'schema'>(first && firstType ? 'entities' : 'maps')
+  const [tab, setTab] = useState<'maps' | 'places' | 'entities' | 'board' | 'opening' | 'schema'>(
+    first && firstType === 'place' ? 'places' : first && firstType ? 'entities' : 'maps'
+  )
   const [schemaMode, setSchemaMode] = useState<'visual' | 'json'>('visual')
   const [schema, setSchema] = useState<WorldSchema | null>(null)
   const world = list.find((w) => w.id === selected) ?? list[0] ?? null
@@ -155,8 +161,10 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
                   onChange={setTab}
                   options={[
                     { value: 'maps', label: 'Maps' },
+                    { value: 'places', label: 'Places' },
                     { value: 'entities', label: 'Entities & Lore' },
                     { value: 'board', label: `Board ${world.posts}` },
+                    { value: 'opening', label: 'Opening' },
                     { value: 'schema', label: 'Schema' }
                   ]}
                 />
@@ -169,17 +177,19 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
                   <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Your character</span>
                   <SheetSelect value={world.player} onChange={(sheet) => void engine('worlds.setPlayer', { id: world.id, sheet }).catch(failed('Could not set your character'))} className="h-7 w-40 text-[12px]" />
                 </span>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  icon={<Play className="h-3.5 w-3.5" />}
-                  onClick={() => {
-                    useApp.getState().setView('play')
-                  }}
-                  title="Switch to Play mode to play this world"
-                >
-                  Play World
-                </Button>
+                {playEnabled && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    icon={<Play className="h-3.5 w-3.5" />}
+                    onClick={() => {
+                      useApp.getState().setView('play')
+                    }}
+                    title="Switch to Play mode to play this world"
+                  >
+                    Play World
+                  </Button>
+                )}
                 <Button size="sm" variant="ghost" icon={<Trash2 />} onClick={() => remove(world)}>
                   Delete world
                 </Button>
@@ -193,13 +203,18 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
                     if (!player) return toast.info('No active player', 'Select or create a character first.')
                     void setWhere(player, place)
                       .then(() => {
-                        toast.success('Starting location set', 'Character is ready. Entering Play mode...')
-                        useApp.getState().setView('play')
+                        if (playEnabled) {
+                          toast.success('Starting location set', 'Character is ready. Entering Play mode...')
+                          useApp.getState().setView('play')
+                        } else {
+                          toast.success('Starting location set', 'Character starting place updated.')
+                        }
                       })
                       .catch(failed('Could not start there'))
                   }}
                 />
               )}
+              {tab === 'places' && <WorldPlaces key={world.id} world={world} initialKey={world.id === first && firstType === 'place' ? firstKey : undefined} />}
               {tab === 'entities' && (
                 <WorldEntities
                   key={world.id}
@@ -210,6 +225,7 @@ export function WorldsPanel({ initial = null }: { initial?: string | null }) {
                 />
               )}
               {tab === 'board' && <WorldBoard key={world.id} worldId={world.id} />}
+              {tab === 'opening' && <WorldOpening key={world.id} world={world} />}
               {tab === 'schema' && (
                 <div className="flex min-h-0 flex-1 flex-col gap-2">
                   <ShellTabs value={schemaMode} onChange={setSchemaMode} options={[{ value: 'visual', label: 'Visual' }, { value: 'json', label: 'JSON' }]} />

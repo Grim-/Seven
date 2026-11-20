@@ -19,10 +19,13 @@ export interface EntityRecord {
   template: TemplateRef
   name: string
   comps: ComponentRecord[]
+  at?: number
 }
 
 export interface EntityLookup {
   find(uid: string): GameEntity | null
+  /** Attempts to spend the entity's per-round combat reaction; returns false if already spent. */
+  tryReaction?(uid: string): boolean
 }
 
 export class GameEntity implements SignalSource {
@@ -30,6 +33,7 @@ export class GameEntity implements SignalSource {
   world: EntityLookup | null = null
   link: string | null = null
   comps: Component[] = []
+  at: number | null = null
   private live = false
 
   constructor(
@@ -95,6 +99,18 @@ export class GameEntity implements SignalSource {
     return this.comps.some((c) => c.isInvisible())
   }
 
+  /** Collects net roll advantage/disadvantage flags across components on this entity. */
+  rollFlags(scope: 'incoming' | 'outgoing'): { advantage: boolean; disadvantage: boolean } {
+    let advantage = false
+    let disadvantage = false
+    for (const c of this.comps) {
+      const f = c.rollFlags(scope)
+      if (f.advantage) advantage = true
+      if (f.disadvantage) disadvantage = true
+    }
+    return { advantage, disadvantage }
+  }
+
   start(): void {
     if (this.live) return
     this.live = true
@@ -113,11 +129,12 @@ export class GameEntity implements SignalSource {
   }
 
   toRecord(): EntityRecord {
-    return { uid: this.uid, template: { ...this.template }, name: this.name, comps: this.comps.map((c) => c.toJSON()) }
+    return { uid: this.uid, template: { ...this.template }, name: this.name, comps: this.comps.map((c) => c.toJSON()), ...(this.at === null ? {} : { at: this.at }) }
   }
 
   static fromRecord(record: EntityRecord, catalog: Catalog): GameEntity {
     const entity = new GameEntity(record.uid, record.template, record.name, catalog)
+    entity.at = typeof record.at === 'number' ? record.at : null
     for (const r of record.comps) {
       const comp = restoreComponent(r)
       if (comp) entity.add(comp)

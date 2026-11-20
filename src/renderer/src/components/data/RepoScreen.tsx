@@ -10,7 +10,7 @@ import { toast } from '../../store/toasts'
 import type { DataSelection } from '../../store/data'
 import type { KindScreenProps } from '../../registries/kinds'
 import { onLibraryChange } from '../../lib/library'
-import { entryMenuAt } from '../../views/data/entryMenu'
+import { KindSelectionBar, entryMenuAt, multiEntryMenuAt } from '../../views/data/entryMenu'
 import { copyText } from '../../lib/notify'
 import { noteFailure } from '../../store/problems'
 import { withReferences } from '../chat/References'
@@ -253,6 +253,7 @@ export function RepoScreen({ id, select }: KindScreenProps) {
   return (
     <KindShell
       id="repos"
+      pickable
       layouts={['cards', 'deck', 'list']}
       items={(repos ?? []).map((r) => ({
         key: r.id,
@@ -261,8 +262,13 @@ export function RepoScreen({ id, select }: KindScreenProps) {
         icon: <Dices className="h-4 w-4" />,
         updatedAt: r.updatedAt
       }))}
+      selectionBar={(picked, { selectAll, clear }) => (
+        <KindSelectionBar kind="repo" picked={picked} total={(repos ?? []).length} onSelectAll={selectAll} onClear={clear} />
+      )}
       onOpen={(item) => select({ kind: 'repo', id: item.key })}
-      onMenu={(e, item) => entryMenuAt(e, 'repo', item.key, item.title)}
+      onMenu={(e, item, picked) =>
+        picked.length > 1 ? multiEntryMenuAt(e, 'repo', picked) : entryMenuAt(e, 'repo', item.key, item.title)
+      }
       adds={[{ label: 'New repo', icon: <Plus />, onClick: () => askNewRepo(select) }]}
       empty="No repos yet."
     />

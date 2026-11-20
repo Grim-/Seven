@@ -3,6 +3,7 @@ import { engine, main, on } from '../lib/ipc'
 import { errorText } from '../lib/format'
 import { useApp } from './app'
 import { useModels } from './models'
+import { useImageHost } from './image'
 import { useAgents } from './agents'
 import { useSessions } from './sessions'
 import { toast } from './toasts'
@@ -50,26 +51,69 @@ import { usePlaces } from './places'
 import { useDownloads } from './downloads'
 import { failed } from '../lib/notify'
 
-export type WindowMode = 'app' | 'overlay'
+export type WindowMode = 'app'
 
 let mode: WindowMode = 'app'
 
 async function loadEngineState(retried = false): Promise<void> {
+  const vault = useVault.getState().status
+  const locked = vault.configured && !vault.unlocked
+  if (locked) {
+    // Vault is locked: only load non-vault public state so nothing tries to read encrypted vault data before unlock.
+    try {
+      await Promise.allSettled([
+        useTools.getState().refresh(),
+        useModels.getState().refresh(),
+        useImageHost.getState().refresh(),
+        useThemes.getState().refresh(),
+        useDownloads.getState().refresh()
+      ])
+    } catch (err) {
+      if (!isLockedError(err)) toast.error('Could not reach the engine', errorText(err))
+    } finally {
+      useApp.setState((s) => ({ startup: { ...s.startup, engine: true, workspace: false, ready: false } }))
+    }
+    return
+  }
+
   try {
-    const results = await Promise.allSettled([useTools.getState().refresh(), useModels.getState().refresh(), useAgents.getState().refresh(), useSessions.getState().refresh(openConversations().flatMap((c) => (c.sessionId ? [c.sessionId] : []))), useData.getState().refresh(), useDashboards.getState().refresh(), useWidgetInfo.getState().refresh(), useThemes.getState().refresh(), useAvatars.getState().refresh(), useStyleList.getState().refresh(), usePlaces.getState().refresh(), useDownloads.getState().refresh()])
+    const openIds = openConversations().flatMap((c) => (c.sessionId ? [c.sessionId] : []))
+    const results = await Promise.allSettled([
+      useTools.getState().refresh(),
+      useToolsets.getState().load(),
+      useModels.getState().refresh(),
+      useImageHost.getState().refresh(),
+      useImageHost.getState().refreshHistory(),
+      useAgents.getState().refresh(),
+      useSessions.getState().refresh(openIds),
+      useData.getState().refresh(),
+      useDashboards.getState().refresh(),
+      useWidgetInfo.getState().refresh(),
+      useThemes.getState().refresh(),
+      useAvatars.getState().refresh(),
+      useStyleList.getState().refresh(),
+      usePlaces.getState().refresh(),
+      useDownloads.getState().refresh()
+    ])
     const lockedFail = results.some((r) => r.status === 'rejected' && isLockedError(r.reason))
     if (lockedFail && !retried && useVault.getState().status.unlocked) {
       useVault.setState({ status: await main('vault.status') })
       return loadEngineState(true)
     }
-    const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected' && !isLockedError(r.reason))
-    if (failed) throw failed.reason
-    const home = focusedConversation()
-    const first = useSessions.getState().list[0]
-    if (mode === 'overlay' && home && !home.sessionId && first) home.go(first.id)
-    else recheckOpen()
+    const failedReq = results.find((r): r is PromiseRejectedResult => r.status === 'rejected' && !isLockedError(r.reason))
+    if (failedReq) throw failedReq.reason
+    const focused = focusedConversation()
+    if (focused?.sessionId) {
+      await useSessions.getState().load(focused.sessionId).catch(() => undefined)
+    }
+    recheckOpen()
   } catch (err) {
     if (!isLockedError(err)) toast.error('Could not reach the engine', errorText(err))
+  } finally {
+    const stillLocked = useVault.getState().status.configured && !useVault.getState().status.unlocked
+    useApp.setState((s) => ({
+      startup: { ...s.startup, engine: true, workspace: !stillLocked, ready: !stillLocked }
+    }))
   }
 }
 
@@ -79,23 +123,33 @@ export async function bootstrap(windowMode: WindowMode = 'app'): Promise<void> {
   if (started) return
   started = true
   mode = windowMode
-  useWindows.getState().setHome(mode === 'overlay' ? 'overlay' : 'chat')
+  useWindows.getState().setHome('chat')
 
-  if (mode === 'app') {
-    on('app.focusSession', ({ sessionId }) => openChat(sessionId))
-  }
+  on('app.focusSession', ({ sessionId }) => openChat(sessionId))
 
   on('engine.status', (status) => {
     const previous = useApp.getState().engine
-    useApp.setState({ engine: status })
+    useApp.setState((s) => ({
+      engine: status,
+      startup: {
+        ...s.startup,
+        engine: status.state === 'ready' ? true : s.startup.engine,
+        ready: status.state === 'crashed' ? true : s.startup.ready
+      }
+    }))
     if (status.state === 'ready' && previous.state !== 'ready') void loadEngineState()
   })
   on('settings.changed', (settings) => useApp.setState({ settings }))
   on('vault.changed', (status) => {
     const previous = useVault.getState().status
     useVault.setState({ status, ...(status.unlocked ? { asking: false } : {}) })
-    if (previous.unlocked && !status.unlocked) clearPersonal()
-    if (status.unlocked !== previous.unlocked || status.configured !== previous.configured) void loadEngineState().then(recheckOpen)
+    if (previous.unlocked && !status.unlocked) {
+      clearPersonal()
+      useApp.setState((s) => ({ startup: { ...s.startup, workspace: false, ready: false } }))
+    } else if (status.unlocked && !previous.unlocked) {
+      useApp.setState((s) => ({ startup: { ...s.startup, workspace: false, ready: false } }))
+    }
+    if (status.unlocked !== previous.unlocked || status.configured !== previous.configured) void loadEngineState()
   })
   on('model.state', (host) => {
     const previous = useModels.getState().host.status
@@ -157,7 +211,6 @@ export async function bootstrap(windowMode: WindowMode = 'app'): Promise<void> {
   })
   on('view.events', ({ title, world, events }) => void playViewEvents(events, title, world).catch(noteFailure('play', 'Could not apply view events')))
   on('toolsets.changed', ({ list }) => useToolsets.getState().set(list))
-  void useToolsets.getState().load().catch(noteFailure('tools', 'Could not load the toolsets'))
   on('backdrop.changed', ({ sessionId, state }) => useBackdrops.getState().set(sessionId, state))
   on('backdrop.app', ({ backdrop }) => void useApp.getState().updateSettings({ backdrop }).catch(failed('Could not set the backdrop')))
   on('turn.phase', ({ messageId, phase }) => usePhases.getState().set(messageId, phase))
@@ -181,7 +234,18 @@ export async function bootstrap(windowMode: WindowMode = 'app'): Promise<void> {
 
   const [settings, info, status, vault] = await Promise.all([main('settings.get'), main('app.info'), main('engine.status'), main('vault.status')])
   useVault.setState({ status: vault })
-  useApp.setState({ settings, info, engine: status, ...(mode === 'app' ? { view: settings.lastView } : {}) })
+  useApp.setState((s) => ({
+    settings,
+    info,
+    engine: status,
+    view: settings.lastView,
+    startup: {
+      ...s.startup,
+      settings: true,
+      engine: status.state === 'ready',
+      ready: status.state === 'crashed' ? true : s.startup.ready
+    }
+  }))
   if (mode === 'app' && info.vaultMissing) toast.error('Vault folder not found', `${info.vaultMissing} isn't there, so Seven opened the default vault. Connect it and switch to it in Settings, Vault.`)
   if (status.state === 'ready') {
     await engine('ping').catch(noteFailure('engine', 'The engine did not answer'))

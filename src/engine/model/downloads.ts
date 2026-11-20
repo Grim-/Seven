@@ -2,7 +2,7 @@ import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
-import type { DownloadItem } from '@shared/types'
+import type { DownloadBundleFile, DownloadItem, ImageModelConfig } from '@shared/types'
 import { isVaultLocked } from '@shared/sealed'
 import { dataRoot } from '../util/paths'
 import { newId, readJson, writeJson } from '../util/fs'
@@ -12,13 +12,24 @@ import { fetchResumable, partOf, sizeOn } from '../net/resumable'
 
 const FILE = path.join(dataRoot, 'downloads.json')
 const ACTIVE: DownloadItem['state'][] = ['queued', 'downloading']
-const PART = /-(\d{5})-of-(\d{5})\.gguf$/i
+const PART = /-(\d{5})-of-(\d{5})(\.(?:gguf|safetensors|sft))$/i
 
 function partFiles(file: string): string[] {
   const m = file.match(PART)
   if (!m) return [file]
   const parts = Number(m[2])
-  return Array.from({ length: parts }, (_, i) => file.replace(PART, `-${String(i + 1).padStart(5, '0')}-of-${m[2]}.gguf`))
+  const ext = m[3]
+  return Array.from({ length: parts }, (_, i) => file.replace(PART, `-${String(i + 1).padStart(5, '0')}-of-${m[2]}${ext}`))
+}
+
+function safeJoin(root: string, rel: string): string {
+  const clean = rel.replace(/^[/\\]+/, '').split('/').filter((s) => s && s !== '.' && s !== '..')
+  const base = path.resolve(root)
+  const resolved = path.resolve(base, ...clean)
+  if (resolved !== base && !resolved.startsWith(`${base}${path.sep}`)) {
+    throw new Error(`Invalid target path "${rel}" outside ${root}.`)
+  }
+  return resolved
 }
 
 function auth(): Record<string, string> {
@@ -72,7 +83,7 @@ class Downloads extends EventEmitter {
     this.emit('changed', this.list())
   }
 
-  start(input: { repo: string; file: string; name: string; folder: string; total: number }): DownloadItem[] {
+  start(input: { repo: string; file: string; name: string; folder: string; total: number; files?: DownloadBundleFile[]; imageConfig?: Partial<ImageModelConfig>; targetModelId?: string }): DownloadItem[] {
     if (!input.folder) throw new Error('Pick a model folder to save it in. Add one under Folders in Models first if there are none.')
     const same = this.all().find((d) => d.repo === input.repo && d.file === input.file && d.folder === input.folder && d.state !== 'done')
     if (same) throw new Error(`${input.name} is already in your downloads. Resume it there instead.`)
@@ -89,8 +100,28 @@ class Downloads extends EventEmitter {
     if (next) void this.run(next)
   }
 
-  private targets(d: DownloadItem): { url: string; target: string }[] {
-    return partFiles(d.file).map((file) => ({ url: hubUrl(d.repo, file), target: path.join(d.folder, path.posix.basename(file)) }))
+  private targets(d: DownloadItem): { url: string; target: string; role?: DownloadBundleFile['role'] }[] {
+    if (d.files && d.files.length > 0) {
+      const seen = new Set<string>()
+      const out: { url: string; target: string; role?: DownloadBundleFile['role'] }[] = []
+      for (const entry of d.files) {
+        const parts = partFiles(entry.file)
+        for (const file of parts) {
+          const rel = entry.targetRel && parts.length === 1 ? entry.targetRel : entry.targetRel ? `${path.posix.dirname(entry.targetRel)}/${path.posix.basename(file)}` : file
+          const target = safeJoin(d.folder, rel)
+          if (seen.has(target)) continue
+          seen.add(target)
+          out.push({ url: hubUrl(entry.repo, file), target, role: entry.role })
+        }
+      }
+      return out
+    }
+    const repoSlug = d.repo.split('/').pop() ?? d.repo
+    return partFiles(d.file).map((file) => {
+      const hasSubdir = file.includes('/')
+      const rel = hasSubdir ? `${repoSlug}/${file}` : path.posix.basename(file)
+      return { url: hubUrl(d.repo, file), target: safeJoin(d.folder, rel) }
+    })
   }
 
   private async run(d: DownloadItem): Promise<void> {
@@ -121,7 +152,9 @@ class Downloads extends EventEmitter {
           }
         })
       }
-      this.patch(d.id, { state: 'done', path: files[0].target, received: total, total, speed: 0, secondsLeft: 0 })
+      const primary = files.find((f) => f.role === 'model')?.target ?? files[0].target
+      this.patch(d.id, { state: 'done', path: primary, received: total, total, speed: 0, secondsLeft: 0 })
+      this.emit('completed', { item: d, files })
     } catch (err) {
       if (!this.stopping.has(d.id)) this.patch(d.id, { state: 'failed', speed: 0, secondsLeft: null, error: err instanceof Error ? err.message : String(err) })
     } finally {

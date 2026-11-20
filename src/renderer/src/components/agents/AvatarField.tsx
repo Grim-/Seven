@@ -1,6 +1,6 @@
-import { Pencil, Sparkles } from 'lucide-react'
+import { Pencil, SlidersHorizontal } from 'lucide-react'
 import { PICTURE_RENDERER, avatarIdOfRef, fileOfRef } from '@shared/avatars'
-import type { AvatarRef } from '@shared/types'
+import type { AvatarRef, ImagePromptContext } from '@shared/types'
 import { engine } from '../../lib/ipc'
 import { openEntry } from '../../lib/library'
 import { failed } from '../../lib/notify'
@@ -14,7 +14,15 @@ import { LiveAvatar } from '../avatars/LiveAvatar'
 
 const TILE = 44
 
-export function AvatarField({ value, onChange }: { value: AvatarRef | null; onChange: (v: AvatarRef | null) => void }) {
+export function AvatarField({
+  value,
+  onChange,
+  context
+}: {
+  value: AvatarRef | null
+  onChange: (v: AvatarRef | null) => void
+  context?: ImagePromptContext | null
+}) {
   const list = useAvatars((s) => s.list)
   const chosen = avatarIdOfRef(value)
   const file = fileOfRef(value)
@@ -36,7 +44,7 @@ export function AvatarField({ value, onChange }: { value: AvatarRef | null; onCh
           </button>
         ))}
       </div>
-      <PictureField options={MEDIA_OPTIONS} value={file} onChange={(id) => onChange(id ? { kind: 'file', assetId: id } : null)} />
+      <PictureField options={{ ...MEDIA_OPTIONS, what: 'an agent avatar', context }} value={file} onChange={(id) => onChange(id ? { kind: 'file', assetId: id } : null)} />
       <div className="flex flex-wrap gap-1.5">
         {chosen && (
           <Button size="sm" variant="ghost" icon={<Pencil />} onClick={() => openEntry('avatar', chosen)}>
@@ -44,7 +52,7 @@ export function AvatarField({ value, onChange }: { value: AvatarRef | null; onCh
           </Button>
         )}
         {file && (
-          <Button size="sm" variant="ghost" icon={<Sparkles />} onClick={editable}>
+          <Button size="sm" variant="ghost" icon={<SlidersHorizontal />} onClick={editable}>
             Make it an editable avatar
           </Button>
         )}

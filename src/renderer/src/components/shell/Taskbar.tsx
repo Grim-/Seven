@@ -1,6 +1,6 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Globe, Menu as MenuIcon } from 'lucide-react'
-import { viewsIn } from '../../views/registry'
+import { useViewsIn } from '../../views/registry'
 import { showBrowser } from '../side/BrowserTab'
 import { useTools } from '../../store/tools'
 import { cn } from '../../lib/cn'
@@ -45,8 +45,8 @@ function ResponsiveTaskbar() {
   const setView = useApp((s) => s.setView)
   const compact = useCompactLayout()
   const menu = useSheet(NAV_SHEET)
-  const tabs = useMemo(() => viewsIn('tabs'), [])
-  const settingsTabs = useMemo(() => viewsIn('settings'), [])
+  const tabs = useViewsIn('tabs')
+  const settingsTabs = useViewsIn('settings')
 
   const slotRef = useRef<HTMLDivElement>(null)
   const tabMeasureRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -128,11 +128,13 @@ function ResponsiveTaskbar() {
 function DesktopTaskbar() {
   const view = useApp((s) => s.view)
   const setView = useApp((s) => s.setView)
-  const browserOn = useTools((s) => s.list.some((m) => m.id === 'browser' && m.state === 'on'))
+  const browserOn = useTools((s) => s.list.some((m) => m.id === 'web' && m.state === 'on'))
+  const tabs = useViewsIn('tabs')
+  const settingsTabs = useViewsIn('settings')
 
   return (
     <nav className="relative z-40 flex h-11 shrink-0 items-stretch border-t border-line/40 bg-bg/95 px-1.5">
-      {viewsIn('tabs').map((item) => (
+      {tabs.map((item) => (
         <div key={item.id} className="group relative flex">
           <Tab active={view === item.id} icon={item.icon} label={item.label} onClick={() => setView(item.id)} />
           <FavouritesFlyout view={item.id} links={item.menu} />
@@ -157,7 +159,7 @@ function DesktopTaskbar() {
       <div className="flex items-stretch pl-1">
         <NotificationButton />
         <LockButton compact />
-        {viewsIn('settings').map((item) => (
+        {settingsTabs.map((item) => (
           <Tab key={item.id} active={view === item.id} icon={item.icon} onClick={() => setView(item.id)} />
         ))}
       </div>

@@ -1,8 +1,10 @@
+import { useMemo } from 'react'
 import type { StoredMapObject } from '@shared/game/mapObjects'
 import { Field, Input, Segmented, TagInput, Textarea } from '../ui'
 import { MapObjectGraphicPicker } from '../game/MapObjectGraphicPicker'
 import { EntrySelect } from '../game/EntrySelect'
 import { ObjectPlayManager } from '../maps/ObjectPlayManager'
+import { mapObjectImageContext, useRegisterImageContext } from '../../lib/imagePromptContext'
 
 interface Props {
   value: StoredMapObject
@@ -10,6 +12,11 @@ interface Props {
 }
 
 export function StoredMapObjectEditor({ value, onChange }: Props) {
+  const objectContext = useMemo(
+    () => mapObjectImageContext({ name: value.name, description: value.description, tags: value.tags }),
+    [value.name, value.description, value.tags]
+  )
+  useRegisterImageContext(objectContext)
   return (
     <div className="flex flex-col gap-4 font-mono select-none">
       {/* NAME & COLLISION */}
@@ -44,6 +51,7 @@ export function StoredMapObjectEditor({ value, onChange }: Props) {
           image={value.image}
           size={value.size}
           graphicSource={value.graphicSource}
+          context={objectContext}
           onChange={(image, size, graphicSource) =>
             onChange({ ...value, image, size, graphicSource })
           }

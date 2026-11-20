@@ -1,6 +1,6 @@
 import { LUCK, type EffectGroup } from '../../effectGroups'
 import { registerComponent, roll, type TooltipRow } from '../../core'
-import { ActionPiece, type ActionEvent, type EffectBranch } from '../Action'
+import { ActionPiece, chainScore, expectedActionValue, type ActionEvent, type EffectBranch, type UseContext } from '../Action'
 
 export class Chance extends ActionPiece {
   static readonly type: string = 'action.chance'
@@ -29,6 +29,12 @@ export class Chance extends ActionPiece {
     this.report(event, { percent: Math.round(percent), passed: hit }, `Chance (${Math.round(percent)}%): ${hit ? 'passed' : 'failed'}.`)
     if (hit) return this.next(event)
     this.branch(event, String(this.params.onFail))
+  }
+
+  score(ctx: UseContext): number {
+    if (!this.action) return 0
+    const p = Math.min(1, Math.max(0, expectedActionValue(String(this.params.percent), { ...ctx, action: this.action }) / 100))
+    return p * chainScore(this.action, String(this.params.emit), ctx) + (1 - p) * chainScore(this.action, String(this.params.onFail), ctx)
   }
 }
 

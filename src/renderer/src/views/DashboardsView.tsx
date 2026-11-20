@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, Layers, LayoutGrid, MessageSquare, Plus, Settings2, Trash2 } from 'lucide-react'
 import type { AssetMeta, Dashboard } from '@shared/types'
 import { SUGGESTED_ICONS } from '@shared/widgets'
-import { Button, EmptyState, Field, Input, Modal, Select, ShellTabs, Toggle, ViewHeader, DoneEditing, useAutosavedState } from '../components/ui'
+import { Button, EmptyState, Field, Input, Modal, Select, ShellTabs, ViewHeader, DoneEditing, useAutosavedState } from '../components/ui'
 import { BoardTabletop } from '../components/dashboards/BoardTabletop'
 import { DashboardIcon } from '../components/dashboards/DashboardIcon'
 import { AddPicker, fileThings, placeOnBoard } from '../components/dashboards/AddPicker'
@@ -112,9 +112,6 @@ function DashboardSettings({ dashboard, list, onClose }: { dashboard: Dashboard 
         <Field label="Icon">
           <IconPicker value={icon} onChange={(v) => change({ icon: v })} />
         </Field>
-        <Field label="Overlay toolbar" hint="Shows a button for this dashboard on the overlay toolbar.">
-          <Toggle checked={onToolbar} onChange={(v) => change({ onToolbar: v })} label={onToolbar ? 'Shown' : 'Hidden'} />
-        </Field>
         {dashboard && list.length > 1 && (
           <Field label="Order">
             <div className="flex gap-2">
@@ -190,7 +187,7 @@ function DashboardsViewBody() {
     <div className="flex h-full flex-col gap-3 p-5">
       <ViewHeader
         title="Dashboards"
-        subtitle="Boards you put anything on: pages, pictures, music, video, PDFs. Drop or paste files straight onto a board. Each can sit on the overlay toolbar."
+        subtitle="Boards you put anything on: pages, pictures, music, video, PDFs. Drop or paste files straight onto a board."
         actions={
           <Button variant="primary" icon={<Plus />} onClick={() => setSettings('new')}>
             New dashboard

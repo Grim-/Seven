@@ -4,18 +4,20 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { MODEL_KINDS, type ChatTemplate, type ModelConfig, type ModelConfigResult, type ModelEntry, type ModelInfo, type ModelKind, type RemoteApi } from '@shared/types'
+import { DEFAULT_IMAGE_CONFIG, MODEL_KINDS, type ChatTemplate, type ImageCompanionRef, type ImageCompanions, type ImageModelConfig, type ModelConfig, type ModelConfigResult, type ModelEntry, type ModelInfo, type ModelKind, type RemoteApi } from '@shared/types'
+import { resolveImageArchSpec, missingRecipeSlots, type CompanionSlot } from '@shared/imageModels'
 import { REMOTE_APIS } from '@shared/remoteModels'
 import { paths } from '../util/paths'
 import { remoteKeys } from './keys'
 import type { ApiTarget } from './apiChat'
 import { readJson, writeJson } from '../util/fs'
 import { normalize } from './params'
-import { readHeader } from './gguf/read'
+import { isModelFile, readModelInfo } from './weightMeta'
 
 interface ModelsFile {
   models: ModelEntry[]
   configs: Record<string, ModelConfig>
+  imageConfigs?: Record<string, Partial<ImageModelConfig>>
   favourites?: string[]
   lastUsed?: Record<string, number>
   info?: Record<string, { size: number; info: ModelInfo | null; v?: number }>
@@ -27,15 +29,14 @@ interface ModelsFile {
 
 export type ConfigOverlay = (id: string, own: ModelConfig) => ModelConfig
 
-const INFO_VERSION = 5
+const INFO_VERSION = 7
 function readInfo(filePath: string): Promise<ModelInfo | null> {
-  return readHeader(filePath, { size: true }).catch((err: unknown) => (noteFailure(err, 'models', "Could not read a model file's header"), null))
+  return readModelInfo(filePath, { size: true }).catch((err: unknown) => (noteFailure(err, 'models', "Could not read a model file's header"), null))
 }
-
 
 function modelId(filePath: string): string {
   const base = path
-    .basename(filePath, '.gguf')
+    .basename(filePath, path.extname(filePath))
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -56,8 +57,32 @@ function describe(filePath: string, folder: string | null): ModelEntry {
   return { id: modelId(filePath), name, path: path.resolve(filePath), sizeBytes, quant: null, folder }
 }
 
-function isGguf(file: string): boolean {
-  return path.extname(file).toLowerCase() === '.gguf'
+function normalizeImageConfig(raw?: Partial<ImageModelConfig> | null): ImageModelConfig {
+  const s = raw ?? {}
+  const opt = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null)
+  const num = (v: unknown, fallback: number, min: number): number => (typeof v === 'number' && Number.isFinite(v) && v >= min ? v : fallback)
+  const bool = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : fallback)
+  const mode = s.mode === 'model' || s.mode === 'diffusion' || s.mode === 'auto' ? s.mode : DEFAULT_IMAGE_CONFIG.mode
+  return {
+    mode,
+    vae: opt(s.vae),
+    tae: opt(s.tae),
+    clipL: opt(s.clipL),
+    clipG: opt(s.clipG),
+    t5xxl: opt(s.t5xxl),
+    llm: opt(s.llm),
+    llmVision: opt(s.llmVision),
+    loraDir: opt(s.loraDir),
+    width: Math.round(num(s.width, DEFAULT_IMAGE_CONFIG.width, 64)),
+    height: Math.round(num(s.height, DEFAULT_IMAGE_CONFIG.height, 64)),
+    steps: Math.round(num(s.steps, DEFAULT_IMAGE_CONFIG.steps, 1)),
+    cfgScale: num(s.cfgScale, DEFAULT_IMAGE_CONFIG.cfgScale, 0),
+    sampler: typeof s.sampler === 'string' && s.sampler.trim() ? s.sampler.trim() : DEFAULT_IMAGE_CONFIG.sampler,
+    clipOnCpu: bool(s.clipOnCpu, DEFAULT_IMAGE_CONFIG.clipOnCpu),
+    vaeTiling: bool(s.vaeTiling, DEFAULT_IMAGE_CONFIG.vaeTiling),
+    flashAttention: bool(s.flashAttention, DEFAULT_IMAGE_CONFIG.flashAttention),
+    offloadToCpu: bool(s.offloadToCpu, DEFAULT_IMAGE_CONFIG.offloadToCpu)
+  }
 }
 
 function walk(dir: string, depth: number, out: string[]): void {
@@ -72,7 +97,7 @@ function walk(dir: string, depth: number, out: string[]): void {
   for (const entry of entries) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) walk(full, depth + 1, out)
-    else if (entry.isFile() && isGguf(entry.name)) out.push(full)
+    else if (entry.isFile() && isModelFile(entry.name)) out.push(full)
   }
 }
 
@@ -110,18 +135,30 @@ export class ModelRegistry extends EventEmitter {
     const info = this.data.info ?? {}
     return [...this.data.models]
       .filter((m) => {
-        const known = info[m.id]?.size === m.sizeBytes ? info[m.id]?.info : null
+        const known = this.infoOf(m, info[m.id])
         return !known || (MODEL_KINDS[known.kind].listed && !(known.split && known.split.part > 0))
       })
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((m) => {
-        if (m.remote) return { ...m, favourite: favs.has(m.id), remote: { ...m.remote, hasKey: remoteKeys.has(m.id) }, ...(used[m.id] ? { lastUsedAt: used[m.id] } : {}), info: undefined }
+        if (m.remote) {
+          const override = this.data.kinds?.[m.id]
+          const category = override === 'image' ? ('image' as const) : m.remote.category
+          return {
+            ...m,
+            favourite: favs.has(m.id),
+            remote: { ...m.remote, hasKey: remoteKeys.has(m.id), ...(category ? { category } : {}) },
+            ...(used[m.id] ? { lastUsedAt: used[m.id] } : {}),
+            ...(override ? { kindChosen: true } : {}),
+            info: undefined
+          }
+        }
+        const resolved = this.infoOf(m, info[m.id])
         return {
           ...m,
           favourite: favs.has(m.id),
           ...(used[m.id] ? { lastUsedAt: used[m.id] } : {}),
-          info: this.infoOf(m, info[m.id]),
-          quant: this.infoOf(m, info[m.id])?.quant ?? null,
+          info: resolved,
+          quant: resolved?.quant ?? null,
           ...(this.data.kinds?.[m.id] ? { kindChosen: true } : {})
         }
       })
@@ -146,9 +183,22 @@ export class ModelRegistry extends EventEmitter {
     return this.list().find((m) => m.id === id)?.info?.mtpLayers ?? null
   }
 
-  projectors(): { id: string; name: string; path: string }[] {
+  private modelsOfKind(kind: ModelKind): ImageCompanionRef[] {
     const info = this.data.info ?? {}
-    return this.data.models.filter((m) => !m.remote && this.infoOf(m, info[m.id])?.kind === 'projector').map((m) => ({ id: m.id, name: m.name, path: m.path }))
+    return this.data.models.filter((m) => !m.remote && this.infoOf(m, info[m.id])?.kind === kind).map((m) => ({ id: m.id, name: m.name, path: m.path }))
+  }
+
+  projectors(): ImageCompanionRef[] {
+    return this.modelsOfKind('projector')
+  }
+
+  imageCompanions(): ImageCompanions {
+    return {
+      vaes: this.modelsOfKind('vae'),
+      textEncoders: this.modelsOfKind('text_encoder'),
+      projectors: this.modelsOfKind('projector'),
+      loras: this.modelsOfKind('lora')
+    }
   }
 
   projectorFor(id: string): { choice: string | null; auto: boolean } {
@@ -254,8 +304,8 @@ export class ModelRegistry extends EventEmitter {
   }
 
   add(filePath: string): ModelEntry {
-    if (!fs.existsSync(filePath)) throw new Error(`There is no file at ${filePath}. Pick a .gguf model file that exists on this computer.`)
-    if (!filePath.toLowerCase().endsWith('.gguf')) throw new Error('Only .gguf files can be added')
+    if (!fs.existsSync(filePath)) throw new Error(`There is no file at ${filePath}. Pick a supported model file (.gguf, .safetensors, .sft, .ckpt) that exists on this computer.`)
+    if (!isModelFile(filePath)) throw new Error('Only .gguf, .safetensors, .sft, and .ckpt files can be added')
     const entry = describe(filePath, null)
     this.data.models = [...this.data.models.filter((m) => m.id !== entry.id), entry]
     this.changed()
@@ -316,6 +366,7 @@ export class ModelRegistry extends EventEmitter {
     if (this.data.templates) delete this.data.templates[id]
     if (this.data.projectors) delete this.data.projectors[id]
     if (this.data.packs) delete this.data.packs[id]
+    if (this.data.imageConfigs) delete this.data.imageConfigs[id]
     if (this.data.models.length === before) return false
     this.changed()
     return true
@@ -363,5 +414,107 @@ export class ModelRegistry extends EventEmitter {
     delete this.data.configs[id]
     this.save()
     return { config: this.ownConfig(id) }
+  }
+
+  getImageConfig(id: string): ImageModelConfig {
+    this.get(id)
+    return normalizeImageConfig(this.data.imageConfigs?.[id])
+  }
+
+  setImageConfig(id: string, patch: Partial<ImageModelConfig>): ImageModelConfig {
+    this.get(id)
+    const next = normalizeImageConfig({ ...this.getImageConfig(id), ...patch })
+    this.data.imageConfigs = { ...(this.data.imageConfigs ?? {}), [id]: next }
+    this.save()
+    return next
+  }
+
+  resetImageConfig(id: string): ImageModelConfig {
+    this.get(id)
+    if (this.data.imageConfigs) delete this.data.imageConfigs[id]
+    this.save()
+    return normalizeImageConfig(null)
+  }
+
+  private resolveCompanionFile(ref: string | null, role: string): string | null {
+    if (!ref) return null
+    const model = this.data.models.find((m) => m.id === ref)
+    const resolved = model ? model.path : path.resolve(ref)
+    if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+      throw new Error(`The ${role} file for this image model was not found (${resolved}). Pick another in Models.`)
+    }
+    return resolved
+  }
+
+  resolveImagePipeline(id: string): {
+    mode: 'model' | 'diffusion'
+    modelPath: string
+    vae: string | null
+    tae: string | null
+    clipL: string | null
+    clipG: string | null
+    t5xxl: string | null
+    llm: string | null
+    llmVision: string | null
+    loraDir: string | null
+    config: ImageModelConfig
+  } {
+    const entry = this.get(id)
+    if (entry.remote) throw new Error(`${entry.name} is a remote model, not a local diffusion file.`)
+    if (!fs.existsSync(entry.path)) throw new Error(`Model file not found on disk: ${entry.path}`)
+    const config = this.getImageConfig(id)
+    const vae = this.resolveCompanionFile(config.vae, 'VAE')
+    const tae = this.resolveCompanionFile(config.tae, 'TAE / TAESD')
+    const clipL = this.resolveCompanionFile(config.clipL, 'CLIP-L')
+    const clipG = this.resolveCompanionFile(config.clipG, 'CLIP-G')
+    const t5xxl = this.resolveCompanionFile(config.t5xxl, 'T5XXL')
+    const llm = this.resolveCompanionFile(config.llm, 'LLM encoder')
+    const llmVision = this.resolveCompanionFile(config.llmVision, 'LLM vision projector')
+    let loraDir: string | null = null
+    if (config.loraDir) {
+      const candidate = this.data.models.find((m) => m.id === config.loraDir)?.path ?? path.resolve(config.loraDir)
+      if (!fs.existsSync(candidate)) throw new Error(`The LoRA folder for this image model was not found (${candidate}).`)
+      loraDir = fs.statSync(candidate).isDirectory() ? candidate : path.dirname(candidate)
+    }
+    const info = this.infoFor(id)
+    const spec = resolveImageArchSpec(info?.architecture, entry.name)
+    const hasEncoders = Boolean(clipL || clipG || t5xxl || llm)
+    const mode: 'model' | 'diffusion' = config.mode === 'auto' ? (spec?.modular || hasEncoders ? 'diffusion' : 'model') : config.mode
+    if (mode === 'diffusion' && spec) {
+      const configured: Record<CompanionSlot, string | null> = { vae, tae, clipL, clipG, t5xxl, llm, llmVision }
+      const missing = missingRecipeSlots(spec, configured)
+      if (missing.length > 0 && !vae && !tae && !hasEncoders) {
+        const names = missing.map((s) => `${s.label} (${s.flag})`).join(', ')
+        throw new Error(`${entry.name} (${spec.label}) needs its companion weights configured before starting sd-server: ${names}. Open the model's Companions or Auto-match them first.`)
+      }
+    }
+    return { mode, modelPath: entry.path, vae, tae, clipL, clipG, t5xxl, llm, llmVision, loraDir, config }
+  }
+
+  autoMatchImageCompanions(id: string): ImageModelConfig {
+    const entry = this.get(id)
+    const info = this.infoFor(id)
+    const spec = resolveImageArchSpec(info?.architecture, entry.name)
+    const current = this.getImageConfig(id)
+    if (!spec) return current
+    const companions = this.imageCompanions()
+    const poolBySlot: Record<CompanionSlot, ImageCompanionRef[]> = {
+      vae: companions.vaes,
+      tae: companions.vaes,
+      clipL: companions.textEncoders,
+      clipG: companions.textEncoders,
+      t5xxl: companions.textEncoders,
+      llm: [...companions.textEncoders, ...this.modelsOfKind('chat')],
+      llmVision: companions.projectors
+    }
+    const patch: Partial<ImageModelConfig> = {}
+    for (const slot of spec.slots) {
+      if (current[slot.slot]) continue
+      if (slot.slot === 'tae' && (current.vae || patch.vae)) continue
+      const re = new RegExp(slot.matchPattern, 'i')
+      const match = poolBySlot[slot.slot].find((candidate) => re.test(`${candidate.name} ${path.basename(candidate.path)}`))
+      if (match) patch[slot.slot] = match.id
+    }
+    return Object.keys(patch).length ? this.setImageConfig(id, patch) : current
   }
 }

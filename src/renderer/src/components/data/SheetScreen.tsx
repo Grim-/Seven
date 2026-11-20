@@ -11,7 +11,7 @@ import type { KindScreenProps } from '../../registries/kinds'
 import { onLibraryChange } from '../../lib/library'
 import { AssetMedia } from '../pictures/AssetMedia'
 import { SheetEditor } from './sheet/SheetEditor'
-import { entryMenuAt } from '../../views/data/entryMenu'
+import { KindSelectionBar, entryMenuAt, multiEntryMenuAt } from '../../views/data/entryMenu'
 import { noteFailure } from '../../store/problems'
 
 export function askNewSheet(select: (s: DataSelection | null) => void): void {
@@ -48,6 +48,7 @@ function SheetList({ select }: { select: KindScreenProps['select'] }) {
   return (
     <KindShell
       id="sheets"
+      pickable
       layouts={['cards', 'tiles', 'deck', 'list']}
       items={sheets.map((s) => ({
         key: s.id,
@@ -57,8 +58,13 @@ function SheetList({ select }: { select: KindScreenProps['select'] }) {
         thumb: s.image ? <AssetMedia id={s.image} className="h-full w-full object-cover" /> : undefined,
         updatedAt: s.updatedAt
       }))}
+      selectionBar={(picked, { selectAll, clear }) => (
+        <KindSelectionBar kind="sheet" picked={picked} total={sheets.length} onSelectAll={selectAll} onClear={clear} />
+      )}
       onOpen={(item) => select({ kind: 'sheet', id: item.key })}
-      onMenu={(e, item) => entryMenuAt(e, 'sheet', item.key, item.title)}
+      onMenu={(e, item, picked) =>
+        picked.length > 1 ? multiEntryMenuAt(e, 'sheet', picked) : entryMenuAt(e, 'sheet', item.key, item.title)
+      }
       adds={[{ label: 'New character', icon: <Plus />, onClick: () => askNewSheet(select) }]}
       empty="No characters yet."
     />

@@ -42,7 +42,7 @@ export function Profile() {
             compact
             value={about}
             onValue={(text) => autosave.set((u) => ({ ...u, about: text.slice(0, 4000) }))}
-            placeholder="I'm in the UK, so metric and British spelling. Keep replies short unless I ask for more."
+            placeholder="Prefer concise replies unless I ask for detail. Mention your preferred units, tone, or anything agents should always keep in mind."
             className="min-w-0 flex-1"
           />
         </div>

@@ -1,5 +1,6 @@
 import { Component, registerComponent, type GameEntity, type TooltipRow } from '../../core'
 import { Item } from '../Inventory'
+import { bindRefills, refillRule, REFILL_PARAMS } from '../refill'
 
 export class ItemResource extends Component {
   static readonly type: string = 'item.resource'
@@ -9,7 +10,7 @@ export class ItemResource extends Component {
     label: { kind: 'text' as const, default: 'Charges', description: 'Its name.' },
     max: { kind: 'number' as const, default: 10, min: 0, description: 'Most it can hold.' },
     startFull: { kind: 'flag' as const, default: true, description: 'A new item starts full. Off starts it empty.' },
-    regenPerSecond: { kind: 'number' as const, default: 0, description: 'Change every game second. Negative drains it.' },
+    ...REFILL_PARAMS,
     colour: { kind: 'text' as const, default: '', description: 'Bar colour: a theme colour name such as accent, cyan, purple, ok or alert.' }
   }
   protected current = Number.NaN
@@ -52,10 +53,14 @@ export class ItemResource extends Component {
     return true
   }
 
-  tickSim(seconds: number): void {
-    super.tickSim(seconds)
-    const rate = Number(this.params.regenPerSecond)
-    if (rate) this.change(rate * seconds)
+  refillable(): boolean {
+    return true
+  }
+
+  onApplied(): void {
+    super.onApplied()
+    const entity = this.entity
+    if (entity) bindRefills(this, entity, refillRule(this.params), this)
   }
 
   protected saveState(): Record<string, unknown> {

@@ -1,4 +1,4 @@
-import { toId } from '@shared/ids'
+import { stripRef, toId } from '@shared/ids'
 import { cleanElements } from '@shared/chatElements'
 import { allRepos, getRepo, saveRepo } from './library/repos'
 import { guideModules, guideText, moduleGuidePreview } from './chat/context'
@@ -10,9 +10,12 @@ import { serviceKeys } from './model/keys'
 import { getSheet, saveSheet, setSheetFaction, sheetIds } from './library/sheets'
 import { customCommands } from './commands/custom'
 import type { EngineRequestName, EngineRequests, EngineWireRequest, Events } from '@shared/protocol'
-import type { AgentProfile } from '@shared/types'
+import type { AgentProfile, CompanionRole, DownloadItem, ImageModelConfig } from '@shared/types'
 import { ModelRegistry } from './model/registry'
 import { ModelHost } from './model/host'
+import { ImageHost } from './image/host'
+import { imageHistory } from './image/history'
+import { setImageRuntime } from './image/runtime'
 import { llamaLimits, serverBuild, serverDevices } from './model/server/install'
 import { Packs } from './packs'
 import { appFolder, machineRoot } from './install/paths'
@@ -20,7 +23,9 @@ import { PARAMS } from './model/params'
 import { modelTraitSet } from '@shared/modelParams'
 import { ModelRoutes } from './model/server/modelRoutes'
 import { memoryServer } from './mind/embedder'
+import { notFound } from '@shared/errors'
 import { AgentRegistry } from './agents/registry'
+import { agentPreset, agentPresets } from './agents/presets'
 import { SessionStore } from './sessions/store'
 import { ChatRunner } from './chat/runner'
 import { UiRequests } from './ui/requests'
@@ -28,6 +33,7 @@ import { DEFAULT_RULES, PermissionStore } from './permissions/rules'
 import { CheckpointStore } from './checkpoints/store'
 import { detectShell } from './tools/shell'
 import { data } from './data/hub'
+import { kindFolders } from './data/kindFolders'
 import { importToLibrary } from './data/importing'
 import { EXERCISES_FORMAT, WORKOUTS_FORMAT, workout } from './workout/store'
 import { createSlideshow, saveSlideshow } from './library/slideshows'
@@ -39,10 +45,13 @@ import { themes } from './themes/store'
 import { avatars } from './avatars/store'
 import { storyRuns } from './stories'
 import { piperSpeak, piperVoices } from './tts'
+import { creditsEvents, listAttributions, registerCoreAttributions } from './credits'
 import './sources/builtin'
 import { LLAMA_SERVER } from './install/helpers/llamaServer'
+import { SD_SERVER, sdServerLimits } from './install/helpers/sdServer'
 import { installEvents } from './install/events'
 import { installState, freeSpace } from './install/state'
+import { listHelpers } from './install/registry'
 import { refreshReleases, choiceViews } from './install/releases'
 import { install, cancelJob } from './install/job'
 import { activate, addExisting, onActivated, removeVersion, verifyVersion } from './install/versions'
@@ -52,12 +61,13 @@ import { commandInfo, commandsFor, runCommand } from './commands/registry'
 import type { Ambience, AmbienceCue, Theme } from '@shared/theme'
 import type { Avatar } from '@shared/avatars'
 import { tags as tagStore } from './library/tags'
-import { setGuideSource, specialPages, USER, allKinds, clearKind, kindInfo, removeEntry, renameEntry, rollText, drawEntry, drawableEntries, previewEntry, find as libraryFind, overview as libraryOverview, resolveEntry, partView, timelineRows, describeEvent, resolveRoutineEntry, entryInside } from './library/kinds'
+import { setGuideSource, specialPages, USER, allKinds, kinds as libraryKinds, clearKind, kindInfo, removeEntry, renameEntry, rollText, drawEntry, drawableEntries, previewEntry, find as libraryFind, overview as libraryOverview, resolveEntry, partView, timelineRows, describeEvent, resolveRoutineEntry, entryInside } from './library/kinds'
 import { contextPrefs } from './chat/prefs'
 import { modules } from './modules/registry'
 import { setAgentAccess } from './agents/access'
 import { setToolsFolderCheck } from './tools/workspace'
 import { setPrivateKey, vaultEvents } from './util/secure'
+import { installStarterPacks } from './portability/starterPacks'
 import { clearIndexes } from './util/dirIndex'
 import { checkFiles, migrate, vaultStatus } from './vault'
 import { minds } from './mind/store'
@@ -85,6 +95,7 @@ import { backdrops } from './backdrops'
 import { clearStats, summarize } from './turnstats'
 import { worlds } from './worlds/store'
 import { importMap } from './maps/importMap'
+import { ensureDefaultMapTileset } from './maps/defaultTileset'
 import { maps } from './maps/store'
 import { mapListing, mapWithPlace } from './maps/usage'
 import { rollDecision, rollFor } from './actions'
@@ -95,6 +106,7 @@ import { cleanDeckOwner, cleanSwap, hasSwap } from '@shared/cardDecks'
 import { entryField, entryFields, resolveIncludes } from './library/includes'
 import { mapReaders } from './maps/mapReaders'
 import { visitorsOf, whoIsHere } from './worlds/presence'
+import { worldEvents } from './worlds/events'
 import { journalAction, watchJourneys } from './worlds/journeys'
 import { toolsets } from './toolsets/store'
 import { skills } from './skills'
@@ -111,20 +123,27 @@ import { agentFolders, liveFolder, removeFolderTree } from './agents/folders'
 import { currentActor } from './timeline/actor'
 import { compendium } from '../modules/dnd/compendium'
 import { gameDefs } from '../modules/game/store'
-import { awardCharacterXp, changeCreatureHealth, changeHealth as changeGameHealth, characterMisfits, giveItem, takeItem, joinCharacter, leaveCharacter, onEntityMoved, saveCharacter, tickCharacters, triggerStoryMoment, useAbility } from '../modules/game/characters'
+import { awardCharacterXp, changeCreatureHealth, changeHealth as changeGameHealth, characterMisfits, giveItem, takeItem, joinCharacter, leaveCharacter, onEntityMoved, saveCharacter, triggerStoryMoment } from '../modules/game/characters'
 import { saves } from './worlds/saves'
+import { advanceWorldTime, longRest, shortRest, syncAlmanacs } from './worlds/time'
+import { endBattle, endTurn, fleeBattle, joinBattle, moveInBattle, parleyInBattle, startBattle } from './worlds/battle'
+import { stepAiTurn } from './worlds/battleAi'
+import { useAbilityInWorld, useItemInWorld } from './worlds/battleUse'
 import './worlds/sheetTokens'
 import { resolveTokens } from './worlds/tokenSources'
 import { spawnCreature, updateCreature } from './worlds/creatures'
+import { wakeMapSpawners } from './worlds/spawners'
 import { blueprintSources, searchBlueprints, spawnBlueprint } from './worlds/blueprints'
 import { saveInPlay } from './worlds/playLayer'
-import { adoptOldPlay, bring, createNewWorldSave, removeSave, removeWorldSaves, takeOut, travel } from './worlds/party'
+import { adoptOldPlay, bring, copyWorldSave, createNewWorldSave, removeSave, removeWorldSaves, takeOut, travel } from './worlds/party'
 import { decisions, storyActions } from '../modules/decisions/store'
 import { factions } from './factions/store'
 import { mapObjectsStore } from './mapObjects/store'
 import { triggerActionsStore } from './triggerActions/store'
 import { runEffects } from './effects/run'
 import { lootTablesStore } from './lootTables/store'
+import { almanacs } from './almanac/store'
+import { cleanSessionScene } from '@shared/almanac'
 import { widgetInfo } from './data/widgetSources'
 import { resolveThings } from '../modules/core/things'
 import './data/glances'
@@ -168,6 +187,8 @@ process.on('uncaughtException', (err) => {
 })
 
 data.setEmitter(emit)
+registerCoreAttributions()
+creditsEvents.on('changed', () => emit('credits.changed', {}))
 modules.on('changed', (list: ModuleInfo[]) => emit('tools.changed', list))
 registerWorkoutExport()
 registerEntryExports()
@@ -180,6 +201,14 @@ const host = new ModelHost((entry) => {
   const mmproj = models.projectorPath(entry.id)
   return { mtpLayers: models.mtpLayers(entry.id), mmproj, architecture: info?.architecture ?? null, template: models.templateText(entry.id), traits: modelTraitSet(info, mmproj !== null), build: serverBuild() }
 })
+const imageHost = new ImageHost(
+  models,
+  () => host.getState().modelId,
+  () => host.suspendForVram()
+)
+imageHost.on('changed', (state) => emit('image.changed', state))
+imageHistory.on('changed', (list) => emit('image.history.changed', list))
+setImageRuntime({ host: imageHost, models })
 const afterModelChange = <T>(id: string, result: T): T => {
   emit('packs.changed', {})
   if (host.loadedId === id) host.checkRestart(models.getConfig(id))
@@ -201,9 +230,10 @@ onActivated(LLAMA_SERVER, async () => {
   await host.restartOnActive()
   await minds.embedder.restartOnActive()
 })
+onActivated(SD_SERVER, () => imageHost.restartOnActive())
 void endLeftovers()
-  .then((n) => n && report('warning', 'llama-server', `Ended ${n} llama-server${n > 1 ? 's' : ''} left running by an earlier run`))
-  .catch((err: unknown) => noteFailure(err, 'llama-server', 'Could not end llama-servers left by an earlier run'))
+  .then((n) => n && report('warning', 'server', `Ended ${n} model server${n > 1 ? 's' : ''} left running by an earlier run`))
+  .catch((err: unknown) => noteFailure(err, 'server', 'Could not end model servers left by an earlier run'))
 const agents = new AgentRegistry()
 agents.useFolders(agentFolders)
 const agentFolder = (): string | null => {
@@ -233,12 +263,52 @@ setupCommands({ runner, sessions, agents })
 
 setBindingResolver((agentId) => (agentId ? (agents.getOrDefault(agentId).world ?? null) : null))
 
+const ROLE_CONFIG_KEY: Partial<Record<CompanionRole, keyof Pick<ImageModelConfig, 'vae' | 'tae' | 'clipL' | 'clipG' | 't5xxl' | 'llm' | 'llmVision'>>> = {
+  vae: 'vae',
+  tae: 'tae',
+  clipL: 'clipL',
+  clipG: 'clipG',
+  t5xxl: 't5xxl',
+  llm: 'llm',
+  llmVision: 'llmVision'
+}
+
 models.on('changed', (list) => emit('models.changed', list))
 downloads.on('changed', (list) => emit('downloads.changed', list))
+downloads.on('completed', ({ item, files }: { item: DownloadItem; files: { target: string; role?: CompanionRole }[] }) => {
+  void (async () => {
+    const folders = [...new Set([...models.list().map((m) => m.folder).filter((f): f is string => Boolean(f)), item.folder])]
+    const list = await models.scan(folders)
+    const byPath = new Map(list.map((m) => [path.resolve(m.path).toLowerCase(), m]))
+    const primaryTarget = files.find((f) => f.role === 'model')?.target ?? item.path
+    const mainEntry =
+      (item.targetModelId ? list.find((m) => m.id === item.targetModelId) : undefined) ??
+      (primaryTarget ? byPath.get(path.resolve(primaryTarget).toLowerCase()) : undefined)
+    if (!mainEntry) return
+    const patch: Partial<ImageModelConfig> = { ...(item.imageConfig ?? {}) }
+    for (const f of files) {
+      const slotKey = f.role ? ROLE_CONFIG_KEY[f.role] : undefined
+      if (!slotKey) continue
+      const entry = byPath.get(path.resolve(f.target).toLowerCase())
+      patch[slotKey] = entry?.id ?? f.target
+    }
+    if (Object.keys(patch).length > 0) models.setImageConfig(mainEntry.id, patch)
+    models.autoMatchImageCompanions(mainEntry.id)
+  })().catch((err: unknown) => noteFailure(err, 'models', `Could not finish setting up downloaded files for ${item.name}`))
+})
 host.on('state', (state) => emit('model.state', state))
 agents.on('changed', (list) => emit('agents.changed', list))
 setAgentAccess(agents)
 sessions.on('changed', (list) => emit('sessions.changed', list))
+
+function refreshIdleInstructions(id: string): void {
+  if (runner.isRunning(id) || runner.isCompacting(id) || !sessions.loadContext(id).instructions) return
+  try {
+    runner.refreshInstructions(id)
+  } catch (err) {
+    noteFailure(err, 'chat', 'Could not refresh chat instructions')
+  }
+}
 sessions.on('todos', (sessionId: string, list: TodoList) => emit('todos.changed', { sessionId, list }))
 backdrops.on('changed', (sessionId: string, state: ChatBackdrops) => emit('backdrop.changed', { sessionId, state }))
 backdrops.on('app', (backdrop: Backdrop | null) => emit('backdrop.app', { backdrop }))
@@ -265,9 +335,11 @@ saves.on('changed', (world: string) => emit('saves.changed', { world }))
 decisions.on('changed', () => emit('decisions.changed', {}))
 storyActions.on('changed', () => emit('storyActions.changed', {}))
 factions.on('changed', () => emit('factions.changed', {}))
+worldEvents.on('changed', () => emit('worldEvents.changed', {}))
 mapObjectsStore.on('changed', () => emit('mapObjects.changed', {}))
 triggerActionsStore.on('changed', () => emit('triggerActions.changed', {}))
 lootTablesStore.on('changed', () => emit('lootTables.changed', {}))
+almanacs.onChange(() => emit('almanacs.changed', {}))
 board.setNames((id) => agents.list().find((a) => a.id === id)?.name ?? 'an agent')
 scripts.onChange(() => emit('python.changed', {}))
 storyRuns.on('changed', () => emit('stories.changed', {}))
@@ -358,7 +430,15 @@ function warmIndexes(): void {
   }
 }
 
-vaultEvents.on('unlocked', () => setTimeout(warmIndexes, 0))
+const runStarterPacks = (): void => {
+  void modules.ready().then(() => installStarterPacks())
+}
+
+vaultEvents.on('unlocked', () => {
+  setTimeout(warmIndexes, 0)
+  setTimeout(runStarterPacks, 50)
+})
+setTimeout(runStarterPacks, 100)
 
 const handlers: Handlers = {
   ping: () => ({ pid: process.pid, at: Date.now() }),
@@ -378,15 +458,19 @@ const handlers: Handlers = {
   'models.remote.test': ({ id }) => apiTest(models.remoteTarget(id)),
   'models.remote.probe': (input) => apiProbe(models.previewRemoteTarget(input)),
   'models.remote.models': (input) => listRemoteModels(models.previewRemoteTarget({ ...input, model: '', contextSize: null })),
-  'models.load': ({ id }) => {
+  'models.load': async ({ id }) => {
     if (models.isRemote(id)) throw new Error('Remote models are not loaded here. Give an agent this model in Agents and it is used when that agent replies.')
     models.assertRunnable(id)
+    if (models.infoFor(id)?.kind === 'image') throw new Error(`${models.get(id).name} is an image diffusion model. Use Generate image or an agent's image tool to run it on sd-server.`)
+    if (sdServerLimits().autoSwapChatModel && (imageHost.getState().status !== 'unloaded' || imageHost.getState().pid)) {
+      await imageHost.unload()
+    }
     models.touch(id)
     return host.load(models.get(id), models.getConfig(id))
   },
   'models.fillInfo': () => models.fillInfo(),
-  'hub.search': ({ query }) => searchHub(query),
-  'hub.files': ({ repo }) => hubFiles(repo),
+  'hub.search': ({ query, family }) => searchHub(query, family),
+  'hub.files': ({ repo, family }) => hubFiles(repo, family),
   'hub.fileInfo': ({ repo, file }) => hubFileInfo(repo, file),
   'hub.repoFacts': ({ repo, updatedAt }) => hubRepoFacts(repo, updatedAt),
   'hub.token.has': () => serviceKeys.has(HUB_TOKEN),
@@ -411,6 +495,7 @@ const handlers: Handlers = {
       vramTotal: vram?.total ?? null
     }
   },
+  'credits.list': () => listAttributions(modules.list()),
   'models.params': () => PARAMS,
   'models.config.get': ({ id }) => models.ownConfig(id),
   'packs.list': async ({ id }) => {
@@ -435,6 +520,20 @@ const handlers: Handlers = {
   'models.config.reset': ({ id }) => afterModelChange(id, models.resetConfig(id)),
   'models.projector.get': ({ id }) => ({ ...models.projectorFor(id), options: models.projectors().map(({ id: pid, name }) => ({ id: pid, name })) }),
   'models.projector.set': ({ id, projector }) => afterModelChange(id, { ...models.setProjector(id, projector), options: models.projectors().map(({ id: pid, name }) => ({ id: pid, name })) }),
+  'models.imageConfig.get': ({ id }) => models.getImageConfig(id),
+  'models.imageConfig.set': ({ id, patch }) => models.setImageConfig(id, patch),
+  'models.imageConfig.reset': ({ id }) => models.resetImageConfig(id),
+  'models.imageConfig.autoMatch': ({ id }) => models.autoMatchImageCompanions(id),
+  'models.imageCompanions': () => models.imageCompanions(),
+  'image.status': () => imageHost.getState(),
+  'image.load': ({ id }) => imageHost.load(id),
+  'image.unload': () => imageHost.unload(),
+  'image.generate': (req) => imageHost.generate(req),
+  'image.edit': (req) => imageHost.edit(req),
+  'image.cancel': () => imageHost.cancel(),
+  'image.history.list': () => imageHistory.list(),
+  'image.history.remove': ({ id }) => imageHistory.remove(id),
+  'image.history.clear': () => imageHistory.clear(),
   'models.template.get': ({ id }) => models.getTemplate(id),
   'models.template.set': ({ id, choice }) => {
     if (choice.type === 'jinja' && !choice.template.trim()) throw new Error('The Jinja template is empty. Paste a chat template, or set Chat template back to the one in the file.')
@@ -443,6 +542,20 @@ const handlers: Handlers = {
   'agents.list': () => agents.list(),
   'agents.get': ({ id }) => agents.get(id),
   'agents.save': (draft) => agents.save(draft),
+  'agents.presets': ({ role }) =>
+    agentPresets(role).map((p) => ({
+      id: p.id,
+      moduleId: p.moduleId,
+      role: p.role,
+      name: p.name,
+      description: p.description,
+      installed: Boolean(agents.find(p.id))
+    })),
+  'agents.ensurePreset': ({ id }) => {
+    const preset = agentPreset(id)
+    if (!preset) throw notFound(new Error(`Unknown agent preset "${id}"`))
+    return agents.ensurePreset(preset)
+  },
   'agents.delete': ({ id, folder }) => {
     const gone = liveFolder(agents.get(id).folder)
     const removed = agents.delete(id)
@@ -475,10 +588,24 @@ const handlers: Handlers = {
   'worlds.create': ({ name, schema }) => worlds.create(name, schema ?? undefined),
   'worlds.rename': ({ id, name }) => worlds.rename(id, name),
   'worlds.setPlayer': ({ id, sheet }) => worlds.setPlayer(id, sheet),
+  'worldEvents.list': (args) => worldEvents.list(args?.worldId ?? null),
+  'worldEvents.get': ({ id, worldId }) => worldEvents.get(id, worldId ?? null),
+  'worldEvents.save': ({ event, previousId }) => worldEvents.save(event, previousId ?? null),
+  'worldEvents.delete': ({ id }) => {
+    worldEvents.remove(id)
+    return true
+  },
+  'worldEvents.setStatus': ({ id, status, worldId }) => worldEvents.setStatus(id, status, worldId ?? null),
+  'worldEvents.resolve': ({ id, worldId, outcomeId, transcriptSummary }) =>
+    worldEvents.resolve(id, { worldId: worldId ?? null, outcomeId, transcriptSummary }),
   'worlds.setTags': ({ id, tags }) => worlds.setTags(id, tags),
+  'worlds.setLaunch': ({ id, launch }) => worlds.setLaunch(id, launch),
   'actions.roll': ({ action, character, pick, world, deck }) => {
-    const result = rollFor(cleanAction(action), character, pick ?? null)
+    const clean = cleanAction(action)
+    const result = rollFor(clean, character, pick ?? null)
     journalAction(world ?? null, result)
+    const save = world && clean.seconds ? saves.current(world) : null
+    if (save && clean.seconds) advanceWorldTime(save.id, clean.seconds, 'action', Object.keys(save.characters))
     if (deck && hasSwap(result.cards)) swapCards(deck, result.cards)
     return result
   },
@@ -490,7 +617,22 @@ const handlers: Handlers = {
   'decks.addSet': ({ ref, set }) => ({ deck: addSet(ref, set) }),
   'decks.setOwner': ({ deck, owner }) => setDeckOwner(deck, owner ? cleanDeckOwner(owner) : null),
   'worlds.journey': ({ id, sheet }) => worlds.journeys(id)[sheet] ?? [],
-  'worlds.addJourney': ({ id, sheet, kind, text }) => worlds.addJourney(id, sheet, kind, text),
+  'worlds.addJourney': ({ id, sheet, kind, text }) => {
+    const entry = worlds.addJourney(id, sheet, kind, text)
+    for (const alm of almanacs.list().filter((a) => a.worldId === id)) {
+      try {
+        almanacs.recordEntry(alm.id, {
+          kind: 'travel',
+          title: text.slice(0, 72) || 'Journey Event',
+          summary: text,
+          who: [`@sheet:${stripRef(sheet).replace(/^sheet:/i, '')}`]
+        })
+      } catch (err) {
+        noteFailure(err, 'almanac', 'Could not mirror journey entry to Almanac')
+      }
+    }
+    return entry
+  },
   'places.visitors': ({ sheets }) => visitorsOf(sheets),
   'places.tokens': ({ world, tokens }) => resolveTokens(tokens, saveInPlay(world, false), world),
   'worlds.delete': ({ id }) => {
@@ -508,10 +650,12 @@ const handlers: Handlers = {
   'maps.create': ({ name }) => maps.create(name),
   'maps.save': ({ map }) => maps.save(map),
   'maps.import': ({ path: file, map }) => importMap(file, map),
+  'maps.ensureDefaultTileset': () => ensureDefaultMapTileset(),
   'worlds.maps': ({ id }) => worlds.mapUses(id),
   'worlds.useMap': ({ id, map }) => worlds.useMap(id, map),
   'worlds.dropMap': ({ id, map }) => worlds.dropMap(id, map),
   'worlds.saveMapUse': ({ id, use }) => worlds.saveMapUse(id, use),
+  'worlds.wakeSpawners': ({ world, map, entering }) => wakeMapSpawners(world, map, Boolean(entering)),
   'maps.readers': () => mapReaders(),
   'worlds.put': ({ id, type, key, entity }) => (worlds.put(id, type, key, entity), true),
   'worlds.remove': ({ id, type, key }) => worlds.remove(id, type, key),
@@ -537,9 +681,206 @@ const handlers: Handlers = {
   'lootTables.save': ({ table, previousId }) => lootTablesStore.save(table, previousId ?? null),
   'lootTables.delete': ({ id }) => { lootTablesStore.remove(id); return true },
   'lootTables.roll': ({ id }) => lootTablesStore.roll(id),
+  'almanacs.list': () => almanacs.list(),
+  'almanacs.get': ({ id }) => almanacs.find(id) ?? null,
+  'almanacs.save': ({ almanac, previousId }) => almanacs.save(almanac, previousId ?? undefined),
+  'almanacs.delete': ({ id }) => almanacs.remove(id),
+  'almanacs.advanceClock': ({ id, deltaSeconds, absoluteTime }) => almanacs.advanceClock(id, deltaSeconds ?? 0, absoluteTime),
+  'almanacs.recordEntry': ({ id, entry }) => almanacs.recordEntry(id, entry),
+  'almanacs.archiveChat': (opts) => almanacs.archiveChat(opts),
+  'sessions.setScene': ({ id, scene }) => {
+    const cleaned = scene ? cleanSessionScene(scene) : null
+    if (cleaned?.almanacId) {
+      const alm = almanacs.find(cleaned.almanacId)
+      if (alm && cleaned.characters.length) {
+        const nextCast = [...new Set([...alm.cast, ...cleaned.characters])]
+        if (nextCast.length !== alm.cast.length) almanacs.save({ ...alm, cast: nextCast }, alm.id)
+      }
+      if (cleaned.where && cleaned.characters.length) {
+        for (const c of cleaned.characters) {
+          const sheetId = stripRef(c).replace(/^sheet:/i, '').trim()
+          if (!sheetId) continue
+          try {
+            const sh = getSheet(sheetId)
+            if (sh.story.where !== cleaned.where) {
+              saveSheet({ ...sh, story: { ...sh.story, where: cleaned.where } })
+            }
+          } catch {
+            // Ad-hoc character name without a sheet
+          }
+        }
+      }
+    }
+    const updated = sessions.update(id, { scene: cleaned })
+    refreshIdleInstructions(id)
+    return updated
+  },
+  'sessions.setDmMode': ({ id, on }) => {
+    const updated = sessions.update(id, { dmMode: on })
+    refreshIdleInstructions(id)
+    return updated
+  },
+  'sessions.activeForWorld': ({ worldId, saveId }) => {
+    const wantedWorld = String(worldId || '').trim()
+    if (!wantedWorld) return null
+    const wantedSave = saveId ? String(saveId).trim() : null
+    const list = sessions.list()
+    const match = (strictSave: boolean) =>
+      list.find((s) => {
+        const sc = s.scene
+        if (!sc || sc.worldId !== wantedWorld) return false
+        if ((sc.mode ?? 'gameplay') !== 'gameplay') return false
+        if (strictSave && wantedSave) return sc.saveId === wantedSave
+        return !wantedSave || !sc.saveId || sc.saveId === wantedSave
+      }) ?? null
+    return (wantedSave ? match(true) : null) ?? match(false)
+  },
+  'sessions.bindGameplay': ({ sessionId, agentId, worldId, saveId, mapId, placeKey, playerSheet, title }) => {
+    const wantedWorld = String(worldId || '').trim()
+    if (!wantedWorld) throw new Error('worldId is required to bind a Gameplay Chat')
+    const created = !sessionId
+    const meta = sessionId ? sessions.get(sessionId) : sessions.create(agents.getOrDefault(agentId ?? '').id)
+    const wantedSave = saveId ? String(saveId).trim() : null
+    const matchingAlmanac =
+      almanacs.list().find((a) => a.worldId === wantedWorld && (!wantedSave || a.saveId === wantedSave)) ??
+      almanacs.list().find((a) => a.worldId === wantedWorld) ??
+      null
+    const cleanPlace = placeKey ? String(placeKey).trim() : null
+    const cleanPlayer = playerSheet ? String(playerSheet).trim() : null
+    const where = cleanPlace ? (cleanPlace.startsWith('@place:') ? cleanPlace : `@place:${cleanPlace}`) : (matchingAlmanac?.opening?.startingWhere ?? '')
+    const scene = cleanSessionScene({
+      almanacId: matchingAlmanac?.id ?? '',
+      mode: 'gameplay',
+      worldId: wantedWorld,
+      saveId: wantedSave ?? matchingAlmanac?.saveId ?? null,
+      mapId: mapId ? String(mapId).trim() : null,
+      placeKey: cleanPlace,
+      playerSheet: cleanPlayer,
+      where,
+      characters: cleanPlayer ? [`@sheet:${cleanPlayer}`] : [],
+      worldTime: matchingAlmanac?.currentTime ?? null
+    })
+    const nextTitle = created ? (title?.trim() || `${wantedWorld} · Gameplay`) : undefined
+    const updated = sessions.update(meta.id, {
+      ...(nextTitle ? { title: nextTitle } : {}),
+      scene,
+      dmMode: true
+    })
+    refreshIdleInstructions(meta.id)
+    return updated
+  },
+  'sessions.detachGameplay': ({ id }) => {
+    const updated = sessions.update(id, { scene: null, dmMode: false })
+    refreshIdleInstructions(id)
+    return updated
+  },
+  'sessions.rolloverGameplay': ({ id }) => {
+    const prev = sessions.get(id)
+    const scene = prev.scene
+    if (!scene?.worldId || (scene.mode ?? 'gameplay') !== 'gameplay') {
+      throw new Error('Only a bound Gameplay Chat can roll over to a fresh session.')
+    }
+    const worldId = scene.worldId
+    const save = (scene.saveId ? saves.read(scene.saveId) : null) ?? saves.current(worldId)
+    const playerSheet = scene.playerSheet ?? (worlds.exists(worldId) ? worlds.meta(worldId).player : null) ?? null
+    let livePlaceKey = scene.placeKey ?? null
+    if (playerSheet && worlds.exists(worldId)) {
+      const presence = whoIsHere(worldId)
+      for (const [pk, list] of Object.entries(presence)) {
+        if (list.some((v) => v.sheet === playerSheet)) {
+          livePlaceKey = pk
+          break
+        }
+      }
+    }
+    const nextHandoff = (scene.handoffNumber ?? 1) + 1
+    const baseTitle = prev.title.replace(/\s*\(#\d+\)\s*$/, '').trim() || `${worldId} · Gameplay`
+    const next = sessions.create(prev.agentId)
+    const nextScene = cleanSessionScene({
+      ...scene,
+      mode: 'gameplay',
+      saveId: save?.id ?? scene.saveId ?? null,
+      placeKey: livePlaceKey,
+      where: livePlaceKey ? `@place:${livePlaceKey}` : scene.where,
+      worldTime: save?.clock?.time ?? scene.worldTime ?? null,
+      parentSessionId: prev.id,
+      handoffNumber: nextHandoff,
+      archivedEntryId: null
+    })
+    const updated = sessions.update(next.id, {
+      title: `${baseTitle} (#${nextHandoff})`,
+      scene: nextScene,
+      dmMode: true
+    })
+
+    // Zero-compaction carry-over: copy ONLY the verbatim last user message and last assistant reply
+    const oldMessages = sessions.messages(prev.id)
+    const lastAssistantIdx = [...oldMessages].reverse().findIndex((m) => m.role === 'assistant' && m.status === 'complete')
+    const carry: typeof oldMessages = []
+    if (lastAssistantIdx !== -1) {
+      const aIdx = oldMessages.length - 1 - lastAssistantIdx
+      for (let i = aIdx - 1; i >= 0; i--) {
+        if (oldMessages[i].role === 'user') {
+          carry.push(oldMessages[i])
+          break
+        }
+      }
+      carry.push(oldMessages[aIdx])
+    } else {
+      const lastUser = [...oldMessages].reverse().find((m) => m.role === 'user')
+      if (lastUser) carry.push(lastUser)
+    }
+
+    if (carry.length) {
+      const models = sessions.turnModels(prev.id)
+      for (const msg of carry) {
+        sessions.appendMessage(updated.id, msg)
+        const items = models.get(msg.id)
+        if (items) sessions.saveTurnModel(updated.id, msg.id, items)
+      }
+    }
+
+    // Detach outgoing session so activeForWorld points strictly to the fresh session (history stays intact)
+    sessions.update(prev.id, { scene: null, dmMode: false })
+    refreshIdleInstructions(updated.id)
+    return updated
+  },
+  'sessions.startMetaScene': ({ worldId, eventId, agentId }) => {
+    const wantedWorld = String(worldId || '').trim()
+    const wantedEvent = String(eventId || '').trim()
+    const ev = worldEvents.get(wantedEvent, wantedWorld || null)
+    const effectiveWorld = wantedWorld || ev.worldId
+    const save = effectiveWorld ? saves.current(effectiveWorld) : null
+    const meta = sessions.create(agents.getOrDefault(agentId ?? '').id)
+    const leaders = [
+      ...new Set(
+        ev.participants
+          .flatMap((p) => (p.kind === 'sheet' && p.refId ? [p.refId] : (p.characters ?? [])))
+          .filter(Boolean)
+      )
+    ].map((s) => `@sheet:${s}`)
+    const scene = cleanSessionScene({
+      almanacId: '',
+      mode: 'meta',
+      worldId: effectiveWorld || null,
+      saveId: save?.id ?? null,
+      eventId: ev.id,
+      where: '',
+      characters: leaders,
+      worldTime: save?.clock?.time ?? null
+    })
+    const updated = sessions.update(meta.id, {
+      title: `Meta · ${ev.title}`,
+      scene,
+      dmMode: false
+    })
+    refreshIdleInstructions(updated.id)
+    return updated
+  },
   'stats.clear': () => clearStats(),
   'server.status': async () => ({ build: serverBuild(), logLines: llamaLimits().logLines, chat: await host.chatServer(), memory: memoryServer(), vram: await host.vram() }),
   'server.build': () => serverBuild(),
+  'install.helpers': () => listHelpers(),
   'install.state': ({ helper }) => installState(helper),
   'install.check': async ({ helper }) => {
     await refreshReleases(helper)
@@ -700,12 +1041,14 @@ const handlers: Handlers = {
   'game.joinCharacter': ({ sheet, template }) => joinCharacter(sheet, template),
   'game.saveCharacter': ({ sheet, record }) => saveCharacter(sheet, record),
   'game.leaveCharacter': ({ sheet }) => leaveCharacter(sheet),
-  'game.tickCharacters': ({ sheets, seconds }) => tickCharacters(sheets, seconds),
+  'saves.advance': ({ id, seconds, source, sheets }) => advanceWorldTime(id, seconds, source, sheets),
+  'saves.shortRest': ({ id, sheets, hitDice }) => shortRest(id, sheets, hitDice),
+  'saves.longRest': ({ id, sheets }) => longRest(id, sheets),
   'saves.list': ({ world }) => saves.worldSaves(world),
   'saves.all': () => saves.list(),
   'saves.get': ({ id }) => saves.get(id),
   'saves.current': ({ world }) => saves.current(world),
-  'saves.create': ({ world, name, copy }) => (copy ? saves.create(world, name, true) : createNewWorldSave(world, name)),
+  'saves.create': ({ world, name, copy, options }) => (copy ? copyWorldSave(world, name) : createNewWorldSave(world, name, options)),
   'saves.select': ({ world, id }) => saves.select(world, id),
   'saves.rename': ({ id, name }) => saves.rename(id, name),
   'saves.remove': ({ id }) => removeSave(id),
@@ -724,13 +1067,26 @@ const handlers: Handlers = {
   'game.changeHealth': ({ sheet, delta }) => changeGameHealth(sheet, delta),
   'game.changeCreatureHealth': ({ world, uid, delta }) => changeCreatureHealth(world, uid, delta),
   'effects.run': (req) => runEffects(req),
-  'game.useAbility': ({ sheet, ability, target, at, distance }) => useAbility(sheet, ability, target, at, distance),
+  'game.useAbility': ({ sheet, ability, target, world, at, distance }) => useAbilityInWorld(sheet, ability, target, world, at, distance),
+  'game.useItem': ({ sheet, item, target, world, at }) => useItemInWorld(sheet, item, target, world, at),
+  'battle.start': ({ world, map, initiatorId, targetIds }) => startBattle({ world, map, initiatorId, targetIds }),
+  'battle.join': ({ world, entries }) => joinBattle(world, entries),
+  'battle.endTurn': ({ world }) => endTurn(world),
+  'battle.move': ({ world, actorId, at }) => moveInBattle(world, actorId, at),
+  'battle.parley': (req) => parleyInBattle(req),
+  'battle.flee': ({ world }) => fleeBattle(world),
+  'battle.end': ({ world }) => endBattle(world),
+  'battle.stepAi': ({ world }) => stepAiTurn(world),
   'game.awardXp': ({ sheet, amount, classId, reason }) => awardCharacterXp(sheet, { amount, classId, reason }),
   'game.onMove': (req) => onEntityMoved(req),
   'game.storyTrigger': ({ sheet, tag, summary, detail, flags }) => triggerStoryMoment(sheet, { tag, summary, detail, flags }),
   'saves.markUsed': ({ id, trigger, flag }) => saves.markUsed(id, trigger, flag),
   'saves.setFlag': ({ id, flag }) => saves.setFlag(id, flag),
-  'saves.writeClock': ({ id, clockId, clock }) => saves.writeClock(id, clockId, clock),
+  'saves.writeClock': ({ id, clockId, clock }) => {
+    const saved = saves.writeClock(id, clockId, clock)
+    syncAlmanacs(saved)
+    return saved
+  },
   'decisions.get': ({ id }) => decisions.get(id),
   'decisions.save': ({ decision, previousId }) => decisions.save(decision, previousId),
   'storyActions.get': ({ id }) => storyActions.get(id),
@@ -833,6 +1189,13 @@ const handlers: Handlers = {
   'library.inside': ({ entry }) => entryInside(entry),
   'library.field': ({ entry, field }) => entryField(entry, field),
   'data.pages.list': () => data.pages.list(),
+  'data.kindFolders.list': () => {
+    const folders = kindFolders.getAll()
+    return libraryKinds(USER)
+      .filter((k) => Boolean(k.pageTypes?.length) && k.kind !== 'page' && k.kind !== 'folder')
+      .map((k) => ({ kind: k.kind, label: k.label, plural: k.plural, folder: folders[k.kind] ?? '' }))
+  },
+  'data.kindFolders.set': ({ kind, folder }) => kindFolders.set(kind, folder),
   'data.pages.get': ({ id }) => data.pages.get(id),
   'data.pages.find': ({ id }) => ifMissing(() => data.pages.get(id), null),
   'data.pages.create': ({ title, body, fields, type, parent }) => data.pages.create({ title, body, fields, type, parent: parent ?? null }),
@@ -947,6 +1310,7 @@ const shutdown = async (): Promise<void> => {
   await modules.dispose().catch((err: unknown) => noteFailure(err, 'engine', 'Could not shut the modules down'))
   await modelRoutes.close().catch((err: unknown) => noteFailure(err, 'engine', 'Could not close the model routes'))
   await host.dispose().catch((err: unknown) => noteFailure(err, 'engine', 'Could not stop the model server'))
+  await imageHost.unload().catch((err: unknown) => noteFailure(err, 'engine', 'Could not stop the image server'))
   await minds.embedder.unload().catch((err: unknown) => noteFailure(err, 'engine', 'Could not stop the embedding server'))
   process.exit(0)
 }

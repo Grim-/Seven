@@ -75,6 +75,7 @@ export {
   insideText,
   resolveEntry,
   libraryGuide,
+  kindsOwnedBy,
   linkPart,
   partMiss,
   partView,

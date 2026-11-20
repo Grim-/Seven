@@ -25,6 +25,7 @@ export interface GameplaySettings {
   autoPauseOnDialogue: boolean
   autoPauseOnCombat: boolean
   characterSheetGrounding: boolean
+  aiTurnDelayMs: number
 
   // Keybinds
   keybinds: Record<string, { code: string; display: string }>
@@ -59,6 +60,7 @@ const DEFAULT_SETTINGS: GameplaySettings = {
   autoPauseOnDialogue: true,
   autoPauseOnCombat: true,
   characterSheetGrounding: true,
+  aiTurnDelayMs: 650,
   keybinds: DEFAULT_KEYBINDS
 }
 

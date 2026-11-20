@@ -16,9 +16,10 @@ const STATE: Record<DownloadItem['state'], { label: string; tone: Tone }> = {
 
 function progressText(d: DownloadItem): string {
   if (d.state === 'done') return d.path ?? d.folder
+  const count = d.files && d.files.length > 1 ? `${d.files.length} files` : null
   const amount = `${formatBytes(d.received)} of ${formatBytes(d.total)}`
-  if (d.state !== 'downloading') return amount
-  return [amount, d.speed ? `${formatBytes(d.speed)}/s` : null, d.secondsLeft !== null ? `${formatDuration(d.secondsLeft)} left` : null].filter(Boolean).join(' · ')
+  if (d.state !== 'downloading') return [count, amount].filter(Boolean).join(' · ')
+  return [count, amount, d.speed ? `${formatBytes(d.speed)}/s` : null, d.secondsLeft !== null ? `${formatDuration(d.secondsLeft)} left` : null].filter(Boolean).join(' · ')
 }
 
 function DownloadRow({ d }: { d: DownloadItem }) {

@@ -29,6 +29,8 @@ import {
   type ActionDragPayload
 } from '../hud/actionSlots'
 import { toast } from '../../../store/toasts'
+import { runAbilityUse } from '../state/combatGate'
+import { useGameState } from '../state/gameStateStore'
 
 function getAbilityTheme(name: string, damageType?: string) {
   const n = (name + ' ' + (damageType || '')).toLowerCase()
@@ -237,30 +239,30 @@ function SpellBookScreen(props: ScreenProps) {
   const SelIcon = selTheme.Icon
   const selLore = getSpellLore(selLabel, selDamage, selReach)
 
+  const world = useGameState((s) => s.world)
+  const battle = useGameState((s) => s.battle)
+
   const handleCast = (a: Ability) => {
-    const label = String(a.params.label || a.id)
-    const check = a.canUse({ user: entity, target: entity, at: null, distance: 0 })
-    if (check !== true) {
-      toast.info(label, String(check))
-      return
-    }
-
-    if (a.reach() > 0 && props.onAim) {
-      props.onAim({ uid: a.uid, label })
-      props.onClose?.()
-      toast.info(label, 'Aiming spell: click a target or location on the map')
-      return
-    }
-
-    act((e) => {
-      const found = usableAbilities(e).find((x) => x.uid === a.uid || x.id === a.id)
-      if (!found) return 'spell not found'
-      const res = found.use({ user: e, target: e, at: null, distance: 0 })
-      if (res === true) {
-        toast.info(label, `Cast ${label}`)
-        return true
-      }
-      return res
+    runAbilityUse({
+      sheet: visitor.sheet,
+      entity,
+      ability: a,
+      world,
+      battle,
+      onAim: props.onAim,
+      onAimStart: () => {
+        props.onClose?.()
+        toast.info(String(a.params.label || a.id), 'Aiming spell: click a target or location on the map')
+      },
+      act: (fn) =>
+        act((e) => {
+          const res = fn(e)
+          if (res === true) {
+            const label = String(a.params.label || a.id)
+            toast.info(label, `Cast ${label}`)
+          }
+          return res
+        })
     })
   }
 
@@ -377,8 +379,7 @@ function SpellBookScreen(props: ScreenProps) {
                   'group relative flex items-start gap-3 border p-3 cursor-pointer transition-all',
                   isSelected
                     ? 'border-cyan bg-cyan/[0.08] shadow-[0_0_14px_rgba(102,252,241,0.25)]'
-                    : 'border-line/50 bg-black/40 hover:border-line-bright hover:bg-white/[0.02]',
-                  a.cooling > 0 && 'opacity-65'
+                    : 'border-line/50 bg-black/40 hover:border-line-bright hover:bg-white/[0.02]'
                 )}
               >
                 {/* 1:1 Action Bar draggable token */}
@@ -623,14 +624,6 @@ function SpellBookScreen(props: ScreenProps) {
                 </p>
               )}
             </div>
-
-            {/* Cooldown Status */}
-            {selectedAbility.cooling > 0 && (
-              <div className="flex items-center gap-2 border border-line/40 bg-black/50 px-3 py-2 text-[11.5px] text-dim">
-                <Clock className="h-4 w-4 text-faint" />
-                <span>Cooling down: {gameTime(selectedAbility.cooling)}</span>
-              </div>
-            )}
           </div>
         ) : selectedTrait ? (
           <div className="flex flex-col gap-4">

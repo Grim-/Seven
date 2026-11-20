@@ -5,7 +5,9 @@ import type { PlaceVisitor } from '@shared/maps'
 import type { MapToken } from '../../maps/TokenLayer'
 import { useEscapeLayer } from '../../../lib/escape'
 import { useLatest } from '../../../game/react/useLatest'
-import { GamePortrait, GameWindow, HudButton } from '../../../game/ui'
+import { GamePortrait, HudButton } from '../../../game/ui'
+import { SlateContainer } from '../../entries/EntrySlate'
+import { cn } from '../../../lib/cn'
 import { gameScreen, gameScreens, type GameScreen } from './registry'
 import { useGameAct } from './useGameAct'
 import { useGameplaySettings } from '../settings/gameplaySettingsStore'
@@ -60,32 +62,76 @@ function ScreenWindow({
 }) {
   const { shown, act } = useGameAct(visitor.sheet, visitor.game!, catalog)
   const entity = useMemo(() => GameEntity.fromRecord(shown, catalog), [shown, catalog])
+  const tabs = gameScreens()
   return (
-    <GameWindow
-      title={showName(visitor.name)}
-      tabs={gameScreens().map((s) => ({ id: s.id, label: s.label, icon: s.icon, keyHint: s.key.toUpperCase() }))}
-      tab={screen.id}
-      onTab={onOpen}
-      onClose={() => onOpen(null)}
-      side={party.map((p) => (
-        <GamePortrait key={p.sheet} visitor={p.sheet === visitor.sheet ? { ...p, game: shown } : p} catalog={catalog} active={p.sheet === visitor.sheet} onClick={() => onSheet(p.sheet)} className="border border-line/30" />
-      ))}
+    <div
+      className="pointer-events-auto absolute inset-0 z-40 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onOpen(null)
+      }}
     >
-      <screen.Screen
-        entity={entity}
-        catalog={catalog}
-        visitor={visitor}
-        act={act}
-        onClose={() => onOpen(null)}
-        onAim={onAim}
-      />
-    </GameWindow>
+      <SlateContainer
+        title={showName(visitor.name)}
+        tag={screen.label}
+        expanded={true}
+        onRemove={() => onOpen(null)}
+        actions={
+          <div className="flex items-center gap-1">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => onOpen(t.id)}
+                className={cn(
+                  'flex h-5 items-center gap-1 border px-1.5 font-mono text-[9.5px] uppercase tracking-wider transition-colors cursor-pointer',
+                  t.id === screen.id
+                    ? 'border-accent bg-accent/20 text-accent'
+                    : 'border-line/50 bg-black/60 text-dim hover:border-line hover:text-white'
+                )}
+              >
+                <span>{t.label}</span>
+                <span className="text-[8px] text-faint">[{t.key.toUpperCase()}]</span>
+              </button>
+            ))}
+          </div>
+        }
+        className="flex h-[min(82vh,760px)] w-[min(980px,calc(100vw-2rem))] flex-col"
+      >
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {party.length > 1 && (
+            <div className="flex w-52 shrink-0 flex-col gap-1.5 overflow-y-auto border-r border-line/50 p-2">
+              {party.map((p) => (
+                <GamePortrait
+                  key={p.sheet}
+                  visitor={p.sheet === visitor.sheet ? { ...p, game: shown } : p}
+                  catalog={catalog}
+                  active={p.sheet === visitor.sheet}
+                  onClick={() => onSheet(p.sheet)}
+                  className="border border-line/30"
+                />
+              ))}
+            </div>
+          )}
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
+            <screen.Screen
+              entity={entity}
+              catalog={catalog}
+              visitor={visitor}
+              act={act}
+              onClose={() => onOpen(null)}
+              onAim={onAim}
+            />
+          </div>
+        </div>
+      </SlateContainer>
+    </div>
   )
 }
 
 export function GameScreens({
   open,
   sheet,
+  partyIds,
   tokens,
   catalog,
   onOpen,
@@ -94,13 +140,15 @@ export function GameScreens({
 }: {
   open: string | null
   sheet: string | null
+  partyIds?: string[]
   tokens: MapToken[]
   catalog: Catalog
   onOpen: (id: string | null) => void
   onSheet: (sheet: string) => void
   onAim?: (aim: { uid: string; label: string } | null) => void
 }) {
-  const party = tokens.flatMap((t) => (t.visitor.game ? [t.visitor] : []))
+  const partySet = new Set(partyIds?.length ? partyIds : (sheet ? [sheet] : []))
+  const party = tokens.flatMap((t) => (t.visitor.source !== 'creature' && partySet.has(t.visitor.sheet) && t.visitor.game ? [t.visitor] : []))
   const visitor = party.find((v) => v.sheet === sheet) ?? party[0] ?? null
   const screen = open ? gameScreen(open) : null
   useEscapeLayer(!!screen && !!visitor, () => onOpen(null))

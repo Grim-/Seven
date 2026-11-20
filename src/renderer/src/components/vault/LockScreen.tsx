@@ -74,17 +74,24 @@ export function LockScreen() {
   const locked = useLocked()
   const view = useApp((s) => s.view)
   const setView = useApp((s) => s.setView)
-  const [stage, setStage] = useState<'hidden' | 'shown' | 'leaving'>(locked ? 'shown' : 'hidden')
+  const ready = useApp((s) => s.startup.ready)
+  const bootDone = useApp((s) => s.startup.settings && (s.startup.engine || s.engine.state === 'crashed'))
+  const [stage, setStage] = useState<'hidden' | 'shown' | 'decrypting' | 'leaving'>(locked && bootDone ? 'shown' : 'hidden')
 
   useEffect(() => {
+    if (!bootDone) return
     if (locked) {
       setStage('shown')
       return
     }
-    setStage((s) => (s === 'shown' ? 'leaving' : s))
-    const timer = setTimeout(() => setStage('hidden'), 650)
+    if (!ready) {
+      setStage((s) => (s === 'shown' || s === 'decrypting' ? 'decrypting' : s))
+      return
+    }
+    setStage((s) => (s === 'shown' || s === 'decrypting' ? 'leaving' : s))
+    const timer = setTimeout(() => setStage('hidden'), 550)
     return () => clearTimeout(timer)
-  }, [locked])
+  }, [locked, ready, bootDone])
 
   if (stage === 'hidden' || (stage === 'shown' && view === 'settings')) return null
 
@@ -96,13 +103,22 @@ export function LockScreen() {
       <div className="notch relative z-[2] flex w-[26rem] flex-col gap-3 border border-accent/40 border-l-2 border-l-accent bg-bg/90 p-5 shadow-[0_0_40px_rgba(0,0,0,0.8)]">
         <div className="flex items-center gap-2.5">
           <Lock className="h-5 w-5 text-accent" />
-          <DecodeText className="font-mono text-[15px] font-semibold uppercase tracking-[0.24em] text-white" text={stage === 'leaving' ? 'Decrypting' : 'Vault locked'} />
+          <DecodeText
+            className="font-mono text-[15px] font-semibold uppercase tracking-[0.24em] text-white"
+            text={stage === 'decrypting' ? 'Decrypting & loading' : stage === 'leaving' ? 'Unlocked' : 'Vault locked'}
+          />
         </div>
-        <p className="text-[13px] text-dim">Your chats, pages and agent memory are encrypted. Enter your passphrase to open them until Seven closes or you lock it.</p>
-        <PassphraseForm />
-        <button onClick={() => setView('settings')} className="flex items-center gap-1.5 self-start font-mono text-[10.5px] uppercase tracking-[0.14em] text-dim hover:text-accent">
-          <SettingsIcon className="h-3.5 w-3.5" /> Vault settings
-        </button>
+        {stage === 'decrypting' ? (
+          <p className="font-mono text-[12px] text-cyan">Loading chats, pages, agents and workspace…</p>
+        ) : (
+          <>
+            <p className="text-[13px] text-dim">Your chats, pages and agent memory are encrypted. Enter your passphrase to open them until Seven closes or you lock it.</p>
+            <PassphraseForm />
+            <button onClick={() => setView('settings')} className="flex items-center gap-1.5 self-start font-mono text-[10.5px] uppercase tracking-[0.14em] text-dim hover:text-accent">
+              <SettingsIcon className="h-3.5 w-3.5" /> Vault settings
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

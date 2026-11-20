@@ -181,7 +181,8 @@ export class ModelHost extends EventEmitter {
       const missing = model.build?.flags ? unsupportedFlags(args, model.build.flags) : []
       if (missing.length) throw new Error(`llama-server ${model.build!.label} has no ${missing.join(', ')}. Make another version active in Models > llama-server, or change the model's settings.`)
       if (model.template) writeUserFile(templateFile(model.template), model.template)
-      const server = await LlamaServer.start({
+      let server: LlamaServer | null = null
+      server = await LlamaServer.start({
         exe,
         version,
         modelPath: entry.path,
@@ -190,7 +191,7 @@ export class ModelHost extends EventEmitter {
         hold: () => serverLease(version, `Chat model ${entry.name}`),
         signal: controller.signal,
         onExit: (message) => {
-          if (this.served?.server !== server) return
+          if (!server || this.served?.server !== server) return
           this.emit('unloading', entry.id)
           this.served = null
           this.setState({ status: 'error', modelId: null, progress: 0, contextSize: null, error: message, restartNeeded: false })
@@ -212,14 +213,14 @@ export class ModelHost extends EventEmitter {
     }
   }
 
-  async unload(): Promise<ModelHostState> {
+  async unload(opts?: { suspend?: boolean }): Promise<ModelHostState> {
     this.starting?.abort()
     const served = this.served
     if (!served) {
       if (this.state.status !== 'error' && this.state.status !== 'loading') this.setState({ status: 'unloaded', modelId: null, progress: 0, contextSize: null, restartNeeded: false })
       return this.getState()
     }
-    this.emit('unloading', served.entry.id)
+    this.emit('unloading', served.entry.id, opts)
     this.served = null
     try {
       await served.server.stop()
@@ -227,6 +228,21 @@ export class ModelHost extends EventEmitter {
       this.setState({ status: 'unloaded', modelId: null, progress: 0, contextSize: null, error: null, restartNeeded: false })
     }
     return this.getState()
+  }
+
+  /**
+   * Temporarily unload the active local llama-server to free GPU VRAM without closing mid-turn chat state,
+   * returning a callback that reloads the same model and config once the GPU task finishes.
+   */
+  async suspendForVram(): Promise<(() => Promise<void>) | null> {
+    while (this.loading) await this.loading.catch(() => undefined)
+    const served = this.served
+    if (!served) return null
+    const { entry, config } = served
+    await this.unload({ suspend: true })
+    return async () => {
+      await this.load(entry, config)
+    }
   }
 
   async processing(): Promise<boolean> {

@@ -1,13 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
-import { cleanBackdrop, cleanVoice, type AudioPrefs, type DropPrefs, type VoicePrefs, type ChatListPrefs, type ScreenPoint, type Settings, type SidePanelPrefs, type TrayPin } from '@shared/types'
+import { cleanBackdrop, cleanVoice, type AudioPrefs, type DropPrefs, type VoicePrefs, type ChatListPrefs, type Settings, type SidePanelPrefs, type TrayPin } from '@shared/types'
 import { cleanProblemPrefs } from '@shared/problems'
 import { cleanPortabilityPrefs } from '@shared/portability'
 import { dataDir } from './paths'
 
 
-export const DEFAULT_HOTKEY = 'CommandOrControl+Shift+Space'
+const DEFAULT_MODELS_DIR = path.join(dataDir, 'models')
 
 const DEFAULTS: Settings = {
   sidePanel: { open: false, width: 380, tab: 'files' },
@@ -26,12 +26,9 @@ const DEFAULTS: Settings = {
   defaultTheme: 'seven',
   audio: { music: true, sounds: true, volume: 0.6 },
   voice: { on: true, fallback: null, piperPath: '', piperVoices: '' },
-  modelFolders: [],
+  modelFolders: [DEFAULT_MODELS_DIR],
   ambientBackground: true,
   lastView: 'chat',
-  overlayEnabled: true,
-  hotkey: DEFAULT_HOTKEY,
-  overlayPosition: null,
   startWithWindows: false,
   droppedPictures: { ask: true, folder: '' },
   problems: cleanProblemPrefs(null),
@@ -58,9 +55,6 @@ const REMOTE_SETTINGS: Record<keyof Settings, boolean> = {
   lastView: true,
   voice: false,
   modelFolders: false,
-  overlayEnabled: false,
-  hotkey: false,
-  overlayPosition: false,
   startWithWindows: false,
   droppedPictures: false,
   problems: false,
@@ -80,14 +74,6 @@ export function remoteSettingsIn(patch: Partial<Settings>): Partial<Settings> {
     if (!REMOTE_SETTINGS[key]) throw new Error(`The ${key} setting can only be changed on the PC.`)
   }
   return patch
-}
-
-function point(value: unknown): ScreenPoint | null {
-  if (!value || typeof value !== 'object') return null
-  const { x, y } = value as Record<string, unknown>
-  return typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)
-    ? { x: Math.round(x), y: Math.round(y) }
-    : null
 }
 
 function sidePanel(value: unknown): SidePanelPrefs {
@@ -175,9 +161,6 @@ function sanitize(input: Partial<Settings>): Settings {
       : DEFAULTS.modelFolders,
     ambientBackground: typeof input.ambientBackground === 'boolean' ? input.ambientBackground : DEFAULTS.ambientBackground,
     lastView: typeof input.lastView === 'string' && input.lastView ? input.lastView : DEFAULTS.lastView,
-    overlayEnabled: typeof input.overlayEnabled === 'boolean' ? input.overlayEnabled : DEFAULTS.overlayEnabled,
-    hotkey: typeof input.hotkey === 'string' ? input.hotkey.trim() : DEFAULTS.hotkey,
-    overlayPosition: point(input.overlayPosition),
     startWithWindows: typeof input.startWithWindows === 'boolean' ? input.startWithWindows : DEFAULTS.startWithWindows,
     droppedPictures: droppedPictures(input.droppedPictures),
     problems: cleanProblemPrefs(input.problems),
@@ -200,6 +183,13 @@ class SettingsStore extends EventEmitter {
       raw = {}
     }
     this.value = sanitize(raw)
+    if (this.value.modelFolders.includes(DEFAULT_MODELS_DIR)) {
+      try {
+        fs.mkdirSync(DEFAULT_MODELS_DIR, { recursive: true })
+      } catch {
+        // Ignore if unwritable; user can change the folder in Settings.
+      }
+    }
   }
 
   get(): Settings {

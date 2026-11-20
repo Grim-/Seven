@@ -11,10 +11,51 @@ import { ShellTiles } from './ShellTiles'
 import { ShellGallery } from './ShellGallery'
 import { ShellDeck } from './ShellDeck'
 import { SliderNumber } from './SliderNumber'
-import type { ShellAdd, ShellBinding, ShellGroup, ShellItem, ShellLayout, ShellSort, ShellViewProps } from './shellTypes'
+import { TokenFilterInput, parseTokenFilter, type FilterOption } from './TokenFilterInput'
+import type { ShellAdd, ShellBinding, ShellColumnKey, ShellColumnSort, ShellGroup, ShellItem, ShellLayout, ShellSort, ShellViewProps } from './shellTypes'
 import { readStored, writeStored } from '../../lib/stored'
 
 export type { ShellAdd, ShellGroup, ShellItem, ShellLayout, ShellSort } from './shellTypes'
+
+const METRIC_MULT: Record<string, number> = {
+  b: 1,
+  kb: 1024,
+  k: 1e3,
+  mb: 1024 ** 2,
+  m: 1e6,
+  gb: 1024 ** 3,
+  g: 1e9,
+  tb: 1024 ** 4,
+  t: 1e12
+}
+
+function parseAsideSortValue(item: ShellItem): number | null {
+  if (typeof item.aside === 'string' && item.aside.trim()) {
+    const m = item.aside.trim().match(/^([\d,.]+)\s*(tb|gb|mb|kb|b|t|g|m|k)?$/i)
+    if (m) {
+      const n = Number(m[1].replace(/,/g, ''))
+      const unit = (m[2] ?? '').toLowerCase()
+      if (Number.isFinite(n)) return n * (METRIC_MULT[unit] ?? 1)
+    }
+    return null
+  }
+  return item.updatedAt ?? null
+}
+
+function compareByColumn(a: ShellItem, b: ShellItem, col: ShellColumnKey, sorts: ShellSort[]): number {
+  if (col === 'name') {
+    const nameSort = sorts.find((s) => s.id === 'name')
+    return nameSort ? nameSort.compare(a, b) : a.title.localeCompare(b.title)
+  }
+  if (col === 'type') return (a.tag ?? '').localeCompare(b.tag ?? '') || a.title.localeCompare(b.title)
+  if (col === 'contents') return (a.subtitle ?? '').localeCompare(b.subtitle ?? '') || a.title.localeCompare(b.title)
+  const na = parseAsideSortValue(a)
+  const nb = parseAsideSortValue(b)
+  if (na !== null && nb !== null) return na - nb || a.title.localeCompare(b.title)
+  if (na !== null) return 1
+  if (nb !== null) return -1
+  return (a.aside ?? '').localeCompare(b.aside ?? '') || a.title.localeCompare(b.title)
+}
 
 export function menuAdds(items: MenuItem[]): ShellAdd[] {
   return items.map((item) => ({
@@ -41,6 +82,8 @@ function addMenu(e: React.MouseEvent, adds: ShellAdd[]): void {
 interface Saved {
   layout: ShellLayout
   sort: string
+  sortDir?: 'asc' | 'desc'
+  colSort?: ShellColumnSort | null
   size: number
 }
 
@@ -57,16 +100,19 @@ const LAYOUTS: Record<ShellLayout, { title: string; icon: ReactNode; View: Compo
   deck: { title: 'Deck', icon: <SquareStack className="h-3.5 w-3.5" />, View: ShellDeck }
 }
 
-function read(id: string): { layout?: string; sort?: string; size?: number } | null {
-  return readStored<{ layout?: string; sort?: string; size?: number } | null>(`seven.shell.${id}`, null)
+function read(id: string): Partial<Saved> | null {
+  return readStored<Partial<Saved> | null>(`seven.shell.${id}`, null)
 }
 
 function load(ids: string[], layouts: ShellLayout[], sorts: ShellSort[]): Saved {
   const raw = ids.map(read).find(Boolean) ?? {}
-  const layout = (raw.layout === 'grid' ? 'tiles' : raw.layout) as ShellLayout
+  const rawLayout = raw.layout as string | undefined
+  const layout = (rawLayout === 'grid' ? 'tiles' : rawLayout) as ShellLayout
   return {
     layout: layouts.includes(layout) ? layout : layouts[0],
     sort: sorts.some((s) => s.id === raw.sort) ? (raw.sort as string) : sorts[0].id,
+    sortDir: raw.sortDir === 'desc' ? 'desc' : 'asc',
+    colSort: raw.colSort ?? null,
     size: typeof raw.size === 'number' && raw.size > 0 ? raw.size : 100
   }
 }
@@ -106,6 +152,7 @@ export function KindShell({
   items,
   adds = [],
   header,
+  selectionBar,
   empty = 'Nothing here yet.',
   onOpen,
   onMenu,
@@ -124,6 +171,7 @@ export function KindShell({
   items: ShellItem[]
   adds?: ShellAdd[]
   header?: ReactNode
+  selectionBar?: (picked: string[], actions: { selectAll: () => void; clear: () => void }) => ReactNode
   empty?: string
   onOpen?: (item: ShellItem, shown: ShellItem[]) => void
   onMenu?: (e: React.MouseEvent, item: ShellItem, picked: string[]) => void
@@ -140,6 +188,8 @@ export function KindShell({
   const ids = inherit ? [id, inherit] : [id]
   const [saved, setSaved] = useState<Saved>(() => load(ids, layouts, sorts))
   const [query, setQuery] = useState('')
+  const [typeFilters, setTypeFilters] = useState<string[]>([])
+  const [tagFilters, setTagFilters] = useState<string[]>([])
   const [dragging, setDragging] = useState<string[]>([])
   const [picking, setPicking] = useState<Picking>({ picked: [], anchor: null })
   const [over, setOver] = useState<string | null>(null)
@@ -149,19 +199,88 @@ export function KindShell({
     store(id, value)
   }
 
+  const parsedFilter = useMemo(() => parseTokenFilter(query), [query])
+  const activeTypes = useMemo(() => [...new Set([...typeFilters, ...parsedFilter.types])], [typeFilters, parsedFilter.types])
+  const activeTags = useMemo(() => [...new Set([...tagFilters, ...parsedFilter.tags])], [tagFilters, parsedFilter.tags])
+
+  const { typeOptions, tagOptions } = useMemo(() => {
+    const typeCounts = new Map<string, number>()
+    const tagCounts = new Map<string, number>()
+    for (const item of items) {
+      const k = (item.kind ?? item.tag ?? '').trim().toLowerCase()
+      if (k) typeCounts.set(k, (typeCounts.get(k) ?? 0) + 1)
+      for (const t of item.tags ?? []) {
+        const low = t.trim().toLowerCase()
+        if (low) tagCounts.set(low, (tagCounts.get(low) ?? 0) + 1)
+      }
+    }
+    const typeOpts: FilterOption[] =
+      typeCounts.size > 1
+        ? [...typeCounts.entries()].map(([id, count]) => ({ id, count })).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id))
+        : []
+    const tagOpts: FilterOption[] = [...tagCounts.entries()]
+      .map(([id, count]) => ({ id, count }))
+      .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id))
+    return { typeOptions: typeOpts, tagOptions: tagOpts }
+  }, [items])
+
+  const activeColumnSort: ShellColumnSort | null = useMemo(() => {
+    if (saved.colSort) return saved.colSort
+    const rev = saved.sortDir === 'desc'
+    if (saved.sort === 'name') return { column: 'name', dir: rev ? 'desc' : 'asc' }
+    if (saved.sort === 'size-desc' || saved.sort === 'recent' || saved.sort === 'downloads' || saved.sort === 'updated') {
+      return { column: 'aside', dir: rev ? 'asc' : 'desc' }
+    }
+    if (saved.sort === 'size-asc') return { column: 'aside', dir: rev ? 'desc' : 'asc' }
+    return null
+  }, [saved.colSort, saved.sort, saved.sortDir])
+
   const shown = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const list = q
-      ? items.filter(
-          (i) =>
-            i.title.toLowerCase().includes(q) ||
-            i.subtitle?.toLowerCase().includes(q) ||
-            i.excerpt?.toLowerCase().includes(q)
-        )
-      : [...items]
+    const q = parsedFilter.text
+    const list =
+      q || activeTypes.length > 0 || activeTags.length > 0
+        ? items.filter((i) => {
+            if (activeTypes.length > 0) {
+              const k = (i.kind ?? i.tag ?? '').trim().toLowerCase()
+              if (!activeTypes.includes(k)) return false
+            }
+            if (activeTags.length > 0) {
+              const iTags = (i.tags ?? []).map((t) => t.trim().toLowerCase())
+              if (!activeTags.every((t) => iTags.includes(t))) return false
+            }
+            if (!q) return true
+            return (
+              i.title.toLowerCase().includes(q) ||
+              i.subtitle?.toLowerCase().includes(q) ||
+              i.excerpt?.toLowerCase().includes(q)
+            )
+          })
+        : [...items]
+    if (saved.colSort) {
+      const mul = saved.colSort.dir === 'desc' ? -1 : 1
+      return list.sort((a, b) => (a.group ?? 0) - (b.group ?? 0) || mul * compareByColumn(a, b, saved.colSort!.column, sorts))
+    }
     const sort = sorts.find((s) => s.id === saved.sort) ?? sorts[0]
-    return list.sort((a, b) => (a.group ?? 0) - (b.group ?? 0) || sort.compare(a, b))
-  }, [items, query, saved.sort, sorts])
+    const mul = saved.sortDir === 'desc' ? -1 : 1
+    return list.sort((a, b) => (a.group ?? 0) - (b.group ?? 0) || mul * sort.compare(a, b))
+  }, [items, parsedFilter.text, activeTypes, activeTags, saved.sort, saved.sortDir, saved.colSort, sorts])
+
+  const handleToolbarSort = (sortId: string) => {
+    if (!saved.colSort && saved.sort === sortId) {
+      update({ sortDir: saved.sortDir === 'desc' ? 'asc' : 'desc' })
+    } else {
+      update({ sort: sortId, sortDir: 'asc', colSort: null })
+    }
+  }
+
+  const handleColumnSort = (column: ShellColumnKey) => {
+    if (activeColumnSort?.column === column) {
+      const nextDir = activeColumnSort.dir === 'asc' ? 'desc' : 'asc'
+      update({ colSort: { column, dir: nextDir } })
+    } else {
+      update({ colSort: { column, dir: column === 'aside' ? 'desc' : 'asc' } })
+    }
+  }
 
   const layout = layouts.includes(saved.layout) ? saved.layout : layouts[0]
   const View = LAYOUTS[layout].View
@@ -222,20 +341,65 @@ export function KindShell({
         }
       : {}
 
+  const selectAll = () => setPicking({ picked: shown.map((i) => i.key), anchor: shown[0]?.key ?? null })
+  const clearSelection = () => setPicking({ picked: [], anchor: null })
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!pickable) return
+    const target = e.target as HTMLElement | null
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+      e.preventDefault()
+      selectAll()
+    } else if (e.key === 'Escape' && picked.length) {
+      e.preventDefault()
+      clearSelection()
+    }
+  }
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col border border-line/60 bg-black/70">
+    <div
+      tabIndex={pickable ? -1 : undefined}
+      onKeyDown={handleKeyDown}
+      className="flex min-h-0 flex-1 flex-col border border-line/60 bg-black/70 outline-none"
+    >
       <div className="flex shrink-0 items-center gap-2 border-b border-line/40 px-2.5 py-1.5">
-        <div className="flex min-w-0 flex-1 items-center gap-2">{header}</div>
-        {filter && <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
-          placeholder="Filter"
-          spellCheck={false}
-          className="h-6 w-40 border border-line/40 bg-transparent px-2 text-[12px] text-white outline-none placeholder:text-faint focus:border-accent/50"
-        />}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {pickable && picked.length > 0 && selectionBar ? (
+            selectionBar(picked, { selectAll, clear: clearSelection })
+          ) : (
+            <>
+              {header}
+              {pickable && selectionBar && shown.length > 0 && (
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  title="Select all items (Ctrl+A · Ctrl+click · Shift+click)"
+                  className="border border-line/50 px-2 py-0.5 font-mono text-[10.5px] text-dim hover:border-accent/50 hover:text-accent"
+                >
+                  Select all
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        {filter && (
+          <TokenFilterInput
+            compact
+            value={query}
+            onChange={setQuery}
+            types={typeFilters}
+            onTypesChange={setTypeFilters}
+            tags={tagFilters}
+            onTagsChange={setTagFilters}
+            typeOptions={typeOptions}
+            tagOptions={tagOptions}
+            placeholder={typeOptions.length || tagOptions.length ? 'Filter, type: or #tag' : 'Filter'}
+            className="min-w-[10rem] max-w-[20rem]"
+          />
+        )}
         {sorts.map((s) => (
-          <ToolButton key={s.id} title={s.title} active={saved.sort === s.id} onClick={() => update({ sort: s.id })}>
+          <ToolButton key={s.id} title={s.title} active={!saved.colSort && saved.sort === s.id} onClick={() => handleToolbarSort(s.id)}>
             {s.icon}
           </ToolButton>
         ))}
@@ -267,7 +431,7 @@ export function KindShell({
                 </div>
                 {g.note && <div className="text-[11.5px] leading-snug text-dim">{g.note}</div>}
                 {inGroup.length || (!query && g.adds?.length) ? (
-                  <View items={inGroup} adds={query ? [] : (g.adds ?? [])} bind={bind} scale={saved.size / 100} asideLabel={asideLabel} />
+                  <View shellId={id} items={inGroup} adds={query ? [] : (g.adds ?? [])} bind={bind} scale={saved.size / 100} asideLabel={asideLabel} columnSort={activeColumnSort} onColumnSort={handleColumnSort} />
                 ) : (
                   <div className="text-[12px] text-faint">{query ? 'No matches.' : 'None yet.'}</div>
                 )}
@@ -275,7 +439,7 @@ export function KindShell({
             )
           })
         ) : (
-          <View items={shown} adds={query ? [] : adds} bind={bind} scale={saved.size / 100} asideLabel={asideLabel} />
+          <View shellId={id} items={shown} adds={query ? [] : adds} bind={bind} scale={saved.size / 100} asideLabel={asideLabel} columnSort={activeColumnSort} onColumnSort={handleColumnSort} />
         )}
         {!groups && !shown.length && (
           <div className="px-1 py-3 text-[12.5px] text-faint">

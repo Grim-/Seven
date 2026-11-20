@@ -14,7 +14,7 @@ import type { WorldMeta } from '@shared/world'
 import type { WorldMapUse } from '@shared/maps'
 import type { StoredFaction } from '@shared/game/factions'
 import type { CompendiumRef } from '@shared/compendium'
-import { guessCreatureFaction, monsterToSheetInput } from '@shared/game/creatures'
+import { monsterToSheetInput } from '@shared/game/creatures'
 import { Button, Modal, Segmented, Select } from '../ui'
 import { useCompendiumList } from '../dnd/useCompendiumList'
 import { engine } from '../../lib/ipc'
@@ -58,12 +58,11 @@ export function AddWorldCharacterModal({ world, uses, onClose, onAdded }: Props)
       .slice(0, 50)
   }, [monsterRefs, search])
 
-  // When a monster is picked, set default name and faction
+  // When a monster is picked, set default name and faction from world factions
   const handleSelectMonster = (ref: CompendiumRef) => {
     setSelectedMonsterRef(ref)
     setCustomName(ref.name)
-    const guessed = guessCreatureFaction(ref)
-    setAssignedFaction(guessed)
+    setAssignedFaction((prev) => prev || factions.find((f) => f.defaultStance === 'hostile')?.id || factions[0]?.id || '')
   }
 
   // Auto-select first monster if none selected yet
@@ -83,7 +82,7 @@ export function AddWorldCharacterModal({ world, uses, onClose, onAdded }: Props)
       const sheetInput = monsterToSheetInput({
         monster: entry,
         customName: customName.trim() || entry.name,
-        factionId: assignedFaction || guessCreatureFaction(entry)
+        factionId: assignedFaction || null
       })
 
       // 3. Save as a standard character sheet
@@ -102,7 +101,7 @@ export function AddWorldCharacterModal({ world, uses, onClose, onAdded }: Props)
 
       toast.success(
         'Creature Spawned',
-        `${newSheet.title} spawned as a character sheet in faction ${sheetInput.faction ?? 'monsters'}.`
+        `${newSheet.title} spawned as a character sheet${sheetInput.faction ? ` in faction ${sheetInput.faction}` : ''}.`
       )
       onAdded(newSheet.id)
       onClose()
@@ -314,9 +313,6 @@ export function AddWorldCharacterModal({ world, uses, onClose, onAdded }: Props)
                           <Flag className="h-3.5 w-3.5 text-cyan" />
                           Assigned Faction:
                         </label>
-                        <span className="text-[10px] text-cyan">
-                          Auto-suggested: {guessCreatureFaction(selectedMonsterRef)}
-                        </span>
                       </div>
                       <Select
                         value={assignedFaction}

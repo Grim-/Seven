@@ -5,75 +5,50 @@ export interface ClockView {
   label: string
   calendar: Calendar
   dayPart: number
-  speed: number
-  paused: boolean
-  speeds: number[]
-}
-
-const SPEEDS = [1, 2, 4, 8]
-
-export interface ClockHooks {
-  tick: (seconds: number) => void
-  show: (view: ClockView) => void
-  save: (clockId: string, state: ClockState) => void
+  hourSeconds: number
+  roundSeconds: number
+  toDawn: number
+  longRestIn: number
+  shortRestLabel: string
+  longRestLabel: string
 }
 
 export class WorldClock {
   private clock: GameClock
   private shown = ''
+  private longRestAt: number | null = null
 
   constructor(
     readonly def: TimeDef,
     state: ClockState,
-    private hooks: ClockHooks
+    longRestAt: number | null,
+    private show: (view: ClockView) => void
   ) {
-    this.clock = new GameClock(def.clock, (seconds) => this.hooks.tick(seconds))
-    this.clock.fromJSON(state)
-    this.clock.setSpeed(this.clock.speed)
-    this.show()
+    this.clock = new GameClock(def.clock)
+    this.set(state, longRestAt)
   }
 
   get daylight(): number {
     return this.clock.calendar().daylight
   }
 
-  get paused(): boolean {
-    return this.clock.paused
-  }
-
-  update(dt: number): void {
-    if (this.clock.advance(dt) > 0) this.save()
-    this.show()
-  }
-
-  setSpeed(speed: number): void {
-    this.clock.setSpeed(speed)
-    this.clock.setPaused(false)
-    this.save()
-    this.show()
-  }
-
-  setPaused(paused: boolean): void {
-    this.clock.setPaused(paused)
-    this.save()
-    this.show()
-  }
-
-  save(): void {
-    this.hooks.save(this.def.id, this.clock.toJSON())
+  set(state: ClockState, longRestAt: number | null): void {
+    this.clock.fromJSON(state)
+    this.longRestAt = longRestAt
+    const v = this.view()
+    const key = `${v.calendar.day}:${v.calendar.hour}:${v.calendar.minute}:${v.longRestIn}`
+    if (key === this.shown) return
+    this.shown = key
+    this.show(v)
   }
 
   view(): ClockView {
-    const { minSpeed, maxSpeed } = this.def.clock
-    const day = this.clock.unit('day')
-    return { clockId: this.def.id, label: this.def.label, calendar: this.clock.calendar(), dayPart: (this.clock.now % day) / day, speed: this.clock.speed, paused: this.clock.paused, speeds: SPEEDS.filter((s) => s >= minSpeed && s <= maxSpeed) }
-  }
-
-  private show(): void {
-    const v = this.view()
-    const key = `${v.calendar.day}:${v.calendar.hour}:${v.calendar.minute}:${v.speed}:${v.paused}`
-    if (key === this.shown) return
-    this.shown = key
-    this.hooks.show(v)
+    const day = this.clock.daySeconds
+    const hour = this.def.clock.hourSeconds
+    const intoDay = this.clock.time % day
+    const dawn = this.def.dawnHour * hour
+    const longRestIn = this.longRestAt === null ? 0 : Math.max(0, this.longRestAt + this.def.longRestGapSeconds - this.clock.time)
+    const hours = (seconds: number) => `${Math.round((seconds / hour) * 10) / 10} h`
+    return { clockId: this.def.id, label: this.def.label, calendar: this.clock.calendar(), dayPart: intoDay / day, hourSeconds: hour, roundSeconds: this.def.roundSeconds, toDawn: (dawn - intoDay + day) % day || day, longRestIn, shortRestLabel: hours(this.def.shortRestSeconds), longRestLabel: hours(this.def.longRestSeconds) }
   }
 }

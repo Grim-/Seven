@@ -10,6 +10,7 @@ import { skills } from '../../skills'
 import { ToolError } from '../../tools/types'
 import { freeName, storePacking } from '../packing'
 import { scoreDoc } from '../query'
+import { registerKind } from '../kindRegistry'
 import { ENTRY_WIDGET } from './runtime'
 import { clip, has, withJson, type Kind, type KindContext, type KindHit } from './types'
 
@@ -66,6 +67,8 @@ const memoryLine = (m: { pinned: boolean }) => (m.pinned ? 'pinned' : 'recalled 
 export const memoryKind: Kind = {
   presents: { chat: true, widget: ENTRY_WIDGET },
   lasting: true,
+  inKindList: false,
+  actionsStayWhenHidden: true,
   group: 'Agents',
   kind: 'memory',
   remove(id, ctx) {
@@ -364,3 +367,10 @@ export const commandKind: Kind = {
     return c.usage
   }
 }
+
+registerKind(200, skillKind)
+registerKind(230, agentKind)
+registerKind(260, memoryKind)
+registerKind(270, thoughtKind)
+registerKind(280, styleKind)
+registerKind(320, commandKind)

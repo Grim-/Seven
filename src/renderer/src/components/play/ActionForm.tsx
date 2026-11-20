@@ -12,6 +12,7 @@ import { useCheckTargets } from './useCheckTargets'
 import type { PlayWhere } from './playStore'
 import { CardSwapField } from './CardSwapField'
 import { EffectsEditor } from '../game/effects/EffectsEditor'
+import { DurationInput } from '../game/DurationInput'
 
 const BLANK_CHECK: ActionCheck = { against: CHANCE, difficulty: MIDDLE, base: BASE - 1, pass: null, fail: null, passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null, effects: [] }
 export const BLANK_ACTION: Action = { attempt: '', needs: 'any', by: null, roller: 'player', checks: [BLANK_CHECK], pass: '', fail: '', passCards: NO_SWAP, failCards: NO_SWAP, passAction: null, failAction: null, effects: [] }
@@ -81,6 +82,10 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
             <Segmented value={a.needs} options={NEEDS} onChange={(needs) => set({ ...a, needs })} />
           </div>
           <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-[11px] text-dim">
+              <span className="font-mono uppercase tracking-[0.1em] text-faint">Takes</span>
+              <DurationInput value={a.seconds ?? 0} onChange={(seconds) => set({ ...a, seconds })} />
+            </label>
             <RollerField value={a.roller ?? 'player'} onChange={(roller) => set({ ...a, roller })} />
             <label className="flex items-center gap-2 text-[11px] text-dim">
               <span className="font-mono uppercase tracking-[0.1em] text-faint">Preview with</span>

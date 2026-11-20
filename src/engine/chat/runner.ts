@@ -4,12 +4,14 @@ import { EventEmitter } from 'node:events'
 import crypto from 'node:crypto'
 import type { ChatHistoryItem } from './items'
 import path from 'node:path'
-import { agentSheets, type AgentDraft, type AgentProfile, type ModelConfig, type ThinkingLevel, type ToolChoiceMode, type ChatMessage, type ChatPart, type ContextSummary, type ContextUsage, type PermissionMode, type PromptCost, type PromptView, type TurnPhaseKind, type RewindPreview, type SessionMeta, type ToolPart } from '@shared/types'
+import { agentSheets, type AgentDraft, type AgentProfile, type ModelConfig, type ThinkingLevel, type ToolChoiceMode, type ChatMessage, type ChatPart, type ContextSummary, type ContextUsage, type PermissionMode, type PromptCost, type PromptSection, type PromptView, type TurnPhaseKind, type RewindPreview, type SessionMeta, type ToolPart } from '@shared/types'
 import type { Events } from '@shared/protocol'
 import type { ChatElement } from '@shared/chatElements'
 import type { ModelHost } from '../model/host'
 import { checkFits } from './fit'
-import { buildInstructions, withState } from './context'
+import { buildInstructionSections, buildInstructions, parseFrozenInstructionSections, withState } from './context'
+import { buildGameplaySceneDelta } from './sceneDelta'
+import { isGameplayScene } from '@shared/almanac'
 import { TurnMeter, usageOf } from './stats'
 import { NEXT_TURN, activeSummary, rebuildHistory, summaryBlock, type FitResult } from './history'
 import { TOOLS_OFF, applyTrim, handoffRequest, planSummary, planTrim, summaryRequest } from './compact'
@@ -187,6 +189,7 @@ export class ChatRunner extends EventEmitter {
     return this.preparing || this.turn !== null || this.compacting !== null
   }
   private grants = new Map<string, SessionGrants>()
+  private lastSceneSig = new Map<string, string>()
 
   constructor(
     private host: ModelHost,
@@ -199,7 +202,9 @@ export class ChatRunner extends EventEmitter {
     private emitEvent: Emit
   ) {
     super()
-    host.on('unloading', () => this.closeActive())
+    host.on('unloading', (_id: string, opts?: { suspend?: boolean }) => {
+      if (!opts?.suspend) this.closeActive()
+    })
     minds.on('pinned', (sessionId: string) => this.remembered(sessionId))
   }
 
@@ -410,7 +415,7 @@ export class ChatRunner extends EventEmitter {
     if (a && a.sessionId !== sessionId) await this.saveState(a)
     this.closeActive()
     const remoteModel = this.models.isRemote(modelId)
-    const chat = new ApiChat(remoteModel ? this.models.remoteTarget(modelId) : this.host.serverTarget(), systemPrompt)
+    const chat = new ApiChat(remoteModel ? this.models.remoteTarget(modelId) : () => this.host.serverTarget(), systemPrompt)
     const saved = this.sessions.loadHistory(sessionId)
     const history = saved ?? (this.sessions.messages(sessionId).length ? this.rebuildFor(sessionId, systemPrompt) : null)
     if (!remoteModel && a?.sessionId !== sessionId) await this.loadState(sessionId, modelId, saved)
@@ -441,27 +446,29 @@ export class ChatRunner extends EventEmitter {
     return this.probeOf(sessionId) ? probeTools() : toolsFor(agent)
   }
 
+  private effectiveAgentFor(sessionId: string, agent: AgentProfile): AgentProfile {
+    let chosenToolChoice: ToolChoiceMode | null = null
+    let chosenStyle: string | null = null
+    try {
+      const meta = this.sessions.get(sessionId)
+      chosenToolChoice = meta.toolChoice ?? null
+      chosenStyle = meta.reasoningStyle ?? null
+    } catch (err) {
+      noteFailure(err, 'chat', "Could not read the chat's reasoning settings")
+      chosenToolChoice = null
+      chosenStyle = null
+    }
+    return {
+      ...agent,
+      ...(chosenToolChoice !== null ? { toolChoice: chosenToolChoice } : {}),
+      ...(chosenStyle !== null ? { reasoningStyle: chosenStyle } : {})
+    }
+  }
+
   private promptFor(sessionId: string, agent: AgentProfile, tools: ToolDef[], memoryText: string): string {
     const probe = this.probeOf(sessionId)
-    if (!probe) {
-      let chosenToolChoice: ToolChoiceMode | null = null
-      let chosenStyle: string | null = null
-      try {
-        const meta = this.sessions.get(sessionId)
-        chosenToolChoice = meta.toolChoice ?? null
-        chosenStyle = meta.reasoningStyle ?? null
-      } catch (err) {
-        noteFailure(err, 'chat', "Could not read the chat's reasoning settings")
-        chosenToolChoice = null
-        chosenStyle = null
-      }
-      const effectiveAgent = {
-        ...agent,
-        ...(chosenToolChoice !== null ? { toolChoice: chosenToolChoice } : {}),
-        ...(chosenStyle !== null ? { reasoningStyle: chosenStyle } : {})
-      }
-      return buildInstructions(effectiveAgent, tools, memoryText)
-    }
+    const meta = this.sessions.list().find((s) => s.id === sessionId)
+    if (!probe) return buildInstructions(this.effectiveAgentFor(sessionId, agent), tools, memoryText, meta?.scene ?? null, meta?.dmMode === true)
     return probeInstructions(agent, probe.subject, data.pages.find(probe.pageId)?.title ?? probePageTitle(probe.subject), tools.some((t) => t.name === 'ask_user'))
   }
 
@@ -511,12 +518,58 @@ export class ChatRunner extends EventEmitter {
     const agent = this.agents.getOrDefault(sessionId ? this.sessions.get(sessionId).agentId : agentId)
     const frozen = sessionId ? this.frozenFor(sessionId, agent) : null
     const tools = frozen ? frozen.tools : sessionId ? this.allowedFor(sessionId, agent) : toolsFor(agent)
-    const systemPrompt = frozen ? frozen.systemPrompt : sessionId ? this.promptFor(sessionId, agent, tools, this.memoryFor(agent)) : buildInstructions(agent, tools, this.memoryFor(agent))
+    const probe = sessionId ? this.probeOf(sessionId) : null
+    const meta = sessionId ? this.sessions.list().find((s) => s.id === sessionId) : undefined
+    const memory = this.memoryFor(agent)
+    const instructionSpecs = frozen
+      ? parseFrozenInstructionSections(frozen.systemPrompt)
+      : probe
+        ? [{ id: 'probe', sourceId: 'agent', label: 'Module probe', detail: `Inspecting module "${probe.subject}"`, text: this.promptFor(sessionId!, agent, tools, memory) }]
+        : buildInstructionSections(sessionId ? this.effectiveAgentFor(sessionId, agent) : agent, tools, memory, meta?.scene ?? null, meta?.dmMode === true)
+
+    const instructionSections: PromptSection[] = instructionSpecs.map((s) => ({
+      ...s,
+      kind: 'instruction',
+      tokens: estimateTokens(s.text)
+    }))
+
+    const moduleNames = new Map(modules.list().map((m) => [m.id, m.name]))
+    const byGroup = new Map<string, ToolDef[]>()
+    for (const t of tools) {
+      const list = byGroup.get(t.group)
+      if (list) list.push(t)
+      else byGroup.set(t.group, [t])
+    }
+
+    const toolSections: PromptSection[] = [...byGroup.entries()].map(([group, list]) => {
+      const modName = moduleNames.get(group) ?? group
+      const functions = Object.fromEntries(list.map((t) => [t.name, { description: t.description, params: t.params }]))
+      const json = JSON.stringify(functions, null, 2)
+      const names = list.map((t) => t.name).join(', ')
+      return {
+        id: `tool:${group}`,
+        sourceId: group,
+        label: `${modName} module`,
+        detail: `From ${modName} module (${list.length} tool${list.length === 1 ? '' : 's'}: ${names})`,
+        kind: 'tool',
+        text: json,
+        tokens: estimateTokens(JSON.stringify(functions))
+      }
+    })
+
+    const sections = [...instructionSections, ...toolSections]
+    const systemPrompt = frozen ? frozen.systemPrompt : instructionSections.map((s) => s.text).join('\n\n')
     const fresh = sessionId && !frozen ? 'This chat has not sent its first message yet, so these are the instructions it will start with. ' : ''
     const functions = Object.fromEntries(tools.map((t) => [t.name, { description: t.description, params: t.params }]))
-    const plain = () => `${systemPrompt}${tools.length ? `\n\n----- Tools (${tools.length}) -----\n${JSON.stringify(functions, null, 2)}` : ''}`
-    const text = plain()
-    return { text, tokens: estimateTokens(text), format: 'API', note: `${fresh}The system message as sent to the model; the tools go alongside it as JSON schemas, and the model's chat template formats both. The token count is an estimate.` }
+    const text = `${systemPrompt}${tools.length ? `\n\n----- Tools (${tools.length}) -----\n${JSON.stringify(functions, null, 2)}` : ''}`
+    const wireTokens = estimateTokens(systemPrompt) + toolSections.reduce((sum, s) => sum + s.tokens, 0)
+    return {
+      text,
+      tokens: wireTokens,
+      format: 'API',
+      note: `${fresh}Hover a coloured block or source pill to see what adds it to context. Token counts reflect compact API size.`,
+      sections
+    }
   }
 
   draftUsage(agentId: string): ContextUsage | null {
@@ -803,7 +856,14 @@ export class ChatRunner extends EventEmitter {
     if (todos?.editedByUser) this.sessions.clearTodoEdit(sessionId)
     const probe = this.probeOf(sessionId)
     const boardBlock = tools.some((t) => t.name === 'read_messages') ? board.unseen(sessionId, 3) : ''
-    const stated = withState(resolvedModelText ?? prompt) + referenceBlock(resolvedModelText ?? prompt) + fileBlock + todoBlock + boardBlock + (probe ? probeState(probe.pageId, this.sessions.messages(sessionId)) : '')
+    const meta = this.sessions.get(sessionId)
+    let sceneDeltaBlock = ''
+    if (isGameplayScene(meta.scene) && meta.scene) {
+      const delta = buildGameplaySceneDelta(meta.scene, resolvedModelText ?? prompt, this.lastSceneSig.get(sessionId) ?? null)
+      this.lastSceneSig.set(sessionId, delta.sig)
+      sceneDeltaBlock = delta.block
+    }
+    const stated = withState(resolvedModelText ?? prompt) + sceneDeltaBlock + referenceBlock(resolvedModelText ?? prompt) + fileBlock + todoBlock + boardBlock + (probe ? probeState(probe.pageId, this.sessions.messages(sessionId)) : '')
     let modelPrompt = pending ? `${summaryBlock(pending)}\n\n${stated}` : stated
 
     const placeholder: Turn = {
@@ -1017,7 +1077,8 @@ export class ChatRunner extends EventEmitter {
         this.sessions.saveContext(sessionId, { usage })
         this.emitEvent('context.usage', { sessionId, usage })
       }
-      if (agent.context.autoSummary && usage.used / usage.size >= agent.context.summaryAt) {
+      const isGameplay = isGameplayScene(this.sessions.get(sessionId).scene)
+      if (!isGameplay && agent.context.autoSummary && usage.used / usage.size >= agent.context.summaryAt) {
         try {
           this.compact(sessionId)
         } catch {

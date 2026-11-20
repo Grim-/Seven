@@ -88,7 +88,7 @@ function saveText(id: string): string {
   return [`# ${save.name}`, `Save, id \`${save.id}\`: a playthrough of the world ${world}. Everything that happens in play is kept in it.`, `Characters: ${who.length ? who.join(', ') : 'none'}`, `Flags: ${Object.keys(save.flags).join(', ') || 'none'}`].join('\n\n')
 }
 
-const saveKind: Kind = {
+export const saveKind: Kind = {
   kind: SAVE_KIND,
   presents: { chat: true, widget: ENTRY_WIDGET },
   label: 'Save',
@@ -96,7 +96,7 @@ const saveKind: Kind = {
   icon: 'save',
   description: 'a playthrough of a world, with its own characters; a character is in one save at a time',
   group: 'Game',
-  source: 'Game',
+  source: 'Play',
   parts: [],
   actions: [],
   exportable: false,
@@ -125,5 +125,5 @@ const saveKind: Kind = {
 }
 
 export function gameKinds(): Kind[] {
-  return [saveKind, ...defTypes().map(kindOf)]
+  return defTypes().map(kindOf)
 }

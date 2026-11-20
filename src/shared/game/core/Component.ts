@@ -155,6 +155,18 @@ export abstract class Component implements SignalSource {
     return this.comps.some((c) => c.isInvisible())
   }
 
+  /** Collects roll advantage/disadvantage flags contributed by child buffs/traits. */
+  rollFlags(scope: 'incoming' | 'outgoing'): { advantage: boolean; disadvantage: boolean } {
+    let advantage = false
+    let disadvantage = false
+    for (const c of this.comps) {
+      const f = c.rollFlags(scope)
+      if (f.advantage) advantage = true
+      if (f.disadvantage) disadvantage = true
+    }
+    return { advantage, disadvantage }
+  }
+
   protected saveState(): Record<string, unknown> {
     return {}
   }

@@ -1,8 +1,9 @@
 import type { ViewEvent } from '@shared/effects'
 import { moduleList, type ModuleEntry } from '@shared/moduleList'
 import type { CharacterSheet } from '@shared/types'
-import type { JsonSchema } from '../tools/schema'
-import type { CheckSchema } from '../tools/checkSchema'
+import type { JsonObjectSchema, JsonSchema } from '../tools/schema'
+import { LIVE_CHECKS, type CheckSchema } from '../tools/checkSchema'
+import { registerSchemaSource } from '../tools/schemaSources'
 import type { ToolContext } from '../tools/types'
 import { moduleIsOn } from '../modules/isOn'
 import type { PlayTargetCandidate } from './targets'
@@ -46,3 +47,11 @@ export const cardVariationDefs = moduleList<CardVariationDef>()
 export function liveCardVariations(): CardVariationDef[] {
   return cardVariationDefs.on(moduleIsOn)
 }
+
+export const CARD_VARIATION_SCOPE = 'card_variation'
+
+registerSchemaSource({
+  id: CARD_VARIATION_SCOPE,
+  entries: (on) =>
+    cardVariationDefs.on((module) => moduleIsOn(module) && on(module)).map((v) => ({ name: v.id, summary: v.name, params: v.data(LIVE_CHECKS) as JsonObjectSchema }))
+})

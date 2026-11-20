@@ -10,9 +10,10 @@ export class Buff extends Component {
   static readonly DESCRIPTION: string = 'A buff or debuff: lasts its duration and holds the pieces that do its work. The same buff from the same source adds stacks.'
   static readonly PARAMS = {
     id: { kind: 'text' as const, default: '', description: 'Which buff this is; with the source, decides when two applications stack.' },
-    duration: { kind: 'number' as const, default: 0, min: 0, description: 'Seconds it lasts. 0 lasts until removed.', section: 'Duration and stacking' },
+    duration: { kind: 'duration' as const, default: 0, min: 0, description: 'How long it lasts. 0 lasts until removed.', section: 'Duration and stacking' },
     potency: { kind: 'number' as const, default: 1, min: 0, description: 'Strength per stack, read by its pieces.', section: 'Duration and stacking' },
     maxStacks: { kind: 'number' as const, default: 1, min: 1, description: 'Most stacks it can reach.', section: 'Duration and stacking' },
+    endsOn: { kind: 'list' as const, default: [], of: { kind: 'signal' as const, default: '', description: 'A signal on the holder that ends it, such as On Long Rest.' }, description: 'Signals on the holder that end it, such as On Short Rest or On Long Rest.', section: 'Duration and stacking' },
     tags: { kind: 'list' as const, default: [], of: { kind: 'text' as const, default: '', description: 'A tag, such as debuff or curable.' }, description: 'Tags that effects can find it by, such as debuff or poison.', section: 'Tags' }
   }
   source: string | null = null
@@ -48,6 +49,9 @@ export class Buff extends Component {
   onApplied(): void {
     super.onApplied()
     if (this.remaining === Infinity && Number(this.params.duration) > 0) this.remaining = Number(this.params.duration)
+    const entity = this.entity
+    const ends = Array.isArray(this.params.endsOn) ? this.params.endsOn.map(String).filter(Boolean) : []
+    if (entity) for (const signal of ends) this.bind(entity, signal, () => (this.parent instanceof Buffs ? this.parent.removeBuff(this) : undefined))
   }
 
   advance(seconds: number): void {
@@ -187,6 +191,10 @@ export class Buffs extends Component {
     return made
   }
 
+  dropExpired(seconds: number): void {
+    for (const b of this.held) if (b.remaining <= seconds) this.remove(b)
+  }
+
   removeBuff(buff: Buff): void {
     buff.end()
     if (this.remove(buff)) this.entity?.emit('OnBuffRemoved', { buff: buff.id })
@@ -194,8 +202,9 @@ export class Buffs extends Component {
 
   tickSim(seconds: number): void {
     for (const b of this.held) {
-      b.tickSim(seconds)
-      b.advance(seconds)
+      const span = Math.min(seconds, b.remaining)
+      b.tickSim(span)
+      b.advance(span)
       if (b.done()) this.removeBuff(b)
     }
   }

@@ -70,3 +70,39 @@ export function modelTraitSet(info: ModelInfo | null | undefined, vision: boolea
   const swa = info.slidingWindow === undefined ? {} : { swa: (info.slidingWindow ?? 0) > 0 }
   return { moe: info.experts !== null, dense: info.experts === null, mtp: Boolean(info.mtpLayers), ...swa, ...seen }
 }
+
+const FAMILY_RULES: [RegExp, string][] = [
+  [/^gemma/i, 'Gemma'],
+  [/^qwen[-_]?image/i, 'Qwen Image'],
+  [/^qwen/i, 'Qwen'],
+  [/^llama/i, 'Llama'],
+  [/^deepseek/i, 'DeepSeek'],
+  [/^(mistral|mixtral|ministral|devstral|codestral|pixtral)/i, 'Mistral'],
+  [/^phi/i, 'Phi'],
+  [/^(glm|chatglm)/i, 'GLM'],
+  [/^(gpt[-_]?oss|gptoss|gpt-?\d)/i, 'GPT'],
+  [/^claude/i, 'Claude'],
+  [/^gemini/i, 'Gemini'],
+  [/^imagen/i, 'Imagen'],
+  [/^command/i, 'Command'],
+  [/^flux/i, 'Flux'],
+  [/^sdxl/i, 'SDXL'],
+  [/^sd3/i, 'SD3'],
+  [/^(sd\d*|stable[-_]?diffusion|checkpoint)/i, 'Stable Diffusion'],
+  [/^nomic/i, 'Nomic'],
+  [/^bge/i, 'BGE']
+]
+
+/** Derive a clean display model family (e.g. Gemma, Qwen, Llama, Flux) from an architecture or remote model id. */
+export function modelFamily(architecture: string | null | undefined, fallbackId?: string | null): string | null {
+  const raw = (architecture?.trim() || fallbackId?.trim() || '').replace(/^models\//, '')
+  if (!raw) return null
+  for (const [re, label] of FAMILY_RULES) {
+    if (re.test(raw)) return label
+  }
+  const stem = raw
+    .replace(/(moe|next|\d+(?:\.\d+)*|[._-].*)$/i, '')
+    .trim()
+  const base = stem || raw
+  return base.charAt(0).toUpperCase() + base.slice(1)
+}

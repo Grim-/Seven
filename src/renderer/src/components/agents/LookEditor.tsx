@@ -1,28 +1,46 @@
-import { useState } from 'react'
-import { DEFAULT_LOOK, type AgentDraft, type AgentLook } from '@shared/types'
+import { useEffect, useMemo, useState } from 'react'
+import { DEFAULT_LOOK, type AgentDraft, type AgentLook, type CharacterSheet } from '@shared/types'
 import { POSE_OPTIONS, poseOf } from '@shared/moods'
 import { AvatarField } from './AvatarField'
 import { ColorRow, Field, Select, Slider } from '../ui'
 import { AgentAvatar, LookBackground, lookVars } from './look'
 import { PictureField } from '../pictures/PictureField'
 import { MEDIA_OPTIONS } from '../pictures/mediaOptions'
+import { engine } from '../../lib/ipc'
+import { agentImageContext, useRegisterImageContext } from '../../lib/imagePromptContext'
 
 export function LookEditor({ draft, onChange }: { draft: AgentDraft; onChange: (d: AgentDraft) => void }) {
   const look: AgentLook = { ...DEFAULT_LOOK, ...draft.look }
   const set = (patch: Partial<AgentLook>) => onChange({ ...draft, look: { ...look, ...patch } })
   const preview = { id: draft.id ?? 'draft', name: draft.name, look } as Parameters<typeof AgentAvatar>[0]['agent']
   const [pose, setPose] = useState('idle')
+  const [linkedSheet, setLinkedSheet] = useState<CharacterSheet | null>(null)
+  useEffect(() => {
+    if (!draft.sheet) {
+      setLinkedSheet(null)
+      return
+    }
+    let live = true
+    void engine('sheets.get', { id: draft.sheet })
+      .then((sheet) => live && setLinkedSheet(sheet))
+      .catch(() => live && setLinkedSheet(null))
+    return () => {
+      live = false
+    }
+  }, [draft.sheet])
+  const agentContext = useMemo(() => agentImageContext(draft, linkedSheet), [draft, linkedSheet])
+  useRegisterImageContext(agentContext)
   return (
     <div className="col-span-2 grid grid-cols-[1fr_220px] gap-4">
       <div className="flex flex-col gap-3">
         <Field label="Avatar" hint="Shown beside replies, in the chat header, on the overlay button and in lists. It reacts while the agent thinks, uses tools and talks, and to any mood the agent sets. Or use a picture, GIF or short video.">
-          <AvatarField value={look.avatar} onChange={(avatar) => set({ avatar })} />
+          <AvatarField value={look.avatar} context={agentContext} onChange={(avatar) => set({ avatar })} />
         </Field>
         <Field label="Accent colour" hint="Used for the chat and the overlay while this agent's chat is open.">
           <ColorRow value={look.accent} onChange={(v) => set({ accent: v })} allowNone />
         </Field>
         <Field label="Background" hint="Shown behind the chat, dimmed.">
-          <PictureField options={MEDIA_OPTIONS} value={look.background} onChange={(id) => set({ background: id })} />
+          <PictureField options={{ ...MEDIA_OPTIONS, what: 'a chat background', context: agentContext }} value={look.background} onChange={(id) => set({ background: id })} />
         </Field>
         <div className="grid grid-cols-2 gap-4">
           <Field label={`Background strength ${Math.round(look.backgroundOpacity * 100)}%`}>

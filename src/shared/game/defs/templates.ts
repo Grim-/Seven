@@ -76,6 +76,17 @@ componentTemplate({
     { id: 'well_fed', name: 'Well fed', notes: '+2 most Health for 6 hours.', values: { duration: 21600, comps: [{ type: 'buff.statBonus', stat: 'health', amount: 2 }] } },
     { id: 'shielded', name: 'Shielded', notes: '+2 Armour for a minute.', values: { duration: 60, comps: [{ type: 'buff.statBonus', stat: 'armour', amount: 2 }] } },
     {
+      id: 'dodging',
+      name: 'Dodging',
+      notes: 'Focused on evasion until your next turn: incoming attack rolls suffer disadvantage.',
+      values: {
+        duration: 0,
+        endsOn: ['OnTurnStart'],
+        tags: ['condition', 'dodge'],
+        comps: [{ type: 'buff.rollModifier', scope: 'incoming', mode: 'disadvantage' }]
+      }
+    },
+    {
       id: 'static_charge',
       name: 'Static Charge',
       notes: 'Your next hit discharges 5 lightning damage.',
@@ -184,13 +195,46 @@ componentTemplate({
     { id: 'cure_wounds', name: 'Cure Wounds', notes: 'Heals someone you touch.', values: { cost: { mana: 4 }, range: 5, comps: [{ type: 'action.heal', on: 'OnUse', amount: '1d8 + 3' }] } },
     { id: 'fire_bolt', name: 'Fire Bolt', notes: 'A mote of fire at one creature. Costs nothing.', values: { range: 120, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d10', damageType: 'fire' }] } },
     { id: 'guiding_bolt', name: 'Guiding Bolt', notes: 'A flash of radiant light. Skeletons take double.', values: { cost: { mana: 4 }, range: 120, comps: [{ type: 'action.damage', on: 'OnUse', amount: '4d6', damageType: 'radiant' }] } },
-    { id: 'unarmed_strike', name: 'Unarmed Strike', notes: 'Fallback melee strike when no weapon is equipped.', values: { range: 5, unarmedOnly: true, comps: [{ type: 'action.damage', on: 'OnUse', amount: 'max(1, 1 + floor((user.str - 10) / 2))', damageType: 'bludgeoning' }] } },
-    { id: 'claws', name: 'Claws', notes: 'Two slashing claw strikes (multi-attack).', values: { range: 5, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d6 + floor((user.str - 10) / 2)', times: 2, damageType: 'slashing' }] } },
-    { id: 'bite', name: 'Bite', notes: 'Heavy piercing bite.', values: { range: 5, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d10 + floor((user.str - 10) / 2)', damageType: 'piercing' }] } }
+    {
+      id: 'dash',
+      name: 'Dash',
+      notes: 'Double your movement speed for the rest of this turn.',
+      values: { range: 0, action: 'action', comps: [{ type: 'action.addMovement', on: 'OnUse', who: 'caster', amount: 'user.speed' }] }
+    },
+    {
+      id: 'dodge',
+      name: 'Dodge',
+      notes: 'Focus entirely on evasion until the start of your next turn.',
+      values: { range: 0, action: 'action', comps: [{ type: 'action.applyBuff', on: 'OnUse', who: 'caster', buff: 'dodging' }] }
+    },
+    {
+      id: 'unarmed_strike',
+      name: 'Unarmed Strike',
+      notes: 'Fallback melee strike when no weapon is equipped.',
+      values: {
+        range: 5,
+        unarmedOnly: true,
+        comps: [
+          { type: 'action.attackRoll', on: 'OnUse', emit: 'OnStrikeHit', bonus: 'floor((user.str - 10) / 2)', defenseStat: 'armour' },
+          { type: 'action.damage', on: 'OnStrikeHit', amount: 'max(1, 1 + floor((user.str - 10) / 2))', damageType: 'bludgeoning' }
+        ]
+      }
+    },
+    { id: 'claws', name: 'Claws', notes: 'Two slashing claw strikes (multi-attack).', values: { range: 5, comps: [{ type: 'action.attackRoll', on: 'OnUse', emit: 'OnStrikeHit', bonus: 'floor((user.str - 10) / 2)', defenseStat: 'armour' }, { type: 'action.damage', on: 'OnStrikeHit', amount: '1d6 + floor((user.str - 10) / 2)', times: 2, damageType: 'slashing' }] } },
+    { id: 'bite', name: 'Bite', notes: 'Heavy piercing bite.', values: { range: 5, comps: [{ type: 'action.attackRoll', on: 'OnUse', emit: 'OnStrikeHit', bonus: 'floor((user.str - 10) / 2)', defenseStat: 'armour' }, { type: 'action.damage', on: 'OnStrikeHit', amount: '1d10 + floor((user.str - 10) / 2)', damageType: 'piercing' }] } }
   ]
 })
 
-const ATTACK = { type: 'ability', id: 'attack', label: 'Attack', weaponRange: true, comps: [{ type: 'action.weaponHit' }] }
+const ATTACK = {
+  type: 'ability',
+  id: 'attack',
+  label: 'Attack',
+  weaponRange: true,
+  comps: [
+    { type: 'action.attackRoll', on: 'OnUse', emit: 'OnStrikeHit', bonus: 'floor((user.str - 10) / 2)', defenseStat: 'armour' },
+    { type: 'action.weaponHit', on: 'OnStrikeHit' }
+  ]
+}
 
 componentTemplate({
   type: ITEM_TEMPLATES,
@@ -219,7 +263,7 @@ entityTemplate({
     {
       id: 'adventurer',
       name: 'Adventurer',
-      notes: 'Stats, Health, Stamina, Mana, buffs, an unarmed strike + spell book, a 20-stack inventory, and equipment with the starter slots (belt slots come from the Belt slots stat).',
+      notes: 'Stats, Health, Stamina, buffs, an unarmed strike + spell book, a 20-stack inventory, and equipment with the starter slots (belt slots come from the Belt slots stat).',
       values: {
         components: [
           { type: 'stats', base: {} },
@@ -230,7 +274,6 @@ entityTemplate({
           { type: 'classes' },
           { type: 'health', stat: 'health' },
           { type: 'resource', stat: 'stamina' },
-          { type: 'resource', stat: 'mana' },
           { type: 'buffs' },
           { type: 'abilities', comps: [{ type: 'ability', id: 'unarmed_strike', label: 'Unarmed Strike', range: 5, unarmedOnly: true, comps: [{ type: 'action.damage', on: 'OnUse', amount: 'max(1, 1 + floor((user.str - 10) / 2))', damageType: 'bludgeoning' }] }] },
           { type: 'inventory', slots: 20 },
@@ -248,50 +291,5 @@ entityTemplate({
   icon: 'skull',
   description: 'creature templates: what each is made of. Every one placed in a world is a new creature made from its template',
   components: 'The components each creature of this kind is made of.',
-  starter: [
-    {
-      id: 'skeleton',
-      name: 'Skeleton',
-      notes: 'Takes double radiant and bludgeoning, half piercing, no poison.',
-      values: {
-        components: [
-          { type: 'stats', base: { health: 13, armour: 13, dex: 14, con: 15, int: 6, wis: 8, cha: 5, radiant_resist: -1, bludgeoning_resist: -1, piercing_resist: 0.5, poison_resist: 1 } },
-          { type: 'health', stat: 'health' },
-          { type: 'buffs' },
-          { type: 'abilities', comps: [{ type: 'ability', id: 'bone_shot', label: 'Bone shot', range: 80, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d6 + 2', damageType: 'piercing' }] }] }
-        ]
-      }
-    },
-    {
-      id: 'wolf',
-      name: 'Wolf',
-      values: {
-        components: [
-          { type: 'stats', base: { health: 11, armour: 13, str: 12, dex: 15, speed: 40 } },
-          { type: 'health', stat: 'health' },
-          { type: 'buffs' },
-          { type: 'abilities', comps: [{ type: 'ability', id: 'bite', label: 'Bite', range: 5, comps: [{ type: 'action.damage', on: 'OnUse', amount: '2d4 + 2', damageType: 'piercing' }] }] }
-        ]
-      }
-    },
-    {
-      id: 'tiger',
-      name: 'Tiger',
-      notes: 'Has two innate attacks: a single Bite and a 2× Claws multi-attack.',
-      values: {
-        components: [
-          { type: 'stats', base: { health: 37, armour: 12, str: 17, dex: 15, con: 14, speed: 40 } },
-          { type: 'health', stat: 'health' },
-          { type: 'buffs' },
-          {
-            type: 'abilities',
-            comps: [
-              { type: 'ability', id: 'bite', label: 'Bite', range: 5, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d10 + 3', damageType: 'piercing' }] },
-              { type: 'ability', id: 'claws', label: 'Claws', range: 5, comps: [{ type: 'action.damage', on: 'OnUse', amount: '1d8 + 3', times: 2, damageType: 'slashing' }] }
-            ]
-          }
-        ]
-      }
-    }
-  ]
+  starter: []
 })

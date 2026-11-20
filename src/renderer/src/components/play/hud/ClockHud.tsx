@@ -1,7 +1,10 @@
-import { Pause } from 'lucide-react'
+import { Hourglass } from 'lucide-react'
 import type { ClockView } from '../../../game/explore/WorldClock'
 import type { ClockControls } from '../../worlds/PlayStage'
+import { Eyebrow, Popover } from '../../ui'
 import { cn } from '../../../lib/cn'
+import { ShortRestPop, type RestMember } from './ShortRestPop'
+import { LongRestPop } from './LongRestPop'
 
 function SkyArc({ dayPart }: { dayPart: number }) {
   const day = dayPart >= 0.25 && dayPart < 0.75
@@ -23,31 +26,26 @@ const two = (n: number) => String(n).padStart(2, '0')
 export function ClockHud({
   view,
   controls,
+  party = [],
   offsetRight = false
 }: {
   view: ClockView
   controls: ClockControls | null
+  party?: RestMember[]
   offsetRight?: boolean
 }) {
   const { calendar } = view
-  const isPaused = view.paused
-
-  const button = (on: boolean) =>
-    cn(
-      'flex h-7 min-w-8 items-center justify-center border px-1 font-mono text-[11px] font-bold transition-colors',
-      on
-        ? 'border-accent bg-accent text-black'
-        : 'border-transparent text-dim hover:text-white hover:bg-white/5'
-    )
+  const waits = [
+    { label: '1 round', seconds: view.roundSeconds },
+    { label: '10 min', seconds: view.hourSeconds / 6 },
+    { label: '1 h', seconds: view.hourSeconds },
+    { label: 'Until dawn', seconds: view.toDawn }
+  ]
 
   return (
     <div
-      className={`pointer-events-auto absolute top-2.5 z-20 flex items-stretch transition-all duration-300 ease-out ${
+      className={`pointer-events-auto absolute top-2.5 z-20 flex items-stretch border border-line/60 bg-black/90 transition-all duration-300 ease-out ${
         offsetRight ? 'right-[360px]' : 'right-3'
-      } ${
-        isPaused
-          ? 'border border-accent/80 bg-black/95 opacity-100 shadow-[0_4px_20px_rgba(245,158,11,0.3)] backdrop-blur'
-          : 'border border-line/30 bg-black/30 opacity-40 backdrop-blur-sm hover:border-line/80 hover:bg-black/90 hover:opacity-100 hover:shadow-[0_4px_20px_rgba(0,0,0,0.8)]'
       }`}
     >
       <div className="flex items-center gap-2 py-0.5 pl-2 pr-2.5" title={view.label}>
@@ -61,29 +59,37 @@ export function ClockHud({
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-0.5 border-l border-line/40 px-1">
-        <button
-          type="button"
-          title={isPaused ? 'Resume' : 'Pause'}
-          aria-label={isPaused ? 'Resume' : 'Pause'}
+      <div className={cn('flex items-center gap-0.5 border-l border-line/40 px-1', !controls && 'opacity-35')}>
+        <Popover
+          title="Wait"
           disabled={!controls}
-          onClick={() => controls?.setPaused(!isPaused)}
-          className={button(isPaused)}
+          triggerClassName="flex h-7 min-w-8 items-center justify-center border border-transparent px-1 text-dim hover:bg-white/5 hover:text-white"
+          trigger={<Hourglass className="h-3.5 w-3.5" />}
+          className="notch-sm flex flex-col gap-2.5 p-3"
         >
-          <Pause className="h-3 w-3" />
-        </button>
-        {view.speeds.map((s) => (
-          <button
-            key={s}
-            type="button"
-            title={`${s}× speed`}
-            disabled={!controls}
-            onClick={() => controls?.setSpeed(s)}
-            className={button(!isPaused && view.speed === s)}
-          >
-            {s}×
-          </button>
-        ))}
+          {(close) => (
+            <>
+              <Eyebrow>Wait</Eyebrow>
+              <div className="flex flex-wrap gap-1.5">
+                {waits.map((w) => (
+                  <button
+                    key={w.label}
+                    type="button"
+                    onClick={() => {
+                      controls?.pass(w.seconds, 'wait')
+                      close()
+                    }}
+                    className="border border-line/60 px-2.5 py-1 font-mono text-[12px] text-dim hover:border-dim hover:text-white"
+                  >
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </Popover>
+        <ShortRestPop controls={controls} party={party} label={view.shortRestLabel} />
+        <LongRestPop controls={controls} waitHours={Math.ceil(view.longRestIn / view.hourSeconds)} label={view.longRestLabel} />
       </div>
     </div>
   )

@@ -1,48 +1,16 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
-import net from 'node:net'
 import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { ServerTimings } from '@shared/types'
 import { removePath } from '../../util/fs'
 import { childEnded, childStarted, endIfServer } from './children'
+import { freePort, portTaken, sleep, waitWithAbort } from './net'
 import type { ServerLimits } from './install'
-
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer()
-    probe.once('error', reject)
-    probe.listen(0, '127.0.0.1', () => {
-      const address = probe.address()
-      const port = typeof address === 'object' && address ? address.port : 0
-      probe.close(() => (port ? resolve(port) : reject(new Error('No free port for llama-server'))))
-    })
-  })
-}
-
-function portTaken(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const probe = net.createServer()
-    probe.once('error', () => resolve(true))
-    probe.listen(port, '127.0.0.1', () => probe.close(() => resolve(false)))
-  })
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
 
 class PortTaken extends Error {}
 
-function wait(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms)
-    signal.addEventListener('abort', () => {
-      clearTimeout(timer)
-      reject(new Error('Loading was cancelled'))
-    }, { once: true })
-  })
-}
+const wait = (ms: number, signal: AbortSignal) => waitWithAbort(ms, signal, 'Loading was cancelled')
 
 export interface ServerOptions {
   exe: string
@@ -160,13 +128,15 @@ export class LlamaServer {
         resolve(new LlamaServer(child, port, o.args, key, slotDir, o.version, o.limits))
       })
     })
+    let readyDone = false
     server.child.once('exit', (code) => {
       release()
-      if (server.stopping) return
+      if (server.stopping || !readyDone) return
       removePath(server.slotDir)
       o.onExit(`llama-server stopped (exit code ${code ?? 'unknown'}).${server.tail.length ? `\n${server.lastLines()}` : ''}`)
     })
     await server.ready(o.signal, port)
+    readyDone = true
     return server
   }
 

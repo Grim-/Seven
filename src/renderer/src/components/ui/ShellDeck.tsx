@@ -22,6 +22,15 @@ export function ShellDeck({ items, adds, bind, scale }: ShellViewProps) {
               />
             )}
             <FaceCount count={item.count} />
+            {item.action && (
+              <span
+                className="absolute right-2 top-2 z-10"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                {item.action}
+              </span>
+            )}
           </Pressable>
         )
       })}

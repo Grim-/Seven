@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Clock, SlidersHorizontal, X } from 'lucide-react'
+import { SlidersHorizontal, X } from 'lucide-react'
 import { Abilities, hasWieldedWeapon } from '@shared/game/components'
 import { createComponent, type Component, type ComponentDef } from '@shared/game/core'
 import { ABILITY_TEMPLATES } from '@shared/game/defs'
@@ -10,7 +10,6 @@ import { GamePanel, RowList, getGameVisual } from '../../../../game/ui'
 import { cn } from '../../../../lib/cn'
 import { useGameDefs } from '../../useGameDefs'
 import { PartsEditor } from '../../parts/PartsEditor'
-import { gameTime } from './time'
 import { registerComponentPanel, type PanelProps } from './registry'
 
 function toDef(c: Component): ComponentDef {
@@ -98,7 +97,6 @@ function AbilitiesPanel({ comp, entity, catalog, changed }: PanelProps<Abilities
                       <span className="font-mono text-[10.5px] text-dim">
                         {cost || 'Free action'}
                         {range > 0 ? ` · Reach ${range} ft` : ''}
-                        {a.cooling > 0 ? ` · Ready in ${gameTime(a.cooling)}` : ''}
                       </span>
                       <RowList rows={rows} />
                     </div>,
@@ -135,12 +133,6 @@ function AbilitiesPanel({ comp, entity, catalog, changed }: PanelProps<Abilities
                     </span>
                     {range > 0 && (
                       <span className="border border-line/40 bg-black/50 px-1.5 py-0.5 text-dim">{range} ft</span>
-                    )}
-                    {a.cooling > 0 && (
-                      <span className="flex items-center gap-1 border border-warn/40 bg-warn/10 px-1.5 py-0.5 text-warn">
-                        <Clock className="h-2.5 w-2.5" />
-                        {gameTime(a.cooling)}
-                      </span>
                     )}
                   </div>
                 </div>

@@ -12,6 +12,7 @@ import type { OpposedProps } from './opposedCheck'
 import type { ParamSchema } from './game/core/params'
 import type { MoodName } from './moods'
 import type { ChatElement } from './chatElements'
+import type { SessionSceneBinding } from './almanac'
 export type ModelStatus = 'unloaded' | 'loading' | 'ready' | 'error'
 
 export type RemoteApi = 'openai' | 'anthropic' | 'google'
@@ -21,6 +22,7 @@ export interface RemoteSpec {
   baseUrl: string | null
   model: string
   hasKey: boolean
+  category?: 'chat' | 'reasoning' | 'image' | 'audio' | 'other'
 }
 
 export interface ModelEntry {
@@ -40,7 +42,27 @@ export interface ModelEntry {
 export const MODEL_KINDS = {
   chat: { label: 'Chat', plural: 'Chat', runnable: true, chats: true, always: true, listed: true, note: null },
   embedding: { label: 'Embedding', plural: 'Embedding', runnable: true, chats: false, always: true, listed: true, note: null },
+  image: { label: 'Image', plural: 'Image', runnable: true, chats: false, always: true, listed: true, note: null },
   projector: { label: 'Vision adapter', plural: 'Vision adapters', runnable: false, chats: false, always: false, listed: false, note: 'A vision adapter goes with a model; it is not a model of its own.' },
+  vae: { label: 'VAE', plural: 'VAEs', runnable: false, chats: false, always: false, listed: false, note: 'A VAE goes with a diffusion image model; it is not a model of its own.' },
+  text_encoder: {
+    label: 'Text encoder',
+    plural: 'Text encoders',
+    runnable: false,
+    chats: false,
+    always: false,
+    listed: false,
+    note: 'A text encoder (CLIP or T5XXL) goes with a diffusion image model; it is not a model of its own.'
+  },
+  lora: {
+    label: 'LoRA',
+    plural: 'LoRAs',
+    runnable: false,
+    chats: false,
+    always: false,
+    listed: false,
+    note: 'A LoRA adapter modifies a diffusion image model; it is not a standalone model.'
+  },
   imatrix: {
     label: 'Importance matrix',
     plural: 'Importance matrices',
@@ -54,6 +76,154 @@ export const MODEL_KINDS = {
 } as const
 
 export type ModelKind = keyof typeof MODEL_KINDS
+
+export type HubFamily = 'image-packs' | 'gguf' | 'diffusion' | 'image-gguf' | 'image-companions'
+
+export type ImagePipelineMode = 'auto' | 'model' | 'diffusion'
+
+export interface ImageModelConfig {
+  mode: ImagePipelineMode
+  vae: string | null
+  tae: string | null
+  clipL: string | null
+  clipG: string | null
+  t5xxl: string | null
+  llm: string | null
+  llmVision: string | null
+  loraDir: string | null
+  width: number
+  height: number
+  steps: number
+  cfgScale: number
+  sampler: string
+  clipOnCpu: boolean
+  vaeTiling: boolean
+  flashAttention: boolean
+  offloadToCpu: boolean
+}
+
+export const DEFAULT_IMAGE_CONFIG: ImageModelConfig = {
+  mode: 'auto',
+  vae: null,
+  tae: null,
+  clipL: null,
+  clipG: null,
+  t5xxl: null,
+  llm: null,
+  llmVision: null,
+  loraDir: null,
+  width: 1024,
+  height: 1024,
+  steps: 20,
+  cfgScale: 7,
+  sampler: 'euler',
+  clipOnCpu: false,
+  vaeTiling: false,
+  flashAttention: false,
+  offloadToCpu: false
+}
+
+export interface ImageCompanionRef {
+  id: string
+  name: string
+  path: string
+}
+
+export interface ImageCompanions {
+  vaes: ImageCompanionRef[]
+  textEncoders: ImageCompanionRef[]
+  projectors: ImageCompanionRef[]
+  loras: ImageCompanionRef[]
+}
+
+export type ImageHostStatus = 'unloaded' | 'loading' | 'ready' | 'generating' | 'error'
+
+export interface ImageProgress {
+  stage: string
+  detail: string
+  completed: number | null
+  total: number | null
+  elapsedMs: number
+}
+
+export interface ImageHostState {
+  status: ImageHostStatus
+  residency: 'ephemeral' | 'resident'
+  modelId: string | null
+  modelName: string | null
+  pid: number | null
+  startedAt: number | null
+  version: string | null
+  args: string[]
+  busyCount: number
+  progress: ImageProgress | null
+  error: string | null
+  log: string[]
+}
+
+export interface ImageGenerateRequest {
+  modelId?: string | null
+  prompt: string
+  negativePrompt?: string
+  width?: number
+  height?: number
+  steps?: number
+  cfgScale?: number
+  seed?: number
+  sampler?: string
+  name?: string
+  originTool?: string
+  sessionId?: string
+  contextTitle?: string
+}
+
+export interface ImageEditRequest extends ImageGenerateRequest {
+  sourceAssetId: string
+  maskAssetId?: string
+}
+
+export interface GeneratedImageResult {
+  asset: AssetMeta
+  seed: number | null
+  width: number
+  height: number
+  modelId: string
+  durationMs: number
+}
+
+export interface ImageHistoryEntry {
+  id: string
+  createdAt: number
+  kind: 'generate' | 'edit'
+  prompt: string
+  negativePrompt?: string | null
+  modelId: string
+  modelName: string
+  assetId: string
+  sourceAssetId?: string | null
+  width: number
+  height: number
+  steps: number
+  cfgScale: number
+  seed: number | null
+  sampler?: string | null
+  durationMs: number
+  contextTitle?: string | null
+  originTool?: string | null
+}
+
+export interface ImageContextSnippet {
+  id: string
+  label: string
+  text: string
+}
+
+export interface ImagePromptContext {
+  title: string
+  subject?: string
+  suggestedPrompt?: string
+  snippets: ImageContextSnippet[]
+}
 
 
 
@@ -86,6 +256,8 @@ export interface HubModel {
   architecture: string | null
   contextLength: number | null
   gated: boolean
+  family?: HubFamily
+  pipelineTag?: string | null
 }
 
 export interface HubFile {
@@ -95,6 +267,16 @@ export interface HubFile {
 }
 
 export type DownloadState = 'queued' | 'downloading' | 'paused' | 'done' | 'failed'
+
+export type CompanionRole = 'model' | 'vae' | 'tae' | 'clipL' | 'clipG' | 't5xxl' | 'llm' | 'llmVision' | 'lora' | 'other'
+
+export interface DownloadBundleFile {
+  repo: string
+  file: string
+  size?: number
+  targetRel?: string
+  role?: CompanionRole
+}
 
 export interface DownloadItem {
   id: string
@@ -110,6 +292,9 @@ export interface DownloadItem {
   error: string | null
   path: string | null
   startedAt: number
+  files?: DownloadBundleFile[]
+  imageConfig?: Partial<ImageModelConfig>
+  targetModelId?: string
 }
 
 export interface ChatServerStatus {
@@ -700,11 +885,22 @@ export interface PromptCost {
   modules: Record<string, number>
 }
 
+export interface PromptSection {
+  id: string
+  sourceId: string
+  label: string
+  detail: string
+  tokens: number
+  text: string
+  kind: 'instruction' | 'tool'
+}
+
 export interface PromptView {
   text: string
   tokens: number | null
   format: string
   note: string | null
+  sections?: PromptSection[]
 }
 
 export interface ContextUsage {
@@ -755,6 +951,8 @@ export interface SessionMeta {
   thinking?: ThinkingLevel | null
   toolChoice?: ToolChoiceMode | null
   probe?: { subject: string; pageId: string } | null
+  scene?: SessionSceneBinding | null
+  dmMode?: boolean
   createdAt: number
   updatedAt: number
 }
@@ -1217,15 +1415,6 @@ export interface EngineStatus {
   restarts: number
 }
 
-export type OverlayMode = 'button' | 'toolbar' | 'panel'
-export type OverlayPanel = 'chat' | 'dashboard'
-
-export interface OverlayState {
-  mode: OverlayMode
-  panel: OverlayPanel | null
-  anchor: { right: boolean; bottom: boolean }
-}
-
 export type ViewId = string
 
 export interface ScreenPoint {
@@ -1413,9 +1602,6 @@ export interface Settings {
   modelFolders: string[]
   ambientBackground: boolean
   lastView: ViewId
-  overlayEnabled: boolean
-  hotkey: string
-  overlayPosition: ScreenPoint | null
   startWithWindows: boolean
   droppedPictures: DropPrefs
   problems: ProblemPrefs
@@ -1885,4 +2071,21 @@ export interface BoardMessage {
   text: string
   at: number
   editedAt: number | null
+}
+
+export interface AttributionEntry {
+  id: string
+  name: string
+  category: string
+  license: string
+  url?: string
+  usedFor: string
+  attribution?: string
+  source?: string
+  moduleId?: string
+}
+
+export interface ResolvedAttribution extends AttributionEntry {
+  moduleName?: string
+  moduleDisabled?: boolean
 }

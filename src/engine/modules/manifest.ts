@@ -1,4 +1,4 @@
-import type { ModuleActionDef, ModuleKind, ModuleSettingDef, PageTypeInfo, PanelTabInfo, ToolPermission } from '@shared/types'
+import type { AttributionEntry, ModuleActionDef, ModuleKind, ModuleSettingDef, PageTypeInfo, PanelTabInfo, ToolPermission } from '@shared/types'
 import { API_VERSION } from './sdk'
 
 export interface McpConfig {
@@ -21,6 +21,7 @@ export interface Manifest {
   kind: ModuleKind
   needsWorkspace: boolean
   always: boolean
+  defaultOff: boolean
   toolless: boolean
   permission: ToolPermission
   toolPermissions: Record<string, ToolPermission>
@@ -30,6 +31,7 @@ export interface Manifest {
   pages: PageTypeInfo[]
   presentations: TemplateSpec[]
   dependencies: string[]
+  attributions: AttributionEntry[]
   mcp: McpConfig | null
 }
 
@@ -181,6 +183,31 @@ function mcpOf(raw: Record<string, unknown>): McpConfig {
   }
 }
 
+function attributionsOf(value: unknown, moduleId: string): AttributionEntry[] {
+  if (!Array.isArray(value)) return []
+  const out: AttributionEntry[] = []
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue
+    const a = raw as Record<string, unknown>
+    const name = typeof a.name === 'string' ? a.name.trim() : ''
+    const usedFor = typeof a.usedFor === 'string' ? a.usedFor.trim() : ''
+    if (!name || !usedFor) continue
+    const id = typeof a.id === 'string' && a.id.trim() ? a.id.trim() : `${moduleId}:${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+    out.push({
+      id,
+      name,
+      category: typeof a.category === 'string' && a.category.trim() ? a.category.trim() : 'Module',
+      license: typeof a.license === 'string' && a.license.trim() ? a.license.trim() : 'Notice',
+      ...(typeof a.url === 'string' && a.url.trim() ? { url: a.url.trim() } : {}),
+      usedFor,
+      ...(typeof a.attribution === 'string' && a.attribution.trim() ? { attribution: a.attribution.trim() } : {}),
+      source: `module:${moduleId}`,
+      moduleId
+    })
+  }
+  return out
+}
+
 export function parseManifest(input: unknown, folderName: string, builtin: boolean): Manifest {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('module.json must be a JSON object')
   const raw = input as Record<string, unknown>
@@ -205,6 +232,7 @@ export function parseManifest(input: unknown, folderName: string, builtin: boole
     kind,
     needsWorkspace: raw.needsWorkspace === true,
     always: raw.always === true,
+    defaultOff: raw.defaultOff === true,
     toolless: raw.tools === false,
     permission,
     toolPermissions,
@@ -212,6 +240,7 @@ export function parseManifest(input: unknown, folderName: string, builtin: boole
     actions: actionsOf(raw.actions),
     presentations: presentationsOf(raw.presentations),
     dependencies: Array.isArray(raw.dependencies) ? [...new Set(raw.dependencies.filter((d): d is string => typeof d === 'string' && ID_PATTERN.test(d) && d !== id))] : [],
+    attributions: attributionsOf(raw.attributions, id),
     panel: panelOf(raw.panel, typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : id),
     pages: pagesOf(raw.kinds ?? raw.pages, raw.view, raw.panel, id, typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : id),
     mcp: kind === 'mcp' ? mcpOf((raw.mcp && typeof raw.mcp === 'object' ? raw.mcp : raw) as Record<string, unknown>) : null

@@ -3,6 +3,17 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { killTree } from './tools/shell'
+import { registerAttribution } from './credits'
+
+registerAttribution({
+  id: 'piper-tts',
+  name: 'Piper TTS',
+  category: 'Voice',
+  license: 'MIT',
+  url: 'https://github.com/rhasspy/piper',
+  usedFor: 'Local offline neural text-to-speech voices in Seven.',
+  source: 'tts:piper'
+})
 
 const MAX_TEXT = 4000
 

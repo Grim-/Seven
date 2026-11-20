@@ -2,6 +2,7 @@ import { avatarRendererInfo, type Avatar } from '@shared/avatars'
 import type { SettingValues } from '@shared/settingSpec'
 import { MOODS, ACTIVITIES } from '@shared/moods'
 import type { Kind } from '../library/kinds'
+import { registerKind } from '../library/kindRegistry'
 import { storePacking } from '../library/packing'
 import { avatars } from './store'
 
@@ -68,3 +69,5 @@ export const avatarKind: Kind = {
   resolve: (ref) => avatars.find(ref)?.id ?? null,
   full: (id) => avatarText(avatars.get(id))
 }
+
+registerKind(250, avatarKind)

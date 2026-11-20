@@ -1,3 +1,4 @@
+import type { SessionSceneBinding } from '@shared/almanac'
 import type { ChatMessage, SessionMeta, TodoItem, TodoList } from '@shared/types'
 import type { SessionStore } from './store'
 import type { SessionFiles } from './files'
@@ -19,6 +20,9 @@ export const sessionAccess = {
   list(): SessionMeta[] {
     return (store?.list() ?? []).filter((s) => !s.incognito)
   },
+  get(id: string): SessionMeta | undefined {
+    return store?.list().find((s) => s.id === id)
+  },
   isIncognito(id: string | null): boolean {
     return store?.isIncognito(id) ?? false
   },
@@ -31,6 +35,10 @@ export const sessionAccess = {
   rename(id: string, title: string): void {
     if (!store) throw new Error('Chats are not available')
     store.update(id, { title: title.trim() || 'Untitled' })
+  },
+  updateScene(id: string, scene: SessionSceneBinding | null): SessionMeta {
+    if (!store) throw new Error('Chats are not available')
+    return store.update(id, { scene })
   },
   remove(id: string): void {
     if (!removeChat) throw new Error('Chats are not available')

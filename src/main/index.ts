@@ -4,8 +4,6 @@ import { EngineSupervisor } from './engine-supervisor'
 import { broadcast, createAppWindow } from './app-window'
 import { Vault } from './vault'
 import { createNotifier } from './notifications'
-import { OverlayController } from './overlay'
-import { Hotkey } from './hotkey'
 import { createTray, type SevenTray } from './tray'
 import { registerIpc } from './ipc'
 import { Gateway } from './network/gateway'
@@ -27,11 +25,6 @@ if (settings.loadError) noteMainFailure(settings.loadError, 'settings', 'Could n
 if (vaultsReadError) noteMainFailure(vaultsReadError, 'vault', 'Could not read the list of vaults, so Seven opened the default vault', 'error')
 process.on('uncaughtException', (err) => problems.add({ severity: 'error', area: 'main', ...errorReport(err) }))
 process.on('unhandledRejection', (err) => problems.add({ severity: 'error', area: 'main', ...errorReport(err) }))
-const overlay = new OverlayController(broadcast)
-const hotkey = new Hotkey(() => {
-  if (!settings.get().overlayEnabled) settings.set({ overlayEnabled: true })
-  overlay.toggle()
-})
 
 let appWindow: BrowserWindow | null = null
 let tray: SevenTray | null = null
@@ -97,7 +90,7 @@ if (!app.requestSingleInstanceLock()) {
     vault = new Vault(engine, broadcast)
     const network = new Gateway(() => engine.modelRoutes())
     gateway = network
-    const ipc = registerIpc({ engine, overlay, hotkey, vault, gateway: network, problems, showApp, quit })
+    const ipc = registerIpc({ engine, vault, gateway: network, problems, showApp, quit })
     const link = new Bridge(() => network.settings(), network.devices, network.uploads, (name, params) => engine.request(name as EngineRequestName, params as never), ipc, () => void network.refresh())
     network.attachBridge({ connected: () => link.connectedDevices(), disconnect: (deviceId) => link.disconnectDevice(deviceId) })
     bridge = link
@@ -116,10 +109,6 @@ if (!app.requestSingleInstanceLock()) {
     let previous = settings.get()
     settings.on('changed', (value) => {
       broadcast({ event: 'settings.changed', payload: value })
-      if (value.overlayEnabled !== previous.overlayEnabled) {
-        overlay.setEnabled(value.overlayEnabled)
-        tray?.refresh()
-      }
       if (value.startWithWindows !== previous.startWithWindows) applyLoginItem(value.startWithWindows)
       if (value.problems.keep !== previous.problems.keep) problems.trim()
       previous = value
@@ -132,16 +121,11 @@ if (!app.requestSingleInstanceLock()) {
     ensureAppWindow(!startHidden)
 
     const current = settings.get()
-    if (current.overlayEnabled) overlay.show()
-    const hotkeyError = hotkey.apply(current.hotkey)
-    if (hotkeyError) problems.add({ severity: 'warning', area: 'hotkey', message: `The hotkey ${current.hotkey} is not registered: ${hotkeyError}` })
     applyLoginItem(current.startWithWindows)
 
     tray = createTray({
       showApp: () => showApp(null),
       resetWindow: () => resetWindow(ensureAppWindow(true)),
-      toggleOverlay: () => settings.set({ overlayEnabled: !settings.get().overlayEnabled }),
-      isOverlayEnabled: () => settings.get().overlayEnabled,
       quit
     })
 
@@ -150,7 +134,6 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     quitting = true
-    hotkey.dispose()
     vault?.wipeCopies()
     engine.stop()
     bridge?.detach()

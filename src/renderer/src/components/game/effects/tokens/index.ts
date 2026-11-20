@@ -1,4 +1,5 @@
 import './NumberToken'
+import './DurationToken'
 import './ChoiceToken'
 import './TemplateToken'
 import './StoredActionToken'

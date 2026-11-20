@@ -61,3 +61,8 @@ export function helperOf(id: string): InstallHelper {
   if (!helper) throw new Error(`Seven has no installer called ${id}.`)
   return helper
 }
+
+/** Return metadata for every registered helper installer. */
+export function listHelpers(): { id: string; title: string; about: string }[] {
+  return [...helpers.values()].map((h) => ({ id: h.id, title: h.title, about: h.about }))
+}

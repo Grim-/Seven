@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
-import { Lock, MessageSquare, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Lock, MessageSquare, Pencil, Plus, Trash2, Unlink } from 'lucide-react'
+import { isGameplayScene } from '@shared/almanac'
 import { Button, Panel, SearchBox, DecodeText, VirtualList, askText, confirmDelete } from '../../components/ui'
 import { SearchResults } from '../../components/chat/SearchResults'
 import { AgentAvatar } from '../../components/agents/look'
+import { detachGameplaySession } from '../../components/play/gameplaySession'
 import { useSessions } from '../../store/sessions'
 import { useAgents } from '../../store/agents'
 import { useVault } from '../../store/vault'
@@ -67,6 +69,15 @@ export function ChatList({ selected, onOpen, onNew, onDeleted }: { selected: str
                       entryMenuAt(e, 'chat', s.id, s.title, [
                         { label: 'Open', icon: <MessageSquare />, onSelect: () => onOpen(s.id) },
                         { label: `New chat with ${agent?.name ?? 'this agent'}`, icon: <Plus />, onSelect: () => onNew(s.agentId) },
+                        ...(isGameplayScene(s.scene)
+                          ? [
+                              {
+                                label: 'Detach from World',
+                                icon: <Unlink />,
+                                onSelect: () => void detachGameplaySession(s.id).catch(failed('Could not detach Gameplay Chat'))
+                              }
+                            ]
+                          : []),
                         { label: 'Rename', icon: <Pencil />, onSelect: () => renameChat(s.id, s.title) },
                         { label: 'Delete', icon: <Trash2 />, danger: true, onSelect: () => remove(s.id, s.title) }
                       ])
@@ -82,6 +93,11 @@ export function ChatList({ selected, onOpen, onNew, onDeleted }: { selected: str
                         <DecodeText className="truncate pr-12 text-[13px] text-white" text={s.title} onMount={false} />
                         <span className="flex items-center gap-2 font-mono text-[10.5px] text-dim">
                           <span className="truncate text-teal/80">{agent?.name ?? 'Agent'}</span>
+                          {isGameplayScene(s.scene) && (
+                            <span className="border border-cyan/50 bg-cyan/10 px-1 text-[8.5px] font-bold uppercase tracking-wider text-cyan">
+                              GAMEPLAY
+                            </span>
+                          )}
                           {s.incognito && <IncognitoMark className="py-0" />}
                           <span>{formatRelative(s.updatedAt)}</span>
                           {waiting.has(s.id) ? <span className="animate-pulse font-bold text-accent">? needs you</span> : running[s.id] && <span className="h-1.5 w-1.5 animate-pulse bg-cyan" />}

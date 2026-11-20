@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react'
 import { FolderOpen } from 'lucide-react'
 import { DEFAULT_PORTABILITY_PREFS } from '@shared/portability'
 import { Button, Input, PathRow, SaveState, Segmented, SettingCard, SettingRow, Toggle, useDraft } from '../../components/ui'
-import { main } from '../../lib/ipc'
+import { engine, main } from '../../lib/ipc'
 import { useApp } from '../../store/app'
 import { failed } from '../../lib/notify'
 import { FolderInput } from '../../components/files/FolderInput'
@@ -87,6 +88,34 @@ function ExportImportPrefs() {
   )
 }
 
+function KindFolderRow({ row }: { row: { kind: string; label: string; plural: string; folder: string } }) {
+  const draft = useDraft(row.folder, (folder) => engine('data.kindFolders.set', { kind: row.kind, folder }))
+  return (
+    <SettingRow label={row.plural} hint={`Default folder for new ${row.plural.toLowerCase()} (e.g. ${row.kind.replace(/\./g, '_')}/). Empty uses top level.`} aside={<SaveState status={draft.status} error={draft.error} />}>
+      <div className="w-72">
+        <FolderInput value={draft.draft} onChange={draft.change} />
+      </div>
+    </SettingRow>
+  )
+}
+
+function KindFolders() {
+  const [rows, setRows] = useState<{ kind: string; label: string; plural: string; folder: string }[]>([])
+  useEffect(() => {
+    void engine('data.kindFolders.list')
+      .then(setRows)
+      .catch(failed('Could not load kind folders'))
+  }, [])
+  if (!rows.length) return null
+  return (
+    <SettingCard title="Default folders by kind" intro="Automatically places newly created files (character sheets, cards, weather, workouts, etc.) into their own folder unless you pick one explicitly.">
+      {rows.map((row) => (
+        <KindFolderRow key={row.kind} row={row} />
+      ))}
+    </SettingCard>
+  )
+}
+
 export function FilesFolders() {
   const info = useApp((s) => s.info)
   return (
@@ -99,6 +128,7 @@ export function FilesFolders() {
         </PathRow>
         <ToolFolders />
       </SettingCard>
+      <KindFolders />
       <ModelFolders />
       <LinkedFolders />
       <DroppedPictures />

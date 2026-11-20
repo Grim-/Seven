@@ -23,4 +23,4 @@ export class StartCombat extends WorldPiece {
 }
 
 registerComponent(StartCombat)
-registerLegacyTriggerAction('start_combat', (p) => [{ type: StartCombat.type, creature: '' }])
+registerLegacyTriggerAction('start_combat', () => [{ type: StartCombat.type, creature: '' }])

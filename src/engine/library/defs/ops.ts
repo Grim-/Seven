@@ -1,43 +1,39 @@
 import { notFound } from '@shared/errors'
-import { stripRef, toId } from '@shared/ids'
+import { compactId, stripRef, toId } from '@shared/ids'
 import { referencePattern, splitLink, withoutTitle } from '@shared/text'
 import { pageKindOf, type EntryPreview, type EntryViewData, type KindInfo, type KindLinkActionInfo, type LibrarySection, type ViewRef } from '@shared/types'
 import MiniSearch from 'minisearch'
 import { agentAccess } from '../../agents/access'
-import { avatarKind } from '../../avatars/kind'
+import '../../avatars/kind'
 import { data } from '../../data/hub'
 import { setWidgetKinds } from '../../data/widgetSources'
 import { timeline } from '../../timeline/store'
 import { ToolError } from '../../tools/types'
 import { noteFailure } from '../../util/report'
 import { fieldText, resolveIncludes } from '../includes'
-import { moduleKinds } from '../moduleKinds'
+import { ownedKinds, type OwnedKind } from '../kindRegistry'
+import { modules } from '../../modules/registry'
+import { moduleOnForAgent } from '../../modules/isOn'
 import { matchesWhere, parseQuery, scoreDoc } from '../query'
 import { cleanTag, splitTags, tags as tagStore } from '../tags'
-import { chatKind, dayKind, messageKind, reminderKind, routineKind, scriptKind, storyKind, themeKind, weblogKind } from './activity'
-import { agentKind, commandKind, memoryKind, skillKind, styleKind, thoughtKind } from './agents'
-import { addonKinds, boardKind, exerciseKind, fileKind, folderKind, pageKind, repoKind, sheetKind, slideshowKind, workoutEntryKind } from './content'
+import './activity'
+import './agents'
+import './content'
 import { setKindRuntime } from './runtime'
 import { accessOf, checkPart, clip, kindFlags, USER, type FindOptions, type FindResult, type Hit, type Kind, type KindChild, type KindChildInput, type KindContext, type KindHit, type TrailStep } from './types'
-import { factionKind, lootTableKind, mapKind, nexusKinds, objectKind, placeKind, triggerActionKind, worldKind } from './worlds'
-
-function withNexus(list: Kind[]): Kind[] {
-  const taken = new Set(list.map((k) => k.kind))
-  const claimed = new Set(list.flatMap((k) => (k.worldType ? [k.worldType] : [])))
-  const at = list.indexOf(worldKind)
-  return [...list.slice(0, at + 1), ...nexusKinds(taken, claimed), ...list.slice(at + 1)]
-}
+import './worlds'
 
 function everyKind(): Kind[] {
-  return withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, chatKind, agentKind, themeKind, avatarKind, memoryKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
+  return ownedKinds().map((o) => o.kind)
 }
 
-export function kinds(ctx: KindContext = USER): Kind[] {
+function resolvable(ctx: KindContext): OwnedKind[] {
   const hidden = new Set(accessOf(ctx).hidden)
-  return everyKind().filter((k) => {
-    if (hidden.has(k.kind)) return false
+  return ownedKinds().filter(({ kind, module }) => {
+    if (module && !modules.isOn(module)) return false
+    if (hidden.has(kind.kind)) return false
     try {
-      return k.available(ctx)
+      return kind.available(ctx)
     } catch (err) {
       noteFailure(err, 'library', 'Could not check whether a kind is available')
       return false
@@ -45,8 +41,22 @@ export function kinds(ctx: KindContext = USER): Kind[] {
   })
 }
 
+function onForAgent(module: string | null, agentId: string | null): boolean {
+  return !module || moduleOnForAgent(module, agentId)
+}
+
+export function kinds(ctx: KindContext = USER): Kind[] {
+  return resolvable(ctx).map((o) => o.kind)
+}
+
+export function kindsOwnedBy(module: string | null): Kind[] {
+  return ownedKinds()
+    .filter((o) => o.module === module && (!o.module || modules.isOn(o.module)))
+    .map((o) => o.kind)
+}
+
 export function allKinds(): { kind: string; label: string; description: string; short: string; rollable: boolean; parts: { name: string; description: string }[]; linkActions: KindLinkActionInfo[] }[] {
-  const list = withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, agentKind, themeKind, avatarKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind, dayKind, routineKind])
+  const list = kinds(USER).filter((k) => k.inKindList !== false)
   const shortOf = (k: Kind) => {
     const label = k.label.toLowerCase()
     return /^[a-z][\w-]*$/.test(label) && !list.some((o) => o !== k && (o.kind === label || o.label.toLowerCase() === label)) ? label : k.kind
@@ -62,7 +72,7 @@ export function hiddenActions(agentId: string): Set<string> {
   const incognito = agentAccess.get(agentId)?.incognito === true
   const out = new Set<string>()
   if (!hidden.size && !incognito) return out
-  for (const k of withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds(), worldKind, mapKind, placeKind, objectKind, factionKind, triggerActionKind, lootTableKind, storyKind, scriptKind, skillKind, reminderKind, agentKind, themeKind, avatarKind, thoughtKind, styleKind, boardKind, messageKind, weblogKind, commandKind])) if (hidden.has(k.kind) || (incognito && k.lasting)) for (const a of k.actions) out.add(a)
+  for (const k of everyKind()) if (!k.actionsStayWhenHidden && (hidden.has(k.kind) || (incognito && k.lasting))) for (const a of k.actions) out.add(a)
   return out
 }
 
@@ -297,10 +307,16 @@ export function find(query: string, kindName: string | string[] | null, limit = 
 
 function byName(k: Kind, ref: string, ctx: KindContext): string | null {
   const raw = stripRef(ref)
+  const rawLower = raw.toLowerCase()
   const id = toId(raw)
   if (!id || k.resolveOnly) return null
   try {
-    return k.search('', 100_000, ctx).find((h) => h.id === raw || toId(h.title) === id || toId(h.id) === id)?.id ?? null
+    const all = k.search('', 100_000, ctx)
+    const exact = all.find((h) => h.id === raw || h.id.toLowerCase() === rawLower || toId(h.title) === id || toId(h.id) === id)
+    if (exact) return exact.id
+    const compact = compactId(raw)
+    if (!compact) return null
+    return all.find((h) => compactId(h.id) === compact || compactId(h.title) === compact)?.id ?? null
   } catch (err) {
     noteFailure(err, 'library', 'Could not look up an entry by name')
     return null
@@ -568,7 +584,7 @@ export function rollText(text: string, ctx: KindContext = USER, depth = 0): { te
   return { text: out, rolled }
 }
 
-export function libraryGuide(toolNames: string[], agentId: string | null = null): string {
+export function libraryGuide(toolNames: string[], agentId: string | null = null, guideLink: (module: string) => string | null = () => null): string {
   if (!toolNames.includes('read_kind')) return ''
   const mine = new Set(toolNames)
   const lines = [
@@ -579,7 +595,16 @@ export function libraryGuide(toolNames: string[], agentId: string | null = null)
     'Everything that holds other things is a path the same way. Reading one lists what is inside it, each with its path: @world:my_world lists its maps, @world:my_world/the_map the places, objects and characters on that map, @world:my_world/the_map/the_village what is inside that place. Copy the paths you are given; each one goes a level deeper.'
   ]
   if (mine.has('draw')) lines.push('Draw in replies and pages with a ```svg block (one <svg> element, no scripts or outside links); draw saves one as a file. A ```mermaid block draws a flowchart, sequence diagram or timeline. ![name](seven:file/<id>) puts a library picture in a page.')
-  for (const k of kinds({ agentId, user: false })) lines.push(`- @${k.kind}: ${k.label}, ${k.description}${mine.has('show') && k.parts.length > 1 ? `. Parts: ${k.parts.map((p) => `#${p}`).join(', ')}` : ''}`)
+  const groups = new Map<string, OwnedKind[]>()
+  for (const o of resolvable({ agentId, user: false })) if (onForAgent(o.module, agentId)) groups.set(o.kind.group, [...(groups.get(o.kind.group) ?? []), o])
+  for (const [group, list] of groups) {
+    const links = [...new Set(list.flatMap((o) => (o.module ? [o.module] : [])))].flatMap((m) => {
+      const link = guideLink(m)
+      return link ? [link] : []
+    })
+    lines.push(`### ${group}${links.length ? ` (${links.join(', ')})` : ''}`)
+    for (const { kind } of list) lines.push(`- @${kind.kind}: ${kind.description}`)
+  }
   return lines.join('\n')
 }
 
@@ -622,14 +647,12 @@ export function kindOf(entry: string, ctx: KindContext = USER): { kind: Kind; id
   return resolveEntry(entry, null, ctx)
 }
 
-const pageBackedLists = (): Kind[] => withNexus([pageKind, folderKind, sheetKind, slideshowKind, repoKind, ...addonKinds(), fileKind, workoutEntryKind, exerciseKind, ...moduleKinds()])
-
 export function kindOfPageType(type: string | null | undefined): string {
-  return pageBackedLists().find((k) => k.pageTypes?.includes(type ?? ''))?.kind ?? pageKindOf(type)
+  return everyKind().find((k) => k.pageTypes?.includes(type ?? ''))?.kind ?? pageKindOf(type)
 }
 
 export function isPageBacked(kind: string): boolean {
-  return pageBackedLists().some((k) => k.kind === kind && Boolean(k.pageTypes))
+  return everyKind().some((k) => k.kind === kind && Boolean(k.pageTypes))
 }
 
 setKindRuntime({

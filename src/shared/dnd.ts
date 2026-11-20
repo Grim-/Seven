@@ -238,6 +238,15 @@ export function hitDiceCount(d: DndStats): number {
   return m ? Number(m[1]) : d.level
 }
 
+export function spendHitDice(d: DndStats, count: number, roll: (sides: number) => number): Partial<DndStats> {
+  const sides = Number(/d(\d+)/.exec(d.hitDice.total)?.[1] ?? 0)
+  const n = Math.min(Math.max(0, Math.floor(count)), hitDiceCount(d) - d.hitDice.used)
+  if (!sides || n <= 0) return {}
+  let total = 0
+  for (let i = 0; i < n; i++) total += Math.max(0, roll(sides) + mod(d.stats.con))
+  return { hp: { ...d.hp, cur: Math.min(d.hp.max, Math.max(0, d.hp.cur) + total) }, hitDice: { ...d.hitDice, used: d.hitDice.used + n } }
+}
+
 export function longRest(d: DndStats): Partial<DndStats> {
   return {
     hp: { ...d.hp, cur: d.hp.max, temp: 0 },

@@ -70,6 +70,7 @@ export function CardFace({ name, label, layout, values, color, art = null, promp
       foot={at('footer').map((f) => `${f.label} ${shown(values[f.id])}`).join(' · ') || undefined}
       color={color ?? layout.color}
       edit={edit}
+      expandable={!edit}
       className={cn('card-face', className)}
     />
   )

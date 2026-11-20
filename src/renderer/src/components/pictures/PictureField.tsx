@@ -1,4 +1,4 @@
-import { Images, ImagePlus, X } from 'lucide-react'
+import { Aperture, Images, ImagePlus, X } from 'lucide-react'
 import { Button } from '../ui'
 import { AssetMedia } from './AssetMedia'
 import type { PictureOptions } from '../data/PicturePicker'
@@ -6,7 +6,8 @@ import { usePicturePick } from './usePicturePick'
 import { cn } from '../../lib/cn'
 
 export function PictureField({ value, onChange, options = {}, large = false, clearable = true }: { value: string | null; onChange: (id: string | null) => void; options?: PictureOptions; large?: boolean; clearable?: boolean }) {
-  const { fromSeven, fromDisk } = usePicturePick(value, onChange, options)
+  const { fromSeven, fromDisk, fromGenerate } = usePicturePick(value, onChange, options)
+  const canGenerate = !options.kinds || options.kinds.includes('image')
   return (
     <div className={cn('flex gap-2', large ? 'flex-col' : 'items-center')}>
       {(value || large) && (
@@ -14,13 +15,18 @@ export function PictureField({ value, onChange, options = {}, large = false, cle
           {value ? <AssetMedia id={value} className="h-full w-full" /> : <span className="text-[12px] text-faint">No picture yet</span>}
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <Button size="sm" variant="secondary" icon={<Images />} onClick={fromSeven}>
-          Use image from Seven
+          Library
         </Button>
         <Button size="sm" variant="secondary" icon={<ImagePlus />} onClick={fromDisk}>
-          Use image from…
+          Upload
         </Button>
+        {canGenerate && (
+          <Button size="sm" variant="secondary" icon={<Aperture />} onClick={fromGenerate}>
+            Generate
+          </Button>
+        )}
         {value && clearable && (
           <Button size="sm" variant="ghost" icon={<X />} onClick={() => onChange(null)}>
             Clear

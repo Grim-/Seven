@@ -4,7 +4,6 @@ import { parseDecisions } from '@shared/decisions'
 import { smallestAt } from '@shared/shapes'
 import { showName } from '@shared/ids'
 import { defaultDialogueTree } from '@shared/game/dialogue'
-import { combatantFromVisitor } from '@shared/game/state/BattleStateMachine'
 import type { MenuItem } from '../ui'
 import { engine } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
@@ -20,25 +19,10 @@ function engageItem(ctx: TokenContext): MenuItem {
   return {
     label: 'Engage Combat',
     icon: <Swords className="h-4 w-4 text-accent" />,
-    onSelect: () =>
-      ctx.approach(() => {
-        const mine = ctx.tokens.find((tok) => tok.visitor.sheet === ctx.player)
-        const playerCombatant = mine
-          ? combatantFromVisitor(mine.visitor, mine.at, true)
-          : {
-              id: ctx.player ?? 'player',
-              sheet: ctx.player ?? undefined,
-              name: 'Player Character',
-              isPlayer: true,
-              hp: { cur: 12, max: 12 },
-              ac: 14,
-              speedMax: 30,
-              at: t.at,
-              attacks: [{ name: 'Strike', bonus: 4, damage: '1d8 + 2' }],
-              faction: 'player'
-            }
-        useGameState.getState().startBattle([playerCombatant, combatantFromVisitor(t.visitor, t.at, false)])
-      })
+    onSelect: () => {
+      if (!ctx.player) return
+      ctx.approach(() => void useGameState.getState().startBattle(ctx.player!, [t.visitor.token || t.visitor.sheet]))
+    }
   }
 }
 
@@ -71,9 +55,10 @@ function withApproach(ctx: TokenContext, item: MenuItem, label: string): MenuIte
 registerTokenSourceUi('sheet', {
   items: (ctx) => {
     const v = ctx.token.visitor
+    const isSelf = Boolean(ctx.player && v.sheet === ctx.player)
     return [
-      ...(v.sheet !== ctx.player ? otherItems(ctx) : []),
-      { label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(`@sheet:${v.sheet}`, v.agent ? [v.agent] : []) },
+      ...(!isSelf ? otherItems(ctx) : []),
+      ...(!isSelf ? [{ label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(`@sheet:${v.sheet}`, v.agent ? [v.agent] : []) }] : []),
       ...parseActions(ctx.standing.actions).map((a, i) => withApproach(ctx, actionItems(ctx.holder, a, i)[0], a.attempt)),
       ...parseDecisions(ctx.standing.decisions).map((d, i) => withApproach(ctx, decisionItems(ctx.holder, d, i, null)[0], d.question)),
       ...(ctx.editing ? newPlayItems(ctx.holder) : []),

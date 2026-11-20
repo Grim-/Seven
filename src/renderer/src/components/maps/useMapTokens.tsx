@@ -67,7 +67,7 @@ export function useMapTokens({ world, use, places, player, editing, save, onSele
     onSelect
   })
   const items = (t: MapToken): MenuItem[] => [
-    ...(onWalk ? [{ label: 'Move here', icon: <Footprints className="h-4 w-4 text-cyan" />, onSelect: () => onWalk(t.at) }] : []),
+    ...(onWalk && t.visitor.sheet !== player ? [{ label: 'Move here', icon: <Footprints className="h-4 w-4 text-cyan" />, onSelect: () => onWalk(t.at) }] : []),
     ...(tokenSourceUi(t.visitor.source)?.items(context(t)) ?? []),
     ...(editing ? [{ label: 'Take off this map', icon: <LogOut />, danger: true, onSelect: () => setStanding(t.visitor.token, null) }] : [])
   ]

@@ -1,21 +1,10 @@
-import type { Kind, KindContext } from './kinds'
-import { modules } from '../modules/registry'
-import { agentAccess } from '../agents/access'
+import type { Kind } from './kinds'
 import { contribute } from '../modules/contributions'
+import { registerKind } from './kindRegistry'
 
-const registered = new Map<string, { module: string; kind: Kind }>()
+const MODULE_KIND_ORDER = 100
 
-export function registerModuleKind(module: string, kind: Kind): void {
-  registered.set(kind.kind, { module, kind })
+export function registerModuleKind(module: string, kind: Kind, order = MODULE_KIND_ORDER): void {
+  registerKind(order, kind, module)
   contribute(module, 'Kind', kind.plural)
-}
-
-function moduleOn(module: string, ctx: KindContext): boolean {
-  if (!modules.isOn(module)) return false
-  if (ctx.user || !ctx.agentId || ctx.agentId === '_any') return true
-  return agentAccess.get(ctx.agentId)?.modules.includes(module) === true
-}
-
-export function moduleKinds(): Kind[] {
-  return [...registered.values()].map(({ module, kind }) => ({ ...kind, available: (ctx: KindContext) => moduleOn(module, ctx) && kind.available(ctx) }))
 }

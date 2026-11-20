@@ -79,8 +79,10 @@ export class Input {
   }
 
   private boundAt(screen: Point): Bound | null {
-    let target: Container | null = this.app.renderer.events.rootBoundary.hitTest(screen.x, screen.y)
-    while (target) {
+    const boundary = this.app.renderer?.events?.rootBoundary
+    if (!boundary?.rootTarget || boundary.rootTarget.destroyed) return null
+    let target: Container | null = boundary.hitTest(screen.x, screen.y)
+    while (target && !target.destroyed) {
       const found = this.bound.get(target)
       if (found) return found
       target = target.parent

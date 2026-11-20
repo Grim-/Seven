@@ -18,6 +18,10 @@ export interface StoredFaction {
   description: string
   defaultStance: FactionStance
   relations: Record<string, FactionStance>
+  /** Optional named standalone character sheets affiliated with this faction. */
+  members?: string[]
+  /** Optional generic NPC/creature/monster blueprint refs (e.g. `dnd:bandit`, `game:guard`, `game_character:adventurer`). */
+  roster?: string[]
   tags: string[]
   updatedAt: number
 }
@@ -117,6 +121,12 @@ export function cleanStoredFaction(raw: unknown): StoredFaction | null {
       relations[toId(target)] = stance as FactionStance
     }
   }
+  const members = Array.isArray(v.members)
+    ? [...new Set(v.members.filter((m): m is string => typeof m === 'string' && Boolean(m.trim())).map((m) => m.trim().replace(/^@?sheet:/i, '')))]
+    : []
+  const roster = Array.isArray(v.roster)
+    ? [...new Set(v.roster.filter((r): r is string => typeof r === 'string' && Boolean(r.trim())).map((r) => r.trim()))]
+    : []
   const tags = Array.isArray(v.tags) ? v.tags.filter((t): t is string => typeof t === 'string' && Boolean(t.trim())).map((t) => t.trim().toLowerCase()) : []
   return {
     id,
@@ -124,6 +134,8 @@ export function cleanStoredFaction(raw: unknown): StoredFaction | null {
     description: str(v.description),
     defaultStance,
     relations,
+    ...(members.length ? { members } : {}),
+    ...(roster.length ? { roster } : {}),
     tags,
     updatedAt: typeof v.updatedAt === 'number' ? v.updatedAt : Date.now()
   }
@@ -131,10 +143,14 @@ export function cleanStoredFaction(raw: unknown): StoredFaction | null {
 
 export function storedFactionText(f: StoredFaction): string {
   const relationRows = Object.entries(f.relations).map(([target, stance]) => `- @faction:${target}: ${stance.toUpperCase()}`)
+  const memberRows = (f.members ?? []).map((m) => `- @sheet:${m}`)
+  const rosterRows = (f.roster ?? []).map((r) => `- ${r}`)
   return [
     `# ${f.name} (@faction:${f.id})`,
     f.description.trim(),
     `Default diplomatic stance towards others: **${f.defaultStance.toUpperCase()}**`,
+    memberRows.length ? `### Named Character Sheets:\n${memberRows.join('\n')}` : '',
+    rosterRows.length ? `### Typical NPC / Creature Roster:\n${rosterRows.join('\n')}` : '',
     relationRows.length ? `### Known Relations:\n${relationRows.join('\n')}` : '### Known Relations:\nNo specific faction overrides recorded; uses default stance.',
     f.tags.length ? `Tags: #${f.tags.join(' #')}` : ''
   ]

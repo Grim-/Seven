@@ -15,9 +15,10 @@ export function pickWith(e: PickKeys, id: string, now: Picking & { selected: str
     return { picked: base.includes(id) ? base.filter((x) => x !== id) : [...base, id], anchor: id }
   }
   if (!e.shiftKey) return null
-  const from = now.order.indexOf(now.anchor ?? now.selected ?? '')
   const to = now.order.indexOf(id)
-  if (from < 0 || to < 0) return null
+  if (to < 0) return null
+  const from = now.order.indexOf(now.anchor ?? now.selected ?? '')
+  if (from < 0) return { picked: [id], anchor: id }
   const [a, b] = from < to ? [from, to] : [to, from]
-  return { picked: now.order.slice(a, b + 1), anchor: now.anchor ?? now.selected }
+  return { picked: now.order.slice(a, b + 1), anchor: now.anchor ?? now.selected ?? id }
 }

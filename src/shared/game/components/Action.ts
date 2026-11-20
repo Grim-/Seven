@@ -28,16 +28,19 @@ export interface UseContext {
   collect?: (result: EffectResult) => void
   runStored?: (id: string, event: ActionEvent) => boolean
   view?: (event: ViewEvent) => void
+  grantMovement?: (feet: number) => void
 }
 
 export interface ActionEvent extends UseContext {
   action: Action
+  crit?: boolean
   [extra: string]: unknown
 }
 
 export function actionValue(formula: string, event: UseContext & { [extra: string]: unknown }, seed: string): number {
   let n = 0
   const read = (who: GameEntity | null, stat: string) => (who ? who.comp(Stats)?.value(stat) : undefined)
+  const mult = event.crit === true ? 2 : 1
   return evaluate(formula, {
     value: (name) => {
       if (name === 'distance') return event.distance
@@ -49,10 +52,49 @@ export function actionValue(formula: string, event: UseContext & { [extra: strin
     },
     dice: (count, sides) => {
       let total = 0
-      for (let i = 0; i < count; i++) total += rollInt(event.user.uid, `${seed}:${n++}`, 1, sides)
+      const rolls = Math.max(0, count * mult)
+      for (let i = 0; i < rolls; i++) total += rollInt(event.user.uid, `${seed}:${n++}`, 1, sides)
       return total
     }
   })
+}
+
+/** Deterministic expected midpoint of a formula using average dice values for AI/tactical scoring. */
+export function expectedActionValue(formula: string, ctx: UseContext & { [extra: string]: unknown }): number {
+  const read = (who: GameEntity | null, stat: string) => (who ? who.comp(Stats)?.value(stat) : undefined)
+  try {
+    return evaluate(formula, {
+      value: (name) => {
+        if (name === 'distance') return ctx.distance
+        const [who, stat] = name.split('.')
+        if (who === 'user') return read(ctx.user, stat)
+        if (who === 'target') return read(ctx.target, stat)
+        const v = ctx[name]
+        return typeof v === 'number' ? v : undefined
+      },
+      dice: (count, sides) => count * ((sides + 1) / 2)
+    })
+  } catch {
+    return 0
+  }
+}
+
+/** Returns true if any piece inside an Action belongs to the given EffectGroup (e.g. HARM). */
+export function actionHasGroup(action: Action, group: EffectGroup): boolean {
+  return action.pieces().some((p) => (p.constructor as typeof ActionPiece).GROUP === group)
+}
+
+/** Sums the tactical score of pieces listening to a given event lane inside an Action. */
+export function chainScore(action: Action | null, signal: string, ctx: UseContext): number {
+  if (!action || !signal) return 0
+  return action
+    .pieces()
+    .filter((p) => String(p.params.on) === signal)
+    .reduce((sum, p) => {
+      const pick = (p.constructor as typeof ActionPiece).AIMS ? WHO[String(p.params.who)] : undefined
+      const targeted: UseContext = pick ? { ...ctx, target: pick({ ...ctx, action }) } : ctx
+      return sum + p.score(targeted)
+    }, 0)
 }
 
 export abstract class Action extends Component {
@@ -129,12 +171,12 @@ export abstract class ActionPiece extends Component {
 
   abstract handle(event: ActionEvent): void
 
-  next(event: ActionEvent): void {
-    this.branch(event, String(this.params.emit))
+  next(event: ActionEvent, extra: Partial<ActionEvent> = {}): void {
+    this.branch(event, String(this.params.emit), extra)
   }
 
-  branch(event: ActionEvent, name: string): void {
-    if (name) this.action?.emit(name, { ...this.original(event) })
+  branch(event: ActionEvent, name: string, extra: Partial<ActionEvent> = {}): void {
+    if (name) this.action?.emit(name, { ...this.original(event), ...extra })
   }
 
   seed(event: ActionEvent): string {

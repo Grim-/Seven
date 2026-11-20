@@ -2,7 +2,7 @@ import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
-import { CHANGES_KEY, PLACE_TYPE, PLACE_TYPE_KEY, STARTER_SCHEMA, inspectSchema, normalEntity, withPlaces, worldId, type WorldChanges, type WorldEntity, type WorldMeta, type WorldPost, type WorldSchema, type WorldType } from '@shared/world'
+import { CHANGES_KEY, PLACE_TYPE, PLACE_TYPE_KEY, STARTER_SCHEMA, cleanWorldLaunch, inspectSchema, normalEntity, worldId, type WorldChanges, type WorldEntity, type WorldLaunch, type WorldMeta, type WorldPost, type WorldSchema, type WorldType } from '@shared/world'
 import { dataRoot } from '../util/paths'
 import { readJson, removePath, writeJson } from '../util/fs'
 import { cleanMap, cleanMapUses, cleanShapes, type JourneyEntry, type JourneyKind, type Standing, type WorldMapUse } from '@shared/maps'
@@ -46,7 +46,7 @@ class WorldStore extends EventEmitter {
     return path.join(ROOT, id)
   }
 
-  private manifest(id: string): { name: string; updatedAt: number; player?: string | null; rules?: string; tags?: unknown; flags?: Record<string, string | number | boolean> } {
+  private manifest(id: string): { name: string; updatedAt: number; player?: string | null; rules?: string; tags?: unknown; flags?: Record<string, string | number | boolean>; launch?: unknown } {
     return readJson(path.join(this.dir(id), 'manifest.json'), { name: id, updatedAt: 0 })
   }
 
@@ -90,6 +90,14 @@ class WorldStore extends EventEmitter {
     return this.meta(id)
   }
 
+  setLaunch(id: string, launch: Partial<WorldLaunch>): WorldMeta {
+    const m = this.manifest(id)
+    const next = cleanWorldLaunch({ ...cleanWorldLaunch(m.launch), ...launch })
+    writeJson(path.join(this.dir(id), 'manifest.json'), { ...m, launch: next, updatedAt: Date.now() })
+    this.emit('changed', id)
+    return this.meta(id)
+  }
+
   private touch(id: string): void {
     const m = this.manifest(id)
     writeJson(path.join(this.dir(id), 'manifest.json'), { ...m, updatedAt: Date.now() })
@@ -120,7 +128,7 @@ class WorldStore extends EventEmitter {
 
   allTypeKeys(): string[] {
     if (!fs.existsSync(ROOT)) return []
-    const out = new Set<string>()
+    const out = new Set<string>([PLACE_TYPE_KEY])
     for (const d of fs.readdirSync(ROOT, { withFileTypes: true })) {
       if (!d.isDirectory() || !this.exists(d.name)) continue
       for (const k of Object.keys(this.schema(d.name).types)) out.add(k)
@@ -140,6 +148,7 @@ class WorldStore extends EventEmitter {
       rules: typeof m.rules === 'string' ? m.rules : '',
       tags: Array.isArray(m.tags) ? m.tags.filter((t): t is string => typeof t === 'string') : [],
       flags: m.flags && typeof m.flags === 'object' ? m.flags : {},
+      launch: cleanWorldLaunch(m.launch),
       updatedAt: m.updatedAt
     }
   }
@@ -174,9 +183,12 @@ class WorldStore extends EventEmitter {
 
   schema(id: string): WorldSchema {
     if (!this.exists(id)) throw notFound(new WorldError(`There is no world "${id}"`))
-    const schema = readJson<WorldSchema>(path.join(this.dir(id), 'schema.json'), STARTER_SCHEMA)
-    const place = schema.types[PLACE_TYPE_KEY]
-    return place && !('Actions' in place.fields) ? this.splitPlaceActions(id, schema, place) : schema
+    const raw = readJson<WorldSchema>(path.join(this.dir(id), 'schema.json'), STARTER_SCHEMA)
+    const place = raw.types?.[PLACE_TYPE_KEY]
+    const migrated = place && !('Actions' in place.fields) ? this.splitPlaceActions(id, raw, place) : raw
+    if (!(PLACE_TYPE_KEY in (migrated.types ?? {}))) return migrated
+    const { [PLACE_TYPE_KEY]: _builtIn, ...customTypes } = migrated.types
+    return { ...migrated, types: customTypes }
   }
 
   private splitPlaceActions(id: string, schema: WorldSchema, place: WorldType): WorldSchema {
@@ -197,17 +209,20 @@ class WorldStore extends EventEmitter {
   }
 
   saveSchema(id: string, schema: WorldSchema): WorldMeta {
-    const check = inspectSchema(schema)
+    const { [PLACE_TYPE_KEY]: _builtIn, ...customTypes } = schema.types ?? {}
+    const clean = { ...schema, types: customTypes }
+    const check = inspectSchema(clean)
     if (check.errors.length) throw new WorldError(`The schema has problems; fix these and save it again: ${check.errors.join('; ')}`)
-    writeJson(path.join(this.dir(id), 'schema.json'), schema)
+    writeJson(path.join(this.dir(id), 'schema.json'), clean)
     this.touch(id)
     return this.meta(id)
   }
 
   type(id: string, typeKey: string): WorldType {
+    if (typeKey === PLACE_TYPE_KEY) return PLACE_TYPE
     const schema = this.schema(id)
     const t = schema.types[typeKey]
-    if (!t) throw new WorldError(`There is no type "${typeKey}". Set type to one of: ${Object.keys(schema.types).join(', ')}.`)
+    if (!t) throw new WorldError(`There is no type "${typeKey}". Set type to one of: ${[PLACE_TYPE_KEY, ...Object.keys(schema.types)].join(', ')}.`)
     return t
   }
 
@@ -329,9 +344,6 @@ class WorldStore extends EventEmitter {
   useMap(id: string, mapId: string): WorldMapUse[] {
     const targetMap = maps.get(mapId)
     if (!targetMap) throw notFound(new WorldError(`There is no map "${mapId}". find with kind map lists them.`))
-    const schema = this.schema(id)
-    const placed = withPlaces(schema)
-    if (placed !== schema) this.saveSchema(id, placed)
     const uses = this.mapUses(id)
     if (uses.some((u) => u.map === mapId)) return uses
 

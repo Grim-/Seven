@@ -29,6 +29,24 @@ export function paramsIn(parts: SentencePart[]): string[] {
   return parts.flatMap((p) => ('param' in p ? [p.param] : 'optional' in p ? paramsIn(p.optional) : []))
 }
 
+/**
+ * Renders a sentence template using the same `{var}` and `[optional ...]` syntax as ability piece sentences.
+ * Optional `[...]` groups are included only when at least one `{var}` inside them resolves to a non-empty value.
+ */
+export function renderSentenceTemplate(template: string, vars: Record<string, string>): string {
+  if (!template) return ''
+  const draw = (parts: SentencePart[]): string =>
+    parts
+      .map((p) => {
+        if ('text' in p) return p.text
+        if ('param' in p) return vars[p.param] ?? ''
+        const hasValue = paramsIn(p.optional).some((k) => Boolean((vars[k] ?? '').trim()))
+        return hasValue ? draw(p.optional) : ''
+      })
+      .join('')
+  return draw(parseSentence(template)).replace(/ {2,}/g, ' ').trim()
+}
+
 interface Described {
   PARAMS: ParamSchema
   SENTENCE?: string

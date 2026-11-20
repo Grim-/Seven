@@ -1,6 +1,5 @@
 import { entryLink } from '../../core'
 import { BUFF_TEMPLATES } from '../../templateKinds'
-import type { ActionEvent } from '../Action'
 import { Buffs, type Buff } from '../Buffs'
 import type { GameEntity } from '../../core'
 

@@ -10,6 +10,7 @@ import { copyPath, readJson, readText, removePath, renamePath, writeJson } from 
 import { DirIndex } from '../util/dirIndex'
 import { LIMITS } from '../limits'
 import { DataError, cleanFields, coerce, compare, matches, slug, validateValues } from './validate'
+import { kindFolders } from './kindFolders'
 import { scoreDoc } from '../library/query'
 
 export interface WriteContext {
@@ -566,15 +567,31 @@ export class PageStore {
   find(ref: string, accept: (p: PageMeta) => boolean = () => true): PageMeta | null {
     const raw = stripRef(ref ?? '')
     if (!raw) return null
+    const rawLower = raw.toLowerCase()
     const list = this.list()
     const id = toId(raw)
     const byPath = id ? new PageTree(list).at(id) : null
     if (byPath && accept(byPath)) return byPath
-    const byId = list.find((p) => p.id === raw && accept(p))
+    const byId =
+      list.find((p) => p.id === raw && accept(p)) ??
+      list.find((p) => (p.id.toLowerCase() === rawLower || (id !== '' && (p.id === id || toId(p.id) === id))) && accept(p))
     if (byId) return byId
     const aliases = this.aliases()
-    const alias = aliases[raw] ?? aliases[id]
-    return (alias ? list.find((p) => p.id === alias && accept(p)) : undefined) ?? null
+    const alias = aliases[raw] ?? aliases[rawLower] ?? aliases[id]
+    if (alias) {
+      const aliased = list.find((p) => p.id === alias && accept(p))
+      if (aliased) return aliased
+    }
+    if (!raw.includes('/') && id) {
+      const byTitle = list.find((p) => idSegment(p.title) === id && accept(p))
+      if (byTitle) return byTitle
+      const compact = id.replace(/[_.-]+/g, '')
+      if (compact) {
+        const byCompact = list.find((p) => (idSegment(p.id).replace(/[_.-]+/g, '') === compact || idSegment(p.title).replace(/[_.-]+/g, '') === compact) && accept(p))
+        if (byCompact) return byCompact
+      }
+    }
+    return null
   }
 
   named(ref: string): PageMeta[] {
@@ -694,7 +711,16 @@ export class PageStore {
     const title = path[0] ?? ''
     if (!title) throw new DataError('An id needs letters or numbers.')
     if (input.type === FOLDER_TYPE && input.body?.trim()) throw new DataError('A folder holds no text. Put the text in a page inside it.')
-    const parent = this.folderOf(input.parent === undefined ? this.defaultParent() : input.parent)
+    let resolvedParent: string | null
+    if (input.parent !== undefined && input.parent !== null) {
+      resolvedParent = this.folderOf(input.parent)
+    } else if (input.type && input.type !== FOLDER_TYPE) {
+      const configured = kindFolders.forKind(pageKindOf(input.type))
+      resolvedParent = configured ? this.makeFolders(configured, ctx) : this.folderOf(input.parent === undefined ? this.defaultParent() : null)
+    } else {
+      resolvedParent = this.folderOf(input.parent === undefined ? this.defaultParent() : input.parent)
+    }
+    const parent = resolvedParent
     this.checkName(title, parent, null)
     const now = Date.now()
     const id = slug(title) || 'page'
@@ -1026,18 +1052,23 @@ export class PageStore {
     return { page: data, records: records.slice(0, limit), total }
   }
 
-  search(text: string, limit = 20): PageHit[] {
+  search(text: string, limit = 20, filter?: (page: Page) => boolean): PageHit[] {
     const trimmed = text.trim()
-    const pages = this.all()
+    const pages = filter ? this.all().filter(filter) : this.all()
     if (!trimmed) return pages.slice(0, limit).map((p) => ({ id: p.id, title: p.title, snippet: summaryOf(p.body) }))
     const hits: (PageHit & { score: number })[] = []
     for (const p of pages) {
-      const fields = p.records.flatMap((r) =>
-        Object.entries(r.values).map(([name, v]) => ({
-          name,
-          value: Array.isArray(v) ? v.join(' ') : String(v ?? '')
-        }))
-      )
+      const pathStr = this.pathOf(p.id)
+      const fields = [
+        ...(pathStr && pathStr !== p.title ? [{ name: 'Path', value: pathStr }] : []),
+        { name: 'Id', value: p.id },
+        ...p.records.flatMap((r) =>
+          Object.entries(r.values).map(([name, v]) => ({
+            name,
+            value: Array.isArray(v) ? v.join(' ') : String(v ?? '')
+          }))
+        )
+      ]
       const matched = scoreDoc(trimmed, { title: p.title, labels: ['page', 'pages'], fields, body: p.body })
       if (!matched) continue
       hits.push({ id: p.id, title: p.title, snippet: matched.snippet || summaryOf(p.body), score: matched.score })

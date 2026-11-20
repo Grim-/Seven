@@ -61,6 +61,10 @@ export class TokenView {
     return this.token.visitor.sheet
   }
 
+  get key(): string {
+    return this.token.visitor.token || this.token.visitor.sheet
+  }
+
   update(token: MapToken): void {
     const moved = token.at.x !== this.token.at.x || token.at.y !== this.token.at.y
     this.token = token
@@ -142,7 +146,7 @@ export class TokenView {
     this.frame.rect(-side / 2, -side / 2, side, side)
     if (!this.portrait.visible) this.frame.fill({ color: this.engine.theme.card, alpha: 0.95 })
     this.frame.stroke({ width: 2, color: this.look.border })
-    const hp = this.token.visitor.dnd?.hp
+    const hp = this.token.visitor.hp ?? this.token.visitor.dnd?.hp
     const bars = this.bars ?? (hp ? [{ value: hp.max ? hp.cur / hp.max : 0, colour: hp.max && hp.cur / hp.max < 0.4 ? this.engine.theme.alert : this.engine.theme.cyan }] : [])
     this.bar.clear()
     bars.forEach((b, i) => drawBar(this.bar, side, BAR, b.value, b.colour, this.engine.theme.bg, i * (BAR + 1)))
@@ -156,6 +160,13 @@ export class TokenView {
     return this.side
   }
 
+  /** Visual width/height of the token in world coordinates at the current zoom. */
+  get worldSize(): number {
+    const zoom = this.zoom > 0 ? this.zoom : (this.engine.camera.zoom || 1)
+    const side = this.side > 0 ? this.side : Math.max(this.look.smallest, this.look.base * zoom)
+    return side / zoom
+  }
+
   destroy(): void {
     this.engine.tweens.cancel(this.body)
     this.engine.tweens.cancel(this.body.scale)
@@ -163,6 +174,7 @@ export class TokenView {
     this.engine.input.unbind(this.root)
     if (this.image) this.engine.assets.release(this.image)
     this.crop?.destroy(false)
+    this.root.removeFromParent()
     this.root.destroy({ children: true })
   }
 }

@@ -1,0 +1,48 @@
+{
+  "seven": "export",
+  "version": 3,
+  "protection": "none",
+  "savedAt": 1763500000000,
+  "about": {
+    "kind": "repo",
+    "label": "Repo",
+    "title": "Starter Names",
+    "also": []
+  },
+  "entries": [
+    {
+      "kind": "repo",
+      "id": "starter-names",
+      "title": "Starter Names",
+      "value": {
+        "title": "Starter Names",
+        "type": "repo",
+        "body": "",
+        "fields": [],
+        "records": [],
+        "data": {
+          "tags": [
+            "names",
+            "starter"
+          ],
+          "scope": "run",
+          "values": [
+            "Maren Lind",
+            "Callum Reyes",
+            "Sora Takahashi",
+            "Dorian Hale",
+            "Nadia Kovács",
+            "Bram Whitaker",
+            "Elena Costa",
+            "Tarek Haddad",
+            "Freya Holm",
+            "Gideon Brooks",
+            "Linnea Park",
+            "Owen Gallagher"
+          ]
+        }
+      },
+      "isDependency": false
+    }
+  ]
+}

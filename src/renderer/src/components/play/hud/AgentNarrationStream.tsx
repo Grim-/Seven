@@ -1,42 +1,73 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ChevronDown, ChevronUp, X, Radio } from 'lucide-react'
+import type { ChatMessage } from '@shared/types'
 import { useDialogue, type NarrationLogEntry } from '../dialogue/dialogueStore'
+import { useSessions } from '../../../store/sessions'
+import { Markdown } from '../../chat/Markdown'
 import { cn } from '../../../lib/cn'
 
 export interface AgentNarrationStreamProps {
+  sessionId?: string | null
   className?: string
   autoFadeMs?: number
 }
 
+function assistantTextOf(m: ChatMessage): string {
+  return m.parts
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join('')
+    .trim()
+}
+
 export function AgentNarrationStream({
+  sessionId = null,
   className,
-  autoFadeMs = 4500
+  autoFadeMs = 9000
 }: AgentNarrationStreamProps) {
   const narrationLog = useDialogue((s) => s.narrationLog)
+  const sessionMessages = useSessions((s) => (sessionId ? s.messages[sessionId] : undefined))
+  const sessionRunning = useSessions((s) => (sessionId ? Boolean(s.running[sessionId]) : false))
 
   const [visible, setVisible] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [pinned, setPinned] = useState(false)
 
-  // Filter for DM narrative announcements and environmental entries
-  const dmEntries = narrationLog.filter((e) => e.kind === 'dm' || e.kind === 'check')
+  // Prefer live assistant narration from the bound Gameplay Chat session, falling back to local dialogueStore entries
+  const dmEntries = useMemo<NarrationLogEntry[]>(() => {
+    if (sessionMessages && sessionMessages.length > 0) {
+      const fromChat = sessionMessages
+        .filter((m) => m.role === 'assistant')
+        .map((m) => ({
+          id: m.id,
+          speaker: 'DM',
+          text: assistantTextOf(m),
+          kind: 'dm' as const,
+          at: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }))
+        .filter((e) => e.text.length > 0)
+      if (fromChat.length > 0) return fromChat
+    }
+    return narrationLog.filter((e) => e.kind === 'dm' || e.kind === 'check')
+  }, [sessionMessages, narrationLog])
+
   const latestEntry: NarrationLogEntry | undefined = dmEntries[dmEntries.length - 1]
 
-  // When a new entry arrives, awaken the stream and reset the auto-fade timer
+  // Awaken stream when new narration arrives or is actively streaming; don't auto-fade while streaming
   useEffect(() => {
-    if (!latestEntry) return
+    if (!latestEntry && !sessionRunning) return
     setVisible(true)
 
-    if (pinned || expanded) return
+    if (pinned || expanded || sessionRunning) return
 
     const timer = setTimeout(() => {
       setVisible(false)
     }, autoFadeMs)
 
     return () => clearTimeout(timer)
-  }, [latestEntry?.id, pinned, expanded, autoFadeMs])
+  }, [latestEntry?.id, latestEntry?.text.length, sessionRunning, pinned, expanded, autoFadeMs])
 
-  if (!latestEntry || (!visible && !pinned && !expanded)) {
+  if ((!latestEntry && !sessionRunning) || (!visible && !pinned && !expanded)) {
     return null
   }
 
@@ -45,7 +76,7 @@ export function AgentNarrationStream({
       className={cn(
         'pointer-events-auto flex flex-col font-mono select-none transition-all duration-300 ease-out shadow-2xl backdrop-blur-md',
         'w-[min(580px,calc(100vw-480px))]',
-        pinned || expanded
+        pinned || expanded || sessionRunning
           ? 'border border-accent/60 bg-black/95 opacity-100'
           : 'border border-line/60 bg-black/85 opacity-95 hover:opacity-100 hover:border-accent/50',
         className
@@ -54,9 +85,9 @@ export function AgentNarrationStream({
       {/* HEADER / TRANSMISSION TELEMETRY */}
       <div className="flex h-6 items-center justify-between border-b border-line/40 bg-white/[0.02] px-2 text-[9px] font-bold uppercase tracking-wider text-dim">
         <div className="flex items-center gap-1.5 text-accent truncate">
-          <Radio className="h-3 w-3 text-accent animate-pulse" />
-          <span className="text-white">TRANSMISSION // DM NARRATION</span>
-          {latestEntry.at && <span className="text-faint font-mono">[{latestEntry.at}]</span>}
+          <Radio className={cn('h-3 w-3 text-accent', sessionRunning && 'animate-pulse')} />
+          <span className="text-white">{sessionRunning ? 'LIVE // DM NARRATING…' : 'TRANSMISSION // DM NARRATION'}</span>
+          {latestEntry?.at && <span className="text-faint font-mono">[{latestEntry.at}]</span>}
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
@@ -104,25 +135,31 @@ export function AgentNarrationStream({
       {/* STREAM PROSE CONTENT */}
       <div
         className={cn(
-          'flex flex-col gap-1.5 overflow-y-auto px-3 py-2 text-[11px] leading-relaxed text-white',
-          expanded ? 'max-h-48' : 'max-h-24'
+          'flex flex-col gap-1.5 overflow-y-auto px-3 py-1.5 text-[11px] leading-relaxed text-white select-text',
+          expanded ? 'max-h-64' : 'max-h-20'
         )}
       >
-        {(expanded ? dmEntries : [latestEntry]).map((entry) => (
-          <div
-            key={entry.id}
-            className="border-l border-accent/70 pl-2.5 py-0.5"
-          >
-            {expanded && (
-              <div className="text-[9px] font-bold uppercase text-accent mb-0.5">
-                {entry.speaker || 'WORLD NARRATOR'}
-              </div>
-            )}
-            <p className="font-sans text-[11.5px] italic text-neutral-200 antialiased leading-relaxed">
-              "{entry.text}"
-            </p>
+        {!latestEntry && sessionRunning ? (
+          <div className="border-l border-accent/70 pl-2.5 py-0.5 text-[11px] text-dim animate-pulse">
+            Narrating scene…
           </div>
-        ))}
+        ) : (
+          (expanded ? dmEntries : latestEntry ? [latestEntry] : []).map((entry) => (
+            <div
+              key={entry.id}
+              onClick={() => !expanded && setExpanded(true)}
+              title={!expanded ? 'Click to expand narration' : undefined}
+              className={cn('border-l border-accent/70 pl-2.5 py-0.5', !expanded && 'cursor-pointer')}
+            >
+              {expanded && (
+                <div className="text-[9px] font-bold uppercase text-accent mb-0.5">
+                  {entry.speaker || 'WORLD NARRATOR'}
+                </div>
+              )}
+              <Markdown text={entry.text} className={cn('font-sans text-[11.5px] text-neutral-100 antialiased leading-relaxed', !expanded && 'line-clamp-2')} />
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

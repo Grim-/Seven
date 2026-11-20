@@ -680,18 +680,22 @@ export class ApiChat {
   used = 0
 
   constructor(
-    private target: ApiTarget,
+    private targetSource: ApiTarget | (() => ApiTarget),
     systemPrompt: string
   ) {
     this.items = systemPrompt ? [{ type: 'system', text: systemPrompt }] : []
   }
 
+  private resolveTarget(): ApiTarget {
+    return typeof this.targetSource === 'function' ? this.targetSource() : this.targetSource
+  }
+
   get contextSize(): number {
-    return this.target.contextSize
+    return this.resolveTarget().contextSize
   }
 
   get local(): boolean {
-    return this.target.local === true
+    return this.resolveTarget().local === true
   }
 
   getChatHistory(): ChatHistoryItem[] {
@@ -707,9 +711,10 @@ export class ApiChat {
   }
 
   private async round(o: PromptOptions): Promise<Round> {
+    const target = this.resolveTarget()
     try {
-      const handler = ROUND_HANDLERS.get(this.target.spec.api) ?? openaiRound
-      const r = await handler(this.target, this.items, o)
+      const handler = ROUND_HANDLERS.get(target.spec.api) ?? openaiRound
+      const r = await handler(target, this.items, o)
       const input = r.input || estimate(this.items)
       const output = r.output || estimate(r.text + r.thought + r.calls.map((c) => c.args).join(''))
       this.usage.input += input
@@ -717,12 +722,12 @@ export class ApiChat {
       this.used = input + output
       if (r.timings) {
         this.timings = r.timings
-        this.target.onTimings?.(r.timings)
+        target.onTimings?.(r.timings)
       }
       return r
     } catch (err) {
       if (o.signal?.aborted) return { text: '', thought: '', calls: [], input: 0, output: 0 }
-      throw friendly(err, this.target)
+      throw friendly(err, target)
     }
   }
 

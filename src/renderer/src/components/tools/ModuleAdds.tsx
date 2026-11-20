@@ -43,7 +43,8 @@ export function ModuleAdds({ module }: { module: ModuleInfo }) {
     return items.length ? [{ label: g.label, items }] : []
   })
   const groups = [...module.adds, ...dynamicLists]
-  const hasAnything = Boolean(module.panel) || module.pages.length > 0 || groups.length > 0
+  const mainTabs = module.id === 'image' ? [{ label: 'Image', description: 'Adds a dedicated Image workspace tab to the main taskbar for prompting and configuring sd-server or remote image generation directly.' }] : []
+  const hasAnything = Boolean(module.panel) || module.pages.length > 0 || groups.length > 0 || mainTabs.length > 0
 
   if (!hasAnything) return null
 
@@ -52,6 +53,23 @@ export function ModuleAdds({ module }: { module: ModuleInfo }) {
       <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">
         What it adds
       </div>
+
+      {mainTabs.map((tab) => (
+        <div key={tab.label} className="flex items-start gap-3 border border-accent/35 bg-accent/[0.04] px-3.5 py-2.5">
+          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border border-accent/40 bg-accent/10 text-accent">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[12.5px] font-semibold text-white">{tab.label}</span>
+              <span className="inline-flex items-center gap-1 border border-accent/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-accent-soft">
+                Main tab
+              </span>
+            </div>
+            <p className="mt-0.5 text-[12px] text-dim">{tab.description}</p>
+          </div>
+        </div>
+      ))}
 
       {module.panel && (
         <div className="flex items-start gap-3 border border-accent/35 bg-accent/[0.04] px-3.5 py-2.5">

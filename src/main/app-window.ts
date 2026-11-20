@@ -4,15 +4,15 @@ import { is } from '@electron-toolkit/utils'
 import { Channel, type EventMessage } from '@shared/protocol'
 import { defaultBounds, keepWindowState, loadWindowState } from './windowState'
 
-export type RendererMode = 'app' | 'overlay'
+export type RendererMode = 'app'
 
 const preload = join(import.meta.dirname, '../preload/index.mjs')
 
-function loadRenderer(win: BrowserWindow, mode: RendererMode): void {
+function loadRenderer(win: BrowserWindow): void {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    void win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}?mode=${mode}`)
+    void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    void win.loadFile(join(import.meta.dirname, '../renderer/index.html'), { query: { mode } })
+    void win.loadFile(join(import.meta.dirname, '../renderer/index.html'))
   }
 }
 
@@ -47,32 +47,7 @@ export function createAppWindow(options: { show: boolean; onEvent: (message: Eve
   win.on('maximize', () => options.onEvent({ event: 'window.maximized', payload: true }))
   win.on('unmaximize', () => options.onEvent({ event: 'window.maximized', payload: false }))
   denyPopups(win)
-  loadRenderer(win, 'app')
-  return win
-}
-
-export function createOverlayWindow(): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 72,
-    height: 72,
-    show: false,
-    frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-    hasShadow: false,
-    resizable: false,
-    maximizable: false,
-    minimizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    title: 'Seven Overlay',
-    webPreferences: { preload, sandbox: false, plugins: true }
-  })
-  win.setAlwaysOnTop(true, 'screen-saver')
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-  denyPopups(win)
-  loadRenderer(win, 'overlay')
+  loadRenderer(win)
   return win
 }
 

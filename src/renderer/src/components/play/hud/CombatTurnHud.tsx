@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   RotateCcw,
   Skull,
@@ -13,8 +13,10 @@ export function CombatTurnHud() {
   const endTurn = useGameState((s) => s.endTurn)
   const endBattle = useGameState((s) => s.endBattle)
   const executeAiTurn = useGameState((s) => s.executeAiTurn)
+  const aiTurnDelayMs = useGameplaySettings((s) => s.settings.aiTurnDelayMs)
+  const aiTurnRef = useRef<string | null>(null)
 
-  // Hotkey: Space ends player turn
+  // Hotkey: Space ends active party member turn
   useEffect(() => {
     if (!battle || battle.status !== 'active') return
     const onKey = (e: KeyboardEvent) => {
@@ -26,25 +28,36 @@ export function CombatTurnHud() {
       const endTurnCode = useGameplaySettings.getState().settings.keybinds.endTurn?.code ?? 'Space'
       if (e.code === endTurnCode && !e.repeat) {
         e.preventDefault()
-        endTurn()
+        void endTurn()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [battle, endTurn])
 
-  // Automated enemy AI turn execution
+  // Engine-driven AI turn execution (deduplicated per encounter round + turn index)
   useEffect(() => {
-    if (!battle || battle.status !== 'active') return
+    if (!battle || battle.status !== 'active') {
+      aiTurnRef.current = null
+      return
+    }
     const activeActor = battle.queue[battle.activeTurnIndex]
-    if (!activeActor || activeActor.isPlayer) return
+    if (!activeActor || activeActor.isPlayer) {
+      aiTurnRef.current = null
+      return
+    }
+
+    const turnKey = `${battle.id}:${battle.round}:${battle.activeTurnIndex}`
+    if (aiTurnRef.current === turnKey) return
 
     const timer = setTimeout(() => {
-      executeAiTurn()
-    }, 1100)
+      if (aiTurnRef.current === turnKey) return
+      aiTurnRef.current = turnKey
+      void executeAiTurn()
+    }, Math.max(0, aiTurnDelayMs))
 
     return () => clearTimeout(timer)
-  }, [battle?.status, battle?.activeTurnIndex, battle?.queue, executeAiTurn])
+  }, [battle?.id, battle?.status, battle?.round, battle?.activeTurnIndex, battle?.queue, aiTurnDelayMs, executeAiTurn])
 
   if (!battle) return null
 

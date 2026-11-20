@@ -1,9 +1,12 @@
 import crypto from 'node:crypto'
 import type { FormAnswer, WebLogEntry } from '@shared/types'
+import { linkFor } from '@shared/text'
 import type { ModuleFactory } from '../../engine/modules/sdk'
-import { ToolError, optInt, str, type ToolContext, type ToolDef } from '../../engine/tools/types'
+import { ToolError, optInt, optStr, str, type ToolContext, type ToolDef } from '../../engine/tools/types'
 import { logWeb } from '../../engine/weblog'
 import { modules } from '../../engine/modules/registry'
+import { data } from '../../engine/data/hub'
+import { linkView } from '../../engine/library/kinds'
 import { parseHTML } from 'linkedom'
 import { parseFeed } from '@rowanmanning/feed-parser'
 import { linkedText, pageText, privateHost, readBody } from '../../engine/web/page'
@@ -42,6 +45,21 @@ function plain(html: string): string {
   if (!/[<&]/.test(html)) return html.replace(/\s+/g, ' ').trim()
   const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`)
   return (document.body?.textContent ?? '').replace(/\s+/g, ' ').trim()
+}
+
+function largest(srcset: string): string | null {
+  const items = srcset
+    .split(',')
+    .map((s) => s.trim().split(/\s+/))
+    .filter((p) => p[0])
+    .map(([src, size]) => ({ src, n: Number.parseFloat(size ?? '1') || 1 }))
+  return items.sort((a, b) => b.n - a.n)[0]?.src ?? null
+}
+
+function extFor(type: string, url: string): string {
+  const t = /image\/(png|jpe?g|gif|webp|avif|bmp|svg)/.exec(type)?.[1]
+  if (t) return t === 'jpeg' ? 'jpg' : t
+  return /\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?|#|$)/i.exec(url)?.[1]?.toLowerCase() ?? 'png'
 }
 
 function when(date: Date | null): string {
@@ -295,6 +313,88 @@ const factory: ModuleFactory = (sdk) =>
           }
         },
         execute: (params, ctx) => this.feed(params, ctx)
+      })
+      tools.add({
+        name: 'browser_open',
+        group: 'web',
+        needsWorkspace: false,
+        command: true,
+        activity: () => 'opening a page',
+        description: "Show the user a page in the browser in Seven's side panel. You don't see the page; use web tools or browser_images to read it.",
+        params: { type: 'object', properties: { url: { type: ['string', 'null'], description: 'Address, or null for a blank search page' } } },
+        execute: async (params) => {
+          const address = optStr(params, 'url')
+          if (address) {
+            let parsed: URL
+            try {
+              parsed = new URL(address.trim())
+            } catch {
+              throw new ToolError(`"${address}" is not a full address. Set url to one starting with https://, e.g. "https://example.com/page".`)
+            }
+            if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+              throw new ToolError(`Only http and https addresses work, not ${parsed.protocol}. Set url to an address starting with https://.`)
+            }
+          }
+          this.openBrowser(address)
+          return address ? `Opened ${address} in the browser.` : 'Opened the browser.'
+        }
+      })
+      tools.add({
+        name: 'browser_images',
+        group: 'web',
+        needsWorkspace: false,
+        maxRepeats: 3,
+        activity: () => 'looking for pictures',
+        description: 'List the pictures on a web page, with their addresses and descriptions, so you can save the right one with browser_save_image.',
+        params: { type: 'object', properties: { url: { type: 'string' } } },
+        execute: async (params, ctx) => {
+          const { res, url, outcome, signal } = await this.open(str(params, 'url'), ctx, 'browser_images', 'text/html,*/*;q=0.5')
+          const body = await readBody(res, signal)
+          logWeb({ at: Date.now(), agentId: ctx.agentId, sessionId: ctx.sessionId, kind: 'read', target: url.href, outcome, note: 'pictures' })
+          const { document } = parseHTML(body.toString('utf8'))
+          const found = new Map<string, string>()
+          const add = (src: string | null | undefined, alt: string) => {
+            if (!src || src.startsWith('data:')) return
+            try {
+              const abs = new URL(src, url).href
+              if (!found.has(abs)) found.set(abs, alt.replace(/\s+/g, ' ').trim().slice(0, 120))
+            } catch {
+              return
+            }
+          }
+          for (const m of document.querySelectorAll('meta[property="og:image"], meta[name="twitter:image"]')) add(m.getAttribute('content'), 'page preview image')
+          for (const img of document.querySelectorAll('img')) {
+            const w = Number(img.getAttribute('width') ?? 0)
+            const h = Number(img.getAttribute('height') ?? 0)
+            if ((w && w < 48) || (h && h < 48)) continue
+            const src = (img.getAttribute('srcset') && largest(img.getAttribute('srcset') ?? '')) || img.getAttribute('data-src') || img.getAttribute('src')
+            add(src, img.getAttribute('alt') || img.getAttribute('title') || '')
+          }
+          if (!found.size) return `No pictures found on ${url.href}. Some sites load pictures with scripts; the user can right-click pictures in Seven's browser to save them.`
+          return [...found.entries()]
+            .slice(0, 40)
+            .map(([src, alt], i) => `${i + 1}. ${alt || '(no description)'}: ${src}`)
+            .join('\n')
+        }
+      })
+      tools.add({
+        name: 'browser_save_image',
+        group: 'web',
+        needsWorkspace: false,
+        maxRepeats: 5,
+        activity: () => 'saving a picture',
+        description: 'Save a picture from the web into the library by its address, so it can be shown, put on boards or used in pages. name is a short file name.',
+        params: { type: 'object', properties: { url: { type: 'string' }, name: { type: ['string', 'null'] } } },
+        execute: async (params, ctx) => {
+          const { res, url, outcome, signal } = await this.open(str(params, 'url'), ctx, 'browser_save_image', 'image/*,*/*;q=0.5')
+          const type = (res.headers.get('content-type') ?? '').toLowerCase()
+          if (type && !type.startsWith('image/')) throw new ToolError(`That address is ${type.split(';')[0]}, not a picture. browser_images lists the pictures on a page.`)
+          const body = await readBody(res, signal, DOCUMENT_BYTES)
+          logWeb({ at: Date.now(), agentId: ctx.agentId, sessionId: ctx.sessionId, kind: 'read', target: url.href, outcome, note: 'saved picture' })
+          const base = (optStr(params, 'name') || decodeURIComponent(url.pathname.split('/').pop() || 'picture')).replace(/\.[a-z0-9]+$/i, '').replace(/[^\w .-]+/g, '_').trim().slice(0, 60) || 'picture'
+          const asset = data.assets.registerBytes(`${base}.${extFor(type, url.href)}`, body, { tool: 'web', sessionId: ctx.sessionId, original: url.href })
+          return { text: `Saved ${linkFor('file', asset.name)} to the library.`, view: linkView(`file/${asset.id}`, { agentId: ctx.agentId }) }
+        }
       })
     }
   }

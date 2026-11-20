@@ -12,7 +12,13 @@ type HeaderFacts = Omit<ModelInfo, 'sizeBytes'>
 
 const RESOLVERS: { [K in keyof HeaderFacts]: (v: GgufView) => HeaderFacts[K] } = {
   kind: resolveKind,
-  architecture: (v) => v.architecture,
+  architecture: (v) => {
+    if (v.architecture) return v.architecture
+    if (v.tensorNames.some((n) => n.startsWith('double_blocks.') || n.startsWith('single_blocks.'))) return 'flux'
+    if (v.tensorNames.some((n) => n.startsWith('joint_blocks.'))) return 'sd3'
+    if (v.tensorNames.some((n) => n.startsWith('model.diffusion_model.') || n.startsWith('diffusion_model.'))) return 'stable-diffusion'
+    return null
+  },
   name: (v) => text(v.general.name),
   sizeLabel: (v) => text(v.general.size_label),
   author: (v) => text(v.general.organization) ?? text(v.general.author),

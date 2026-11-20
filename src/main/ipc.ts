@@ -2,8 +2,6 @@ import fs from 'node:fs'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import { Channel, ERROR_MARKER, type CodedErrorWire, type MainRequestName, type MainRequests } from '@shared/protocol'
 import type { EngineSupervisor } from './engine-supervisor'
-import type { OverlayController } from './overlay'
-import type { Hotkey } from './hotkey'
 import type { Vault } from './vault'
 import { settings, remoteSettingsIn, remoteSettingsOut } from './settings'
 import { dataDir, missingVault } from './paths'
@@ -30,8 +28,6 @@ type MainHandlers = {
 
 export interface IpcContext {
   engine: EngineSupervisor
-  overlay: OverlayController
-  hotkey: Hotkey
   vault: Vault
   gateway: Gateway
   problems: Problems
@@ -56,7 +52,6 @@ export interface MainDispatch {
 
 export function registerIpc(ctx: IpcContext): MainDispatch {
   const handlers: MainHandlers = {
-    'overlay.resetPosition': () => ctx.overlay.resetPosition(),
     'vault.status': () => ctx.vault.check(),
     'vault.setup': (_win, { passphrase }) => ctx.vault.setup(passphrase),
     'vault.unlock': (_win, { passphrase }) => ctx.vault.unlock(passphrase),
@@ -78,7 +73,7 @@ export function registerIpc(ctx: IpcContext): MainDispatch {
     'dialog.openFile': (win, { filters }) => pick(win, { properties: ['openFile'], filters }),
     'assets.readImage': (_win, { id }) => readImage(id),
     'dialog.openModelFile': (win) =>
-      pick(win, { properties: ['openFile'], filters: [{ name: 'GGUF models', extensions: ['gguf'] }] }),
+      pick(win, { properties: ['openFile'], filters: [{ name: 'Model files', extensions: ['gguf', 'safetensors', 'sft', 'ckpt'] }] }),
     'dialog.openFiles': async (win) => {
       const result = win
         ? await dialog.showOpenDialog(win, { properties: ['openFile', 'multiSelections'] })
@@ -170,22 +165,7 @@ export function registerIpc(ctx: IpcContext): MainDispatch {
     'network.pair.deny': (_win, { requestId }) => ctx.gateway.pairDeny(requestId),
     'network.revoke': (_win, { deviceId }) => ctx.gateway.revoke(deviceId),
     'network.unpairAll': () => ctx.gateway.unpairAll(),
-    'network.deviceLevel': (_win, { deviceId, level }) => ctx.gateway.setDeviceLevel(deviceId, level),
-    'overlay.isExpanded': () => ctx.overlay.isExpanded(),
-    'overlay.state': () => ctx.overlay.state(),
-    'overlay.setMode': (_win, { mode, panel, items, focus }) => ctx.overlay.setMode(mode, { panel, items, focus }),
-    'overlay.setExpanded': (_win, { expanded, focus }) => ctx.overlay.setExpanded(expanded, focus),
-    'overlay.dragStart': () => ctx.overlay.dragStart(),
-    'overlay.dragEnd': () => ctx.overlay.dragEnd(),
-    'hotkey.set': (_win, { accelerator }) => {
-      const error = ctx.hotkey.apply(accelerator)
-      if (error) {
-        ctx.hotkey.apply(settings.get().hotkey)
-        return { ok: false, error }
-      }
-      settings.set({ hotkey: accelerator.trim() })
-      return { ok: true, error: null }
-    }
+    'network.deviceLevel': (_win, { deviceId, level }) => ctx.gateway.setDeviceLevel(deviceId, level)
   }
 
   ipcMain.handle(Channel.engine, (_event, name: string, params) => {

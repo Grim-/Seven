@@ -8,7 +8,6 @@ import type { ChatMessage, ReminderRepeat, WebLogEntry } from '@shared/types'
 import { agentAccess } from '../../agents/access'
 import { board } from '../../board/store'
 import { data } from '../../data/hub'
-import { modules } from '../../modules/registry'
 import { scripts } from '../../python/scripts'
 import { reminders } from '../../reminders/store'
 import { routines } from '../../routines/store'
@@ -22,6 +21,8 @@ import { noteFailure } from '../../util/report'
 import { WEB_LOG } from '../../weblog'
 import { chatExport } from '../exporters'
 import { storePacking } from '../packing'
+import { registerKind } from '../kindRegistry'
+import { registerModuleKind } from '../moduleKinds'
 import { ENTRY_WIDGET, kindRt } from './runtime'
 import { accessOf, has, USER, withJson, type Kind, type KindContext, type KindHit } from './types'
 
@@ -171,6 +172,7 @@ export const chatKind: Kind = {
   presents: { chat: true, widget: ENTRY_WIDGET },
   group: 'Agents',
   kind: 'chat',
+  inKindList: false,
   portability: { canExport: true, canImport: false },
   rename: (id, name) => sessionAccess.rename(id, name),
   remove: (id) => sessionAccess.remove(id),
@@ -231,22 +233,22 @@ const storyLine = (r: StoryRun) => `${r.template_id}, ${r.status ?? 'active'}, a
 
 export const storyKind: Kind = {
   presents: { chat: true, widget: ENTRY_WIDGET },
-  group: 'Worlds',
+  group: 'Storyteller',
   kind: 'story',
   portability: { canExport: true, canImport: false },
   remove: (id) => storyRuns.delete(id),
-  label: 'Story',
+  label: 'Story run',
   textParts: ['summary'],
-  plural: 'Stories',
+  plural: 'Story runs',
   exportable: true,
   export(id) {
     return withJson(this, id, storyRuns.get(id))
   },
   icon: 'book-open',
-  description: 'Storyteller runs: branching stories with acts, what is true in them, and where they stand',
+  description: 'active or archived Storyteller runs: rolled scenario bindings, current act, and tracked story facts',
   parts: ['summary'],
   actions: ['list_stories', 'start_story', 'load_story_context', 'checkpoint_story', 'record_facts', 'close_story', 'resume_story'],
-  available: () => modules.isOn('storyteller'),
+  available: () => true,
   title: (id) => id,
   search(query, limit) {
     const q = query.toLowerCase()
@@ -297,7 +299,7 @@ export const scriptKind: Kind = {
   description: 'saved Python scripts and their last runs',
   parts: ['code', 'output'],
   actions: ['run_python', 'python_save'],
-  available: () => modules.isOn('python'),
+  available: () => true,
   title: (id) => scripts.find(id)?.name ?? id,
   search(query, limit) {
     const q = query.toLowerCase()
@@ -634,3 +636,13 @@ export function timelineRows(limit: number, ctx: KindContext = USER): TimelineRo
     .slice(0, limit)
     .map((s) => ({ kind: s.kind.kind, id: s.id, title: s.title, icon: s.kind.icon, label: s.kind.label, what: eventWhat(s.event, ctx), at: s.event.last }))
 }
+
+registerModuleKind('storyteller', storyKind, 180)
+registerModuleKind('python', scriptKind, 190)
+registerKind(210, reminderKind)
+registerKind(220, chatKind)
+registerKind(240, themeKind)
+registerKind(300, messageKind)
+registerKind(310, weblogKind, 'web')
+registerKind(330, dayKind)
+registerKind(340, routineKind)

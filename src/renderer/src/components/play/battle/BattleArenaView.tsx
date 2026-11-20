@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
 import {
-  Compass,
   Footprints,
   MessageSquarePlus,
   Shield,
@@ -9,6 +8,7 @@ import {
   Zap
 } from 'lucide-react'
 import type { BattleState } from '@shared/game/state/BattleStateMachine'
+import { activeCombatManeuvers } from '../state/combatGate'
 import { useGameState } from '../state/gameStateStore'
 import { useDialogue } from '../dialogue/dialogueStore'
 import { defaultDialogueTree } from '@shared/game/dialogue'
@@ -19,15 +19,13 @@ interface BattleArenaViewProps {
   selectedTargetId: string | null
   onSelectTarget: (id: string | null) => void
   onAttack: (targetId: string, attackName?: string) => void
-  onSwitchToMap: () => void
 }
 
 export function BattleArenaView({
   battle,
   selectedTargetId,
   onSelectTarget,
-  onAttack,
-  onSwitchToMap
+  onAttack
 }: BattleArenaViewProps) {
   const activeActor = battle.queue[battle.activeTurnIndex]
   const isPlayerTurn = activeActor?.isPlayer ?? false
@@ -37,14 +35,16 @@ export function BattleArenaView({
   const endBattle = useGameState((s) => s.endBattle)
   const dashAction = useGameState((s) => s.dashAction)
   const dodgeAction = useGameState((s) => s.dodgeAction)
-  const lastRoll = useGameState((s) => s.lastRoll)
+  const tokens = useGameState((s) => s.tokens)
+  const catalog = useGameState((s) => s.catalog)
+  const maneuvers = activeCombatManeuvers(battle, tokens, catalog)
 
   const logBottomRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll combat log
   useEffect(() => {
     logBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [battle.logs.length, lastRoll])
+  }, [battle.logs.length])
 
   // Filter players and enemies
   const playerCombatants = battle.queue.filter((c) => c.isPlayer)
@@ -54,12 +54,10 @@ export function BattleArenaView({
   const targetCombatant = enemyCombatants.find((c) => c.id === selectedTargetId) ?? enemyCombatants[0] ?? null
 
   const [selectedAttack, setSelectedAttack] = useState<string>(
-    activeActor?.attacks?.[0]?.name ?? 'Strike'
+    activeActor?.attacks?.[0]?.id ?? activeActor?.attacks?.[0]?.name ?? ''
   )
 
-  const attacks = activeActor?.attacks && activeActor.attacks.length > 0
-    ? activeActor.attacks
-    : [{ name: 'Strike', bonus: 3, damage: '1d6 + 2' }]
+  const attacks = activeActor?.attacks ?? []
 
   return (
     <div className="relative flex h-full w-full flex-col bg-black/95 font-mono select-none overflow-hidden">
@@ -129,15 +127,6 @@ export function BattleArenaView({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onSwitchToMap}
-            title="Switch back to zoomed-in Map Camera (Tab)"
-            className="flex items-center gap-1.5 border border-cyan/60 bg-cyan/15 px-3 py-1 text-[10.5px] font-bold text-cyan hover:bg-cyan hover:text-black transition-all cursor-pointer"
-          >
-            <Compass className="h-3.5 w-3.5" />
-            <span>MAP CAM [TAB]</span>
-          </button>
-          <button
-            type="button"
             onClick={() => endBattle('flee')}
             title="Disengage and flee"
             className="flex items-center gap-1 border border-line/40 bg-line/10 px-2 py-1 text-[10.5px] text-faint hover:border-alert hover:text-alert transition-colors cursor-pointer"
@@ -187,7 +176,7 @@ export function BattleArenaView({
                   </div>
                   <div className="flex items-center gap-1 border border-cyan/60 bg-cyan/15 px-2 py-0.5 text-[10px] font-bold text-cyan">
                     <Shield className="h-3 w-3" />
-                    <span>AC {c.ac ?? 14}</span>
+                    <span>AC {c.ac}</span>
                   </div>
                 </div>
 
@@ -223,7 +212,7 @@ export function BattleArenaView({
                       className="flex items-center justify-between text-dim"
                     >
                       <span className="text-white">{att.name}</span>
-                      <span>+{att.bonus} to hit ({att.damage})</span>
+                      <span>{att.range} ft{att.damage ? ` (${att.damage})` : ''}</span>
                     </div>
                   ))}
                 </div>
@@ -255,7 +244,7 @@ export function BattleArenaView({
               {targetCombatant && (
                 <div className="flex items-center gap-1.5 text-[9.5px]">
                   <span className="border border-alert/60 bg-alert/20 px-1.5 py-0.5 font-bold text-alert">
-                    AC {targetCombatant.ac ?? 10}
+                    AC {targetCombatant.ac}
                   </span>
                   <span className="text-dim">
                     HP {targetCombatant.hp.cur}/{targetCombatant.hp.max}
@@ -264,63 +253,16 @@ export function BattleArenaView({
               )}
             </div>
 
-            {/* D20 ROLL THEATER */}
+            {/* LATEST ACTION SUMMARY */}
             <div className="flex min-h-[90px] items-center justify-center p-2">
-              {lastRoll ? (
-                <div className="flex items-center gap-4 animate-in fade-in zoom-in duration-200">
-                  {/* DIE VISUAL */}
-                  <div
-                    className={cn(
-                      'flex h-14 w-14 shrink-0 flex-col items-center justify-center border text-[20px] font-black shadow-lg',
-                      lastRoll.isCrit
-                        ? 'border-accent bg-accent/25 text-accent shadow-[0_0_24px_rgba(255,160,0,0.5)] scale-110'
-                        : lastRoll.hit
-                        ? 'border-cyan bg-cyan/20 text-cyan shadow-[0_0_20px_rgba(0,216,246,0.3)]'
-                        : 'border-line/60 bg-black text-dim'
-                    )}
-                  >
-                    <span className="text-[8px] uppercase tracking-wider text-faint">D20</span>
-                    <span>{lastRoll.d20}</span>
-                  </div>
-
-                  {/* ROLL FORMULA & VERDICT */}
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2 text-[12px]">
-                      <span className="text-white font-bold">{lastRoll.attackerName}</span>
-                      <span className="text-faint">used</span>
-                      <span className="text-cyan font-bold">{lastRoll.attackName}</span>
-                      <span className="text-faint">on</span>
-                      <span className="text-white font-bold">{lastRoll.targetName}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-[11px]">
-                      <span className="text-dim">
-                        Roll {lastRoll.d20} + Mod {lastRoll.bonus} ={' '}
-                        <strong className="text-white text-[13px]">{lastRoll.total}</strong> vs AC{' '}
-                        {lastRoll.targetAc}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 mt-0.5">
-                      <span
-                        className={cn(
-                          'px-2 py-0.5 text-[10.5px] font-extrabold uppercase tracking-widest',
-                          lastRoll.isCrit
-                            ? 'bg-accent text-black shadow-[0_0_12px_rgba(255,160,0,0.6)]'
-                            : lastRoll.hit
-                            ? 'border border-ok bg-ok/25 text-ok'
-                            : 'border border-alert bg-alert/25 text-alert'
-                        )}
-                      >
-                        {lastRoll.isCrit ? 'CRITICAL HIT!' : lastRoll.hit ? 'HIT!' : 'MISS!'}
-                      </span>
-                      {lastRoll.hit && (
-                        <span className="text-[13px] font-extrabold text-alert">
-                          -{lastRoll.damage} DAMAGE
-                        </span>
-                      )}
-                    </div>
-                  </div>
+              {battle.logs.length > 0 ? (
+                <div className="flex flex-col items-center gap-1 text-center text-[11px]">
+                  <span className="text-[9.5px] uppercase tracking-wider text-cyan">
+                    {battle.logs[battle.logs.length - 1].actorName}
+                  </span>
+                  <span className="text-white/90">
+                    {battle.logs[battle.logs.length - 1].text}
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-[11px] text-faint">
@@ -413,7 +355,7 @@ export function BattleArenaView({
                   </div>
                   <div className="flex items-center gap-1 border border-alert/60 bg-alert/20 px-2 py-0.5 text-[10px] font-bold text-alert">
                     <Shield className="h-3 w-3" />
-                    <span>AC {c.ac ?? 10}</span>
+                    <span>AC {c.ac}</span>
                   </div>
                 </div>
 
@@ -522,7 +464,7 @@ export function BattleArenaView({
           <span className="text-dim">
             SPEED:{' '}
             <strong className="text-accent">
-              {economy.movementRemaining} / {activeActor?.speedMax ?? 30} FT
+              {economy.movementRemaining} / {activeActor?.speedMax ?? economy.movementMax} FT
             </strong>
           </span>
         </div>
@@ -554,35 +496,35 @@ export function BattleArenaView({
           {/* DASH */}
           <button
             type="button"
-            disabled={!isPlayerTurn || economy.actionUsed}
+            disabled={!maneuvers.canDash}
             onClick={dashAction}
             className={cn(
               'flex h-8 items-center gap-1.5 border px-3 text-[11px] font-bold uppercase transition-all',
-              isPlayerTurn && !economy.actionUsed
+              maneuvers.canDash
                 ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent cursor-pointer'
                 : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
             )}
           >
             <Footprints className="h-3.5 w-3.5 text-accent" />
-            <span>DASH</span>
+            <span>{maneuvers.dashLabel}</span>
           </button>
 
           {/* DODGE */}
           <button
             type="button"
-            disabled={!isPlayerTurn || economy.actionUsed || economy.isDodging}
+            disabled={!maneuvers.canDodge}
             onClick={dodgeAction}
             className={cn(
               'flex h-8 items-center gap-1.5 border px-3 text-[11px] font-bold uppercase transition-all',
               economy.isDodging
                 ? 'border-accent bg-accent/20 text-accent cursor-default'
-                : isPlayerTurn && !economy.actionUsed
+                : maneuvers.canDodge
                 ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent cursor-pointer'
                 : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
             )}
           >
             <Shield className="h-3.5 w-3.5 text-accent" />
-            <span>DODGE</span>
+            <span>{maneuvers.dodgeLabel}</span>
           </button>
 
           {/* PARLEY */}

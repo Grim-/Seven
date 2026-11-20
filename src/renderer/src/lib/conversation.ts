@@ -5,6 +5,7 @@ import { useApp } from '../store/app'
 import { useWindowId } from './window'
 import { failed } from './notify'
 import { queueComposer } from './composer'
+import { engine } from './ipc'
 
 export interface Conversation {
   key: string
@@ -93,4 +94,16 @@ export function startChatWith(agentId: string, link: string): void {
   if (!home) return
   openChat(null, agentId)
   queueComposer(home, `${link} `, true)
+}
+
+export function startDmChatWith(agentId: string, link: string): void {
+  const home = useWindows.getState().home
+  if (!home) return
+  void engine('sessions.create', { agentId })
+    .then((s) => engine('sessions.setDmMode', { id: s.id, on: true }))
+    .then((s) => {
+      openChat(s.id)
+      queueComposer(home, `${link} `, true)
+    })
+    .catch(failed('Could not start the DM chat'))
 }

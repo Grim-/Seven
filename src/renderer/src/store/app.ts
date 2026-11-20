@@ -4,11 +4,19 @@ import type { AppInfo, EngineStatus, Settings, ViewId } from '@shared/types'
 import { main } from '../lib/ipc'
 import { allowedRequest } from '../lib/transport'
 
+export interface StartupProgress {
+  ready: boolean
+  settings: boolean
+  engine: boolean
+  workspace: boolean
+}
+
 interface AppState {
   view: ViewId
   settings: Settings | null
   info: AppInfo | null
   engine: EngineStatus
+  startup: StartupProgress
   setView: (view: ViewId) => void
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>
 }
@@ -18,6 +26,7 @@ export const useApp = create<AppState>((set, get) => ({
   settings: null,
   info: null,
   engine: { state: 'starting', restarts: 0 },
+  startup: { ready: false, settings: false, engine: false, workspace: false },
   setView: (view) => {
     set({ view })
     if (allowedRequest('main', 'settings.set')) void main('settings.set', { lastView: view }).catch(noteFailure('app', 'Could not remember the open view'))

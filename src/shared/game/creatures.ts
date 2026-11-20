@@ -1,23 +1,6 @@
-import type { CompendiumEntry, CompendiumRef } from '../compendium'
+import type { CompendiumEntry } from '../compendium'
 import { entrySections } from '../compendium'
 import { blankDnd, cleanDnd, type DndAttack, type DndFeature, type DndStats } from '../dnd'
-
-export function guessCreatureFaction(monster: CompendiumRef | CompendiumEntry): string {
-  const type = String(monster.facts?.type ?? '').toLowerCase()
-  const name = monster.name.toLowerCase()
-  const align = String(monster.facts?.alignment ?? '').toLowerCase()
-
-  if (type.includes('undead') || name.includes('skeleton') || name.includes('zombie') || name.includes('ghoul') || name.includes('vampire') || name.includes('lich')) {
-    return 'undead'
-  }
-  if (name.includes('bandit') || name.includes('thug') || name.includes('pirate') || name.includes('cultist') || name.includes('goblin') || name.includes('kobold')) {
-    return 'bandits'
-  }
-  if (type.includes('humanoid') && (align.includes('good') || align.includes('lawful') || name.includes('guard') || name.includes('knight'))) {
-    return 'town_guard'
-  }
-  return 'monsters'
-}
 
 function parseHp(raw: unknown): { cur: number; max: number; totalHd: string } {
   if (typeof raw === 'number' && Number.isFinite(raw)) {
@@ -26,17 +9,17 @@ function parseHp(raw: unknown): { cur: number; max: number; totalHd: string } {
   const s = String(raw ?? '').trim()
   const match = /^(\d+)(?:\s*\(([^)]+)\))?/.exec(s)
   if (match) {
-    const val = parseInt(match[1], 10) || 10
+    const val = parseInt(match[1], 10) || 0
     return { cur: val, max: val, totalHd: match[2]?.trim() ?? '' }
   }
-  return { cur: 10, max: 10, totalHd: '' }
+  return { cur: 0, max: 0, totalHd: '' }
 }
 
 function parseSpeed(raw: unknown): number {
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw
   const s = String(raw ?? '').trim()
   const match = /(\d+)/.exec(s)
-  return match ? parseInt(match[1], 10) : 30
+  return match ? parseInt(match[1], 10) : 0
 }
 
 export function parseMonsterAttacksAndFeatures(text: string): { attacks: DndAttack[]; features: DndFeature[] } {
@@ -88,7 +71,7 @@ export function monsterToSheetInput({
   faction: string | null
 } {
   const title = customName?.trim() || monster.name
-  const assignedFaction = factionId !== undefined ? factionId : guessCreatureFaction(monster)
+  const assignedFaction = factionId ?? null
   const hpInfo = parseHp(monster.facts.hp)
   const speed = parseSpeed(monster.facts.speed)
   const { attacks, features } = parseMonsterAttacksAndFeatures(monster.text)

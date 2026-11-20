@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
+  Clapperboard,
   Eye,
   Grid,
   ImageIcon,
   Layers,
+  LayoutDashboard,
   LayoutGrid,
-  Map as MapIcon,
-  Maximize2,
   MessageSquare,
   Pin,
   Plus,
   SlidersHorizontal,
-  UserRound
+  UserRound,
+  WalletCards
 } from 'lucide-react'
 import type { AgentProfile, CharacterSheet } from '@shared/types'
 import { showName } from '@shared/ids'
@@ -28,7 +29,6 @@ import { BoardTabletop } from '../dashboards/BoardTabletop'
 import { BackdropPicker } from '../backdrop/Backdrop'
 import { SlateContainer } from '../entries/EntrySlate'
 import { SheetCard } from '../data/SheetCard'
-import { WorldPlay } from '../worlds/WorldPlay'
 import {
   ensureActiveDashboard,
   useBoardSurfaces,
@@ -37,6 +37,8 @@ import {
   useTabletopMode
 } from './tabletopStore'
 import { useConversation } from '../../lib/conversation'
+import { setChatViewMode } from '../../lib/chatViewMode'
+import { ChatViewModeButton } from './ChatViewModeButton'
 
 function useCharacterSheets(): CharacterSheet[] {
   const [sheets, setSheets] = useState<CharacterSheet[]>([])
@@ -68,7 +70,6 @@ export function UserBoardBar() {
   const [editingBackdrop, setEditingBackdrop] = useState(false)
   const boards = useDashboards((s) => s.list)
   const [addingWidget, setAddingWidget] = useState(false)
-  const worlds = useLive(() => engine('worlds.list'), 'worlds.changed') ?? []
   const sheets = useCharacterSheets()
 
   const createNewBoard = () => {
@@ -101,10 +102,35 @@ export function UserBoardBar() {
       .catch(failed('Could not create board'))
   }
 
-  if (!mode.windowed) return null
+  const decksToggle = (
+    <button
+      type="button"
+      onClick={() => setMode({ showDecks: !mode.showDecks })}
+      title={mode.showDecks ? 'Hide card decks on chat' : 'Show card decks on chat'}
+      className={cn(
+        'flex h-6 w-fit shrink-0 items-center gap-1 border px-1.5 font-mono text-[9.5px] uppercase tracking-wider transition-colors cursor-pointer',
+        mode.showDecks
+          ? 'border-accent/70 bg-accent/15 text-accent'
+          : 'border-line/60 bg-black/60 text-dim hover:border-accent hover:text-white'
+      )}
+    >
+      <WalletCards className="h-3 w-3" />
+      <span>Decks</span>
+    </button>
+  )
+
+  if (!mode.windowed) {
+    return (
+      <div className="flex items-center gap-1">
+        <ChatViewModeButton />
+        {decksToggle}
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-1">
+      <ChatViewModeButton />
       {dashboard && mode.layoutMode !== 'creator' && (
         <div className="flex items-center">
           <Select
@@ -131,6 +157,8 @@ export function UserBoardBar() {
           </button>
         </div>
       )}
+
+      {decksToggle}
 
       {mode.layoutMode === 'creator' && sheets.length > 0 && (
         <Select
@@ -244,25 +272,6 @@ export function UserBoardBar() {
             </button>
           </div>
         </div>
-
-        {worlds.length > 0 && mode.layoutMode !== 'creator' && (
-          <div className="flex items-center justify-between border-t border-line/40 pt-2">
-            <span className="text-[10px] uppercase text-dim">Play Table Backdrop</span>
-            <button
-              type="button"
-              onClick={() => setMode({ showPlayTable: !mode.showPlayTable })}
-              className={cn(
-                'flex h-6 items-center gap-1 border px-2 text-[10px] font-semibold uppercase cursor-pointer',
-                mode.showPlayTable
-                  ? 'border-cyan/70 bg-cyan/15 text-cyan'
-                  : 'border-line/60 bg-black/50 text-dim hover:text-white'
-              )}
-            >
-              <MapIcon className="h-3 w-3" />
-              <span>{mode.showPlayTable ? 'ON' : 'OFF'}</span>
-            </button>
-          </div>
-        )}
 
         {dashboard && (
           <div className="flex items-center justify-between border-t border-line/40 pt-2">
@@ -407,7 +416,31 @@ export function ChatTabletop({
   const containerRef = useRef<HTMLDivElement>(null)
   const worlds = useLive(() => engine('worlds.list'), 'worlds.changed') ?? []
   const activeWorld = worlds.find((w) => w.id === agent?.world?.worldId) ?? worlds[0] ?? null
-  const activeWorldId = activeWorld?.id ?? null
+  const ensuringRef = useRef(false)
+
+  useEffect(() => {
+    if (!mode.windowed || dashboard || ensuringRef.current) return
+    ensuringRef.current = true
+    void ensureActiveDashboard(sessionId)
+      .then((d) => selectDashboard(d.id))
+      .catch(() => undefined)
+      .finally(() => {
+        ensuringRef.current = false
+      })
+  }, [mode.windowed, dashboard, sessionId, selectDashboard])
+
+  const ensureBoardThen = (run: () => void) => {
+    if (dashboard) {
+      run()
+      return
+    }
+    void ensureActiveDashboard(sessionId)
+      .then((d) => {
+        selectDashboard(d.id)
+        run()
+      })
+      .catch(failed('Could not create tabletop surface'))
+  }
 
   if (!mode.windowed) {
     return <>{children}</>
@@ -471,56 +504,71 @@ export function ChatTabletop({
     <div
       onContextMenu={(e) => {
         if ((e.target as HTMLElement).closest('[data-slate], input, textarea, button, a')) return
-        openMenu(e, dashboard ? `Board · ${dashboard.name}` : 'Chat Board', [
-          { label: 'Add widget or entry…', icon: <Plus />, onSelect: () => setAddingWidget(true) },
-          ...(dashboard ? [{ label: `Surface background (${activeSlot.label})…`, icon: <ImageIcon />, onSelect: () => setEditingBackdrop(true) }] : []),
+        openMenu(e, dashboard ? `Tabletop · ${dashboard.name}` : 'Tabletop', [
           {
-            label: 'SurfaceTop Overview (Ctrl+Space)',
+            label: 'Add slate or widget…',
+            icon: <Plus />,
+            onSelect: () => ensureBoardThen(() => setAddingWidget(true))
+          },
+          { label: '', separator: true },
+          {
+            label: 'Surface & Background',
             icon: <Layers />,
-            onSelect: toggleSwitcher
+            children: [
+              {
+                label: `Surface background (${activeSlot.label})…`,
+                icon: <ImageIcon />,
+                onSelect: () => ensureBoardThen(() => setEditingBackdrop(true))
+              },
+              {
+                label: 'SurfaceTop Overview (Ctrl+Space)',
+                icon: <Layers />,
+                onSelect: toggleSwitcher
+              },
+              { label: '', separator: true },
+              { label: 'New board…', icon: <Plus />, onSelect: createNewBoard }
+            ]
           },
           {
-            label: mode.pinnedChat ? 'Unpin chat (auto-recede when inspecting board)' : 'Pin chat open',
-            icon: <Pin />,
-            onSelect: () => setMode({ pinnedChat: !mode.pinnedChat })
+            label: 'Layout & Chat',
+            icon: <LayoutGrid />,
+            children: [
+              {
+                label: mode.pinnedChat ? 'Unpin chat (auto-recede when inspecting board)' : 'Pin chat open',
+                icon: <Pin />,
+                onSelect: () => setMode({ pinnedChat: !mode.pinnedChat })
+              },
+              {
+                label: mode.peekTable ? 'Show chat' : 'Hide chat completely',
+                icon: mode.peekTable ? <MessageSquare /> : <Eye />,
+                onSelect: () => setMode({ peekTable: !mode.peekTable })
+              },
+              { label: '', separator: true },
+              {
+                label: mode.layoutMode === 'grid' ? 'Switch to Tabletop slates' : 'Switch to Resizable Grid',
+                icon: mode.layoutMode === 'grid' ? <LayoutGrid /> : <Grid />,
+                onSelect: () => setMode({ layoutMode: mode.layoutMode === 'grid' ? 'tabletop' : 'grid' })
+              },
+              {
+                label: 'Character Creator (Dual-Panel)',
+                icon: <UserRound />,
+                onSelect: () => setMode({ layoutMode: 'creator' })
+              }
+            ]
           },
           {
-            label: mode.layoutMode === 'grid' ? 'Switch to Tabletop slates' : 'Switch to Resizable Grid',
-            icon: mode.layoutMode === 'grid' ? <LayoutGrid /> : <Grid />,
-            onSelect: () => setMode({ layoutMode: mode.layoutMode === 'grid' ? 'tabletop' : 'grid' })
-          },
-          {
-            label: 'Character Creator (Dual-Panel)',
-            icon: <UserRound />,
-            onSelect: () => setMode({ layoutMode: 'creator' })
-          },
-          {
-            label: mode.showPlayTable ? 'Hide Play view table' : 'Show Play view table',
-            icon: <MapIcon />,
-            onSelect: () => setMode({ showPlayTable: !mode.showPlayTable })
-          },
-          {
-            label: mode.peekTable ? 'Show chat' : 'Hide chat completely',
-            icon: mode.peekTable ? <MessageSquare /> : <Eye />,
-            onSelect: () => setMode({ peekTable: !mode.peekTable })
-          },
-          { label: 'New board…', icon: <Plus />, onSelect: createNewBoard },
-          {
-            label: 'Return to standard chat',
-            icon: <Maximize2 />,
-            onSelect: () => setMode({ windowed: false, peekTable: false })
+            label: 'Chat view mode',
+            icon: <LayoutDashboard />,
+            children: [
+              { label: 'Default', icon: <MessageSquare />, onSelect: () => setChatViewMode('default') },
+              { label: 'Tabletop', icon: <LayoutDashboard />, onSelect: () => setChatViewMode('tabletop') },
+              { label: 'Cinema', icon: <Clapperboard />, onSelect: () => setChatViewMode('cinema') }
+            ]
           }
         ])
       }}
       className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
     >
-      {/* BACKGROUND LAYER 1: OPTIONAL LIVE PLAY VIEW */}
-      {mode.showPlayTable && activeWorldId && (
-        <div className="absolute inset-0 z-0 overflow-hidden">
-          <WorldPlay world={activeWorldId} />
-        </div>
-      )}
-
       {/* LAYER 2: UNIFIED BOARD SURFACE (SHARES STACKING CONTEXT SO EXPANDED SLATES SIT ABOVE UNPINNED CHAT) */}
       {dashboard && (
         <div className="pointer-events-none absolute inset-0 overflow-hidden">

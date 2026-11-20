@@ -4,7 +4,6 @@ import type { Point } from '@shared/shapes'
 import type { CompendiumRef } from '@shared/compendium'
 import type { StoredFaction } from '@shared/game/factions'
 import type { CreatureDisposition, CreatureSpawner, SpawnerResetMode, SpawnerTriggerMode } from '@shared/maps'
-import { guessCreatureFaction } from '@shared/game/creatures'
 import { Button, Modal, Select, Input } from '../ui'
 import { useCompendiumList } from '../dnd/useCompendiumList'
 import { engine } from '../../lib/ipc'
@@ -67,7 +66,7 @@ export function PlaceSpawnerModal({ at, onClose, onPlaced }: Props) {
   const handleSelect = (m: CompendiumRef) => {
     setSelectedMonster(m)
     setName(m.name)
-    setFactionId(guessCreatureFaction(m))
+    setFactionId((prev) => prev || factions.find((f) => f.defaultStance === disposition)?.id || factions[0]?.id || '')
   }
 
   // Auto-select first if none selected

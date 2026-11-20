@@ -1,6 +1,6 @@
 import { Component, registerComponent, type GameEntity, type TooltipRow } from '../core'
 import { Resource } from './Resource'
-import { Action, ActionPiece, type EffectLane, type UseContext } from './Action'
+import { Action, ActionPiece, chainScore, type EffectLane, type UseContext } from './Action'
 import { Equipment, Inventory, Item, Wearable } from './Inventory'
 import { ItemResource } from './item/ItemResource'
 import { Weapon } from './item/Weapon'
@@ -35,12 +35,11 @@ export class Ability extends Action {
   static readonly type: string = 'ability'
   static readonly LABEL: string = 'Ability'
   static readonly ICON: string = 'Wand2'
-  static readonly DESCRIPTION: string = 'An ability or spell. Using it pays its cost, starts its cooldown and sends OnUse to its pieces, which chain by sending further events.'
+  static readonly DESCRIPTION: string = 'An ability or spell. Using it pays its cost and sends OnUse to its pieces, which chain by sending further events.'
   static readonly PARAMS = {
     id: { kind: 'text' as const, default: '', description: 'Which ability this is.' },
     label: { kind: 'text' as const, default: '', description: 'Its name.' },
     cost: { kind: 'values' as const, templateKind: 'stat', default: {}, description: 'Resource stat id to amount spent on use.', section: 'Costs' },
-    cooldown: { kind: 'number' as const, default: 0, min: 0, description: 'Seconds before it can be used again.', section: 'Timing and reach' },
     range: { kind: 'number' as const, default: 5, min: 0, description: 'Reach in feet. 0 is self only.', section: 'Timing and reach' },
     weaponRange: { kind: 'flag' as const, default: false, description: 'Use the reach of the weapon it is inside instead of Range.', section: 'Timing and reach' },
     unarmedOnly: { kind: 'flag' as const, default: false, description: 'Only available when no weapon is equipped (e.g. fists). Natural weapons like claws leave this off.', section: 'Timing and reach' },
@@ -51,7 +50,6 @@ export class Ability extends Action {
     permanent: { kind: 'flag' as const, default: false, description: 'Keep this ability even if its granting class is lost.' }
   }
   static readonly LANES: EffectLane[] = [{ event: 'OnUse', label: 'When used' }]
-  cooling = 0
 
   canApply(host: Component | GameEntity): true | string {
     if (host instanceof Abilities || host instanceof Item) return true
@@ -105,7 +103,6 @@ export class Ability extends Action {
       if (this.item) return `${String(this.item.params.label || this.item.id)} has to be worn`
       return this.params.unarmedOnly && hasWieldedWeapon(this.entity) ? 'unavailable while wielding a weapon' : 'it is not known'
     }
-    if (this.cooling > 0) return `ready in ${Math.ceil(this.cooling)} s`
     if (ctx.distance > this.reach() && ctx.target !== ctx.user) return 'out of range'
     for (const [stat, amount] of Object.entries(this.cost)) if ((Resource.of(ctx.user, stat)?.get() ?? 0) < amount) return `not enough ${ctx.user.catalog.stat(stat)?.label ?? stat}`
     for (const [id, amount] of Object.entries(this.itemCost)) {
@@ -130,7 +127,6 @@ export class Ability extends Action {
       let left = count
       for (const stack of [...(bag?.items ?? [])]) if (left > 0 && stack.id === id) left -= bag!.take(stack, left)
     }
-    this.cooling = Number(this.params.cooldown)
     ctx.user.emit('OnCast', { ability: this.id, target: ctx.target?.uid ?? null })
     this.fire('OnUse', ctx)
     return true
@@ -138,22 +134,9 @@ export class Ability extends Action {
 
   score(ctx: UseContext): number {
     if (this.canUse(ctx) !== true) return 0
-    return this.comps.reduce((sum, c) => sum + (c instanceof ActionPiece ? c.score(ctx) : 0), 0)
+    return chainScore(this, 'OnUse', ctx)
   }
 
-  tickSim(seconds: number): void {
-    super.tickSim(seconds)
-    this.cooling = Math.max(0, this.cooling - seconds)
-  }
-
-  protected saveState(): Record<string, unknown> {
-    return { ...super.saveState(), cooling: this.cooling }
-  }
-
-  protected loadState(state: Record<string, unknown>): void {
-    super.loadState(state)
-    this.cooling = Number(state.cooling) || 0
-  }
 }
 
 export class Abilities extends Component {
@@ -186,7 +169,7 @@ export class Abilities extends Component {
   }
 
   tooltipRows(): TooltipRow[] {
-    return this.known.map((a) => ({ label: String(a.params.label || a.id), value: a.cooling > 0 ? `${Math.ceil(a.cooling)} s` : 'ready' }))
+    return this.known.map((a) => ({ label: String(a.params.label || a.id), value: Object.entries(a.cost).map(([s, n]) => `${n} ${this.entity?.catalog.stat(s)?.label ?? s}`).join(', ') || 'free' }))
   }
 }
 

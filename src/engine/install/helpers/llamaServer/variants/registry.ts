@@ -1,13 +1,7 @@
 import type { ReleaseAsset, Settings } from '../../../registry'
-import type { Machine } from '../machine'
+import type { Machine, VariantChoice } from '../../../machine'
 
-export interface VariantChoice {
-  build: string
-  label: string
-  assets: ReleaseAsset[]
-  unavailable: string | null
-  notes: string[]
-}
+export type { VariantChoice }
 
 export interface ServerVariant {
   id: string

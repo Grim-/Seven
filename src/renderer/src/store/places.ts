@@ -30,6 +30,7 @@ function writeCachedPlace(key: string, value: unknown): void {
 }
 
 function commitPlace(key: string, value: unknown): void {
+  if (!usePlaces.getState().loaded) return
   pending.set(key, value)
   void engine('places.set', { key, value })
     .then(() => {

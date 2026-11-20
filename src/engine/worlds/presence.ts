@@ -4,7 +4,7 @@ import { catalogFrom } from '@shared/game/defs'
 import { placesIn, type PlaceVisitor } from '@shared/maps'
 import { PLACE_TYPE_KEY } from '@shared/world'
 import { gameDefs } from '../../modules/game/store'
-import { getSheet, sheetLine } from '../library/sheets'
+import { getSheet, sheetIds, sheetLine } from '../library/sheets'
 import type { CharacterSheet } from '@shared/types'
 import { agentAccess } from '../agents/access'
 import { worlds } from './store'
@@ -27,7 +27,7 @@ export function visitorOf(s: CharacterSheet, agents: { id: string; sheet?: strin
     name: s.title,
     image: s.image,
     line: sheetLine(s),
-    dnd: s.dnd ? { hp: s.dnd.hp, ac: s.dnd.ac, stats: s.dnd.stats, conditions: s.dnd.conditions } : null,
+    dnd: s.dnd ? { hp: s.dnd.hp, ac: s.dnd.ac, stats: s.dnd.stats, conditions: s.dnd.conditions, speed: s.dnd.speed, hitDice: s.dnd.hitDice } : null,
     game: s.game ?? null,
     gameRules: s.gameRules ?? '',
     faction: s.faction ?? null,
@@ -49,19 +49,28 @@ export function visitorsOf(ids: string[]): PlaceVisitor[] {
 }
 
 export function whoIsHere(world: string): Record<string, PlaceVisitor[]> {
-  if (!worlds.schema(world).types[PLACE_TYPE_KEY]) return {}
+  if (!worlds.exists(world)) return {}
   const places = worlds.entities(world, PLACE_TYPE_KEY, false)
   const agents = agentAccess.list()
   const out: Record<string, PlaceVisitor[]> = {}
-  for (const id of Object.keys(saveInPlay(world, false)?.characters ?? {})) {
+  const save = saveInPlay(world, false)
+  const seen = new Set<string>()
+
+  const pushSheet = (id: string, requireUnbound: boolean) => {
+    if (seen.has(id)) return
     let s: CharacterSheet
     try {
       s = getSheet(id)
     } catch (err) {
       noteFailure(err, 'worlds', "Could not read a character's place")
-      continue
+      return
     }
+    if (requireUnbound && s.save) return
+    seen.add(id)
     for (const key of placesIn(s.story.where, world, places)) out[key] = [...(out[key] ?? []), visitorOf(s, agents)]
   }
+
+  for (const id of Object.keys(save?.characters ?? {})) pushSheet(id, false)
+  for (const { id } of sheetIds()) pushSheet(id, true)
   return out
 }

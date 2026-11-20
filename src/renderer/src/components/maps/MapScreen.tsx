@@ -31,6 +31,7 @@ import { useEscapeLayer } from '../../lib/escape'
 import { importMapFile } from './importMapFile'
 import { useMapPictures } from './useMapPictures'
 import { useMap } from './useMap'
+import { mapImageContext, useRegisterImageContext } from '../../lib/imagePromptContext'
 import { generateDungeon, generateMap, resolveDungeonTiles, resolveOverworldTiles } from 'agent_map_gen'
 import type { GenerateConfig } from './GenerateMapModal'
 import { OverlayToolbar, type MapTool } from './OverlayToolbar'
@@ -117,6 +118,20 @@ function MapEditor({ source }: { source: MapData }) {
   const picture = layer?.kind === 'image' ? layer : null
   const selectedSpawner = draft.spawners?.find((s) => s.id === selectedSpawnerId) ?? null
   const selectedShapeForm = selectedShapeId ? draft.shapes?.[selectedShapeId] ?? null : null
+  const mapContext = useMemo(() => {
+    const zoneNames = Object.keys(draft.shapes ?? {})
+    const layerNames = draft.layers.map((l) => l.name).filter(Boolean)
+    const fields: { label: string; text: string }[] = [
+      { label: 'Map size', text: `${draft.size.w}×${draft.size.h} tiles` }
+    ]
+    if (zoneNames.length) fields.push({ label: 'Zones', text: zoneNames.slice(0, 12).join(', ') })
+    if (layerNames.length) fields.push({ label: 'Layers', text: layerNames.slice(0, 10).join(', ') })
+    if (object) {
+      fields.push({ label: 'Object', text: object.name || 'Map object' })
+    }
+    return mapImageContext(showName(draft.name) || 'Map', fields)
+  }, [draft.name, draft.size.w, draft.size.h, draft.shapes, draft.layers, object])
+  useRegisterImageContext(mapContext)
 
   useEscapeLayer(object !== null || picture !== null || selectedSpawner !== null || selectedShapeId !== null || drawingShape !== null, () => {
     setSelected(null)
@@ -316,12 +331,7 @@ function MapEditor({ source }: { source: MapData }) {
         config.type === 'dungeon'
           ? resolveDungeonTiles(result as any, { firstGid: 1 })
           : resolveOverworldTiles(result as any, { firstGid: 1 })
-      const assets = await engine('data.assets.list')
-      let asset = assets.find((a) => a.name.includes('terrain-map-v7'))
-      if (!asset) {
-        const imported = await engine('data.assets.import', { paths: ['O:\\GitHub\\seven\\terrain-map-v7.png'] })
-        asset = imported[0]
-      }
+      const asset = await engine('maps.ensureDefaultTileset')
       if (asset) {
         useData.getState().onAsset(asset.id, asset)
       }

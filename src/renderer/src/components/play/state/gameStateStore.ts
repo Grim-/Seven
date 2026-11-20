@@ -1,384 +1,325 @@
 import { create } from 'zustand'
 import type { Point } from '@shared/shapes'
+import { type ActionPiece, Health, Stats, actionHasGroup, usableAbilities } from '@shared/game/components'
+import { GameEntity, type Catalog, type TimeDef } from '@shared/game/core'
+import { HARM } from '@shared/game/effectGroups'
+import { pointsDistanceFeet } from '@shared/game/nav'
+import type { BattleRecord } from '@shared/game/state/battle'
+import type { BattleState, CombatAttack, Combatant } from '@shared/game/state/BattleStateMachine'
+import type { MapToken } from '../../maps/TokenLayer'
 import { engine } from '../../../lib/ipc'
 import { failed } from '../../../lib/notify'
-import {
-  type GameStateContext,
-  transitionGameState
-} from '@shared/game/state/GameStateMachine'
-import {
-  type BattleState,
-  type Combatant,
-  createInitialBattleState,
-  advanceBattleTurn,
-  spendMovement as spendMove,
-  spendAction as spendAct,
-  spendBonusAction as spendBonus,
-  executeAttack
-} from '@shared/game/state/BattleStateMachine'
-import { useDialogue } from '../dialogue/dialogueStore'
+import { toast } from '../../../store/toasts'
+import { usePlayScene } from '../scenes/sceneStore'
+import { findDefenseRollAbility, findMovementAbility, runAbilityUse } from './combatGate'
 
-export interface LastCombatRoll {
-  attackerName: string
-  targetName: string
-  attackName: string
-  d20: number
-  bonus: number
-  total: number
-  targetAc: number
-  hit: boolean
-  isCrit: boolean
-  damage: number
-  timestamp: number
+function attacksOf(entity: GameEntity | null): CombatAttack[] {
+  if (!entity) return []
+  return usableAbilities(entity)
+    .filter((a) => actionHasGroup(a, HARM))
+    .map((a) => {
+      const dmg = a.comps
+        .filter((c) => (c.constructor as typeof ActionPiece).GROUP === HARM)
+        .flatMap((c) => c.tooltipRows())
+        .map((r) => r.value)
+        .filter(Boolean)
+        .join(' + ')
+      return { id: a.uid, name: String(a.params.label || a.id), range: a.reach(), damage: dmg }
+    })
+}
+
+function projectBattle(
+  record: BattleRecord | null,
+  tokens: MapToken[],
+  catalog: Catalog | null,
+  timeDef: TimeDef | null
+): BattleState | null {
+  if (!record) return null
+  const activeId = record.queue[record.activeIndex]?.id
+  const speedStat = timeDef?.speedStat ?? ''
+  const defaultSpeed = speedStat ? (catalog?.stat(speedStat)?.default ?? 0) : 0
+  let activeDodging = false
+
+  const queue: Combatant[] = record.queue.map((p) => {
+    const tok = tokens.find((t) => (p.kind === 'sheet' ? t.visitor.sheet === p.id : t.visitor.token === p.id))
+    const v = tok?.visitor
+    const ent = v?.game && catalog ? GameEntity.fromRecord(v.game, catalog) : null
+    const hpComp = ent?.comp(Health)
+    const hp = hpComp
+      ? { cur: Math.max(0, Math.round(hpComp.get())), max: Math.max(1, Math.round(hpComp.max())) }
+      : (v?.hp ?? v?.dnd?.hp ?? { cur: 0, max: 0 })
+    const ac = ent?.comp(Stats)?.value('armour') ?? v?.dnd?.ac ?? (catalog?.stat('armour')?.default ?? 0)
+    const statSpeed = speedStat ? ent?.comp(Stats)?.value(speedStat) : undefined
+    const speedMax = record.economy.movementMax || statSpeed || defaultSpeed
+    if (p.id === activeId && ent) {
+      activeDodging = Boolean(ent.rollFlags('incoming').disadvantage)
+    }
+    return {
+      id: p.id,
+      name: v?.name ?? p.id,
+      sheet: p.kind === 'sheet' ? p.id : undefined,
+      image: v?.image ?? null,
+      isPlayer: p.side === 'party',
+      isAlly: p.side === 'ally',
+      initiative: p.initiative,
+      hp,
+      ac,
+      speedMax: v?.dnd?.speed ?? speedMax,
+      at: tok?.at,
+      attacks: attacksOf(ent),
+      faction: p.faction || v?.faction || null
+    }
+  })
+
+  return {
+    id: record.id,
+    round: record.round,
+    queue,
+    activeTurnIndex: Math.min(Math.max(0, record.activeIndex), Math.max(0, queue.length - 1)),
+    economy: {
+      movementRemaining: record.economy.movementRemaining,
+      movementMax: record.economy.movementMax || queue[record.activeIndex]?.speedMax || defaultSpeed,
+      actionUsed: record.economy.actionUsed,
+      bonusActionUsed: record.economy.bonusActionUsed,
+      reactionUsed: Boolean(activeId && record.economy.reactionUsedBy[activeId]),
+      isDodging: activeDodging
+    },
+    status: record.status,
+    logs: record.logs.map((l) => ({
+      id: l.id,
+      round: l.round,
+      actorName: l.actorName,
+      text: l.text,
+      type: l.type,
+      timestamp: l.timestamp
+    }))
+  }
 }
 
 interface GameEngineStore {
-  context: GameStateContext
+  world: string | null
+  map: string | null
+  tileWidth: number
+  tileFeet: number
+  catalog: Catalog | null
+  timeDef: TimeDef | null
+  tokens: MapToken[]
+  tokensSig: string
+  record: BattleRecord | null
   battle: BattleState | null
-  lastRoll: LastCombatRoll | null
-  viewMode: 'map' | 'arena'
 
-  // Exploration & State transitions
-  startInteraction: (targetId: string, targetName?: string) => void
-  endInteraction: () => void
-  openModal: (modalId: string) => void
-  closeModal: () => void
+  syncFromSave: (opts: {
+    world: string
+    map: string
+    tileWidth: number
+    tileFeet: number
+    record: BattleRecord | null
+    tokens: MapToken[]
+    tokensSig?: string
+    catalog: Catalog | null
+    timeDef: TimeDef | null
+  }) => void
 
-  // Combat State Machine
-  startBattle: (combatants: Omit<Combatant, 'initiative'>[]) => void
-  endTurn: () => void
-  spendMovement: (feet: number) => void
-  useAction: () => void
-  useBonusAction: () => void
-  dodgeAction: () => void
-  dashAction: () => void
-  moveActor: (at: Point, distanceFeet: number) => void
-  attackTarget: (targetId: string, attackName?: string) => { hit: boolean; damage: number } | null
-  executeAiTurn: () => void
-  parleyWithEnemy: (enemyId: string, recruited?: boolean) => void
-  clearLastRoll: () => void
-  setViewMode: (mode: 'map' | 'arena') => void
-  toggleViewMode: () => void
-  endBattle: (outcome: 'victory' | 'defeat' | 'flee') => void
+  startBattle: (initiatorId: string, targetIds: string[]) => Promise<void>
+  endTurn: () => Promise<void>
+  dashAction: () => Promise<void>
+  dodgeAction: () => Promise<void>
+  moveActor: (at: Point) => Promise<void>
+  attackTarget: (targetId: string, abilityKey?: string) => Promise<void>
+  executeAiTurn: () => Promise<void>
+  parleyWithEnemy: (enemyId: string, recruited?: boolean, checkId?: string) => Promise<void>
+  endBattle: (outcome?: 'victory' | 'defeat' | 'flee') => Promise<void>
+}
+
+function runCombatSelfAbility(
+  getState: () => GameEngineStore,
+  kind: 'movement' | 'defenseRoll',
+  missingMessage: string
+): void {
+  const { world, battle, tokens, catalog } = getState()
+  if (!world || !battle || battle.status !== 'active' || !catalog) return
+  const active = battle.queue[battle.activeTurnIndex]
+  if (!active?.sheet) return
+  const tok = tokens.find((t) => t.visitor.sheet === active.sheet)
+  const ent = tok?.visitor.game ? GameEntity.fromRecord(tok.visitor.game, catalog) : null
+  if (!ent) return
+  const ability = kind === 'movement' ? findMovementAbility(ent) : findDefenseRollAbility(ent, catalog)
+  if (!ability) {
+    toast.info('Ability Missing', missingMessage)
+    return
+  }
+  runAbilityUse({
+    sheet: active.sheet,
+    entity: ent,
+    ability,
+    target: { sheet: active.sheet },
+    at: active.at ?? null,
+    distance: 0,
+    world,
+    battle
+  })
+}
+
+function syncBattleRecord(get: () => GameEngineStore, record: BattleRecord | null | undefined): void {
+  const { world, map, tileWidth, tileFeet, tokens, tokensSig, catalog, timeDef } = get()
+  if (!world || !map) return
+  get().syncFromSave({
+    world,
+    map,
+    tileWidth,
+    tileFeet,
+    record: record ?? null,
+    tokens,
+    tokensSig,
+    catalog,
+    timeDef
+  })
 }
 
 export const useGameState = create<GameEngineStore>((set, get) => ({
-  context: {
-    mode: 'EXPLORATION',
-    activeEntityId: null,
-    activeTargetId: null,
-    activeModalId: null,
-    paused: false
-  },
+  world: null,
+  map: null,
+  tileWidth: 32,
+  tileFeet: 5,
+  catalog: null,
+  timeDef: null,
+  tokens: [],
+  tokensSig: '',
+  record: null,
   battle: null,
-  lastRoll: null,
-  viewMode: 'map',
 
-  startInteraction: (targetId, targetName) => {
-    set((s) => ({
-      context: transitionGameState(s.context, {
-        type: 'START_INTERACTION',
-        targetId,
-        targetName
-      })
-    }))
-  },
-
-  endInteraction: () => {
-    set((s) => ({
-      context: transitionGameState(s.context, { type: 'END_INTERACTION' })
-    }))
-  },
-
-  openModal: (modalId) => {
-    set((s) => ({
-      context: transitionGameState(s.context, { type: 'OPEN_MODAL', modalId })
-    }))
-  },
-
-  closeModal: () => {
-    set((s) => ({
-      context: transitionGameState(s.context, { type: 'CLOSE_MODAL' })
-    }))
-  },
-
-  startBattle: (combatants) => {
-    const battle = createInitialBattleState(combatants)
-    set((s) => ({
-      battle,
-      lastRoll: null,
-      context: transitionGameState(s.context, { type: 'START_BATTLE' })
-    }))
-    useDialogue.getState().addNarration(
-      'dm',
-      'WORLD NARRATOR',
-      `Battle commenced! Initiative order established with ${combatants.length} combatants.`
-    )
-  },
-
-  endTurn: () => {
-    const current = get().battle
-    if (!current) return
-    const next = advanceBattleTurn(current)
-    set({ battle: next })
-  },
-
-  spendMovement: (feet) => {
-    const current = get().battle
-    if (!current) return
-    set({ battle: spendMove(current, feet) })
-  },
-
-  useAction: () => {
-    const current = get().battle
-    if (!current) return
-    set({ battle: spendAct(current) })
-  },
-
-  useBonusAction: () => {
-    const current = get().battle
-    if (!current) return
-    set({ battle: spendBonus(current) })
-  },
-
-  dodgeAction: () => {
-    const current = get().battle
-    if (!current) return
-    const activeActor = current.queue[current.activeTurnIndex]
-    const stateWithAct = spendAct(current)
-    set({
-      battle: {
-        ...stateWithAct,
-        economy: { ...stateWithAct.economy, isDodging: true },
-        logs: [
-          ...stateWithAct.logs.slice(-30),
-          {
-            id: crypto.randomUUID(),
-            round: current.round,
-            actorName: activeActor.name,
-            text: `${activeActor.name} takes the Dodge action! Attacks against them have disadvantage.`,
-            type: 'info',
-            timestamp: Date.now()
-          }
-        ]
-      }
-    })
-    useDialogue.getState().addNarration(
-      'dm',
-      'WORLD NARRATOR',
-      `${activeActor.name} adopts a defensive dodge posture, increasing evasiveness.`
-    )
-  },
-
-  dashAction: () => {
-    const current = get().battle
-    if (!current) return
-    const activeActor = current.queue[current.activeTurnIndex]
-    const stateWithAct = spendAct(current)
-    set({
-      battle: {
-        ...stateWithAct,
-        economy: {
-          ...stateWithAct.economy,
-          movementRemaining: stateWithAct.economy.movementRemaining + activeActor.speedMax
-        },
-        logs: [
-          ...stateWithAct.logs.slice(-30),
-          {
-            id: crypto.randomUUID(),
-            round: current.round,
-            actorName: activeActor.name,
-            text: `${activeActor.name} dashes! Movement increased by +${activeActor.speedMax} ft.`,
-            type: 'move',
-            timestamp: Date.now()
-          }
-        ]
-      }
-    })
-    useDialogue.getState().addNarration(
-      'dm',
-      'WORLD NARRATOR',
-      `${activeActor.name} dashes, extending tactical movement range by +${activeActor.speedMax} FT.`
-    )
-  },
-
-  moveActor: (at, distanceFeet) => {
-    const current = get().battle
-    if (!current) return
-    const activeActor = current.queue[current.activeTurnIndex]
-    const nextQueue = current.queue.map((c) => (c.id === activeActor.id ? { ...c, at } : c))
-    const withMove = spendMove({ ...current, queue: nextQueue }, distanceFeet)
-    set({ battle: withMove })
-    if (activeActor.sheet) {
-      void engine('game.onMove', { sheet: activeActor.sheet, distance: distanceFeet }).catch(failed('Could not trigger move traits'))
+  syncFromSave: ({ world, map, tileWidth, tileFeet, record, tokens, tokensSig = '', catalog, timeDef }) => {
+    const prev = get()
+    if (
+      prev.world === world &&
+      prev.map === map &&
+      prev.tileWidth === tileWidth &&
+      prev.tileFeet === tileFeet &&
+      prev.record === record &&
+      prev.tokensSig === tokensSig &&
+      prev.catalog === catalog &&
+      prev.timeDef === timeDef
+    ) {
+      if (!record) usePlayScene.getState().endBattle()
+      return
+    }
+    const prevStatus = prev.record?.status ?? null
+    const battle = projectBattle(record, tokens, catalog, timeDef)
+    set({ world, map, tileWidth, tileFeet, catalog, timeDef, tokens, tokensSig, record, battle })
+    if (record?.status === 'active' && prevStatus !== 'active') {
+      usePlayScene.getState().startBattle()
+    } else if (!record) {
+      usePlayScene.getState().endBattle()
     }
   },
 
-  attackTarget: (targetId, attackName) => {
-    const current = get().battle
-    if (!current || current.economy.actionUsed) return null
-    const activeActor = current.queue[current.activeTurnIndex]
-    const target = current.queue.find((c) => c.id === targetId)
-    if (!activeActor || !target) return null
+  startBattle: async (initiatorId, targetIds) => {
+    const { world, map } = get()
+    if (!world || !map || !initiatorId || !targetIds.length) return
+    try {
+      const saved = await engine('battle.start', { world, map, initiatorId, targetIds })
+      syncBattleRecord(get, saved.battle)
+    } catch (err) {
+      failed('Could not start battle')(err)
+    }
+  },
 
-    const chosenAttack = activeActor.attacks?.find((a) => a.name === attackName) ?? activeActor.attacks?.[0]
-    const { nextState, hit, isCrit, d20, bonus, roll, targetAc, damage } = executeAttack(
-      current,
-      activeActor.id,
-      targetId,
-      attackName
-    )
+  endTurn: async () => {
+    const { world } = get()
+    if (!world) return
+    try {
+      const saved = await engine('battle.endTurn', { world })
+      syncBattleRecord(get, saved.battle)
+    } catch (err) {
+      failed('Could not end turn')(err)
+    }
+  },
 
-    set({
-      battle: nextState,
-      lastRoll: {
-        attackerName: activeActor.name,
-        targetName: target.name,
-        attackName: chosenAttack?.name ?? 'Strike',
-        d20,
-        bonus,
-        total: roll,
-        targetAc,
-        hit,
-        isCrit,
-        damage,
-        timestamp: Date.now()
+  dashAction: async () => {
+    runCombatSelfAbility(get, 'movement', 'Active combatant has no movement-granting ability.')
+  },
+
+  dodgeAction: async () => {
+    runCombatSelfAbility(get, 'defenseRoll', 'Active combatant has no defensive roll-modifier ability.')
+  },
+
+  moveActor: async (at) => {
+    const { world, battle } = get()
+    const active = battle?.queue[battle.activeTurnIndex]
+    if (!world || !active) return
+    try {
+      const saved = await engine('battle.move', { world, actorId: active.id, at })
+      syncBattleRecord(get, saved.battle)
+    } catch (err) {
+      failed('Could not move')(err)
+    }
+  },
+
+  attackTarget: async (targetId, abilityKey) => {
+    const { world, battle, tileWidth, tileFeet } = get()
+    if (!world || !battle || battle.status !== 'active') return
+    const active = battle.queue[battle.activeTurnIndex]
+    const target = battle.queue.find((c) => c.id === targetId)
+    if (!active || !active.sheet || !target) return
+    const chosen = (abilityKey ? active.attacks.find((a) => a.id === abilityKey || a.name === abilityKey) : null) ?? active.attacks[0]
+    if (!chosen) {
+      toast.info('No Attack', `${active.name} has no usable attack ability.`)
+      return
+    }
+    const dist = active.at && target.at ? Math.round(pointsDistanceFeet(active.at, target.at, tileWidth, tileFeet)) : 0
+    try {
+      const msg = await engine('game.useAbility', {
+        sheet: active.sheet,
+        ability: chosen.id,
+        target: target.sheet ? { sheet: target.sheet } : { creature: target.id },
+        world,
+        at: target.at ?? null,
+        distance: dist
+      })
+      toast.info(chosen.name, msg)
+    } catch (err) {
+      failed(`Could not use ${chosen.name}`)(err)
+    }
+  },
+
+  executeAiTurn: async () => {
+    const { world } = get()
+    if (!world) return
+    try {
+      const saved = await engine('battle.stepAi', { world })
+      syncBattleRecord(get, saved.battle)
+    } catch (err) {
+      failed('Enemy turn failed')(err)
+    }
+  },
+
+  parleyWithEnemy: async (enemyId, recruited = false, checkId) => {
+    const { world } = get()
+    if (!world) return
+    try {
+      const saved = await engine('battle.parley', { world, targetId: enemyId, mode: recruited ? 'recruit' : 'truce', checkId })
+      syncBattleRecord(get, saved.battle)
+    } catch (err) {
+      failed('Could not parley')(err)
+    }
+  },
+
+  endBattle: async (outcome) => {
+    const { world, battle } = get()
+    if (!world) {
+      set({ record: null, battle: null })
+      usePlayScene.getState().endBattle()
+      return
+    }
+    try {
+      if (outcome === 'flee' && battle?.status === 'active') {
+        await engine('battle.flee', { world })
       }
-    })
-
-    if (isCrit) {
-      useDialogue.getState().say(activeActor.sheet ?? activeActor.id, activeActor.name, 'Critical strike landed!')
-      useDialogue.getState().addNarration('dm', 'WORLD NARRATOR', `${activeActor.name} lands a critical strike on ${target.name} for ${damage} damage!`)
-    } else if (hit) {
-      useDialogue.getState().addNarration('dm', 'WORLD NARRATOR', `${activeActor.name} strikes ${target.name} dealing ${damage} damage.`)
-    } else {
-      useDialogue.getState().addNarration('dm', 'WORLD NARRATOR', `${activeActor.name}'s attack misses ${target.name} (AC ${targetAc}).`)
+      const saved = await engine('battle.end', { world })
+      syncBattleRecord(get, saved.battle)
+      usePlayScene.getState().endBattle()
+    } catch (err) {
+      failed('Could not close battle')(err)
     }
-
-    return { hit, damage }
-  },
-
-  executeAiTurn: () => {
-    const current = get().battle
-    if (!current || current.status !== 'active') return
-    const activeActor = current.queue[current.activeTurnIndex]
-    if (!activeActor || activeActor.isPlayer) return
-
-    // Find living player target
-    const target = current.queue.find((c) => c.isPlayer && c.hp.cur > 0)
-    if (target) {
-      const chosenAttack = activeActor.attacks?.[0]
-      const { nextState, hit, isCrit, d20, bonus, roll, targetAc, damage } = executeAttack(
-        current,
-        activeActor.id,
-        target.id,
-        chosenAttack?.name
-      )
-      const afterTurn = advanceBattleTurn(nextState)
-      set({
-        battle: afterTurn,
-        lastRoll: {
-          attackerName: activeActor.name,
-          targetName: target.name,
-          attackName: chosenAttack?.name ?? 'Strike',
-          d20,
-          bonus,
-          total: roll,
-          targetAc,
-          hit,
-          isCrit,
-          damage,
-          timestamp: Date.now()
-        }
-      })
-
-      if (isCrit) {
-        useDialogue.getState().say(activeActor.sheet ?? activeActor.id, activeActor.name, `${activeActor.name} lands a critical hit!`)
-        useDialogue.getState().addNarration('dm', 'WORLD NARRATOR', `${activeActor.name} scores a critical hit on ${target.name} for ${damage} damage!`)
-      } else if (hit) {
-        useDialogue.getState().say(activeActor.sheet ?? activeActor.id, activeActor.name, `${activeActor.name} attacks!`)
-        useDialogue.getState().addNarration('dm', 'WORLD NARRATOR', `${activeActor.name} hits ${target.name} dealing ${damage} damage.`)
-      } else {
-        useDialogue.getState().addNarration('dm', 'WORLD NARRATOR', `${activeActor.name} attacks ${target.name} but misses.`)
-      }
-    } else {
-      const afterTurn = advanceBattleTurn(current)
-      set({ battle: afterTurn })
-    }
-  },
-
-  parleyWithEnemy: (enemyId, recruited = false) => {
-    const current = get().battle
-    if (!current) return
-    const enemy = current.queue.find((c) => c.id === enemyId)
-    if (!enemy) return
-
-    if (recruited) {
-      useDialogue.getState().say(enemy.sheet ?? enemy.id, enemy.name, 'We have an accord. I stand down.')
-      useDialogue.getState().addNarration('dm', 'WORLD NARRATOR', `${enemy.name} yields to negotiation and allies with your party.`)
-
-      // Enemy joins player party
-      const nextQueue = current.queue.map((c) =>
-        c.id === enemyId ? { ...c, isPlayer: true, faction: 'player' } : c
-      )
-      const livingEnemies = nextQueue.filter((c) => !c.isPlayer && c.hp.cur > 0)
-      const nextStatus = livingEnemies.length === 0 ? 'victory' : current.status
-      set({
-        battle: {
-          ...current,
-          queue: nextQueue,
-          status: nextStatus,
-          logs: [
-            ...current.logs.slice(-30),
-            {
-              id: crypto.randomUUID(),
-              round: current.round,
-              actorName: 'Diplomacy',
-              text: `${enemy.name} was persuaded to join your party! Faction switched to Player.`,
-              type: 'parley',
-              timestamp: Date.now()
-            }
-          ]
-        }
-      })
-    } else {
-      useDialogue.getState().say(enemy.sheet ?? enemy.id, enemy.name, 'I accept this truce. We shall cross paths again.')
-      useDialogue.getState().addNarration('dm', 'WORLD NARRATOR', `${enemy.name} agrees to a ceasefire and leaves the encounter field.`)
-
-      // Truce / stand down
-      const nextQueue = current.queue.filter((c) => c.id !== enemyId)
-      const livingEnemies = nextQueue.filter((c) => !c.isPlayer && c.hp.cur > 0)
-      const nextStatus = livingEnemies.length === 0 ? 'victory' : current.status
-      set({
-        battle: {
-          ...current,
-          queue: nextQueue,
-          status: nextStatus,
-          logs: [
-            ...current.logs.slice(-30),
-            {
-              id: crypto.randomUUID(),
-              round: current.round,
-              actorName: 'Diplomacy',
-              text: `A truce was agreed with ${enemy.name}. They stand down and depart.`,
-              type: 'parley',
-              timestamp: Date.now()
-            }
-          ]
-        }
-      })
-    }
-  },
-
-  clearLastRoll: () => set({ lastRoll: null }),
-  setViewMode: (mode) => set({ viewMode: mode }),
-  toggleViewMode: () => set((s) => ({ viewMode: s.viewMode === 'map' ? 'arena' : 'map' })),
-
-  endBattle: (outcome) => {
-    set((s) => ({
-      battle: null,
-      lastRoll: null,
-      context: transitionGameState(s.context, { type: 'END_BATTLE', outcome })
-    }))
   }
 }))

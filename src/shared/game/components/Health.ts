@@ -12,6 +12,10 @@ export interface Hit {
 export class Health extends Resource {
   static readonly type: string = 'health'
   static readonly DESCRIPTION: string = 'The resource that, at zero, kills the entity. Damage is resolved through the damage formula in data, using the damage type and the target\'s resist.'
+  static readonly PARAMS = {
+    ...Resource.PARAMS,
+    stat: { ...Resource.PARAMS.stat, default: 'health' }
+  }
   private dead = false
   private cause: string | null = null
 
@@ -47,8 +51,17 @@ export class Health extends Resource {
       entity.emit('OnHurt', payload)
       hit.source?.emit('OnDamageDealt', { ...payload, target: entity.uid })
     }
-    if (this.get() <= 0) this.kill(hit.cause)
+    if (this.get() <= 0) this.kill(hit.cause, hit.source)
     return dealt
+  }
+
+  set(value: number): number {
+    const delta = super.set(value)
+    if (this.dead && this.get() > 0) {
+      this.dead = false
+      this.cause = null
+    }
+    return delta
   }
 
   heal(amount: number, cause: string): number {
@@ -59,14 +72,15 @@ export class Health extends Resource {
     return done
   }
 
-  kill(cause: string | null): void {
+  kill(cause: string | null, source: GameEntity | null = null): void {
     if (this.dead) return
-    this.entity?.emit('OnBeforeDeath', { cause })
+    const payload = { cause, source: source?.uid ?? null }
+    this.entity?.emit('OnBeforeDeath', payload)
     if (this.dead || this.get() > 0) return
     this.dead = true
     this.cause = cause
     this.set(0)
-    this.entity?.emit('OnDeath', { cause })
+    this.entity?.emit('OnDeath', payload)
   }
 
   revive(fraction: number): void {
@@ -80,6 +94,10 @@ export class Health extends Resource {
   tickSim(seconds: number): void {
     if (this.dead) return
     super.tickSim(seconds)
+  }
+
+  refillable(): boolean {
+    return !this.dead
   }
 
   protected saveState(): Record<string, unknown> {

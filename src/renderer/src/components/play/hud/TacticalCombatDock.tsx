@@ -8,6 +8,7 @@ import {
   Zap
 } from 'lucide-react'
 import type { BattleState } from '@shared/game/state/BattleStateMachine'
+import { activeCombatManeuvers } from '../state/combatGate'
 import { useGameState } from '../state/gameStateStore'
 import { useDialogue } from '../dialogue/dialogueStore'
 import { defaultDialogueTree } from '@shared/game/dialogue'
@@ -34,9 +35,12 @@ export function TacticalCombatDock({
   const dashAction = useGameState((s) => s.dashAction)
   const dodgeAction = useGameState((s) => s.dodgeAction)
   const endTurn = useGameState((s) => s.endTurn)
+  const tokens = useGameState((s) => s.tokens)
+  const catalog = useGameState((s) => s.catalog)
+  const maneuvers = activeCombatManeuvers(battle, tokens, catalog)
 
   const [selectedAttack, setSelectedAttack] = useState<string>(
-    activeActor?.attacks?.[0]?.name ?? 'Strike'
+    activeActor?.attacks?.[0]?.id ?? activeActor?.attacks?.[0]?.name ?? ''
   )
 
   // Find target combatant
@@ -54,12 +58,12 @@ export function TacticalCombatDock({
           onAttack(targetCombatant.id, selectedAttack)
         }
       } else if (e.key === '2') {
-        if (!economy.actionUsed) {
+        if (maneuvers.canDash) {
           e.preventDefault()
           dashAction()
         }
       } else if (e.key === '3') {
-        if (!economy.actionUsed) {
+        if (maneuvers.canDodge) {
           e.preventDefault()
           dodgeAction()
         }
@@ -73,13 +77,11 @@ export function TacticalCombatDock({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isPlayerTurn, targetCombatant, economy.actionUsed, selectedAttack, onAttack, dashAction, dodgeAction])
+  }, [isPlayerTurn, targetCombatant, economy.actionUsed, maneuvers.canDash, maneuvers.canDodge, selectedAttack, onAttack, dashAction, dodgeAction])
 
   if (!activeActor) return null
 
-  const attacks = activeActor.attacks && activeActor.attacks.length > 0
-    ? activeActor.attacks
-    : [{ name: 'Strike', bonus: 3, damage: '1d6 + 2' }]
+  const attacks = activeActor.attacks ?? []
 
   return (
     <div className="pointer-events-auto absolute inset-x-0 bottom-2 z-30 flex justify-center font-mono select-none px-4">
@@ -96,7 +98,7 @@ export function TacticalCombatDock({
             <div className="flex items-center gap-2 text-[9.5px]">
               <span className="flex items-center gap-0.5 text-accent font-bold">
                 <Shield className="h-3 w-3 text-accent" />
-                AC {activeActor.ac ?? 12}
+                AC {activeActor.ac}
               </span>
               <span className="text-dim">
                 HP {activeActor.hp.cur}/{activeActor.hp.max}
@@ -121,16 +123,16 @@ export function TacticalCombatDock({
             <div className="flex items-center gap-1">
               {attacks.map((att) => (
                 <button
-                  key={att.name}
+                  key={att.id}
                   type="button"
                   disabled={!isPlayerTurn || economy.actionUsed || !targetCombatant}
                   onClick={() => {
-                    setSelectedAttack(att.name)
-                    if (targetCombatant) onAttack(targetCombatant.id, att.name)
+                    setSelectedAttack(att.id)
+                    if (targetCombatant) onAttack(targetCombatant.id, att.id)
                   }}
                   title={
                     targetCombatant
-                      ? `Strike ${targetCombatant.name} with ${att.name} (+${att.bonus} to hit, ${att.damage})`
+                      ? `Use ${att.name} on ${targetCombatant.name} (${att.range} ft${att.damage ? `, ${att.damage}` : ''})`
                       : 'Select a target on the map or in the list first'
                   }
                   className={cn(
@@ -149,46 +151,48 @@ export function TacticalCombatDock({
               ))}
             </div>
             <span className="text-[8.5px] text-faint">
-              {attacks.find((a) => a.name === selectedAttack)?.damage} DMG · +
-              {attacks.find((a) => a.name === selectedAttack)?.bonus} TO HIT
+              {(() => {
+                const chosen = attacks.find((a) => a.id === selectedAttack || a.name === selectedAttack) ?? attacks[0]
+                return chosen ? `${chosen.damage || 'Attack'} · ${chosen.range} FT` : 'NO ATTACK'
+              })()}
             </span>
           </div>
 
           {/* 2. DASH BUTTON */}
           <button
             type="button"
-            disabled={!isPlayerTurn || economy.actionUsed}
+            disabled={!maneuvers.canDash}
             onClick={dashAction}
-            title="Dash: Doubles your movement speed for this turn (Action)"
+            title={`${maneuvers.dashLabel}: Grants tactical movement this turn ([2])`}
             className={cn(
               'flex h-8 items-center gap-1.5 border px-2.5 text-[10.5px] font-bold uppercase transition-all',
-              isPlayerTurn && !economy.actionUsed
+              maneuvers.canDash
                 ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent cursor-pointer'
                 : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
             )}
           >
             <Footprints className="h-3.5 w-3.5 text-accent" />
-            <span>DASH</span>
+            <span>{maneuvers.dashLabel}</span>
             <span className="border border-line/60 bg-line/20 px-1 text-[8.5px] text-dim">[2]</span>
           </button>
 
           {/* 3. DODGE BUTTON */}
           <button
             type="button"
-            disabled={!isPlayerTurn || economy.actionUsed || economy.isDodging}
+            disabled={!maneuvers.canDodge}
             onClick={dodgeAction}
-            title="Dodge: Focus on defense; incoming attacks have disadvantage (Action)"
+            title={`${maneuvers.dodgeLabel}: Incoming attacks suffer disadvantage ([3])`}
             className={cn(
               'flex h-8 items-center gap-1.5 border px-2.5 text-[10.5px] font-bold uppercase transition-all',
               economy.isDodging
                 ? 'border-accent bg-accent/20 text-accent cursor-default'
-                : isPlayerTurn && !economy.actionUsed
+                : maneuvers.canDodge
                 ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent cursor-pointer'
                 : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
             )}
           >
             <Shield className="h-3.5 w-3.5 text-accent" />
-            <span>DODGE</span>
+            <span>{maneuvers.dodgeLabel}</span>
             <span className="border border-line/60 bg-line/20 px-1 text-[8.5px] text-dim">[3]</span>
           </button>
 
@@ -245,17 +249,21 @@ export function TacticalCombatDock({
                     {targetCombatant.name}
                   </span>
                   <span className="border border-alert/60 bg-alert/20 px-1 text-[8px] font-bold text-alert">
-                    AC {targetCombatant.ac ?? 10}
+                    AC {targetCombatant.ac}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 text-[9px] text-dim">
                   <span>
                     HP {targetCombatant.hp.cur}/{targetCombatant.hp.max}
                   </span>
-                  <span className="text-faint">·</span>
-                  <span className="text-alert uppercase">
-                    {targetCombatant.faction ?? 'HOSTILE'}
-                  </span>
+                  {targetCombatant.faction && (
+                    <>
+                      <span className="text-faint">·</span>
+                      <span className="text-alert uppercase">
+                        {targetCombatant.faction}
+                      </span>
+                    </>
+                  )}
                 </div>
                 {/* TARGET HP BAR */}
                 <div className="h-1 w-20 border border-line/40 bg-black/60">

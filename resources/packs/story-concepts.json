@@ -1,0 +1,44 @@
+{
+  "seven": "export",
+  "version": 3,
+  "protection": "none",
+  "savedAt": 1763500000000,
+  "about": {
+    "kind": "repo",
+    "label": "Repo",
+    "title": "Story Concepts",
+    "also": []
+  },
+  "entries": [
+    {
+      "kind": "repo",
+      "id": "starter-concepts",
+      "title": "Story Concepts",
+      "value": {
+        "title": "Story Concepts",
+        "type": "repo",
+        "body": "",
+        "fields": [],
+        "records": [],
+        "data": {
+          "tags": [
+            "concepts",
+            "starter"
+          ],
+          "scope": "use",
+          "values": [
+            "A locked room that opens only during a power cut",
+            "A courier carrying a package addressed to someone who never existed",
+            "An old map whose borders quietly redraw themselves overnight",
+            "Two rivals forced to share shelter during a coastal storm",
+            "A town where everyone remembers a festival that never happened",
+            "A salvaged radio picking up tomorrow's weather forecast",
+            "A retired thief asked to recover something they never stole",
+            "An archive clerk who finds their own name in a century-old ledger"
+          ]
+        }
+      },
+      "isDependency": false
+    }
+  ]
+}

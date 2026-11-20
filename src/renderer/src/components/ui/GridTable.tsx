@@ -1,5 +1,6 @@
-import { createContext, useContext, type FocusEvent, type MouseEvent, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, type FocusEvent, type MouseEvent, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
+import { useColumnResize, type ResizableCol } from './useColumnResize'
 
 export interface GridColumn {
   label: string
@@ -7,31 +8,70 @@ export interface GridColumn {
   right?: boolean
   sorted?: 'asc' | 'desc' | null
   onSort?: () => void
+  minPx?: number
 }
 
 const Template = createContext('')
 
-export function GridTable({ columns, empty, children }: { columns: GridColumn[]; empty?: string | false; children: ReactNode }) {
-  const template = columns.map((c) => c.width).join(' ')
+export function GridTable({ id, columns, empty, children }: { id?: string; columns: GridColumn[]; empty?: string | false; children: ReactNode }) {
+  const storageKey = useMemo(() => id ?? `grid.${columns.map((c) => c.label).join('|').toLowerCase()}`, [id, columns])
+  const specs = useMemo<ResizableCol[]>(
+    () =>
+      columns.map((c, idx) => ({
+        id: c.label || String(idx),
+        defaultWidth: c.width,
+        minPx: c.minPx ?? 48,
+        flex: /fr\b/i.test(c.width) || c.width.includes('minmax(')
+      })),
+    [columns]
+  )
+  const { template, setHeaderRef, startResize, resetWidths, dragging } = useColumnResize(storageKey, specs)
+
   return (
     <Template.Provider value={template}>
-      <div className="flex min-w-0 flex-col overflow-x-auto">
-        <div style={{ gridTemplateColumns: template }} className="grid w-full gap-x-3 border-b border-line/30 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
-          {columns.map((c) =>
-            c.onSort ? (
-              <button key={c.label} type="button" onClick={c.onSort} className={cn('leading-tight uppercase hover:text-white', c.right && 'text-right', c.sorted && 'text-accent')}>
-                {c.label}
-                {c.sorted === 'desc' ? ' ▼' : c.sorted === 'asc' ? ' ▲' : ''}
-              </button>
-            ) : (
-              <span key={c.label} className={cn('leading-tight', c.right && 'text-right')}>
-                {c.label}
-              </span>
-            )
-          )}
+      <div className="flex w-full min-w-0 flex-col overflow-x-auto">
+        <div className="min-w-full w-max">
+          <div style={{ gridTemplateColumns: template }} className="grid w-full gap-x-3 border-b border-line/30 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+            {columns.map((c, idx) => (
+              <div key={c.label || idx} ref={setHeaderRef(idx)} className={cn('relative flex min-w-0 items-center pr-2', c.right && 'justify-end')}>
+                {c.onSort ? (
+                  <button
+                    type="button"
+                    onClick={c.onSort}
+                    className={cn('truncate leading-tight uppercase hover:text-white', c.right && 'text-right', c.sorted && 'text-accent')}
+                    title={`Sort by ${c.label}`}
+                  >
+                    {c.label}
+                    {c.sorted === 'desc' ? ' ▼' : c.sorted === 'asc' ? ' ▲' : ''}
+                  </button>
+                ) : (
+                  <span className={cn('truncate leading-tight', c.right && 'text-right')}>
+                    {c.label}
+                  </span>
+                )}
+                {idx < columns.length - 1 && (
+                  <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    title="Drag to resize · Double-click to reset"
+                    onPointerDown={(e) => startResize(idx, e)}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation()
+                      resetWidths()
+                    }}
+                    className={cn(
+                      'absolute -right-2 top-0 bottom-0 w-2.5 cursor-col-resize select-none transition-colors',
+                      'after:absolute after:right-[4px] after:top-0 after:bottom-0 after:w-px',
+                      dragging === idx ? 'after:bg-accent' : 'after:bg-line/25 hover:after:bg-accent'
+                    )}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          {children}
+          {empty && <div className="px-3.5 py-3 text-[12.5px] text-faint">{empty}</div>}
         </div>
-        {children}
-        {empty && <div className="px-3.5 py-3 text-[12.5px] text-faint">{empty}</div>}
       </div>
     </Template.Provider>
   )

@@ -8,5 +8,9 @@ export function useMap(id: string): MapData | false | null {
 }
 
 export function useWorldMaps(world: string): WorldMapUse[] | null {
-  return useLive(() => engine('worlds.maps', { id: world }).catch(noteFailure('maps', 'Could not load the world maps', () => [])), 'worlds.changed', [world])
+  return useLive(
+    () => engine('worlds.maps', { id: world }).catch(noteFailure('maps', 'Could not load the world maps', () => [])),
+    ['worlds.changed', 'saves.changed'],
+    [world]
+  )
 }

@@ -1,5 +1,5 @@
 import { notFound } from '@shared/errors'
-import { fileName, isAssetId } from '@shared/ids'
+import { compactId, fileName, isAssetId, stripRef } from '@shared/ids'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { AssetKind, AssetMeta, PictureArea } from '@shared/types'
@@ -112,7 +112,7 @@ export class AssetStore {
   }
 
   exists(id: string): boolean {
-    return isAssetId(id) && this.metaFor(id) !== null
+    return this.metaFor(id) !== null
   }
 
   private metaIndex: DirIndex<AssetMeta> | null = null
@@ -135,9 +135,10 @@ export class AssetStore {
   }
 
   metaFor(id: string): AssetMeta | null {
-    if (!isAssetId(id)) return null
-    const meta = this.index.get(this.metaFile(id))
-    return meta && this.stored(id, meta) ? { ...meta } : null
+    const clean = stripRef(id ?? '').toLowerCase()
+    if (!isAssetId(clean)) return null
+    const meta = this.index.get(this.metaFile(clean))
+    return meta && this.stored(clean, meta) ? { ...meta } : null
   }
 
   list(): AssetMeta[] {
@@ -210,9 +211,16 @@ export class AssetStore {
   }
 
   findByName(ref: string, accept: (a: AssetMeta) => boolean = () => true): AssetMeta | null {
-    const want = fileName(ref)
+    const raw = stripRef(ref ?? '')
+    const want = fileName(raw)
+    const wantCompact = compactId(stem(want))
     const list = this.list().filter(accept)
-    return list.find((a) => fileName(a.name) === want) ?? list.find((a) => stem(fileName(a.name)) === want) ?? null
+    return (
+      list.find((a) => fileName(a.name) === want) ??
+      list.find((a) => stem(fileName(a.name)) === want) ??
+      (wantCompact ? list.find((a) => compactId(stem(fileName(a.name))) === wantCompact) : undefined) ??
+      null
+    )
   }
 
   rename(id: string, name: string): AssetMeta {

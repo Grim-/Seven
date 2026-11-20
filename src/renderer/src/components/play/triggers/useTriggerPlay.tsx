@@ -73,7 +73,9 @@ export function useTriggerPlay(options: Options) {
     if (trigger.needsFlag && !save?.flags[trigger.needsFlag]) return toast.info(trigger.name, 'Not yet.')
     if (trigger.hiddenIfFlag && Boolean(save?.flags[trigger.hiddenIfFlag])) return
     if (save && (trigger.once || trigger.setsFlag)) void engine('saves.markUsed', { id: save.id, trigger: trigger.id, flag: trigger.setsFlag }).catch(failed('Could not save it'))
-    const party = tokens.flatMap((t) => (t.visitor.game ? [t.visitor] : []))
+    const partyIds = save?.party?.length ? save.party : (sheet ? [sheet] : [])
+    const partySet = new Set(partyIds)
+    const party = tokens.flatMap((t) => (t.visitor.source !== 'creature' && partySet.has(t.visitor.sheet) && t.visitor.game ? [t.visitor] : []))
     const ctx: TriggerContext = { world, map: map.id, sheet, party, save, catalog, close: closePlay, goTo: (map, place) => void goTo(sheet, map, place).catch(failed('Could not go there')), update: (values) => saveTrigger({ ...trigger, values }) }
     const ui = triggerUi(trigger.type)
     if (ui?.run) ui.run(trigger, ctx)

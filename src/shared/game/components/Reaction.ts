@@ -10,7 +10,8 @@ export class Reaction extends Action {
     id: { kind: 'text' as const, default: '', description: 'Name of this reaction.' },
     signal: { kind: 'signal' as const, default: 'OnHurt', description: 'Signal on the entity that starts it.' },
     when: { kind: 'conditions' as const, default: [], description: 'Conditions that must all hold. Fields of the signal are checked with `is`.' },
-    target: { kind: 'choice' as const, default: 'self', choices: ['self', 'source', 'triggerTarget'], description: 'Who its pieces act on.' }
+    target: { kind: 'choice' as const, default: 'self', choices: ['self', 'source', 'triggerTarget'], description: 'Who its pieces act on.' },
+    usesReaction: { kind: 'flag' as const, default: false, description: 'Requires and spends this entity\'s per-round combat reaction.' }
   }
   static readonly LANES: EffectLane[] = [{ event: 'OnUse', label: 'When it reacts' }]
 
@@ -28,6 +29,7 @@ export class Reaction extends Action {
       if (chainDepth >= MAX_CHAIN_DEPTH) return
       const ok = (this.params.when as ConditionDef[]).every((def) => test(def, { self, payload, seed: `${self.uid}:${this.id}:${this.uses}`, stat: (who, id) => who.comp(Stats)?.value(id) ?? 0 }))
       if (!ok) return
+      if (this.params.usesReaction === true && self.world?.tryReaction && !self.world.tryReaction(self.uid)) return
       const source = typeof payload.source === 'string' ? (self.world?.find(payload.source) ?? null) : null
       const triggerTarget = typeof payload.target === 'string' ? (self.world?.find(payload.target) ?? null) : null
       const targets: Record<string, GameEntity | null> = { self, source, triggerTarget }

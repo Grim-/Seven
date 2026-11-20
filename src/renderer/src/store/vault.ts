@@ -6,6 +6,7 @@ import { useSessions } from './sessions'
 import { useData } from './data'
 import { useDashboards } from './dashboards'
 import { useWindows } from './windows'
+import { useImageHost } from './image'
 
 interface VaultState {
   status: VaultStatus
@@ -49,4 +50,5 @@ export function clearPersonal(): void {
   useWindows.setState({ locations: {} })
   usePlaces.setState({ places: {}, loaded: false })
   useDashboards.setState({ list: [], activeId: null })
+  useImageHost.setState({ history: [] })
 }

@@ -14,6 +14,7 @@ import { LiveCard } from '../cards/LiveCard'
 import { useDeckInUse } from '../cards/useDeckInUse'
 import { useHeldCards, type HeldCard } from '../cards/useHeldCards'
 import { showInPanel } from '../data/showInPanel'
+import { useTabletopMode } from './tabletopStore'
 
 const PREVIEW_W = 220
 
@@ -137,11 +138,11 @@ function BarAgentHand({
   )
 }
 
-function Side({ agent, sheet, height }: { agent: AgentProfile; sheet: string | null; height: number }) {
+function Side({ agent, sheet, height, showDecks }: { agent: AgentProfile; sheet: string | null; height: number; showDecks: boolean }) {
   const status = useCharacterStatus(sheet)
   const sheetDeck = useDeckInUse(sheet ? { character: sheet } : null)
   const agentDeck = useDeckInUse({ agent: agent.id })
-  const entries = sheetDeck?.entries.length ? sheetDeck.entries : (agentDeck?.entries ?? [])
+  const entries = showDecks ? (sheetDeck?.entries.length ? sheetDeck.entries : (agentDeck?.entries ?? [])) : []
   const held = useHeldCards(entries)
   if (!status && !held.length) return null
   const name = status ? showName(status.name) : agent.name
@@ -150,13 +151,14 @@ function Side({ agent, sheet, height }: { agent: AgentProfile; sheet: string | n
 }
 
 export function AgentSide({ agent, height = 30 }: { agent: AgentProfile | null; height?: number }) {
+  const [mode] = useTabletopMode()
   if (!agent) return null
   const sheets = agentSheets(agent)
 
   return (
     <div className="flex items-center gap-2 empty:hidden">
       {(sheets.length ? sheets : [null]).map((sheet) => (
-        <Side key={sheet ?? 'agent'} agent={agent} sheet={sheet} height={height} />
+        <Side key={sheet ?? 'agent'} agent={agent} sheet={sheet} height={height} showDecks={mode.showDecks} />
       ))}
     </div>
   )

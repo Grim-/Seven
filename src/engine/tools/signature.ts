@@ -186,16 +186,20 @@ function inner(s: Schema): [string, Schema][] {
   return Object.entries(((shape.properties as Record<string, Schema> | undefined) ?? {}) as Record<string, Schema>)
 }
 
-function paramLines(entries: [string, Schema][], indent: string): string[] {
+function paramLines(entries: [string, Schema][], indent: string, everyField = false): string[] {
   return entries.flatMap(([k, v]) => {
     const d = typeof v.description === 'string' ? v.description : ''
     const line = `${indent}- ${k}: ${paramType(v as JsonSchema)}${nullable(v) ? ', or null' : ''}${d ? `. ${d}` : ''}`
-    const sub = inner(v).filter(([, s]) => typeof s.description === 'string' || Array.isArray(s.enum) || Array.isArray(s.oneOf))
-    return [line, ...paramLines(sub, `${indent}  `)]
+    const sub = inner(v).filter(([, s]) => everyField || typeof s.description === 'string' || Array.isArray(s.enum) || Array.isArray(s.oneOf))
+    return [line, ...paramLines(sub, `${indent}  `, everyField)]
   })
 }
 
 export function toolGuide(tool: Pick<ToolDef, 'name' | 'description' | 'params' | 'forAgent'>): string {
   const params = resolveToolParams(tool)
   return [`- ${toolSignature({ name: tool.name, params })}: ${tool.description}`, ...paramLines(properties({ name: tool.name, params }), '  ')].join('\n')
+}
+
+export function fieldGuide(name: string, summary: string, params: JsonObjectSchema): string {
+  return [`- ${name}: ${summary}`, ...paramLines(properties({ name, params }), '  ', true)].join('\n')
 }

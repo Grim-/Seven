@@ -2,7 +2,7 @@ import { CORE_MODULES } from '@shared/toolnames'
 import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, Boxes, FileArchive, FolderOpen, Import, Plus, Power, Puzzle, RefreshCw, SlidersHorizontal, Wrench } from 'lucide-react'
 import type { ModuleInfo, ModuleState } from '@shared/types'
-import { BackBar, Button, Field, Input, KindShell, Modal, Panel, SettingCard, SaveState, Select, ShellTabs, StatusBadge, Textarea, Toggle, ViewHeader, useDraft, type ShellItem, type Tone } from '../components/ui'
+import { BackBar, Button, Field, Input, KindShell, Modal, Panel, SettingCard, SaveState, Select, ShellTabs, StatusBadge, Textarea, Toggle, ViewHeader, openMenu, useDraft, type ShellItem, type Tone } from '../components/ui'
 import { engine, main } from '../lib/ipc'
 import { errorText } from '../lib/format'
 import { toast } from '../store/toasts'
@@ -304,13 +304,61 @@ function ImportMcp({ onClose }: { onClose: () => void }) {
   )
 }
 
+function ModuleQuickToggle({ module }: { module: ModuleInfo }) {
+  const [busy, setBusy] = useState(false)
+  const isOn = module.state === 'on' || module.state === 'loading'
+  const disabled = busy || module.state === 'error'
+  const toggle = async () => {
+    setBusy(true)
+    try {
+      if (isOn) await run('Could not switch off', engine('tools.disable', { id: module.id }))
+      else await run('Could not switch on', engine('tools.enable', { id: module.id }))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => void toggle()}
+      title={isOn ? `Switch off ${module.name}` : `Switch on ${module.name}`}
+      className={
+        isOn
+          ? 'inline-flex items-center gap-1 border border-emerald-500/60 bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-300 transition-colors hover:bg-emerald-500/25 disabled:opacity-45'
+          : 'inline-flex items-center gap-1 border border-line/70 bg-black/75 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-dim transition-colors hover:border-accent/70 hover:text-white disabled:opacity-45'
+      }
+    >
+      <Power className="h-3 w-3" />
+      <span>{busy ? '…' : isOn ? 'On' : 'Off'}</span>
+    </button>
+  )
+}
+
 export function ToolsView() {
   const list = useTools((s) => s.list)
   const [selected, setSelected] = useViewPlace<string | null>('tools.selected', null)
   const [dialog, setDialog] = useState<'new' | 'import' | null>(null)
+  const [enablingAll, setEnablingAll] = useState(false)
   const sets = useToolsets((s) => s.list)
   const [setId, setSetId] = useViewPlace<string | null>('tools.toolset', null)
   const current = list.find((m) => m.id === selected) ?? null
+  const enableable = useMemo(() => list.filter((m) => m.state !== 'on' && m.state !== 'loading' && m.state !== 'error'), [list])
+
+  const enableAll = async () => {
+    if (enablingAll || enableable.length === 0) return
+    setEnablingAll(true)
+    let ok = 0
+    try {
+      for (const m of enableable) {
+        const res = await run(`Could not switch on ${m.name}`, engine('tools.enable', { id: m.id }))
+        if (res) ok++
+      }
+      if (ok > 0) toast.success('Modules enabled', `Switched on ${ok} module${ok === 1 ? '' : 's'}.`)
+    } finally {
+      setEnablingAll(false)
+    }
+  }
 
   const items = useMemo((): ShellItem[] => {
     const group = (m: ModuleInfo) => (CORE_MODULES.includes(m.id) && m.source === 'builtin' ? 1 : m.source === 'builtin' ? 2 : 3)
@@ -323,10 +371,31 @@ export function ToolsView() {
         excerpt: m.description,
         icon: <Puzzle className="h-4 w-4" />,
         tag: STATE[m.state].label.toUpperCase(),
+        action: <ModuleQuickToggle module={m} />,
         group: group(m)
       }))
     ]
   }, [list, sets])
+
+  const openModuleMenu = (e: React.MouseEvent, item: ShellItem) => {
+    if (!item.key.startsWith('m:')) return
+    const mod = list.find((m) => m.id === item.key.slice(2))
+    if (!mod) return
+    const isOn = mod.state === 'on' || mod.state === 'loading'
+    openMenu(e, mod.name, [
+      ...(mod.state !== 'error'
+        ? [
+            {
+              label: isOn ? 'Switch off' : mod.state === 'changed' ? 'Switch on again' : 'Switch on',
+              icon: <Power />,
+              onSelect: () => void run(isOn ? 'Could not switch off' : 'Could not switch on', engine(isOn ? 'tools.disable' : 'tools.enable', { id: mod.id }))
+            }
+          ]
+        : []),
+      { label: 'Reload', icon: <RefreshCw />, onSelect: () => void run('Could not reload', engine('tools.reload', { id: mod.id })) },
+      ...(mod.dir ? [{ label: 'Open folder', icon: <FolderOpen />, onSelect: () => void run('Could not open', main('folder.open', { path: mod.dir })) }] : [])
+    ])
+  }
 
   return (
     <div className="flex h-full flex-col gap-3 p-5">
@@ -335,6 +404,11 @@ export function ToolsView() {
         subtitle="Every tool comes from a module folder. Drop a folder into your tools folder, or add an MCP server, then switch it on and pick it for an agent."
         actions={
           <>
+            {enableable.length > 0 && (
+              <Button variant="secondary" icon={<Power />} disabled={enablingAll} onClick={() => void enableAll()}>
+                {enablingAll ? 'Enabling…' : `Enable all (${enableable.length})`}
+              </Button>
+            )}
             <Button variant="secondary" icon={<FileArchive />} onClick={() => void installZip(setSelected)}>
               Install from zip
             </Button>
@@ -365,6 +439,7 @@ export function ToolsView() {
           id="tools"
           layouts={['cards', 'deck', 'list']}
           items={items}
+          asideLabel="Status"
           groups={[
             { label: 'Toolsets', note: 'Bundles of tools you give agents.', adds: [{ label: 'New toolset', icon: <Plus />, onClick: () => setSetId('new') }] },
             { label: 'Core', note: "The heart of Seven: the Library (pages and every kind) and Mind (memory and reasoning). Without them it's just a place to run models." },
@@ -372,6 +447,7 @@ export function ToolsView() {
             { label: 'Your tools folder' }
           ]}
           onOpen={(item) => (item.key.startsWith('t:') ? setSetId(item.key.slice(2)) : setSelected(item.key.slice(2)))}
+          onMenu={openModuleMenu}
           empty="Seven could not find any tool modules."
         />
       )}

@@ -259,10 +259,16 @@ export function presetForSpec(api: RemoteApi, baseUrl: string | null | undefined
 export function classifyRemoteModel(id: string, thinking?: boolean): RemoteModelCategory {
   const lower = id.toLowerCase()
   if (/(tts|native-audio|live|transcribe|audio)/.test(lower)) return 'audio'
-  if (/(image|imagen|banana|veo|omni)/.test(lower)) return 'image'
+  if (/(image|imagen|dall-e|gpt-image|flux|stable[-_]?diffusion|sdxl|sd3|banana|veo|omni)/.test(lower)) return 'image'
   if (thinking || /(^|-)o[1-9]|thinking|deep-research|\br1\b/.test(lower)) return 'reasoning'
   if (/embed|aqa|bisect|robotics/.test(lower)) return 'other'
   return 'chat'
+}
+
+export function isImageModel(entry: { remote?: { model: string; category?: RemoteModelCategory } | null; info?: { kind?: string } | null }): boolean {
+  if (entry.info?.kind === 'image') return true
+  if (!entry.remote) return false
+  return entry.remote.category === 'image' || classifyRemoteModel(entry.remote.model) === 'image'
 }
 
 const CATEGORY_RANK: Record<RemoteModelCategory, number> = {

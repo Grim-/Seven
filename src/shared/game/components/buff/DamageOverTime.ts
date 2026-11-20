@@ -12,11 +12,12 @@ const SCALING: Record<string, (base: number, value: number, neutral: number) => 
 
 export class DamageOverTime extends BuffPiece {
   static readonly type: string = 'buff.damageOverTime'
-  static readonly DESCRIPTION: string = 'Damages the holder while the buff lasts: one hit every tick, or every `every` seconds.'
+  static readonly DESCRIPTION: string = 'Damages the holder while the buff lasts: one hit every `every` seconds, or each time the holder gets the `on` signal (such as On Turn Start).'
   static readonly PARAMS = {
     damageType: { kind: 'template' as const, templateKind: 'damage_type', default: '', description: 'What the damage counts as.' },
     perHit: { kind: 'formula' as const, default: '', description: 'Damage per hit, such as 1d4 or 1d6 + user.int (user: who applied it, target: who has it). Empty uses the buff strength.' },
-    every: { kind: 'number' as const, default: 0, min: 0, description: 'Seconds between hits. 0 hits every tick.' },
+    every: { kind: 'duration' as const, default: 0, min: 0, description: 'Time between hits. 0 hits every tick.' },
+    on: { kind: 'signal' as const, default: '', description: 'Signal on the holder that makes a hit, such as On Turn Start or On Turn End. Empty uses every.' },
     scalingStat: { kind: 'template' as const, templateKind: 'stat', default: '', description: 'Holder stat the damage scales with. Empty for none.' },
     scaling: {
       kind: 'choice' as const,
@@ -26,7 +27,7 @@ export class DamageOverTime extends BuffPiece {
       description: 'How the damage follows the stat. Multiplied by: damage × stat. Proportional to: damage × stat ÷ the stat\'s default, so a stat above its default does more. Inversely proportional to: damage × default ÷ stat, so a stat below its default does more (poison against Constitution).'
     }
   }
-  static readonly SENTENCE: string = 'Deal {perHit} {damageType} damage to the holder[ every {every} s][, {scaling} {scalingStat}]'
+  static readonly SENTENCE: string = 'Deal {perHit} {damageType} damage to the holder[ every {every}][ on {on}][, {scaling} {scalingStat}]'
   static readonly GROUP: EffectGroup | null = HARM
   static readonly ICON: string = 'Droplets'
 
@@ -70,9 +71,15 @@ export class DamageOverTime extends BuffPiece {
     health.damage(this.amount(), { type: String(this.params.damageType), cause: this.buff?.id ?? 'buff', source, continuous: true })
   }
 
+  onApplied(): void {
+    super.onApplied()
+    const signal = String(this.params.on)
+    if (signal && this.entity) this.bind(this.entity, signal, () => this.hit())
+  }
+
   tickSim(seconds: number): void {
     super.tickSim(seconds)
-    this.repeatEvery('hit', Number(this.params.every), seconds, () => this.hit())
+    if (!String(this.params.on)) this.repeatEvery('hit', Number(this.params.every), seconds, () => this.hit())
   }
 }
 

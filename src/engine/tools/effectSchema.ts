@@ -1,86 +1,84 @@
 import '@shared/game/components'
 import { Effects } from '@shared/game/components'
 import { componentsFor, type ComponentClass, type ComponentDef, type ParamSpec } from '@shared/game/core'
-import { cleanComponents } from '@shared/game/core/params'
-import type { JsonSchema } from './schema'
+import { cleanComponents, type ParamSchema } from '@shared/game/core/params'
+import type { JsonObjectSchema, JsonSchema } from './schema'
+import { checkKeys, registerSchemaSource } from './schemaSources'
+
+export const EFFECT_SCOPE = 'effect'
 
 export function effectPieceClasses(host: string = Effects.type): ComponentClass[] {
   return componentsFor(host)
 }
 
-function paramSpecToSchema(spec: ParamSpec): JsonSchema {
+export function paramSpecToSchema(spec: ParamSpec, includeDescription = true): JsonSchema {
+  const desc = includeDescription && spec.description ? { description: spec.description } : {}
   if (spec.kind === 'number') {
-    return { type: ['number', 'null'], description: spec.description }
+    return { type: ['number', 'null'], ...desc }
   }
   if (spec.kind === 'flag') {
-    return { type: ['boolean', 'null'], description: spec.description }
+    return { type: ['boolean', 'null'], ...desc }
   }
   if (spec.kind === 'choice' && spec.choices?.length) {
-    return { enum: [...spec.choices, null], description: spec.description }
+    return { enum: [...spec.choices, null], ...desc }
   }
   if (spec.kind === 'formula') {
-    return { type: ['string', 'number', 'null'], description: spec.description }
+    return { type: ['string', 'number', 'null'], ...desc }
   }
   if (spec.kind === 'list') {
     return {
-      oneOf: [{ type: 'null' }, { type: 'array', items: spec.of ? paramSpecToSchema(spec.of) : { type: 'string' } }],
-      description: spec.description
+      oneOf: [{ type: 'null' }, { type: 'array', items: spec.of ? paramSpecToSchema(spec.of, includeDescription) : { type: 'string' } }],
+      ...desc
     }
   }
   if (spec.kind === 'values') {
     return {
       oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { type: 'number' } }],
-      description: spec.description
+      ...desc
     }
   }
   if (spec.kind === 'components') {
     return {
       oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'object' } }],
-      description: spec.description
+      ...desc
     }
   }
-  return { type: ['string', 'null'], description: spec.description }
+  return { type: ['string', 'null'], ...desc }
 }
 
-function componentSchema(cls: ComponentClass): JsonSchema {
-  const props: Record<string, JsonSchema> = {
-    type: { enum: [cls.type], description: cls.DESCRIPTION },
-    comps: { oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'object' } }], description: 'Optional nested child pieces' }
-  }
-  for (const [key, spec] of Object.entries(cls.PARAMS)) {
-    props[key] = paramSpecToSchema(spec)
-  }
-  return {
-    type: 'object',
-    description: cls.DESCRIPTION,
-    properties: props,
-    additionalProperties: false,
-    required: ['type']
-  }
+export function paramsSchema(params: ParamSchema): JsonObjectSchema {
+  return { type: 'object', properties: Object.fromEntries(Object.entries(params).map(([key, spec]) => [key, paramSpecToSchema(spec)])) }
 }
 
-export function effectDefListSchema(live = false, host: string = Effects.type): JsonSchema {
-  const classes = effectPieceClasses(host)
-  if (live && classes.length) {
-    return { oneOf: classes.map(componentSchema) }
-  }
-  const typeNames = classes.map((c) => c.type)
-  const merged: Record<string, JsonSchema> = {
-    type: typeNames.length
-      ? { enum: typeNames, description: 'Registered effect piece type' }
-      : { type: 'string', description: 'Registered effect piece type' },
-    comps: { oneOf: [{ type: 'null' }, { type: 'array', items: { type: 'object' } }], description: 'Optional nested child pieces' }
-  }
-  for (const cls of classes) {
-    for (const [key, spec] of Object.entries(cls.PARAMS)) {
-      if (!(key in merged)) merged[key] = paramSpecToSchema(spec)
-    }
-  }
+export function effectItemSchema(host: string = Effects.type): JsonSchema {
+  const typeNames = effectPieceClasses(host).map((c) => c.type)
   return {
     type: 'object',
-    properties: merged,
+    properties: {
+      type: typeNames.length ? { enum: typeNames } : { type: 'string' },
+      on: { type: ['string', 'null'] }
+    },
     additionalProperties: true,
     required: ['type']
+  }
+}
+
+registerSchemaSource({
+  id: EFFECT_SCOPE,
+  entries: () =>
+    effectPieceClasses().map((c) => {
+      const own = paramsSchema(c.PARAMS)
+      return {
+        name: c.type,
+        summary: c.DESCRIPTION,
+        params: { ...own, properties: { ...own.properties, on: { type: ['string', 'null'] }, comps: { type: ['array', 'null'], items: { type: 'object' } } } }
+      }
+    })
+})
+
+export function checkEffectKeys(raw: unknown): void {
+  for (const item of Array.isArray(raw) ? raw : []) {
+    if (item && typeof item === 'object' && !Array.isArray(item) && typeof (item as { type?: unknown }).type === 'string') checkKeys(EFFECT_SCOPE, (item as { type: string }).type, item as Record<string, unknown>, ['type'])
   }
 }
 

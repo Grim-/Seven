@@ -1,0 +1,12 @@
+{
+  "id": "image",
+  "name": "Image Generation",
+  "description": "Lets agents generate new pictures and edit existing pictures using configured local (sd-server) or remote image models, saving results into Seven's library as @file links.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "permission": "ask",
+  "toolPermissions": {
+    "generate_image": "ask",
+    "edit_image": "ask"
+  }
+}

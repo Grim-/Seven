@@ -60,7 +60,15 @@ export const GAME_SIGNALS: GameSignalDef[] = [
   { id: 'OnClassOffer', label: 'On Class Offer', group: 'Progression & Story', note: 'Clutch class unlock becomes available (payload: classId, signal).' },
   { id: 'OnTraitGained', label: 'On Trait Gained', group: 'Progression & Story', note: 'Gains an innate trait (payload: trait, label, sourceClass).' },
   { id: 'OnTraitLost', label: 'On Trait Lost', group: 'Progression & Story', note: 'Loses a trait (payload: trait, label, reason).' },
-  { id: 'OnStoryMoment', label: 'On Story Moment', group: 'Progression & Story', note: 'Story event triggers on character (payload: tag, summary, flags).' }
+  { id: 'OnStoryMoment', label: 'On Story Moment', group: 'Progression & Story', note: 'Story event triggers on character (payload: tag, summary, flags).' },
+  { id: 'OnBattleStart', label: 'On Battle Start', group: 'Combat & Health', note: 'Turn-based combat begins (payload: battle).' },
+  { id: 'OnBattleEnd', label: 'On Battle End', group: 'Combat & Health', note: 'Turn-based combat ends (payload: status).' },
+  { id: 'OnTurnStart', label: 'On Turn Start', group: 'Time & Rest', note: 'Start of its turn; outside a fight, each round of time that passes (payload: round).' },
+  { id: 'OnTurnEnd', label: 'On Turn End', group: 'Time & Rest', note: 'End of its turn; outside a fight, each round of time that passes (payload: round).' },
+  { id: 'OnShortRest', label: 'On Short Rest', group: 'Time & Rest', note: 'Finishes a short rest.' },
+  { id: 'OnLongRest', label: 'On Long Rest', group: 'Time & Rest', note: 'Finishes a long rest.' },
+  { id: 'OnDawn', label: 'On Dawn', group: 'Time & Rest', note: 'The clock passes dawn.' },
+  { id: 'OnTimePassed', label: 'On Time Passed', group: 'Time & Rest', note: 'Game time passes (payload: seconds, source).' }
 ]
 
 export const SIGNAL_PAYLOAD_FIELDS: { id: string; label: string; group: string; note: string }[] = [
@@ -77,7 +85,10 @@ export const SIGNAL_PAYLOAD_FIELDS: { id: string; label: string; group: string; 
   { id: 'level', label: 'level', group: 'Progression', note: 'New level reached on OnLevelUp.' },
   { id: 'tag', label: 'tag', group: 'Story', note: 'Tag passed to OnStoryMoment.' },
   { id: 'restricted', label: 'restricted', group: 'Progression', note: 'Boolean restriction flag on OnClassRestricted.' },
-  { id: 'reason', label: 'reason', group: 'General', note: 'Reason text attached to progression or removal events.' }
+  { id: 'reason', label: 'reason', group: 'General', note: 'Reason text attached to progression or removal events.' },
+  { id: 'round', label: 'round', group: 'Time & Rest', note: 'Round number on OnTurnStart / OnTurnEnd.' },
+  { id: 'seconds', label: 'seconds', group: 'Time & Rest', note: 'Game seconds passed on OnTimePassed.' },
+  { id: 'source', label: 'source', group: 'Time & Rest', note: 'What spent the time on OnTimePassed (walk, travel, rest, wait).' }
 ]
 
 export function signalLabel(id: string): string {

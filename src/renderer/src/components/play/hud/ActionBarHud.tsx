@@ -1,16 +1,4 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
-import {
-  Flame,
-  Droplets,
-  Zap,
-  Shield,
-  Heart,
-  Skull,
-  Sparkles,
-  Swords,
-  FlaskConical,
-  Scroll
-} from 'lucide-react'
 import { Classes, Equipment, Inventory, Item, usableAbilities, type Ability } from '@shared/game/components'
 import { GameEntity, type Catalog } from '@shared/game/core'
 import type { PlaceVisitor } from '@shared/maps'
@@ -19,7 +7,8 @@ import { useLatest } from '../../../game/react/useLatest'
 import { hideTip, showTip } from '../../ui/TooltipHost'
 import { openMenu } from '../../ui'
 import { RowList } from '../../../game/ui'
-import { gameTime } from '../../game/character/panels/time'
+import { canSpendTurnCost, runAbilityUse, runItemUse, slotThemeFor } from '../state/combatGate'
+import { useGameState } from '../state/gameStateStore'
 import { useGameAct } from '../screens/useGameAct'
 import { useGameplaySettings } from '../settings/gameplaySettingsStore'
 import {
@@ -40,38 +29,6 @@ import { noteFailure } from '../../../store/problems'
 const typing = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
 const name = (a: Ability) => String(a.params.label || a.id)
-
-function getSlotTheme(name: string) {
-  const n = name.toLowerCase()
-  if (n.includes('fire') || n.includes('flame') || n.includes('burn') || n.includes('pyro')) {
-    return { Icon: Flame, color: 'text-amber-400', border: 'border-amber-500/70', bg: 'bg-amber-500/15', glow: 'shadow-[0_0_12px_rgba(245,158,11,0.35)]' }
-  }
-  if (n.includes('cold') || n.includes('ice') || n.includes('frost') || n.includes('water')) {
-    return { Icon: Droplets, color: 'text-sky-400', border: 'border-sky-500/70', bg: 'bg-sky-500/15', glow: 'shadow-[0_0_12px_rgba(56,189,248,0.35)]' }
-  }
-  if (n.includes('light') || n.includes('shock') || n.includes('thunder') || n.includes('zap') || n.includes('spark')) {
-    return { Icon: Zap, color: 'text-yellow-400', border: 'border-yellow-500/70', bg: 'bg-yellow-500/15', glow: 'shadow-[0_0_12px_rgba(250,204,21,0.35)]' }
-  }
-  if (n.includes('shield') || n.includes('ward') || n.includes('armor') || n.includes('protect') || n.includes('guard')) {
-    return { Icon: Shield, color: 'text-cyan', border: 'border-cyan/70', bg: 'bg-cyan/15', glow: 'shadow-[0_0_12px_rgba(102,252,241,0.35)]' }
-  }
-  if (n.includes('heal') || n.includes('cure') || n.includes('restor') || n.includes('life')) {
-    return { Icon: Heart, color: 'text-emerald-400', border: 'border-emerald-500/70', bg: 'bg-emerald-500/15', glow: 'shadow-[0_0_12px_rgba(52,211,153,0.35)]' }
-  }
-  if (n.includes('potion') || n.includes('draught') || n.includes('elixir') || n.includes('flask')) {
-    return { Icon: FlaskConical, color: 'text-emerald-400', border: 'border-emerald-500/70', bg: 'bg-emerald-500/15', glow: 'shadow-[0_0_12px_rgba(52,211,153,0.35)]' }
-  }
-  if (n.includes('scroll') || n.includes('tome') || n.includes('parchment') || n.includes('book')) {
-    return { Icon: Scroll, color: 'text-purple-400', border: 'border-purple-500/70', bg: 'bg-purple-500/15', glow: 'shadow-[0_0_12px_rgba(192,132,252,0.35)]' }
-  }
-  if (n.includes('necro') || n.includes('death') || n.includes('decay') || n.includes('curse') || n.includes('dark')) {
-    return { Icon: Skull, color: 'text-purple-400', border: 'border-purple-500/70', bg: 'bg-purple-500/15', glow: 'shadow-[0_0_12px_rgba(192,132,252,0.35)]' }
-  }
-  if (n.includes('sword') || n.includes('slash') || n.includes('strike') || n.includes('dagger') || n.includes('weapon')) {
-    return { Icon: Swords, color: 'text-red-400', border: 'border-red-500/70', bg: 'bg-red-500/15', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.35)]' }
-  }
-  return { Icon: Sparkles, color: 'text-cyan', border: 'border-cyan/70', bg: 'bg-cyan/15', glow: 'shadow-[0_0_12px_rgba(102,252,241,0.3)]' }
-}
 
 function ActiveBar({
   visitor,
@@ -95,24 +52,34 @@ function ActiveBar({
     ...(entity.comp(Equipment)?.comps.filter((c): c is Item => c instanceof Item) ?? [])
   ], [entity])
 
+  const world = useGameState((s) => s.world)
+  const battle = useGameState((s) => s.battle)
+
   const useSlot = (slot: ActionSlotDef | null) => {
     if (!slot) return
     if (slot.kind === 'ability') {
       const a = abilities.find((x) => x.uid === slot.uid || x.id === slot.id)
-      if (a && a.reach() > 0) return onAim(aiming === a.uid ? null : { uid: a.uid, label: name(a) })
-      act((e) => {
-        const found = usableAbilities(e).find((x) => x.uid === slot.uid || x.id === slot.id)
-        return found ? found.use({ user: e, target: e, at: null, distance: 0 }) : 'it is gone'
+      if (!a) return
+      runAbilityUse({
+        sheet: visitor.sheet,
+        entity,
+        ability: a,
+        world,
+        battle,
+        aiming,
+        onAim,
+        act
       })
     } else if (slot.kind === 'item') {
-      act((e) => {
-        const bag = e.comp(Inventory)?.items ?? []
-        const worn = e.comp(Equipment)?.comps.filter((c): c is Item => c instanceof Item) ?? []
-        const all = [...bag, ...worn]
-        const found = all.find((i) => i.uid === slot.uid || i.id === slot.id)
-        if (!found) return 'item not found'
-        if (!found.usable()) return 'item cannot be used'
-        return found.use({ user: e, target: e, at: null, distance: 0 })
+      const foundItem = allItems.find((i) => i.uid === slot.uid || i.id === slot.id)
+      if (!foundItem) return
+      runItemUse({
+        sheet: visitor.sheet,
+        item: foundItem,
+        label: itemName(foundItem),
+        world,
+        battle,
+        act
       })
     }
   }
@@ -236,7 +203,9 @@ function ActiveBar({
             ? entity.comp(Classes)?.byId(sourceClassId)?.title || String(catalog.template('game_class', sourceClassId)?.label || sourceClassId)
             : ''
           const ready = a ? a.canUse({ user: entity, target: entity, at: null, distance: 0 }) : 'not available'
-          const cooling = a ? a.cooling > 0 : false
+          const actionCost = String(a?.params.action || 'action')
+          const canSpendCost = a ? canSpendTurnCost(battle, visitor.sheet, actionCost) : true
+          const slotAvailable = ready === true && canSpendCost
           const rows = a
             ? [
                 ...Object.entries(a.cost).map(([s, n]) => ({ label: catalog.stat(s)?.label ?? s, value: String(n) })),
@@ -264,7 +233,7 @@ function ActiveBar({
           )
 
           const label = a ? name(a) : slot.label
-          const theme = getSlotTheme(label)
+          const theme = slotThemeFor(a?.comps)
           const Icon = theme.Icon
 
           return (
@@ -291,17 +260,12 @@ function ActiveBar({
               className={cn(
                 'group relative flex h-[50px] w-[50px] items-center justify-center border font-mono text-[12px] font-bold cursor-grab active:cursor-grabbing transition-all',
                 isOver && 'border-cyan bg-cyan/25 shadow-[0_0_18px_rgba(102,252,241,0.7)] scale-105',
-                ready === true ? cn(theme.border, theme.bg, theme.color, theme.glow, 'hover:scale-105 hover:border-cyan') : 'border-line/40 bg-black/60 text-faint',
+                slotAvailable ? cn(theme.border, theme.bg, theme.color, theme.glow, 'hover:scale-105 hover:border-cyan') : 'border-line/40 bg-black/60 text-faint opacity-50',
                 aiming && a && aiming === a.uid && 'border-cyan bg-cyan/30 text-cyan shadow-[0_0_18px_rgba(102,252,241,0.9)] animate-pulse'
               )}
             >
               <Icon className="h-6 w-6 transition-transform group-hover:scale-110" />
               <span className="absolute left-1.5 top-1 text-[9.5px] font-bold text-white/90 drop-shadow-sm leading-none">{i + 1}</span>
-              {cooling && a && (
-                <span className="absolute inset-x-0 bottom-0 bg-black/90 text-center text-[9px] font-bold text-dim">
-                  {gameTime(a.cooling)}
-                </span>
-              )}
             </button>
           )
         }
@@ -311,7 +275,7 @@ function ActiveBar({
         const tip = item ? itemTip(item) : null
         const itemLabel = item ? itemName(item) : slot.label
         const count = item?.count ?? 0
-        const theme = getSlotTheme(itemLabel)
+        const theme = slotThemeFor(item?.comps, true)
         const Icon = theme.Icon
 
         return (

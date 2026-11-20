@@ -33,6 +33,7 @@ export interface Action {
   passAction?: string | null
   failAction?: string | null
   effects?: ComponentDef[]
+  seconds?: number
 }
 
 export const PASS_EVENT = 'OnPass'
@@ -310,6 +311,7 @@ export function cleanAction(raw: unknown): Action {
     failCards: cleanSwap(v.failCards),
     passAction: text(v.passAction),
     failAction: text(v.failAction),
-    effects: cleanComponents(v.effects)
+    effects: cleanComponents(v.effects),
+    ...(num(v.seconds) ? { seconds: Math.max(0, num(v.seconds) ?? 0) } : {})
   }
 }

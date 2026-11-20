@@ -1,4 +1,5 @@
 import './NumberParam'
+import './DurationParam'
 import './TextParam'
 import './ChoiceParam'
 import './FlagParam'

@@ -10,30 +10,80 @@ import { formatBytes, formatCount } from '../../lib/format'
 import { memoryFit } from './memoryFit'
 import { modelTraits } from './ModelTraits'
 
-export function HubFileRow({ repo, file, folder, stats }: { repo: string; file: HubFile; folder: string | null; stats: SystemStats | null }) {
+const SHARD_PART = /-(\d{5})-of-(\d{5})\.(?:gguf|safetensors|sft)$/i
+
+export function HubFileRow({
+  repo,
+  file,
+  folder,
+  stats,
+  allowCompanions = false,
+  selected,
+  onToggleSelect
+}: {
+  repo: string
+  file: HubFile
+  folder: string | null
+  stats: SystemStats | null
+  allowCompanions?: boolean
+  selected?: boolean
+  onToggleSelect?: () => void
+}) {
   const header = useHub((s) => s.headers[headerKey(repo, file.file)])
   const loadHeader = useHub((s) => s.loadHeader)
   const queued = useDownloads((s) => s.list.some((d) => d.repo === repo && d.file === file.file && d.state !== 'failed'))
+
+  const shardMatch = file.file.match(SHARD_PART)
+  const shardPart = shardMatch ? Number(shardMatch[1]) : 0
+  const shardCount = shardMatch ? Number(shardMatch[2]) : 0
+
   useEffect(() => {
-    void loadHeader(repo, file.file)
-  }, [repo, file.file])
+    if (shardPart <= 1) void loadHeader(repo, file.file)
+  }, [repo, file.file, shardPart])
+
   const info = header?.value ?? null
-  if (info && (!MODEL_KINDS[info.kind].listed || (info.split && info.split.part > 0))) return null
+  const isCompanion = info ? info.kind === 'vae' || info.kind === 'text_encoder' || info.kind === 'lora' || info.kind === 'projector' : false
+
+  if (shardPart > 1) return null
+  if (info && ((!MODEL_KINDS[info.kind].listed && !(allowCompanions && isCompanion)) || (info.split && info.split.part > 0))) return null
+
   const bytes = info?.sizeBytes ?? file.fileBytes
   const fit = info ? memoryFit(bytes, stats) : null
-  const hint = [formatBytes(bytes), info?.split ? `${info.split.parts} parts` : null, info?.contextLength ? `${formatCount(info.contextLength)} context` : null, file.name].filter(Boolean).join(' · ')
-  const start = () => void engine('downloads.start', { repo, file: file.file, name: file.name, folder: folder ?? '', total: bytes }).catch(failed('Could not start the download'))
+  const partsNote = info?.split ? `${info.split.parts} parts` : shardCount > 1 ? `${shardCount} parts` : null
+  const hint = [formatBytes(bytes), partsNote, info?.contextLength ? `${formatCount(info.contextLength)} context` : null, file.file].filter(Boolean).join(' · ')
+
+  const startSingle = () =>
+    void engine('downloads.start', {
+      repo,
+      file: file.file,
+      name: file.name,
+      folder: folder ?? '',
+      total: bytes
+    }).catch(failed('Could not start the download'))
+
   const traits = [
     ...(fit ? [{ key: 'fit', label: fit.label, tone: fit.tone, hint: fit.hint }] : []),
     ...modelTraits(info, bytes).filter((t) => t.key !== 'quant'),
-    ...(!header ? [{ key: 'reading', label: 'Reading header', tone: 'busy' as const }] : []),
-    ...(header?.error ? [{ key: 'error', label: 'Header unreadable', tone: 'error' as const, hint: header.error }] : [])
+    ...(!header ? [{ key: 'reading', label: 'Checking', tone: 'busy' as const }] : []),
+    ...(header?.error ? [{ key: 'error', label: 'Unprobed', tone: 'warn' as const, hint: `${header.error} (download still works)` }] : [])
   ]
+
   return (
     <SettingRow label={info?.quant ?? file.name} hint={hint} aside={<TraitChips traits={traits} />}>
-      <Button size="sm" variant={queued ? 'secondary' : 'badge'} icon={<Download />} disabled={queued || !folder || !info} onClick={start}>
-        {queued ? 'In downloads' : 'Download'}
-      </Button>
+      <div className="flex items-center gap-2">
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            aria-label={`Select ${file.name}`}
+            className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-accent"
+            checked={Boolean(selected)}
+            onChange={onToggleSelect}
+          />
+        )}
+        <Button size="sm" variant={queued ? 'secondary' : 'badge'} icon={<Download />} disabled={queued || !folder} onClick={startSingle}>
+          {queued ? 'In downloads' : 'Download'}
+        </Button>
+      </div>
     </SettingRow>
   )
 }

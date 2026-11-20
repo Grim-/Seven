@@ -1,0 +1,10 @@
+{
+  "id": "play",
+  "name": "Play (2D RPG Preview)",
+  "description": "2D RPG Play view, playthrough saves, and Game Master agent preset. Preview feature — enable in Tools when you want to use it.",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "tools": false,
+  "defaultOff": true,
+  "dependencies": ["game", "world"]
+}

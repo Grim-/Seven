@@ -1,6 +1,6 @@
 import { RotateCcw } from 'lucide-react'
 import { Resource } from '@shared/game/components'
-import type { Catalog, GameEntity } from '@shared/game/core'
+import { signalLabel, type Catalog, type GameEntity } from '@shared/game/core'
 import { Button } from '../../components/ui'
 import { EffectTokenButton } from '../../components/game/effects/EffectTokenButton'
 import { cn } from '../../lib/cn'
@@ -46,7 +46,7 @@ export function VitalsPanel({
             const def = catalog.stat(r.stat)
             const max = r.max()
             const now = r.get()
-            const per = Math.round((def?.regenPerSecond ?? 0) * 3600 * 100) / 100
+            const refills = (def?.refill.on ?? []).map(signalLabel).join(', ')
             const roundedNow = Math.round(now * 100) / 100
             const roundedMax = Math.round(max)
             return (
@@ -55,9 +55,7 @@ export function VitalsPanel({
                   <div className="truncate font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-white">
                     {def?.label ?? r.stat}
                   </div>
-                  {per !== 0 && (
-                    <div className="font-mono text-[10px] text-dim">{`${per > 0 ? '+' : ''}${per}/hr`}</div>
-                  )}
+                  {refills && <div className="truncate font-mono text-[10px] text-dim">{refills}</div>}
                 </div>
                 <GameBar value={now} max={max} colour={def?.colour ?? null} size="md" className="flex-1" />
                 {changed ? (

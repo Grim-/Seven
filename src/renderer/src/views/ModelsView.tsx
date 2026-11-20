@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownAZ, ArrowDownWideNarrow, ArrowUpNarrowWide, Clock, Cloud, Copy, Cpu, Download, FilePlus, FolderOpen, Folders, Layers, Power, Search, Star, Trash2 } from 'lucide-react'
+import { ArrowDownAZ, ArrowDownWideNarrow, ArrowUpNarrowWide, Clock, Cloud, Copy, Cpu, Download, FilePlus, FolderOpen, Folders, Layers, Power, Search, Server, Shapes, Sparkles, Star, Trash2 } from 'lucide-react'
 import type { ModelEntry, ModelKind } from '@shared/types'
 import { presetForSpec, remoteHostLabel } from '@shared/remoteModels'
 import { modelTraitSet } from '@shared/modelParams'
@@ -9,21 +9,26 @@ import { DownloadsCard } from '../components/models/DownloadsCard'
 import { HubSearch } from '../components/models/HubSearch'
 import { HubRepo } from '../components/models/HubRepo'
 import { MTP_NOTE, modelTraits } from '../components/models/ModelTraits'
-import { modelFilters } from '../components/models/modelFilters'
+import { entryFamily, modelFilters } from '../components/models/modelFilters'
 import { applyFilters, useFilterValues } from '../lib/propertyFilters'
 import { useViewPlace } from '../lib/viewPlace'
-import { BackBar, Button, Fact, FactGrid, FilterBar, KindShell, SegmentBar, Select, SettingCard, StatusBadge, ShellTabs, TraitChips, ViewHeader, openMenu, type ShellItem, type ShellSort } from '../components/ui'
+import { BackBar, BrowsePick, Button, Fact, FactGrid, FilterBar, KindShell, SegmentBar, SettingCard, StatusBadge, ShellTabs, TraitChips, ViewHeader, openMenu, type ShellItem, type ShellSort } from '../components/ui'
 import { isRunnable, modelBytes, useModels } from '../store/models'
+import { useImageHost } from '../store/image'
 import { engine, main } from '../lib/ipc'
 import { errorText, formatBytes } from '../lib/format'
 import { toast } from '../store/toasts'
 import { ModelFolders } from './ModelFolders'
 import { ModelSettings } from '../components/models/settings/ModelSettings'
+import { ImageModelConfigPanel } from '../components/models/ImageModelConfigPanel'
 import { AddRemoteModal, RemoteModelDetail } from '../components/models/RemoteModels'
 import { TemplateField } from '../components/models/settings/TemplateField'
 import { ProjectorField } from '../components/models/settings/ProjectorField'
 import { ArgsBox } from '../components/models/settings/ArgsBox'
 import { useModelConfig, type ModelConfigState } from '../components/models/settings/useModelConfig'
+import { generateImage } from '../components/pictures/GenerateImageModal'
+import { useInstallHelper } from '../components/install/useInstallHelper'
+import { openHelperInstaller, openServerView } from '../lib/openServer'
 import { failed, copyText } from '../lib/notify'
 import { noteFailure } from '../store/problems'
 
@@ -37,8 +42,14 @@ function dirOf(file: string): string {
 
 function useActions() {
   const { host, load, unload, remove, setFavourite } = useModels()
+  const { host: imageHost, load: loadImage, unload: unloadImage } = useImageHost()
   const toggle = async (m: ModelEntry) => {
     try {
+      if (m.info?.kind === 'image') {
+        if (imageHost.modelId === m.id && (imageHost.status === 'ready' || imageHost.status === 'generating')) await unloadImage()
+        else await loadImage(m.id)
+        return
+      }
       if (host.modelId === m.id && host.status === 'ready') await unload()
       else await load(m.id)
     } catch (err) {
@@ -64,15 +75,24 @@ function ModelFacts({ model }: { model: ModelEntry }) {
           <FactGrid>
             <Fact label="Type">
               {info ? (
-                <Select
+                <BrowsePick
                   value={info.kind}
-                  options={(Object.keys(MODEL_KINDS) as ModelKind[]).filter((k) => MODEL_KINDS[k].listed).map((k) => ({ value: k, label: MODEL_KINDS[k].label }))}
+                  clearable={Boolean(model.kindChosen)}
+                  placeholder="Type"
+                  options={(Object.keys(MODEL_KINDS) as ModelKind[])
+                    .filter((k) => MODEL_KINDS[k].listed || k === 'vae' || k === 'text_encoder' || k === 'lora' || k === info.kind)
+                    .map((k) => ({
+                      value: k,
+                      label: MODEL_KINDS[k].label,
+                      group: MODEL_KINDS[k].runnable ? 'Runnable models' : 'Companion weights',
+                      ...(MODEL_KINDS[k].note ? { note: MODEL_KINDS[k].note } : {})
+                    }))}
                   onChange={(v) =>
-                    void engine('models.kind', { id: model.id, kind: v as ModelKind })
+                    void engine('models.kind', { id: model.id, kind: v as ModelKind | null })
                       .then((next) => useModels.setState({ list: next }))
                       .catch(failed('Could not change the type'))
                   }
-                  className="h-7 text-[12.5px]"
+                  className="w-60"
                 />
               ) : info === null ? (
                 'Unreadable'
@@ -147,6 +167,7 @@ function ReloadBar({ model }: { model: ModelEntry }) {
 
 function ModelDetail({ model }: { model: ModelEntry }) {
   const host = useModels((s) => s.host)
+  const imageHost = useImageHost((s) => s.host)
   const actions = useActions()
   const [searchModel, setSearchModel] = useState<string | null>(null)
   useEffect(() => {
@@ -157,10 +178,13 @@ function ModelDetail({ model }: { model: ModelEntry }) {
   const info = model.info
   const projector = useProjector(model.id)
   const config = useModelConfig(model.id)
-  const isLoaded = host.modelId === model.id && host.status === 'ready'
-  const isLoading = host.modelId === model.id && host.status === 'loading'
+  const isImage = info?.kind === 'image'
+  const isLoaded = isImage
+    ? imageHost.modelId === model.id && (imageHost.status === 'ready' || imageHost.status === 'generating')
+    : host.modelId === model.id && host.status === 'ready'
+  const isLoading = isImage ? imageHost.modelId === model.id && imageHost.status === 'loading' : host.modelId === model.id && host.status === 'loading'
   const embedding = info?.kind === 'embedding'
-  const chats = !embedding && info?.kind !== 'projector'
+  const chats = info ? MODEL_KINDS[info.kind].chats : true
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 border-b border-line/50 pb-2.5">
@@ -174,19 +198,24 @@ function ModelDetail({ model }: { model: ModelEntry }) {
         </button>
         <TraitChips traits={modelTraits(info, modelBytes(model))} />
         <span className="ml-auto flex flex-wrap items-center gap-2">
-          {isLoaded && <StatusBadge tone="ok">Loaded</StatusBadge>}
+          {isLoaded && <StatusBadge tone="ok">{imageHost.status === 'generating' && isImage ? 'Generating' : 'Loaded'}</StatusBadge>}
           {isLoading && (
             <>
               <StatusBadge tone="busy">Loading</StatusBadge>
               <SegmentBar value={null} className="w-32" />
             </>
           )}
+          {isImage && (
+            <Button size="sm" variant="primary" icon={<Sparkles />} onClick={() => void generateImage({ modelId: model.id })}>
+              Generate image…
+            </Button>
+          )}
           {embedding ? (
             <Button size="sm" variant={searchModel === model.id ? 'secondary' : 'primary'} icon={<Search />} disabled={searchModel === model.id} onClick={() => (actions.useForSearch(model), setSearchModel(model.id))}>
               {searchModel === model.id ? 'Used for memory search' : 'Use for memory search'}
             </Button>
           ) : isRunnable(model) ? (
-            <Button size="sm" variant={isLoaded ? 'secondary' : 'primary'} icon={<Power />} disabled={host.status === 'loading'} onClick={() => void actions.toggle(model)}>
+            <Button size="sm" variant={isLoaded ? 'secondary' : isImage ? 'ghost' : 'primary'} icon={<Power />} disabled={isImage ? imageHost.status === 'loading' || imageHost.status === 'generating' : host.status === 'loading'} onClick={() => void actions.toggle(model)}>
               {isLoaded ? 'Unload' : 'Load'}
             </Button>
           ) : (
@@ -202,12 +231,13 @@ function ModelDetail({ model }: { model: ModelEntry }) {
           )}
         </span>
       </div>
-      <ReloadBar model={model} />
+      {!isImage && <ReloadBar model={model} />}
       {chats ? (
         <ModelSettings modelId={model.id} state={config} traits={modelTraitSet(info, projector.state ? projector.state.choice !== null : null)} overview={<ModelOverview model={model} state={config} />} leads={[{ section: 'vision', node: <ProjectorField projector={projector} /> }]} />
       ) : (
-        <div className="flex min-h-0 max-w-4xl flex-col gap-3 overflow-y-auto">
+        <div className="flex min-h-0 max-w-4xl flex-col gap-3 overflow-y-auto pr-1">
           <ModelFacts model={model} />
+          {isImage && <ImageModelConfigPanel model={model} />}
           {embedding && <div className="text-[12.5px] text-dim">Embedding models aren't chatted with. Seven loads this one on the CPU when agents search their memory.</div>}
         </div>
       )}
@@ -217,6 +247,9 @@ function ModelDetail({ model }: { model: ModelEntry }) {
 
 export function ModelsView() {
   const { list, host, add } = useModels()
+  const imageHost = useImageHost((s) => s.host)
+  const { state: sdInstall } = useInstallHelper('sd-server')
+  const sdReady = Boolean(sdInstall?.active || String(sdInstall?.settings?.customExecutable ?? '').trim())
   const actions = useActions()
   const [tab, setTab] = useViewPlace<Tab>('models.tab', 'all')
   const [selected, setSelected] = useViewPlace<string | null>('models.selected', null)
@@ -253,6 +286,17 @@ export function ModelsView() {
     }
     return [
       { id: 'name', title: 'Sort by name', icon: <ArrowDownAZ className="h-3.5 w-3.5" />, compare: by((a, b) => a.name.localeCompare(b.name)) },
+      {
+        id: 'arch',
+        title: 'Sort by family & architecture',
+        icon: <Shapes className="h-3.5 w-3.5" />,
+        compare: by(
+          (a, b) =>
+            (entryFamily(a) ?? '~').localeCompare(entryFamily(b) ?? '~') ||
+            (a.info?.architecture ?? '~').localeCompare(b.info?.architecture ?? '~') ||
+            a.name.localeCompare(b.name)
+        )
+      },
       { id: 'size-desc', title: 'Largest first', icon: <ArrowDownWideNarrow className="h-3.5 w-3.5" />, compare: by((a, b) => modelBytes(b) - modelBytes(a)) },
       { id: 'size-asc', title: 'Smallest first', icon: <ArrowUpNarrowWide className="h-3.5 w-3.5" />, compare: by((a, b) => modelBytes(a) - modelBytes(b)) },
       { id: 'used', title: 'Last used', icon: <Clock className="h-3.5 w-3.5" />, compare: by((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || a.name.localeCompare(b.name)) },
@@ -267,25 +311,32 @@ export function ModelsView() {
     (): ShellItem[] =>
       filtered.shown
         .map((m) => {
-          const loaded = host.modelId === m.id && host.status === 'ready'
-          const loading = host.modelId === m.id && host.status === 'loading'
+          const isImage = m.info?.kind === 'image'
+          const loaded = isImage
+            ? imageHost.modelId === m.id && imageHost.status === 'ready'
+            : host.modelId === m.id && host.status === 'ready'
+          const loading = isImage
+            ? imageHost.modelId === m.id && (imageHost.status === 'loading' || imageHost.status === 'generating')
+            : host.modelId === m.id && host.status === 'loading'
           const remotePreset = m.remote ? presetForSpec(m.remote.api, m.remote.baseUrl) : null
+          const fam = entryFamily(m)
+          const arch = m.info?.architecture ?? null
           const what = m.remote
-            ? `${remotePreset?.label ?? m.remote.api} · ${m.remote.model}`
-            : [m.info ? MODEL_KINDS[m.info.kind].label : null, m.info?.architecture].filter(Boolean).join(' · ')
+            ? [fam, `${remotePreset?.label ?? m.remote.api} · ${m.remote.model}`].filter(Boolean).join(' · ')
+            : [fam, arch && fam?.toLowerCase() !== arch.toLowerCase() ? arch : null, m.info ? MODEL_KINDS[m.info.kind].label : null].filter(Boolean).join(' · ')
           return {
             key: m.id,
             title: m.name,
             subtitle: `${m.favourite ? '★ ' : ''}${what}`,
             excerpt: m.remote ? `${remoteHostLabel(m.remote.api, m.remote.baseUrl)} · ${m.remote.hasKey ? 'Key saved' : 'No key set'}` : m.path,
             icon: m.remote ? <Cloud className="h-4 w-4 text-teal" /> : <Cpu className="h-4 w-4" />,
-            tag: loaded ? 'LOADED' : loading ? 'LOADING' : m.remote ? (remotePreset?.label ?? m.remote.api).toUpperCase() : (m.info ? MODEL_KINDS[m.info.kind].label : 'GGUF').toUpperCase(),
+            tag: loaded ? 'LOADED' : loading ? (isImage && imageHost.status === 'generating' ? 'GENERATING' : 'LOADING') : m.remote ? (remotePreset?.label ?? m.remote.api).toUpperCase() : (m.info ? MODEL_KINDS[m.info.kind].label : 'MODEL').toUpperCase(),
             traits: m.remote ? [] : modelTraits(m.info, modelBytes(m)),
-            aside: m.remote ? (m.remote.hasKey ? 'key ok' : 'no key') : undefined,
+            aside: m.remote ? (m.remote.hasKey ? 'key ok' : 'no key') : formatBytes(modelBytes(m)),
             updatedAt: m.lastUsedAt
           }
         }),
-    [filtered, host.modelId, host.status]
+    [filtered, host.modelId, host.status, imageHost.modelId, imageHost.status]
   )
 
   useEffect(() => {
@@ -295,7 +346,10 @@ export function ModelsView() {
   const current = selected ? (byId.get(selected) ?? null) : null
 
   const menu = (e: React.MouseEvent, m: ModelEntry) => {
-    const isLoaded = host.modelId === m.id && host.status === 'ready'
+    const isImage = m.info?.kind === 'image'
+    const isLoaded = isImage
+      ? imageHost.modelId === m.id && (imageHost.status === 'ready' || imageHost.status === 'generating')
+      : host.modelId === m.id && host.status === 'ready'
     if (m.remote)
       return openMenu(e, m.name, [
         { label: m.favourite ? 'Remove from favourites' : 'Favourite', icon: <Star />, onSelect: () => actions.star(m) },
@@ -303,9 +357,10 @@ export function ModelsView() {
         { label: 'Remove', icon: <Trash2 />, danger: true, onSelect: () => actions.drop(m) }
       ])
     openMenu(e, m.name, [
+      ...(isImage ? [{ label: 'Generate image…', icon: <Sparkles />, onSelect: () => void generateImage({ modelId: m.id }) }] : []),
       m.info?.kind === 'embedding'
         ? { label: 'Use for memory search', icon: <Search />, onSelect: () => actions.useForSearch(m) }
-        : { label: isLoaded ? 'Unload' : 'Load', icon: <Power />, disabled: host.status === 'loading' || !isRunnable(m), onSelect: () => void actions.toggle(m) },
+        : { label: isLoaded ? 'Unload' : 'Load', icon: <Power />, disabled: (isImage ? imageHost.status === 'loading' || imageHost.status === 'generating' : host.status === 'loading') || !isRunnable(m), onSelect: () => void actions.toggle(m) },
       { label: m.favourite ? 'Remove from favourites' : 'Favourite', icon: <Star />, onSelect: () => actions.star(m) },
       { label: '', separator: true },
       { label: 'Show folder', icon: <FolderOpen />, onSelect: () => actions.showFolder(m) },
@@ -336,17 +391,20 @@ export function ModelsView() {
     <div className="flex h-full flex-col gap-3 p-5">
       <ViewHeader
         title="Models"
-        subtitle="GGUF models Seven can run on this machine."
+        subtitle="Local and remote models Seven can run on this machine."
         actions={
           <>
             <Button variant={folders ? 'secondary' : 'ghost'} icon={<Folders />} onClick={() => setFolders(!folders)}>
               Folders
             </Button>
-            <Button variant={hub ? 'secondary' : 'ghost'} icon={<Download />} onClick={() => setHub(hub ? null : 'search')}>
+            <Button variant={hub ? 'primary' : 'secondary'} icon={<Download />} onClick={() => setHub(hub ? null : 'search')}>
               Download
             </Button>
+            <Button variant="ghost" icon={<Server />} onClick={() => openServerView(tab === 'image' || current?.info?.kind === 'image' ? 'sd-server' : 'llama-server')}>
+              Servers
+            </Button>
             <Button variant="ghost" icon={<Cloud />} onClick={() => setAddingRemote(true)}>
-              Add remote
+              Add remote model
             </Button>
             <Button variant="primary" icon={<FilePlus />} onClick={() => void addFile()}>
               Add file
@@ -357,6 +415,15 @@ export function ModelsView() {
       {folders && <ModelFolders className="shrink-0" />}
       {addingRemote && <AddRemoteModal onClose={() => setAddingRemote(false)} onAdded={open} />}
       {host.status === 'error' && host.error && <div className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3.5 py-2.5 font-mono text-[12px] text-alert">{host.error}</div>}
+      {imageHost.status === 'error' && imageHost.error && <div className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3.5 py-2.5 font-mono text-[12px] text-alert">{imageHost.error}</div>}
+      {tab === 'image' && sdInstall && !sdReady && (
+        <div className="flex items-center gap-3 border border-line border-l-2 border-l-accent bg-accent/5 px-3.5 py-2.5 text-[12.5px] text-white">
+          <span className="flex-1">Local diffusion models need <span className="font-mono text-accent">sd-server</span>. Install a release build or point Seven at your own <span className="font-mono">sd-server.exe</span>.</span>
+          <Button size="sm" variant="primary" icon={<Server />} onClick={() => openHelperInstaller('sd-server')}>
+            Install sd-server…
+          </Button>
+        </div>
+      )}
       <DownloadsCard />
       {hub ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -404,7 +471,7 @@ export function ModelsView() {
               ? 'No remote models connected yet. Click "Add remote" to connect Google Gemini, OpenAI, Anthropic, OpenRouter, or a local server.'
               : list.length
                 ? 'Nothing here for this tab and these filters.'
-                : 'Add a model folder (Folders), or add a single GGUF file.'
+                : 'Add a model folder (Folders), or add a model file (.gguf, .safetensors, .ckpt).'
           }
         />
         </div>

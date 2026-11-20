@@ -1,0 +1,50 @@
+{
+  "seven": "export",
+  "version": 3,
+  "protection": "none",
+  "savedAt": 1763500000000,
+  "about": {
+    "kind": "sheet",
+    "label": "Character sheet",
+    "title": "Tessa Vance",
+    "also": []
+  },
+  "entries": [
+    {
+      "kind": "sheet",
+      "id": "starter-tessa-vance",
+      "title": "Tessa Vance",
+      "value": {
+        "title": "Tessa Vance",
+        "type": "sheet",
+        "body": "",
+        "fields": [],
+        "records": [],
+        "image": null,
+        "voice": null,
+        "data": {
+          "fields": [
+            "Identity",
+            "Appearance",
+            "Motivations & goals",
+            "Speech",
+            "Core beliefs"
+          ],
+          "values": {
+            "Identity": "Field mechanic and courier who knows every shortcut, back alley, and freight schedule in the district.",
+            "Appearance": "Mid 20s, cropped dark hair, scuffed canvas jacket, brass calipers clipped to her belt.",
+            "Motivations & goals": "Save enough to buy her own workshop and stop taking rush jobs for shady brokers.",
+            "Speech": "Fast, direct, upbeat — talks with her hands and laughs off bad odds.",
+            "Core beliefs": "Anything built by people can be taken apart and fixed by people."
+          },
+          "dnd": null,
+          "game": null,
+          "gameRules": "",
+          "faction": null,
+          "story": null
+        }
+      },
+      "isDependency": false
+    }
+  ]
+}

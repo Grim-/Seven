@@ -1,4 +1,4 @@
-import { Download, FolderOpen, Hash, Link, MessageSquarePlus, MessageSquareQuote, PanelRight, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { Dices, Download, FolderOpen, Hash, Link, MessageSquarePlus, MessageSquareQuote, PanelRight, Pencil, Plus, RefreshCw, Trash2, Upload, X } from 'lucide-react'
 import type { LibraryHit, LibrarySection } from '@shared/types'
 import { showName } from '@shared/ids'
 import { askConfirm, askText, openMenu, type MenuItem, confirmDelete } from '../../components/ui'
@@ -6,7 +6,7 @@ import { showInPanel } from '../../components/data/showInPanel'
 import { engine } from '../../lib/ipc'
 import { errorText } from '../../lib/format'
 import { exportKindMenu, exportMenu } from '../../lib/exporting'
-import { openPortableImportFromFiles } from '../../components/portability/portabilityStore'
+import { openPortableExport, openPortableImportFromFiles } from '../../components/portability/portabilityStore'
 import { toast } from '../../store/toasts'
 import { rebuildIndex, type DataSelection, entryLink } from '../../store/data'
 import { useApp } from '../../store/app'
@@ -14,7 +14,7 @@ import { kindUi } from '../../registries/kinds'
 import { failed, copyText } from '../../lib/notify'
 import { useWindows } from '../../store/windows'
 import { showInData } from '../../lib/library'
-import { referenceInChat, startChatWith } from '../../lib/conversation'
+import { referenceInChat, startChatWith, startDmChatWith } from '../../lib/conversation'
 import { useAgents } from '../../store/agents'
 import { boardMenu } from '../../components/data/boardMenu'
 import { favouriteItem } from '../../lib/favourites'
@@ -95,6 +95,126 @@ export function deleteEntry(section: LibrarySection, id: string, title: string, 
   })
 }
 
+export function deleteEntries(section: LibrarySection, ids: string[], after?: () => void): void {
+  if (!ids.length) return
+  if (ids.length === 1) {
+    const hit = section.entries.find((e) => e.id === ids[0])
+    return deleteEntry(section, ids[0], hit?.title ?? ids[0], after)
+  }
+  askConfirm(
+    `Delete ${ids.length} ${section.plural.toLowerCase()}?`,
+    `This removes ${ids.length} selected items from ${section.plural} for good.`,
+    `Delete ${ids.length}`,
+    async () => {
+      let removed = 0
+      let failCount = 0
+      for (const id of ids) {
+        try {
+          await engine('library.remove', { entry: `${section.kind}/${id}` })
+          useDataHistory.getState().forgetEntry(section.kind, id)
+          removed += 1
+        } catch {
+          failCount += 1
+        }
+      }
+      after?.()
+      toast.success(`Deleted ${removed}`, failCount ? `${failCount} could not be deleted` : section.plural)
+    }
+  )
+}
+
+export function openMultiEntryMenu(e: React.MouseEvent, section: LibrarySection, ids: string[], afterDelete?: () => void): void {
+  const items: MenuItem[] = []
+  if (section.exportable) {
+    items.push({
+      label: `Export ${ids.length} selected…`,
+      icon: <Download />,
+      onSelect: () => openPortableExport({ kind: section.kind, entries: ids })
+    })
+  }
+  if (section.removable) {
+    items.push({
+      label: `Delete ${ids.length} selected`,
+      icon: <Trash2 />,
+      danger: true,
+      onSelect: () => deleteEntries(section, ids, afterDelete)
+    })
+  }
+  if (items.length) openMenu(e, `${ids.length} ${section.plural.toLowerCase()}`, items)
+}
+
+export function multiEntryMenuAt(e: React.MouseEvent, kind: string, ids: string[], afterDelete?: () => void): void {
+  const where = at(e)
+  void sectionOf(kind).then((section) => {
+    if (!section) return
+    const items: MenuItem[] = []
+    if (section.exportable) {
+      items.push({
+        label: `Export ${ids.length} selected…`,
+        icon: <Download />,
+        onSelect: () => openPortableExport({ kind, entries: ids })
+      })
+    }
+    if (section.removable) {
+      items.push({
+        label: `Delete ${ids.length} selected`,
+        icon: <Trash2 />,
+        danger: true,
+        onSelect: () => deleteEntries(section, ids, afterDelete)
+      })
+    }
+    if (items.length) openMenu(where, `${ids.length} ${section.plural.toLowerCase()}`, items)
+  })
+}
+
+export function KindSelectionBar({
+  kind,
+  picked,
+  total,
+  exportable = true,
+  removable = true,
+  onSelectAll,
+  onClear
+}: {
+  kind: string
+  picked: string[]
+  total: number
+  exportable?: boolean
+  removable?: boolean
+  onSelectAll: () => void
+  onClear: () => void
+}) {
+  return (
+    <div className="flex items-center gap-1.5 font-mono text-[11px]">
+      <span className="border border-accent/50 bg-accent/10 px-2 py-0.5 text-accent">{picked.length} selected</span>
+      <button type="button" onClick={onSelectAll} className="border border-line/60 px-2 py-0.5 text-dim hover:text-white">
+        All ({total})
+      </button>
+      {exportable && (
+        <button
+          type="button"
+          onClick={() => openPortableExport({ kind, entries: picked })}
+          className="inline-flex items-center gap-1 border border-line/60 px-2 py-0.5 text-dim hover:border-cyan/60 hover:text-cyan"
+        >
+          <Download className="h-3 w-3" /> Export
+        </button>
+      )}
+      {removable && (
+        <button
+          type="button"
+          onClick={() => void sectionOf(kind).then((s) => s && deleteEntries(s, picked, onClear))}
+          className="inline-flex items-center gap-1 border border-line/60 px-2 py-0.5 text-dim hover:border-alert/60 hover:text-alert"
+        >
+          <Trash2 className="h-3 w-3" /> Delete
+        </button>
+      )}
+      <button type="button" onClick={onClear} title="Clear selection (Esc)" className="p-0.5 text-faint hover:text-white">
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
+
 export function clearKind(section: LibrarySection): void {
   askConfirm(`Delete all ${section.count} ${section.plural.toLowerCase()}?`, "This can't be undone. Export them first if you might want them back.", 'Delete all', async () => {
     try {
@@ -139,10 +259,10 @@ export function kindMenuAt(e: React.MouseEvent, section: LibrarySection, select:
   )
 }
 
-export function startChatItems(link: string, first: string[] = []): MenuItem[] {
+export function startChatItems(link: string, first: string[] = [], start: (agentId: string, link: string) => void = startChatWith): MenuItem[] {
   const agents = useAgents.getState().list
   const ordered = [...agents.filter((a) => first.includes(a.id)), ...agents.filter((a) => !first.includes(a.id))]
-  return ordered.map((a) => ({ label: a.name, onSelect: () => startChatWith(a.id, link) }))
+  return ordered.map((a) => ({ label: a.name, onSelect: () => start(a.id, link) }))
 }
 
 export function entryActions(section: LibrarySection, hit: LibraryHit, ctx: { open: () => void; select: (s: DataSelection | null) => void; selected: DataSelection | null }): MenuItem[] {
@@ -154,6 +274,7 @@ export function entryActions(section: LibrarySection, hit: LibraryHit, ctx: { op
     { label: 'Open', icon: <FolderOpen />, onSelect: ctx.open },
     { label: 'Reference in chat', icon: <MessageSquareQuote />, onSelect: () => referenceInChat(link) },
     { label: 'Start chat with', icon: <MessageSquarePlus />, children: startChatItems(link) },
+    { label: 'Start DM chat with', icon: <Dices />, children: startChatItems(link, [], startDmChatWith) },
     { label: 'Show in chat panel', icon: <PanelRight />, onSelect: () => void showInPanel(entry) },
     boardMenu(entry),
     { label: 'Copy link', icon: <Link />, onSelect: () => void copyText(link, 'Link copied', link) },

@@ -22,6 +22,7 @@ import { cleanSvg } from '@shared/svg'
 import { SLIDESHOW_TOOLS } from './slideshowTools'
 import { CHARACTER_TOOLS } from './characterTools'
 import { hitId, resolveEntries, thingsFrom } from './things'
+import { INSPECT_SCHEMA } from './schemaTool'
 
 const VALUE: JsonSchema = { oneOf: [{ type: ['string', 'number', 'boolean', 'null'] }, { type: 'array', items: { type: 'string' } }] }
 const OBJECT: JsonSchema = { type: 'object', properties: {}, additionalProperties: VALUE }
@@ -237,7 +238,7 @@ const addPage: ToolDef = {
     type: 'object',
     properties: {
       id: { type: 'string', description: 'Its path: folders, then the page, e.g. recipes/pancakes' },
-      text: { type: 'string', description: 'Markdown; link entries with @kind:id' }
+      text: { type: 'string', description: 'Markdown' }
     }
   },
   async execute(params, ctx) {
@@ -661,5 +662,5 @@ const repoWrite: ToolDef = {
   }
 }
 
-export const DATA_TOOLS: ToolDef[] = [find, read, addPage, updatePage, renamePage, removePage, pageItems, pageFields, show, addHtml, draw, tag, pickRandom, sheetWrite, ...CHARACTER_TOOLS, repoWrite, ...SLIDESHOW_TOOLS]
+export const DATA_TOOLS: ToolDef[] = [find, read, INSPECT_SCHEMA, addPage, updatePage, renamePage, removePage, pageItems, pageFields, show, addHtml, draw, tag, pickRandom, sheetWrite, ...CHARACTER_TOOLS, repoWrite, ...SLIDESHOW_TOOLS]
 

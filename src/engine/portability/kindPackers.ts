@@ -1,7 +1,8 @@
 import { cleanMap, mapObjects, type MapLayer } from '@shared/maps'
 import { componentClass, type ParamSchema, type ParamSpec } from '@shared/game/core'
 import { defId, type DefType, type GameDef } from '@shared/game/defs'
-import { PLACE_TYPE_KEY, type WorldEntity, type WorldPost, type WorldSchema } from '@shared/world'
+import { PLACE_TYPE_KEY, type WorldEntity, type WorldLaunch, type WorldPost, type WorldSchema } from '@shared/world'
+import { refsIn } from '@shared/story'
 import type { EntryRef, Packing, Unpack } from '../library/packing'
 import { freeName } from '../library/packing'
 import { cleanCard, cleanSet } from '../../modules/cards/clean'
@@ -436,6 +437,7 @@ interface WorldPack {
   rules: string
   tags: string[]
   flags: Record<string, string | number | boolean>
+  launch?: WorldLaunch
   schema: WorldSchema
   entities: Record<string, Record<string, WorldEntity>>
   board: WorldPost[]
@@ -453,7 +455,9 @@ export const worldPacking: Packing = {
     }
     const meta = worlds.meta(id)
     const schema = worlds.schema(id)
-    const entities: Record<string, Record<string, WorldEntity>> = {}
+    const entities: Record<string, Record<string, WorldEntity>> = {
+      [PLACE_TYPE_KEY]: worlds.entities(id, PLACE_TYPE_KEY, true, 'template')
+    }
     for (const typeKey of Object.keys(schema.types)) {
       entities[typeKey] = worlds.entities(id, typeKey, true, 'template')
     }
@@ -464,6 +468,7 @@ export const worldPacking: Packing = {
       rules: meta.rules ?? '',
       tags: meta.tags ?? [],
       flags: meta.flags ?? {},
+      ...(meta.launch ? { launch: meta.launch } : {}),
       schema,
       entities,
       board: worlds.board(id),
@@ -478,6 +483,15 @@ export const worldPacking: Packing = {
     const seen = new Set<string>()
     const meta = worlds.meta(id)
     if (meta.player) pushRef(out, seen, 'sheet', meta.player)
+    if (meta.launch?.startingMap) pushRef(out, seen, 'map', meta.launch.startingMap)
+    for (const aId of meta.launch?.openingActionIds ?? []) pushRef(out, seen, 'trigger_action', aId)
+    for (const p of Object.values(worlds.entities(id, PLACE_TYPE_KEY, true, 'template'))) {
+      if (typeof p.Files === 'string') {
+        for (const r of refsIn(p.Files)) {
+          if (r.kind === 'sheet' || r.kind === 'page' || r.kind === 'agent') pushRef(out, seen, r.kind, r.ref)
+        }
+      }
+    }
     for (const u of worlds.mapUses(id)) {
       pushRef(out, seen, 'map', u.map)
       for (const sId of Object.keys(u.stand ?? {})) pushRef(out, seen, 'sheet', sId)
@@ -505,10 +519,22 @@ export const worldPacking: Packing = {
     if (raw.player) worlds.setPlayer(target.id, how.entry(raw.player, 'sheet'))
     if (raw.tags?.length) worlds.setTags(target.id, raw.tags)
     if (raw.flags && Object.keys(raw.flags).length) worlds.setFlags(target.id, raw.flags)
+    if (raw.launch) {
+      worlds.setLaunch(target.id, {
+        ...raw.launch,
+        startingMap: raw.launch.startingMap ? how.entry(raw.launch.startingMap, 'map') : null,
+        openingActionIds: (raw.launch.openingActionIds ?? []).map((aId) => how.entry(aId, 'trigger_action'))
+      })
+    }
     for (const [typeKey, records] of Object.entries(raw.entities ?? {})) {
       if (!raw.schema.types[typeKey] && typeKey !== PLACE_TYPE_KEY) continue
       for (const [key, ent] of Object.entries(records ?? {})) {
-        worlds.put(target.id, typeKey, key, ent, 'template')
+        if (typeKey === PLACE_TYPE_KEY && typeof ent.Files === 'string' && ent.Files) {
+          const remappedFiles = ent.Files.replace(/@(sheet|page|agent):([^\s]+)/g, (_, kind: string, refId: string) => `@${kind}:${how.entry(refId, kind)}`)
+          worlds.put(target.id, typeKey, key, { ...ent, Files: remappedFiles }, 'template')
+        } else {
+          worlds.put(target.id, typeKey, key, ent, 'template')
+        }
       }
     }
     if (Array.isArray(raw.board)) {

@@ -1,7 +1,7 @@
 {
   "id": "storyteller",
   "name": "Storyteller Nexus",
-  "description": "Runs procedurally seeded, branching stories from templates: Seven keeps the structure (acts, rolled scenarios, what's true about the world), the model writes the prose. It rolls from your repos (in Data); story templates and POIs are its own kinds, and a library folder of JSON files can add more. Story runs are kept in the vault.",
+  "description": "Data-driven, structured randomness for coherent yet varied stories. Templates combine acts, beats, and {repo} rolls so agents can run consistent, replayable stories in chat or anywhere else—independent of Worlds.",
   "version": "1.0.0",
   "apiVersion": 1,
   "permission": "none",
@@ -32,8 +32,8 @@
       "label": "Story template",
       "plural": "Story templates",
       "icon": "scroll-text",
-      "group": "Worlds",
-      "description": "the acts, branches and calls to action a story run follows",
+      "group": "Storyteller",
+      "description": "data-driven story blueprint: acts, beats, thresholds, and {repo} random rolls for varied runs",
       "view": "nexus.html",
       "actions": [
         "add_story_template",
@@ -42,11 +42,11 @@
     },
     {
       "type": "poi",
-      "label": "Point of interest",
-      "plural": "POIs",
+      "label": "Story POI",
+      "plural": "Story POIs",
       "icon": "map-pin",
-      "group": "Worlds",
-      "description": "a place stories can draw on",
+      "group": "Storyteller",
+      "description": "reusable location or encounter seed that Storyteller templates can roll and draw into a run",
       "view": "nexus.html"
     },
     {
@@ -54,8 +54,8 @@
       "label": "Branching story",
       "plural": "Branching stories",
       "icon": "git-branch",
-      "group": "Worlds",
-      "description": "a finished story in passages, where the reader's choices lead to other passages",
+      "group": "Storyteller",
+      "description": "finished interactive story in passages, where the reader's choices lead to other passages",
       "view": "nexus.html",
       "actions": [
         "add_branching_story",

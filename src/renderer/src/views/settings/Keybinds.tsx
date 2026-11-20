@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { Button, SettingCard, SettingRow } from '../../components/ui'
-import { useApp } from '../../store/app'
 import { useGameplaySettings } from '../../components/play/settings/gameplaySettingsStore'
 import {
   KEYBIND_DEFS,
@@ -11,7 +10,6 @@ import {
   type KeybindGroup,
   type KeybindSpec
 } from '../../store/keybinds'
-import { HotkeyField } from './Startup'
 
 const GROUP_TITLES: { group: KeybindGroup; title: string }[] = [
   { group: 'app', title: 'App and navigation' },
@@ -69,7 +67,6 @@ function KeyBadge({ spec }: { spec: KeybindSpec }) {
 }
 
 export function Keybinds() {
-  const appSettings = useApp((s) => s.settings)
   const bindings = useKeybinds((s) => s.bindings)
   const setBinding = useKeybinds((s) => s.setBinding)
   const clearBinding = useKeybinds((s) => s.clearBinding)
@@ -112,10 +109,6 @@ export function Keybinds() {
 
   return (
     <>
-      <SettingCard title="Global overlay">
-        <HotkeyField current={appSettings?.hotkey ?? ''} />
-      </SettingCard>
-
       {GROUP_TITLES.map(({ group, title }) => {
         const items = KEYBIND_DEFS.filter((d) => d.group === group)
         return (

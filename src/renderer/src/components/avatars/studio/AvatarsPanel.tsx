@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, Plus, RotateCcw, Sparkles, Trash2 } from 'lucide-react'
+import { Copy, Plus, RotateCcw, Trash2, Zap } from 'lucide-react'
 import { avatarIdOfRef, avatarRendererInfo, avatarRenderers, type Avatar } from '@shared/avatars'
 import { ACTIVITIES, MOODS, MOOD_NAMES, NEUTRAL_MOOD, REACTION_POSES, isReactionPose, moodDef, nearestMood, poseOf, type Activity, type AvatarPose, type MoodName } from '@shared/moods'
 import { settingsFor, type SettingValue, type SettingValues } from '@shared/settingSpec'
@@ -259,7 +259,7 @@ export function AvatarsPanel({ initial = null }: { initial?: string | null }) {
                         </Button>
                       ))}
                       {(['pulse', 'wobble', 'glitch', 'highlight'] as const).map((preset) => (
-                        <Button key={preset} size="sm" variant="ghost" icon={<Sparkles />} onClick={() => studioTarget && triggerVfx(studioTarget, { preset })}>
+                        <Button key={preset} size="sm" variant="ghost" icon={<Zap />} onClick={() => studioTarget && triggerVfx(studioTarget, { preset })}>
                           {preset}
                         </Button>
                       ))}

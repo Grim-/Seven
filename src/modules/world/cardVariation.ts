@@ -1,6 +1,6 @@
 import type { JsonSchema } from '../../engine/tools/schema'
-import { LIVE_CHECKS, type CheckSchema } from '../../engine/tools/checkSchema'
-import { effectDefListSchema, normalizeEffectDefs } from '../../engine/tools/effectSchema'
+import type { CheckSchema } from '../../engine/tools/checkSchema'
+import { effectItemSchema, normalizeEffectDefs } from '../../engine/tools/effectSchema'
 import { cardVariationDefs, type CardPlayContext, type CardPlayOutcome, type CardRaw } from '../../engine/cards/variations'
 import { rollFor } from '../../engine/actions'
 import { runEffects } from '../../engine/effects/run'
@@ -87,7 +87,7 @@ function patchSide(was: unknown, d: Record<string, unknown>): Record<string, unk
   }
 }
 
-const effectArraySchema = (c: CheckSchema) => ({ oneOf: [{ type: 'null' }, { type: 'array', items: effectDefListSchema(c === LIVE_CHECKS) }] }) as const
+const effectArraySchema = () => ({ oneOf: [{ type: 'null' }, { type: 'array', items: effectItemSchema() }] }) as const
 
 const check = (c: CheckSchema): JsonSchema => ({
   type: 'object',
@@ -99,7 +99,7 @@ const check = (c: CheckSchema): JsonSchema => ({
     fail: { type: ['string', 'null'] },
     passAction: { type: ['string', 'null'], description: 'Trigger action id on check pass' },
     failAction: { type: ['string', 'null'], description: 'Trigger action id on check fail' },
-    effects: { ...effectArraySchema(c), description: 'Inline effects for this check (on: OnPass/OnFail)' }
+    effects: { ...effectArraySchema(), description: 'Inline effects for this check (on: OnPass/OnFail)' }
   }
 })
 
@@ -120,7 +120,7 @@ const data = (c: CheckSchema): JsonSchema => ({
             fail: { type: 'string' },
             passAction: { type: ['string', 'null'], description: 'Trigger action id on pass' },
             failAction: { type: ['string', 'null'], description: 'Trigger action id on fail' },
-            effects: { ...effectArraySchema(c), description: 'Inline effects (on: OnPass/OnFail)' }
+            effects: { ...effectArraySchema(), description: 'Inline effects (on: OnPass/OnFail)' }
           }
         }
       ]
@@ -142,7 +142,7 @@ const data = (c: CheckSchema): JsonSchema => ({
                     properties: {
                       text: { type: 'string' },
                       action: { type: ['string', 'null'], description: 'Trigger action id when chosen' },
-                      effects: { ...effectArraySchema(c), description: 'Inline effects when chosen' }
+                      effects: { ...effectArraySchema(), description: 'Inline effects when chosen' }
                     },
                     required: ['text']
                   }
@@ -165,7 +165,7 @@ const data = (c: CheckSchema): JsonSchema => ({
             against: c(false),
             bonus: { type: ['number', 'null'], description: 'if no sheet' },
             action: { type: ['string', 'null'], description: 'Trigger action id on win/lose' },
-            effects: { ...effectArraySchema(c), description: 'Inline effects (on: OnWin/OnLose)' },
+            effects: { ...effectArraySchema(), description: 'Inline effects (on: OnWin/OnLose)' },
             dc: { type: ['number', 'null'], description: 'fixed, instead of versus' },
             versus: {
               oneOf: [
@@ -177,7 +177,7 @@ const data = (c: CheckSchema): JsonSchema => ({
                     against: c(false),
                     bonus: { type: ['number', 'null'] },
                     action: { type: ['string', 'null'], description: 'Trigger action id for defender' },
-                    effects: { ...effectArraySchema(c), description: 'Inline effects for defender' }
+                    effects: { ...effectArraySchema(), description: 'Inline effects for defender' }
                   }
                 }
               ]

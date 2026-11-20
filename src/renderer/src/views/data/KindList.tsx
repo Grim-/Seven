@@ -4,7 +4,7 @@ import { KindShell } from '../../components/ui'
 import { kindItem } from '../../lib/kindItem'
 import type { DataSelection } from '../../store/data'
 import { kindUi, presentOf } from '../../registries/kinds'
-import { openEntryMenu, openIn } from './entryMenu'
+import { KindSelectionBar, openEntryMenu, openIn, openMultiEntryMenu } from './entryMenu'
 import { useKindEntries } from './useKindEntries'
 
 export { openIn }
@@ -18,10 +18,26 @@ export function KindList({ section, selected, select }: { section: LibrarySectio
   return (
     <KindShell
       id={`kind-${section.kind}`}
+      pickable
       layouts={Thumb ? ['tiles', 'cards', 'deck', 'list'] : ['cards', 'deck', 'list']}
       items={list.map((h) => kindItem(section, h))}
+      selectionBar={(picked, { selectAll, clear }) => (
+        <KindSelectionBar
+          kind={section.kind}
+          picked={picked}
+          total={list.length}
+          exportable={section.exportable}
+          removable={section.removable}
+          onSelectAll={selectAll}
+          onClear={clear}
+        />
+      )}
       onOpen={(item) => openIn(section.kind, item.key, select)}
-      onMenu={(e, item) => {
+      onMenu={(e, item, picked) => {
+        if (picked.length > 1) {
+          openMultiEntryMenu(e, section, picked)
+          return
+        }
         const hit = list.find((h) => h.id === item.key)
         if (hit) openEntryMenu(e, section, hit, { open: () => openIn(section.kind, hit.id, select), select, selected })
       }}

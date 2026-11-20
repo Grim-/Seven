@@ -349,9 +349,65 @@
 
   .shell-slate.shell-face.card-face {
     aspect-ratio: 5 / 7;
-    overflow: visible;
+    overflow: hidden;
     container-type: inline-size;
     --u: calc(100cqw / 320);
+  }
+
+  .shell-slate.shell-face.card-face[data-expanded='true'],
+  .shell-slate.shell-face.card-face[data-editing='true'] {
+    aspect-ratio: auto;
+    overflow: visible;
+  }
+
+  .shell-face-content {
+    position: relative;
+    display: flex;
+    min-height: 0;
+    flex: 1 1 0%;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .shell-slate.shell-face.card-face[data-expanded='true'] .shell-face-content,
+  .shell-slate.shell-face.card-face[data-editing='true'] .shell-face-content {
+    flex: 1 0 auto;
+    overflow: visible;
+  }
+
+  .shell-face-fade {
+    pointer-events: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(36 * var(--u, 1px));
+    background: linear-gradient(180deg, transparent, rgba(9, 10, 13, 0.96) 85%);
+  }
+
+  .shell-face-expand {
+    position: absolute;
+    right: calc(6 * var(--u, 1px));
+    bottom: calc(6 * var(--u, 1px));
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    gap: calc(3 * var(--u, 1px));
+    border: 1px solid color-mix(in srgb, var(--c, var(--color-accent)) 55%, var(--color-line));
+    background: rgba(9, 10, 13, 0.92);
+    padding: calc(2 * var(--u, 1px)) calc(6 * var(--u, 1px));
+    font-family: var(--font-mono);
+    font-size: calc(9.5 * var(--u, 1px));
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink);
+    cursor: pointer;
+  }
+
+  .shell-face-expand:hover {
+    border-color: var(--c, var(--color-accent));
+    color: #fff;
   }
 
   .play-veil {

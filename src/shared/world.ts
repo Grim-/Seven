@@ -92,6 +92,37 @@ export interface WorldBinding {
   id: string
 }
 
+export interface WorldLaunch {
+  setting: string
+  timePeriod: string
+  startingMap: string | null
+  startingPlace: string | null
+  startingTime: number
+  premise: string
+  incitingIncident: string
+  tone: string
+  openingActionIds: string[]
+}
+
+export function cleanWorldLaunch(raw: unknown): WorldLaunch {
+  const v = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>
+  const str = (x: unknown) => (typeof x === 'string' ? x.trim() : '')
+  const num = (x: unknown, fallback: number) => (typeof x === 'number' && Number.isFinite(x) ? Math.max(0, x) : fallback)
+  return {
+    setting: str(v.setting),
+    timePeriod: str(v.timePeriod),
+    startingMap: typeof v.startingMap === 'string' && v.startingMap.trim() ? v.startingMap.trim() : null,
+    startingPlace: typeof v.startingPlace === 'string' && v.startingPlace.trim() ? v.startingPlace.trim() : null,
+    startingTime: num(v.startingTime, 8 * 3600),
+    premise: str(v.premise),
+    incitingIncident: str(v.incitingIncident),
+    tone: str(v.tone),
+    openingActionIds: Array.isArray(v.openingActionIds)
+      ? [...new Set(v.openingActionIds.filter((x): x is string => typeof x === 'string' && Boolean(x.trim())).map((x) => x.trim()))]
+      : []
+  }
+}
+
 export interface WorldMeta {
   id: string
   name: string
@@ -101,6 +132,7 @@ export interface WorldMeta {
   rules: string
   tags: string[]
   flags?: Record<string, string | number | boolean>
+  launch?: WorldLaunch
   updatedAt: number
 }
 
@@ -124,8 +156,8 @@ export function inspectSchema(input: unknown): SchemaCheck {
   const schema = input as Partial<WorldSchema>
   if (typeof schema.version !== 'number') errors.push('version must be a number')
   const types = schema.types
-  if (!types || typeof types !== 'object' || !Object.keys(types).length) {
-    errors.push('types must hold at least one type')
+  if (!types || typeof types !== 'object' || Array.isArray(types)) {
+    errors.push('types must be an object')
     return { errors, warnings }
   }
   for (const [key, t] of Object.entries(types)) {
@@ -295,6 +327,8 @@ export const PLACE_TYPE: WorldType = {
   fields: {
     Name: { kind: 'text', lock: 'create_only', describe: "The place's name." },
     Inside: { kind: 'ref', to: PLACE_TYPE_KEY, describe: 'The place it is inside, if any.' },
+    Looks: { kind: 'text', describe: 'What this place looks like visually at a glance (lighting, layout, materials, atmosphere).', display: { as: 'prose' } },
+    Exits: { kind: 'list', entryRef: { to: PLACE_TYPE_KEY, resolve: true }, describe: 'Direct ways out of this place (one per line, e.g. "iron door (locked)") linked to the destination place. Only immediate exits are shown to preserve anti-clairvoyancy.' },
     Files: { kind: 'text', describe: 'Links to what belongs here, e.g. @page:the_den @sheet:mara.', display: { as: 'prose' } },
     Now: { kind: 'text', describe: 'What is happening here right now. Replace it as the story moves; never add to it.', display: { as: 'prose' } },
     Actions: { kind: 'text', describe: 'Actions that can be attempted here, one block each: what is attempted with (any) or (all), a "- stat difficulty" line per check, then "pass:" and "fail:". Rolled with action_check.', display: { as: 'prose' } },
@@ -313,19 +347,5 @@ export function withPlaces(schema: WorldSchema): WorldSchema {
 
 export const STARTER_SCHEMA: WorldSchema = {
   version: 1,
-  types: {
-    location: {
-      noun: 'location',
-      plural: 'locations',
-      label: 'Name',
-      describe: 'A place in the world.',
-      fields: {
-        Name: { kind: 'text', lock: 'create_only', describe: "The place's name." },
-        Description: { kind: 'text', describe: 'What it is like.', display: { as: 'prose' } },
-        Rules: { kind: 'list', lock: 'locked', describe: 'Laws that hold here. Fixed by the world.', display: { as: 'ledger' } },
-        Notes: { kind: 'log', describe: 'Things noticed or that happened here.', display: { as: 'timeline' } }
-      },
-      display: { accent: '#a97bff', glyph: '◇' }
-    }
-  }
+  types: {}
 }

@@ -21,9 +21,12 @@ export interface ShellItem {
   count?: number
   updatedAt?: number
   aside?: string
+  action?: ReactNode
   traits?: ShellTrait[]
   color?: string | null
   tag?: string
+  kind?: string
+  tags?: string[]
   group?: number
   target?: boolean
 }
@@ -50,17 +53,27 @@ export interface ShellGroup {
 
 export type ShellLayout = 'tiles' | 'cards' | 'list' | 'gallery' | 'deck'
 
+export type ShellColumnKey = 'type' | 'name' | 'contents' | 'aside'
+
+export interface ShellColumnSort {
+  column: ShellColumnKey
+  dir: 'asc' | 'desc'
+}
+
 export interface ShellBinding {
-  props: React.ButtonHTMLAttributes<HTMLButtonElement> & { draggable?: boolean }
+  props: React.HTMLAttributes<HTMLElement> & { draggable?: boolean }
   over: boolean
   dragging: boolean
   picked: boolean
 }
 
 export interface ShellViewProps {
+  shellId?: string
   items: ShellItem[]
   adds: ShellAdd[]
   bind: (item: ShellItem) => ShellBinding
   scale: number
   asideLabel: string
+  columnSort?: ShellColumnSort | null
+  onColumnSort?: (column: ShellColumnKey) => void
 }

@@ -1,5 +1,7 @@
-import { Shield, Crosshair, X } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { Shield, Crosshair } from 'lucide-react'
 import { SheetPortrait } from '../../data/SheetPortrait'
+import { SlateContainer } from '../../entries/EntrySlate'
 import { cn } from '../../../lib/cn'
 
 export interface UnitCardData {
@@ -29,6 +31,7 @@ export interface UnitCardStackProps {
   accentColor?: 'cyan' | 'alert' | 'accent' | 'ok' | 'purple'
   onSelect?: (id: string) => void
   onClear?: () => void
+  footer?: ReactNode
   className?: string
 }
 
@@ -38,54 +41,26 @@ export function UnitCardStack({
   units,
   activeId,
   selectedId,
-  accentColor,
   onSelect,
   onClear,
+  footer,
   className
 }: UnitCardStackProps) {
+  const [expanded, setExpanded] = useState(true)
   if (!units || units.length === 0) return null
 
   const isLeft = side === 'left'
-  const defaultAccent = accentColor ?? (isLeft ? 'cyan' : 'alert')
 
   return (
-    <div
-      className={cn(
-        'pointer-events-auto flex flex-col w-60 select-none font-mono text-[11px] shadow-2xl backdrop-blur-md',
-        className
-      )}
+    <SlateContainer
+      title={title}
+      tag={String(units.length)}
+      expanded={expanded}
+      onToggleExpand={() => setExpanded((v) => !v)}
+      onRemove={onClear}
+      className={cn('pointer-events-auto w-64 font-mono text-[11px]', className)}
     >
-      {/* STACK HEADER */}
-      <div className="flex h-6 items-center justify-between border border-line/60 bg-black/90 px-2 text-[9.5px] font-bold uppercase tracking-wider text-dim">
-        <div className="flex items-center gap-1.5 truncate">
-          <span
-            className={cn(
-              'h-1.5 w-1.5',
-              defaultAccent === 'cyan' && 'bg-cyan',
-              defaultAccent === 'alert' && 'bg-alert',
-              defaultAccent === 'accent' && 'bg-accent',
-              defaultAccent === 'ok' && 'bg-ok',
-              defaultAccent === 'purple' && 'bg-purple'
-            )}
-          />
-          <span className="text-white">{title}</span>
-          <span className="text-faint">[{units.length}]</span>
-        </div>
-
-        {onClear && (
-          <button
-            type="button"
-            onClick={onClear}
-            title="Clear target (Esc)"
-            className="flex h-4 w-4 items-center justify-center border border-line/40 text-faint hover:border-alert hover:text-alert transition-colors cursor-pointer"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        )}
-      </div>
-
-      {/* UNIT CARDS CONTAINER */}
-      <div className="flex flex-col gap-1 mt-1">
+      <div className="flex flex-col gap-1.5 p-1.5">
         {units.map((unit) => {
           const isActive = activeId === unit.id || unit.isActiveTurn
           const isSelected = selectedId === unit.id || unit.isSelected
@@ -96,44 +71,41 @@ export function UnitCardStack({
             isDead
               ? 'bg-line/40'
               : hpPct <= 25
-              ? 'bg-alert'
-              : hpPct <= 50
-              ? 'bg-accent'
-              : isLeft
-              ? 'bg-cyan'
-              : 'bg-alert'
+                ? 'bg-alert'
+                : hpPct <= 50
+                  ? 'bg-accent'
+                  : isLeft
+                    ? 'bg-cyan'
+                    : 'bg-alert'
 
           return (
             <div
               key={unit.id}
               onClick={() => onSelect?.(unit.id)}
               className={cn(
-                'group relative flex flex-col border bg-black/90 p-1.5 transition-all',
+                'group relative flex flex-col border bg-black/70 p-1.5 transition-all',
                 onSelect && 'cursor-pointer hover:bg-white/[0.04]',
-                // Active turn highlight
                 isActive
                   ? isLeft
                     ? 'border-cyan shadow-[0_0_12px_rgba(0,216,246,0.25)]'
                     : 'border-alert shadow-[0_0_12px_rgba(255,77,77,0.25)]'
                   : isSelected
-                  ? 'border-accent shadow-[0_0_10px_rgba(255,160,0,0.2)]'
-                  : 'border-line/60 hover:border-line'
+                    ? 'border-accent shadow-[0_0_10px_rgba(255,160,0,0.2)]'
+                    : 'border-line/50 hover:border-line'
               )}
             >
-              {/* TOP ROW: PORTRAIT + INFO + AC */}
               <div className="flex items-center gap-2">
-                {/* PORTRAIT / THUMBNAIL */}
                 <div className="relative shrink-0">
                   <div
                     className={cn(
-                      'h-9 w-9 overflow-hidden border bg-black/80 flex items-center justify-center text-[11px] font-bold',
+                      'flex h-9 w-9 items-center justify-center overflow-hidden border bg-black/80 text-[11px] font-bold',
                       isActive
                         ? isLeft
                           ? 'border-cyan text-cyan'
                           : 'border-alert text-alert'
                         : isSelected
-                        ? 'border-accent text-accent'
-                        : 'border-line/50 text-white'
+                          ? 'border-accent text-accent'
+                          : 'border-line/50 text-white'
                     )}
                   >
                     {unit.image ? (
@@ -143,21 +115,17 @@ export function UnitCardStack({
                     )}
                   </div>
 
-                  {/* ACTIVE TURN BADGE */}
                   {isActive && (
                     <div
                       className={cn(
-                        'absolute -top-1 -right-1 flex h-3 px-1 items-center justify-center text-[7.5px] font-extrabold uppercase border',
-                        isLeft
-                          ? 'border-cyan bg-cyan text-black'
-                          : 'border-alert bg-alert text-white'
+                        'absolute -right-1 -top-1 flex h-3 items-center justify-center border px-1 text-[7.5px] font-extrabold uppercase',
+                        isLeft ? 'border-cyan bg-cyan text-black' : 'border-alert bg-alert text-white'
                       )}
                     >
                       ACT
                     </div>
                   )}
 
-                  {/* TARGETED ICON */}
                   {isSelected && !isActive && (
                     <div className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center border border-accent bg-black text-accent">
                       <Crosshair className="h-2.5 w-2.5" />
@@ -165,7 +133,6 @@ export function UnitCardStack({
                   )}
                 </div>
 
-                {/* NAME & SUBTITLE */}
                 <div className="flex min-w-0 flex-1 flex-col justify-center">
                   <div className="flex items-center justify-between gap-1">
                     <span
@@ -177,51 +144,29 @@ export function UnitCardStack({
                       {unit.name}
                     </span>
                     {unit.ac !== undefined && (
-                      <span className="flex items-center gap-0.5 shrink-0 text-[9px] font-bold text-accent">
+                      <span className="flex shrink-0 items-center gap-0.5 text-[9px] font-bold text-accent">
                         <Shield className="h-2.5 w-2.5 text-accent" />
                         <span>{unit.ac}</span>
                       </span>
                     )}
                   </div>
 
-                  {/* SUBTITLE: LEVEL/CR, FACTION */}
-                  <div className="flex items-center gap-1.5 text-[8.5px] text-faint truncate">
-                    {unit.level !== undefined && unit.level !== null && (
-                      <span className="text-dim">LVL {unit.level}</span>
-                    )}
-                    {unit.cr !== undefined && unit.cr !== null && (
-                      <span className="text-dim">CR {unit.cr}</span>
-                    )}
-                    {unit.faction && (
-                      <span className="truncate uppercase text-faint">
-                        {unit.faction}
-                      </span>
-                    )}
-                    {unit.subtitle && (
-                      <span className="truncate text-dim">
-                        {unit.subtitle}
-                      </span>
-                    )}
+                  <div className="flex items-center gap-1.5 truncate text-[8.5px] text-faint">
+                    {unit.level !== undefined && unit.level !== null && <span className="text-dim">LVL {unit.level}</span>}
+                    {unit.cr !== undefined && unit.cr !== null && <span className="text-dim">CR {unit.cr}</span>}
+                    {unit.faction && <span className="truncate uppercase text-faint">{unit.faction}</span>}
+                    {unit.subtitle && <span className="truncate text-dim">{unit.subtitle}</span>}
                   </div>
                 </div>
               </div>
 
-              {/* HP TELEMETRY BAR */}
               <div className="mt-1.5 flex flex-col gap-0.5">
                 <div className="flex items-center justify-between text-[8.5px]">
-                  <span className="text-faint font-semibold">
-                    {isDead ? 'DOWNED' : 'HEALTH'}
-                  </span>
+                  <span className="font-semibold text-faint">{isDead ? 'DOWNED' : 'HEALTH'}</span>
                   <span
                     className={cn(
                       'font-mono font-bold',
-                      isDead
-                        ? 'text-faint'
-                        : hpPct <= 25
-                        ? 'text-alert'
-                        : hpPct <= 50
-                        ? 'text-accent'
-                        : 'text-dim'
+                      isDead ? 'text-faint' : hpPct <= 25 ? 'text-alert' : hpPct <= 50 ? 'text-accent' : 'text-dim'
                     )}
                   >
                     {unit.hp.cur}/{unit.hp.max}
@@ -229,16 +174,11 @@ export function UnitCardStack({
                   </span>
                 </div>
 
-                {/* BAR TRACK */}
                 <div className="h-1.5 w-full border border-line/40 bg-black/60">
-                  <div
-                    className={cn('h-full transition-all duration-300', hpColor)}
-                    style={{ width: `${hpPct}%` }}
-                  />
+                  <div className={cn('h-full transition-all duration-300', hpColor)} style={{ width: `${hpPct}%` }} />
                 </div>
               </div>
 
-              {/* STATUS CONDITIONS / TAGS */}
               {unit.conditions && unit.conditions.length > 0 && (
                 <div className="mt-1 flex flex-wrap gap-1">
                   {unit.conditions.map((cond) => (
@@ -254,7 +194,9 @@ export function UnitCardStack({
             </div>
           )
         })}
+
+        {footer && <div className="border-t border-line/40 pt-1.5">{footer}</div>}
       </div>
-    </div>
+    </SlateContainer>
   )
 }

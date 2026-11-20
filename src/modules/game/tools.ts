@@ -1,7 +1,12 @@
 import { BUFF_TEMPLATES, CHARACTER_TEMPLATES, CLASS_TEMPLATES, ITEM_TEMPLATES, TRAIT_TEMPLATES, defTypes } from '@shared/game/defs'
 import { toId } from '@shared/ids'
-import { getSheet } from '../../engine/library/sheets'
+import { getSheet, sheetIds } from '../../engine/library/sheets'
 import { ToolError, type ToolDef } from '../../engine/tools/types'
+import { paramsSchema } from '../../engine/tools/effectSchema'
+import { checkKeys, registerSchemaSource } from '../../engine/tools/schemaSources'
+import { almanacs } from '../../engine/almanac/store'
+import { worlds } from '../../engine/worlds/store'
+import { noteFailure } from '../../engine/util/report'
 import {
   applyCharacterBuff,
   awardCharacterXp,
@@ -21,9 +26,64 @@ import {
   useCharacterItem
 } from './characters'
 import { gameDefs } from './store'
+import { saves } from '../../engine/worlds/saves'
+import { advanceWorldTime, longRest, shortRest } from '../../engine/worlds/time'
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
+
+function journalForSheet(sheetRef: string, text: string): void {
+  try {
+    const s = getSheet(sheetRef)
+    const save = s.save ? saves.read(s.save) : null
+    if (save && worlds.exists(save.world)) {
+      worlds.addJourney(save.world, s.id, 'action', text)
+    }
+  } catch (err) {
+    noteFailure(err, 'worlds', 'Could not journal character milestone')
+  }
+}
+
+function almanacRecordForSheet(sheetRef: string, title: string, summary: string, detail?: string): void {
+  try {
+    const s = getSheet(sheetRef)
+    const save = s.save ? saves.read(s.save) : null
+    if (!save?.almanacId) return
+    const where = save.characters[s.id]?.where || s.story.where || ''
+    almanacs.recordEntry(save.almanacId, {
+      kind: 'milestone',
+      title,
+      summary,
+      outcome: detail || summary,
+      who: [`@sheet:${s.id}`],
+      where
+    })
+  } catch (err) {
+    noteFailure(err, 'almanac', 'Could not record story trigger to Almanac')
+  }
+}
+
+function resolveSpeaker(ref: string): { sheet: string; name: string } {
+  const clean = ref.replace(/^@?sheet:/i, '').trim()
+  if (!clean) return { sheet: '', name: 'Character' }
+  try {
+    const s = getSheet(clean)
+    return { sheet: s.id, name: s.title || s.id }
+  } catch {
+    const lower = clean.toLowerCase()
+    for (const { id } of sheetIds()) {
+      try {
+        const s = getSheet(id)
+        if (s.id.toLowerCase() === lower || s.title.toLowerCase() === lower) {
+          return { sheet: s.id, name: s.title || s.id }
+        }
+      } catch {
+        // Ignore unreadable sheet
+      }
+    }
+    return { sheet: toId(clean), name: clean }
+  }
+}
 
 async function promptPendingOffers(
   sheet: string,
@@ -44,6 +104,16 @@ async function promptPendingOffers(
   }
   return accepted
 }
+
+const GAME_DEF_SCOPE = 'game_def'
+
+registerSchemaSource({
+  id: GAME_DEF_SCOPE,
+  entries: (on) =>
+    on('game')
+      ? defTypes().map((t) => ({ name: t.type, summary: t.description, params: { type: 'object' as const, properties: { notes: { type: ['string', 'null'] }, values: paramsSchema(t.params) } } }))
+      : []
+})
 
 export const gameTools: ToolDef[] = [
   {
@@ -68,6 +138,7 @@ export const gameTools: ToolDef[] = [
       const classId = str(params.classId) || undefined
       const reason = str(params.reason) || undefined
       const res = awardCharacterXp(sheet, { amount, classId, reason })
+      journalForSheet(sheet, `Gained ${res.gained} XP${reason ? ` (${reason})` : ''}`)
       const accepted = await promptPendingOffers(sheet, res.offers, ctx)
       const extra = accepted.length ? ` Unlocked classes: ${accepted.join(', ')}.` : ''
       const pending = res.offers.length - accepted.length
@@ -111,13 +182,15 @@ export const gameTools: ToolDef[] = [
       }
     },
     async execute(params) {
-      const res = setCharacterClass(str(params.sheet), {
+      const sheet = str(params.sheet)
+      const res = setCharacterClass(sheet, {
         action: str(params.action) as 'add' | 'remove' | 'level' | 'accept_offer' | 'dismiss_offer',
         classId: str(params.classId),
         level: typeof params.level === 'number' ? params.level : undefined,
         bypassConditions: params.bypassConditions === true,
         reason: str(params.reason) || undefined
       })
+      journalForSheet(sheet, res.message)
       return res.message
     }
   },
@@ -154,12 +227,14 @@ export const gameTools: ToolDef[] = [
       }
     },
     async execute(params) {
-      const res = setCharacterTrait(str(params.sheet), {
+      const sheet = str(params.sheet)
+      const res = setCharacterTrait(sheet, {
         action: str(params.action) as 'add' | 'remove' | 'reset',
         traitId: str(params.traitId),
         permanent: params.permanent === true,
         reason: str(params.reason) || undefined
       })
+      journalForSheet(sheet, res.message)
       return res.message
     }
   },
@@ -182,17 +257,108 @@ export const gameTools: ToolDef[] = [
     },
     async execute(params, ctx) {
       const sheet = str(params.sheet)
+      const summary = str(params.summary)
+      const detail = str(params.detail) || undefined
       const res = triggerStoryMoment(sheet, {
         tag: str(params.tag) || undefined,
-        summary: str(params.summary),
-        detail: str(params.detail) || undefined,
+        summary,
+        detail,
         flags: params.flags && typeof params.flags === 'object' ? (params.flags as Record<string, unknown>) : undefined
       })
+      almanacRecordForSheet(sheet, summary, summary, detail)
       const accepted = await promptPendingOffers(sheet, res.offers, ctx)
       const offerNote = res.offers.length
         ? ` Triggered ${res.offers.length} clutch unlock offer(s)${accepted.length ? ` (unlocked: ${accepted.join(', ')})` : ''}.`
         : ''
       return `Logged story moment (${res.logged} Story Sheet entry).${offerNote}`
+    }
+  },
+  {
+    name: 'character_speak',
+    group: 'game',
+    needsWorkspace: false,
+    description: 'Have a character speak dialogue aloud in the current scene.',
+    params: {
+      type: 'object',
+      properties: {
+        world: { type: 'string', description: 'World id' },
+        character: { type: 'string', description: 'Character sheet id or name' },
+        dialogue: { type: 'string', description: 'Exact words the character speaks aloud' }
+      },
+      required: ['world', 'character', 'dialogue']
+    },
+    async execute(params, ctx) {
+      const world = str(params.world)
+      const dialogue = str(params.dialogue)
+      if (!world) throw new ToolError('world is required')
+      if (!dialogue) throw new ToolError('dialogue cannot be empty')
+      const speaker = resolveSpeaker(str(params.character))
+      ctx.viewEvents?.([{ kind: 'speak', data: { sheet: speaker.sheet, name: speaker.name, dialogue } }], speaker.name, world)
+      return `${speaker.name}: "${dialogue}"`
+    }
+  },
+  {
+    name: 'advance_time',
+    group: 'game',
+    needsWorkspace: false,
+    description: 'Move a world\'s game clock on when in-world time passes (travel, searching, waiting, sleeping).',
+    params: {
+      type: 'object',
+      properties: {
+        world: { type: 'string', description: 'World id' },
+        minutes: { type: 'number', description: 'Minutes that pass' }
+      },
+      required: ['world', 'minutes']
+    },
+    async execute(params) {
+      const minutes = Number(params.minutes)
+      if (!(minutes > 0)) throw new ToolError('minutes must be more than 0')
+      const save = saves.current(str(params.world))
+      if (!save) throw new ToolError(`There is no save of ${str(params.world)}`)
+      advanceWorldTime(save.id, minutes * 60, 'agent', Object.keys(save.characters))
+      return `${minutes} min passed.`
+    }
+  },
+  {
+    name: 'short_rest',
+    group: 'game',
+    needsWorkspace: false,
+    description: 'The party in a world takes a short rest (1 h). Characters may spend hit dice to heal.',
+    params: {
+      type: 'object',
+      properties: {
+        world: { type: 'string', description: 'World id' },
+        hitDice: { type: 'object', additionalProperties: { type: 'number' }, description: 'Character sheet id to hit dice spent' }
+      },
+      required: ['world']
+    },
+    async execute(params) {
+      const save = saves.current(str(params.world))
+      if (!save) throw new ToolError(`There is no save of ${str(params.world)}`)
+      const raw = params.hitDice && typeof params.hitDice === 'object' ? (params.hitDice as Record<string, unknown>) : {}
+      const party = Object.keys(save.characters)
+      shortRest(save.id, party, Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Number(v) || 0])))
+      for (const sheet of party) journalForSheet(sheet, 'Took a short rest')
+      return 'Short rest taken.'
+    }
+  },
+  {
+    name: 'long_rest',
+    group: 'game',
+    needsWorkspace: false,
+    description: 'The party in a world takes a long rest (8 h).',
+    params: {
+      type: 'object',
+      properties: { world: { type: 'string', description: 'World id' } },
+      required: ['world']
+    },
+    async execute(params) {
+      const save = saves.current(str(params.world))
+      if (!save) throw new ToolError(`There is no save of ${str(params.world)}`)
+      const party = Object.keys(save.characters)
+      longRest(save.id, party)
+      for (const sheet of party) journalForSheet(sheet, 'Took a long rest')
+      return 'Long rest taken.'
     }
   },
   {
@@ -329,7 +495,7 @@ export const gameTools: ToolDef[] = [
           const ability = str(params.abilityId)
           if (!ability) throw new ToolError('Give abilityId for use_ability.')
           const targetId = str(params.target) ? getSheet(str(params.target)).id : null
-          return useAbility(sheet, ability, targetId, null, 0)
+          return useAbility(sheet, ability, targetId ? { sheet: targetId } : null, null, null, 0)
         }
       }
       const fn = handlers[action]
@@ -348,7 +514,7 @@ export const gameTools: ToolDef[] = [
         type: { enum: defTypes().map((d) => d.type), description: 'Game definition kind' },
         id: { type: ['string', 'null'], description: 'Existing id or omitted to create from name' },
         name: { type: 'string', description: 'Display name' },
-        data: { type: 'object', properties: {}, additionalProperties: true, description: 'Definition fields matching that Game def schema (e.g. group, min, max, comps, icon, notes)' }
+        data: { type: 'object', description: `fields: inspect_schema(${GAME_DEF_SCOPE}, <type>)` }
       },
       required: ['type', 'name']
     },
@@ -357,6 +523,8 @@ export const gameTools: ToolDef[] = [
       const name = str(params.name)
       const existing = str(params.id) ? gameDefs.find(defKind, str(params.id)) : gameDefs.find(defKind, name)
       const extra = params.data && typeof params.data === 'object' && !Array.isArray(params.data) ? (params.data as Record<string, unknown>) : {}
+      checkKeys(GAME_DEF_SCOPE, defKind, extra)
+      if (extra.values && typeof extra.values === 'object' && !Array.isArray(extra.values)) checkKeys(GAME_DEF_SCOPE, defKind, extra.values as Record<string, unknown>, [], ['values'])
       const payload = {
         ...(existing ?? {}),
         ...extra,

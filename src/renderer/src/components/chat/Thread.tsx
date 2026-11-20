@@ -957,7 +957,7 @@ export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody
             <SendOffer agent={agent} onSend={() => runtime.thread.composer.send()} />
             <ComposerReferences />
             <ChatPad conv={conv} running={running} />
-            <ChatHand conv={conv} agent={agent} running={running} />
+            {tabletopMode.showDecks && <ChatHand conv={conv} agent={agent} running={running} />}
             {look.outputs && <OutputTray />}
             <Composer running={running} placeholder={placeholder} />
           </div>

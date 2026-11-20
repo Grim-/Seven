@@ -1,6 +1,6 @@
 import { HARM, type EffectGroup } from '../../effectGroups'
 import { entryLink, registerComponent, type TooltipRow } from '../../core'
-import { ActionPiece, actionValue, type ActionEvent } from '../Action'
+import { ActionPiece, actionValue, expectedActionValue, type ActionEvent, type UseContext } from '../Action'
 import { Health } from '../Health'
 
 export class Damage extends ActionPiece {
@@ -49,6 +49,16 @@ export class Damage extends ActionPiece {
     }
     this.report(event, { amount: totalTimes > 1 ? dealt : last, hits, from, to }, `Dealt ${hitText}${dealt} ${label} damage to ${name} (${from} → ${to} HP)${health.isDead ? `; ${name} is down` : ''}.`)
     this.next(event)
+  }
+
+  score(ctx: UseContext): number {
+    const health = ctx.target?.comp(Health)
+    if (!this.action || !ctx.target || !health || health.isDead) return 0
+    const times = Math.max(1, Math.floor(Number(this.params.times) || 1))
+    const raw = Math.max(0, expectedActionValue(String(this.params.amount), { ...ctx, action: this.action }))
+    const expected = health.resolve(raw, { type: String(this.params.damageType), cause: this.action?.id ?? 'ability', source: ctx.user }) * times
+    if (expected <= 0) return 0
+    return expected
   }
 }
 

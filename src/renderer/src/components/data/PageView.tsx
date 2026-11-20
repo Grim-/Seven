@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, FilePlus, FileText, FolderPlus, Upload, Image as ImageIcon, MoreHorizontal, Pencil, Search, Trash2, Volume2 } from 'lucide-react'
+import { Aperture, ChevronDown, FilePlus, FileText, FolderPlus, Upload, Image as ImageIcon, MoreHorizontal, Pencil, Search, Trash2, Volume2 } from 'lucide-react'
 import { pageKindOf, type CollectionViewKind } from '@shared/types'
 import { AddressLead, AddressPane, AddressTools, Button, EmptyState, NavArrows, ShellTabs, askText, openMenu, confirmDelete, useAddressPane, type MenuItem } from '../ui'
 import { engine } from '../../lib/ipc'
@@ -7,6 +7,7 @@ import { errorText, formatRelative } from '../../lib/format'
 import { toast } from '../../store/toasts'
 import { assetUrl, findPage, useAsset, useData, usePage } from '../../store/data'
 import { pickPicture } from './PicturePicker'
+import { generateImage } from '../pictures/GenerateImageModal'
 import { VoiceModal } from '../voice/VoicePicker'
 import { entryMenuAt } from '../../views/data/entryMenu'
 import { cn } from '../../lib/cn'
@@ -20,6 +21,7 @@ import { failed } from '../../lib/notify'
 import { ownScreen } from '../../registries/kinds'
 import { showInData } from '../../lib/library'
 import { chooseFiles } from '../../lib/importFiles'
+import { pageImageContext, useRegisterImageContext } from '../../lib/imagePromptContext'
 import { noteFailure } from '../../store/problems'
 
 
@@ -79,7 +81,21 @@ export function folderNewItems(types: PageTypeChoice[], onCreated: (id: string) 
   return [
     pages.length > 1 ? { label: 'New page', icon: <FilePlus />, children: pages } : { label: 'New page', icon: <FilePlus />, onSelect: () => askNewPage(onCreated, null, parent) },
     { label: 'New folder', icon: <FolderPlus />, onSelect: () => askNewFolder(onCreated, parent) },
-    { label: 'Add files', icon: <Upload />, onSelect: () => void chooseFiles(parent) }
+    { label: 'Add files', icon: <Upload />, onSelect: () => void chooseFiles(parent) },
+    {
+      label: 'Generate image…',
+      icon: <Aperture />,
+      calls: { kind: 'engine', name: 'image.generate' },
+      onSelect: () => {
+        void generateImage().then((asset) => {
+          if (!asset) return
+          if (parent && asset.parent !== parent) {
+            void engine('data.assets.move', { id: asset.id, parent }).catch(failed('Could not place the generated image in this folder'))
+          }
+          toast.success('Image generated', asset.name, { label: 'Open', onSelect: () => showInData({ kind: 'asset', id: asset.id }) })
+        })
+      }
+    }
   ]
 }
 
@@ -121,18 +137,31 @@ export function PageDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const [part, setPart] = useState<string | null>(null)
   const types = usePageTypes()
   const picture = useAsset(page?.image ?? '')
+  const typeLabel = page?.type ? types.find((t) => t.id === page.type)?.label : null
+  const Screen = page?.type ? ownScreen(pageKindOf(page.type)) : undefined
+  const pageContext = useMemo(
+    () => (page ? pageImageContext({ title: page.title, body: page.body, records: page.records }, typeLabel) : null),
+    [page?.title, page?.body, page?.records, typeLabel]
+  )
+  useRegisterImageContext(!Screen ? pageContext : null)
   if (page === undefined) return <div className="p-3 font-mono text-[11px] text-dim">Loading…</div>
   if (!page) return <EmptyState title="Deleted">This page no longer exists.</EmptyState>
 
-  const typeLabel = page.type ? types.find((t) => t.id === page.type)?.label : null
-  const Screen = page.type ? ownScreen(pageKindOf(page.type)) : undefined
   const hasItems = !page.type && page.records.length > 0
   const view: CollectionViewKind = page.view ?? (checkField(page) ? 'checklist' : 'table')
-  const changePicture = () => void pickPicture(page.image).then((r) => r && engine('data.pages.image', { id: page.id, image: r.id }).catch(failed('Could not set the picture')))
+  const changePicture = () =>
+    void pickPicture(page.image, { context: pageContext }).then((r) => r && engine('data.pages.image', { id: page.id, image: r.id }).catch(failed('Could not set the picture')))
+  const generatePagePicture = () =>
+    void generateImage({
+      title: page.title ? `Picture for ${page.title}` : 'Generate page picture',
+      sourceAssetId: page.image ?? undefined,
+      context: pageContext
+    }).then((r) => r && engine('data.pages.image', { id: page.id, image: r.id }).catch(failed('Could not set the picture')))
   const menu = (e: React.MouseEvent) =>
     entryMenuAt(e, pageKindOf(page.type), page.id, page.title, [
       { label: 'Rename', icon: <Pencil />, onSelect: () => askRenamePage(page.id, page.title) },
       { label: page.image ? 'Change picture' : 'Add a picture', icon: <ImageIcon />, onSelect: changePicture },
+      { label: 'Generate picture…', icon: <Aperture />, onSelect: generatePagePicture },
       { label: page.voice ? 'Change voice' : 'Give it a voice', icon: <Volume2 />, onSelect: () => setVoicing(true) },
       {
         label: 'Delete',

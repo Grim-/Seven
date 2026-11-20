@@ -5,8 +5,6 @@ import icon from '../../resources/icon.png?asset'
 interface TrayActions {
   showApp: () => void
   resetWindow: () => void
-  toggleOverlay: () => void
-  isOverlayEnabled: () => boolean
   quit: () => void
 }
 
@@ -25,15 +23,6 @@ export function createTray(actions: TrayActions): SevenTray | null {
         Menu.buildFromTemplate([
           { label: 'Open Seven', click: actions.showApp },
           { label: 'Reset window position', click: actions.resetWindow },
-          {
-            label: 'Show overlay',
-            type: 'checkbox',
-            checked: actions.isOverlayEnabled(),
-            click: () => {
-              actions.toggleOverlay()
-              rebuild()
-            }
-          },
           { type: 'separator' },
           { label: 'Quit Seven', click: actions.quit }
         ])

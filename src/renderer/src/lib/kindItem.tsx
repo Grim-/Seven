@@ -14,6 +14,8 @@ export function kindItem(section: Pick<LibrarySection, 'kind' | 'icon'>, h: Libr
     icon: <KindIcon name={section.icon} className="h-4 w-4" />,
     thumb: Thumb ? <Thumb id={h.id} large /> : undefined,
     face: Face ? <Face id={h.id} /> : undefined,
+    kind: section.kind,
+    tags: h.tags,
     updatedAt: h.at
   }
 }

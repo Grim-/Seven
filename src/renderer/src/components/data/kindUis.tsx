@@ -91,7 +91,9 @@ import { BoardView } from '../board/BoardView'
 import { FactionScreen } from '../factions/FactionScreen'
 import { MapObjectScreen } from '../mapObjects/MapObjectScreen'
 import { TriggerActionScreen } from '../triggerActions/TriggerActionScreen'
+import { WorldEventScreen } from '../worldEvents/WorldEventScreen'
 import { LootTableScreen } from '../lootTables/LootTableScreen'
+import { AlmanacScreen, askNewAlmanac } from '../almanac/AlmanacScreen'
 import { failed } from '../../lib/notify'
 import { sheetFacets } from './sheet/facets'
 
@@ -419,9 +421,11 @@ registerKindUi('exercise', { present: { Screen: ExerciseScreen, Chat: ExerciseCh
 registerKindUi('place', { present: { Screen: panelScreen(WorldsPanel), Chat: PlaceChat, Stage: PlaceStage, Widget: entryWidget(PlaceWidget) }, whole: true, menu: (ctx) => [deletePlaceItem(ctx.id, ctx.title)] })
 registerKindUi('map', { present: { Screen: MapScreen, Chat: MapChat, Stage: MapStage, Widget: entryWidget(MapWidget), Thumb: MapThumb }, addLabel: 'New map', add: (_k, select) => () => askText('New map', 'Name', '', async (name) => { if (name.trim()) select({ kind: 'map', id: (await engine('maps.create', { name })).id }) }), importer: MapImporter, importLabel: 'Import a map made in Tiled' })
 registerKindUi('world', { present: { Screen: panelScreen(WorldsPanel), Chat: WorldChat, Stage: WorldChat, Widget: entryWidget(WorldWidget) }, whole: true })
+registerKindUi('almanac', { present: { Screen: AlmanacScreen }, addLabel: 'New almanac', add: (_k, select) => () => askNewAlmanac(select) })
 registerKindUi('faction', { present: { Screen: FactionScreen }, addLabel: 'New faction', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('map_object', { present: { Screen: MapObjectScreen }, addLabel: 'New map object', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('trigger_action', { present: { Screen: TriggerActionScreen }, addLabel: 'New trigger action', add: (kind, select) => () => select({ kind, id: '__new' }) })
+registerKindUi('world_event', { present: { Screen: WorldEventScreen }, addLabel: 'New world event', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('loot_table', { present: { Screen: LootTableScreen }, addLabel: 'New loot table', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('skill', { present: { Screen: panelScreen(SkillsPanel), Chat: SkillChat, Stage: SkillStage, Widget: entryWidget(SkillWidget) }, whole: true })
 registerKindUi('script', { present: { Screen: panelScreen(PythonPanel), Chat: ScriptPart, Stage: ScriptPart, Widget: entryWidget(ScriptPart) }, whole: true, addLabel: 'New script', add: (_k, select) => () => select({ kind: 'script', id: '_new' }) })

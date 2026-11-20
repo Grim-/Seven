@@ -1,6 +1,6 @@
 import { HELP, type EffectGroup } from '../../effectGroups'
 import { registerComponent, type TooltipRow } from '../../core'
-import { ActionPiece, type ActionEvent } from '../Action'
+import { ActionPiece, expectedActionValue, type ActionEvent, type UseContext } from '../Action'
 import { Health } from '../Health'
 import { registerLegacyTriggerAction } from '../../triggerActions'
 
@@ -30,6 +30,15 @@ export class Heal extends ActionPiece {
     const to = health.get()
     this.report(event, { amount, from, to }, `Healed ${name} for ${to - from} (${from} → ${to} HP).`)
     this.next(event)
+  }
+
+  score(ctx: UseContext): number {
+    const health = ctx.target?.comp(Health)
+    if (!this.action || !health || health.isDead) return 0
+    const missing = Math.max(0, health.max() - health.get())
+    if (missing <= 0) return 0
+    const expected = Math.max(0, expectedActionValue(String(this.params.amount), { ...ctx, action: this.action }))
+    return Math.min(missing, expected) * (missing / Math.max(1, health.max()) + 0.5)
   }
 }
 

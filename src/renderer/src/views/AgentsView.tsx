@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, FolderOpen, MessageSquarePlus, Plus, Shapes, Trash2, X } from 'lucide-react'
 import { KindAccess } from '../components/agents/KindAccess'
 import { agentSheets, DEFAULT_CONTEXT, DEFAULT_LIBRARY_ACCESS, PERMISSION_MODES, type ChatAccess, SAMPLING_KEYS, type AgentDraft, type AgentProfile, type CharacterSheet, type PermissionMode, type PromptCost } from '@shared/types'
-import { BackBar, Button, Field, Input, KindShell, Modal, NumberField, Panel, Select, Slider, Toggle, ViewHeader, useAutosave, MakeOrSaved } from '../components/ui'
+import { BackBar, Button, Field, Input, KindShell, Modal, NumberField, Panel, Select, Slider, Toggle, Tooltip, ViewHeader, useAutosave, MakeOrSaved } from '../components/ui'
+import { formatPromptTokens, sourceTone } from '../lib/promptSources'
 import { engine, main } from '../lib/ipc'
 import { DEFAULT_AGENT_ID, useAgents } from '../store/agents'
 import { useVault } from '../store/vault'
@@ -131,23 +132,82 @@ function usePromptCost(draft: AgentDraft): PromptCost | null {
   return cost
 }
 
-function PromptCostLine({ cost }: { cost: PromptCost | null }) {
+function PromptCostLine({ cost, modules, activeIds }: { cost: PromptCost | null; modules: { id: string; name: string; always: boolean; state: string }[]; activeIds: Set<string> }) {
   if (!cost) return null
   const pre = cost.exact ? '' : '~'
+  const modNames = new Map(modules.map((m) => [m.id, m.name]))
+  const hasChosen = activeIds.size > 0
+  const included = (id: string) => {
+    if (activeIds.has(id)) return true
+    if (!hasChosen) return false
+    const mod = modules.find((m) => m.id === id)
+    return Boolean(mod?.always && mod.state === 'on')
+  }
+  const segments = [
+    ...(cost.system > 0 ? [{ id: 'agent', label: 'Instructions', tokens: cost.system }] : []),
+    ...Object.entries(cost.modules)
+      .filter(([id, tokens]) => tokens > 0 && included(id))
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, tokens]) => ({ id, label: modNames.get(id) ?? id, tokens }))
+  ]
+  const totalSeg = segments.reduce((sum, s) => sum + s.tokens, 0)
   return (
-    <div className="col-span-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 border border-line/40 bg-black/40 px-3 py-2 font-mono text-[11.5px] text-dim">
-      <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Prompt size</span>
-      <span>
-        System prompt <span className="text-white">{pre}{tok(cost.system)}</span>
-      </span>
-      <span>
-        Tools <span className="text-white">{pre}{tok(cost.tools)}</span>
-      </span>
-      <span>
-        Total <span className="text-white">{pre}{tok(cost.total)}</span>
-        {cost.contextSize ? ` of ${tok(cost.contextSize)} (${Math.round((cost.total / cost.contextSize) * 100)}%)` : ''}
-      </span>
-      <span className="text-faint">{cost.exact ? 'counted with the loaded model' : 'estimate; load a model for an exact count'}</span>
+    <div className="col-span-2 flex flex-col gap-2 border border-line/40 bg-black/40 px-3 py-2 font-mono text-[11.5px] text-dim">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Prompt size</span>
+        <span>
+          Instructions <span className="text-white">{pre}{formatPromptTokens(cost.system)}</span>
+        </span>
+        <span>
+          Tools <span className="text-white">{pre}{formatPromptTokens(cost.tools)}</span>
+        </span>
+        <span>
+          Total <span className="text-white">{pre}{formatPromptTokens(cost.total)}</span>
+          {cost.contextSize ? ` of ${formatPromptTokens(cost.contextSize)} (${Math.round((cost.total / cost.contextSize) * 100)}%)` : ''}
+        </span>
+        <span className="text-faint">{cost.exact ? 'counted with the loaded model' : 'estimate; load a model for an exact count'}</span>
+      </div>
+      {segments.length > 0 && totalSeg > 0 && (
+        <>
+          <div className="segment-mask flex h-1.5 w-full overflow-hidden bg-white/[0.06]">
+            {segments.map((seg) => {
+              const tone = sourceTone(seg.id)
+              const pct = Math.max(1, (seg.tokens / totalSeg) * 100)
+              return (
+                <Tooltip
+                  key={seg.id}
+                  title={seg.label}
+                  side="bottom"
+                  body={`${pre}${seg.tokens.toLocaleString()} tokens (${Math.round((seg.tokens / totalSeg) * 100)}% of prompt)`}
+                  className="block h-full shrink-0"
+                  style={{ width: `${pct}%` }}
+                >
+                  <div className={cn('h-full w-full', tone.bar)} />
+                </Tooltip>
+              )
+            })}
+          </div>
+          <div className="flex flex-wrap gap-1.5 text-[10.5px]">
+            {segments.map((seg) => {
+              const tone = sourceTone(seg.id)
+              return (
+                <Tooltip
+                  key={seg.id}
+                  title={seg.label}
+                  side="bottom"
+                  body={`${pre}${seg.tokens.toLocaleString()} tokens (${Math.round((seg.tokens / totalSeg) * 100)}% of prompt)`}
+                >
+                  <span className={cn('inline-flex items-center gap-1 border px-1.5 py-0.5', tone.pill)}>
+                    <span className={tone.dot}>■</span>
+                    <span>{seg.label}</span>
+                    <span className="opacity-75">{pre}{formatPromptTokens(seg.tokens)}</span>
+                  </span>
+                </Tooltip>
+              )
+            })}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -460,7 +520,7 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
           </div>
         </Field>
         {agentGroups(draft, toolsetList, modules).includes('world') && <WorldLink value={draft.world} agentName={draft.name} onChange={(world) => change({ ...draft, world })} />}
-        <PromptCostLine cost={cost} />
+        <PromptCostLine cost={cost} modules={modules} activeIds={new Set(agentGroups(draft, toolsetList, modules))} />
         <div className="col-span-2 flex flex-col gap-2.5">
           <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Tools</span>
           {(() => {

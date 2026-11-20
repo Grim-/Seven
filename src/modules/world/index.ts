@@ -1,7 +1,8 @@
 import type { JsonSchema } from '../../engine/tools/schema'
 import type { ModuleFactory } from '../../engine/modules/sdk'
 import { ToolError, optBool, optInt, optStr, str, type ToolDef } from '../../engine/tools/types'
-import { effectDefListSchema, normalizeEffectDefs } from '../../engine/tools/effectSchema'
+import { checkEffectKeys, effectItemSchema, normalizeEffectDefs } from '../../engine/tools/effectSchema'
+import { checkKeys, registerSchemaSource } from '../../engine/tools/schemaSources'
 import { WorldError, worlds } from '../../engine/worlds/store'
 import { secure } from '../../engine/util/secure'
 import { bindingFor, bindingOrNull, createRecord, editEntries, postBoard, readBoard, recall, remember, search, writeField } from '../../engine/worlds/ops'
@@ -9,6 +10,9 @@ import { resolveIncludes } from '../../engine/library/includes'
 import { factions } from '../../engine/factions/store'
 import { lootTablesStore } from '../../engine/lootTables/store'
 import { triggerActionsStore } from '../../engine/triggerActions/store'
+import { almanacs } from '../../engine/almanac/store'
+import { sessionAccess } from '../../engine/sessions/access'
+import { formatAlmanacClock, formatAlmanacTime } from '@shared/almanac'
 import type { Action, ActionCheck, ActionNeeds } from '@shared/actions'
 import { cleanSwap } from '@shared/cardDecks'
 import { cleanDecision } from '@shared/decisions'
@@ -90,6 +94,26 @@ const ACTION_SCHEMA = {
   },
   required: ['attempt', 'pass', 'fail']
 } as const
+
+const WORLD_SCOPE = 'world'
+const WORLD_ACTION = 'action'
+const WORLD_DECISION = 'decision'
+
+registerSchemaSource({
+  id: WORLD_SCOPE,
+  entries: (on) =>
+    on('world')
+      ? [
+          { name: WORLD_ACTION, summary: 'world_add_action item', params: ACTION_SCHEMA },
+          { name: WORLD_DECISION, summary: 'world_add_decision item', params: DECISION_SCHEMA }
+        ]
+      : []
+})
+
+function checkedItem(name: string, raw: unknown): unknown {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) checkKeys(WORLD_SCOPE, name, raw as Record<string, unknown>)
+  return raw
+}
 
 export function cleanActionCheck(raw: unknown): ActionCheck {
   const v = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
@@ -306,15 +330,7 @@ const tools: ToolDef[] = [
       description:
         'Attach interactive actions with skill/stat checks, pass/fail narrative outcomes, and card gains/losses to any object, place, or character in the world.',
       async execute(p, ctx) {
-        const actionsList = Array.isArray(p.actions) && p.actions.length > 0
-          ? p.actions
-          : p.action
-            ? [p.action]
-            : Array.isArray(p.actions)
-              ? p.actions
-              : null
-
-        const actions = actionsList ? actionsList.map(cleanAction) : null
+        const actions = Array.isArray(p.actions) ? p.actions.map((a) => cleanAction(checkedItem(WORLD_ACTION, a))) : null
 
         return guard(() =>
           writeField(
@@ -333,8 +349,7 @@ const tools: ToolDef[] = [
       type: typeSchema,
       id: { type: 'string', description: 'ID of the target entity' },
       field: { type: 'string', description: 'Record field name storing actions (e.g. actions)' },
-      action: ACTION_SCHEMA,
-      actions: { type: 'array', items: ACTION_SCHEMA }
+      actions: { type: 'array', items: { type: 'object' }, description: `fields: inspect_schema(${WORLD_SCOPE}, ${WORLD_ACTION})` }
     }),
     ['type', 'id', 'field']
   ),
@@ -346,15 +361,7 @@ const tools: ToolDef[] = [
       description:
         'Attach branching decision points with clear options, decider rules (user vs. agent), and card swap outcomes to any place, object, or scene element.',
       async execute(p, ctx) {
-        const decisionsList = Array.isArray(p.decisions) && p.decisions.length > 0
-          ? p.decisions
-          : p.decision
-            ? [p.decision]
-            : Array.isArray(p.decisions)
-              ? p.decisions
-              : null
-
-        const decisions = decisionsList ? decisionsList.map(cleanDecision) : null
+        const decisions = Array.isArray(p.decisions) ? p.decisions.map((d) => cleanDecision(checkedItem(WORLD_DECISION, d))) : null
 
         return guard(() =>
           writeField(
@@ -373,8 +380,7 @@ const tools: ToolDef[] = [
       type: typeSchema,
       id: { type: 'string', description: 'ID of the target entity' },
       field: { type: 'string', description: 'Record field name storing decisions (e.g. decisions)' },
-      decision: DECISION_SCHEMA,
-      decisions: { type: 'array', items: DECISION_SCHEMA }
+      decisions: { type: 'array', items: { type: 'object' }, description: `fields: inspect_schema(${WORLD_SCOPE}, ${WORLD_DECISION})` }
     }),
     ['type', 'id', 'field']
   ),
@@ -438,28 +444,16 @@ const tools: ToolDef[] = [
         name: { type: 'string', description: 'Trigger action name (new creates, existing updates)' },
         id: { type: ['string', 'null'], description: 'Optional explicit id' },
         description: { type: ['string', 'null'], description: 'What this trigger action does' },
-        effects: { type: 'array', items: effectDefListSchema(false), description: 'Ordered effect components from registered ActionPiece/WorldPiece defs' },
+        effects: { type: 'array', items: effectItemSchema(), description: 'Ordered effect pieces; fields: inspect_schema(effect, <type>)' },
         tags: { type: ['array', 'null'], items: { type: 'string' } }
       },
       required: ['name']
     },
-    forAgent: () => ({
-      params: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', description: 'Trigger action name (new creates, existing updates)' },
-          id: { type: ['string', 'null'], description: 'Optional explicit id' },
-          description: { type: ['string', 'null'], description: 'What this trigger action does' },
-          effects: { type: 'array', items: effectDefListSchema(true), description: 'Ordered effect components from registered ActionPiece/WorldPiece defs' },
-          tags: { type: ['array', 'null'], items: { type: 'string' } }
-        },
-        required: ['name']
-      }
-    }),
     async execute(p) {
       const name = str(p, 'name').trim()
       const ref = optStr(p, 'id') ?? name
       const prev = triggerActionsStore.find(ref)
+      if ('effects' in p) checkEffectKeys(p.effects)
       const effects = 'effects' in p ? normalizeEffectDefs(p.effects, 'OnUse') : (prev?.effects ?? [])
       const tags = strings(p.tags) ?? prev?.tags ?? []
       const description = optStr(p, 'description') ?? prev?.description ?? ''
@@ -587,6 +581,55 @@ const tools: ToolDef[] = [
         prev?.id ?? null
       )
       return `${prev ? 'Updated' : 'Created'} ${linkFor('loot_table', saved.id)} (${saved.entries.length} entries, ${saved.rolls} rolls).`
+    }
+  },
+  {
+    name: 'almanac_log',
+    group: 'world',
+    needsWorkspace: false,
+    description:
+      'Record a chronicle event (combat, travel, milestone, world event) or update a story thread on the active Almanac (@almanac:id) and optionally advance the world clock.',
+    params: {
+      type: 'object',
+      properties: {
+        almanac: { type: ['string', 'null'], description: 'Almanac id or title (defaults to the current chat scene Almanac)' },
+        title: { type: 'string', description: 'Event title' },
+        tags: { type: ['array', 'null'], items: { type: 'string' }, description: 'Optional tags for this scene/event' },
+        summary: { type: ['string', 'null'], description: 'Concise summary of what happened' },
+        outcome: { type: ['string', 'null'], description: 'Mechanical or narrative outcome' },
+        secret: { type: ['string', 'null'], description: 'Optional hidden/GM note (omitted from #public reads and newspapers)' },
+        where: { type: ['string', 'null'], description: 'Location ref, e.g. @place:rust_anchorage' },
+        who: { type: ['array', 'null'], items: { type: 'string' }, description: 'Participants, e.g. ["@sheet:kaelen"]' },
+        advanceMinutes: { type: ['integer', 'number', 'null'], description: 'Minutes to advance the Almanac world clock before logging' }
+      },
+      required: ['title']
+    },
+    async execute(p, ctx) {
+      const sessionScene = ctx.sessionId ? sessionAccess.get(ctx.sessionId)?.scene : null
+      const ref = optStr(p, 'almanac') ?? sessionScene?.almanacId ?? almanacs.list()[0]?.id
+      if (!ref) throw new ToolError('No Almanac specified and no Almanac is bound to this chat.')
+      let alm = almanacs.find(ref)
+      if (!alm) {
+        alm = almanacs.save({ title: ref, currentTime: 8 * 3600 })
+      }
+      const advMins = optInt(p, 'advanceMinutes')
+      if (advMins && advMins > 0) {
+        alm = almanacs.advanceClock(alm.id, advMins * 60)
+      }
+      const tags = strings(p.tags) ?? []
+      const where = optStr(p, 'where') ?? sessionScene?.where ?? ''
+      const who = strings(p.who) ?? sessionScene?.characters ?? []
+      const { almanac: saved, entry } = almanacs.recordEntry(alm.id, {
+        kind: 'scene',
+        ...(tags.length ? { tags } : {}),
+        title: str(p, 'title'),
+        summary: optStr(p, 'summary') ?? '',
+        outcome: optStr(p, 'outcome') ?? '',
+        ...(optStr(p, 'secret') ? { secret: optStr(p, 'secret')! } : {}),
+        where,
+        who
+      })
+      return `Logged "${entry.title}" on ${linkFor('almanac', saved.id)} at ${formatAlmanacTime(entry.when)} (#${entry.when.seq}, clock now ${formatAlmanacClock(saved.currentTime)}).`
     }
   }
 ]

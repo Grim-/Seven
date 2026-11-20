@@ -1,6 +1,8 @@
 import { noteFailure } from '../util/report'
 import type { CharacterSheet } from '@shared/types'
+import { recordHealth } from '@shared/game/components'
 import { asToken } from '@shared/maps'
+import { gameCatalog } from '../../modules/game/characters'
 import { getSheet } from '../library/sheets'
 import { agentAccess } from '../agents/access'
 import { visitorOf } from './presence'
@@ -22,11 +24,13 @@ registerTokenSource({
   owns: (token) => sheetOf(token)?.id === token,
   resolve: (tokens) => {
     const agents = agentAccess.list()
+    const cat = gameCatalog()
     return tokens.flatMap((token) => {
       const s = sheetOf(token)
       if (!s) return []
       const v = visitorOf(s, agents)
-      return [asToken(v, token, 'sheet')]
+      const gHp = recordHealth(v.game, cat)
+      return [asToken(v, token, 'sheet', gHp ? { cur: gHp.cur, max: gHp.max } : undefined)]
     })
   },
   placed: (token, save) => (token in save.characters ? save : { ...save, characters: { ...save.characters, [token]: { where: '', game: null } } })

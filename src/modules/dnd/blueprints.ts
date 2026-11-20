@@ -24,7 +24,18 @@ function attackAbility(attack: DndAttack, index: number, catalog: Catalog): Comp
   const dice = /\(([^)]+)\)/.exec(attack.damage)?.[1] ?? /^\s*(\d+)/.exec(attack.damage)?.[1] ?? '1'
   const damageType = attack.damage.split(/\s+/).find((word) => catalog.damageType(word.toLowerCase()) !== null)?.toLowerCase() ?? ''
   const range = firstNumber(attack.notes, /range\s+(\d+)/i, firstNumber(attack.notes, /reach\s+(\d+)/i, 5))
-  return { type: 'ability', id: `attack_${index}`, label: attack.name, range, comps: [{ type: 'action.damage', on: 'OnUse', amount: dice, damageType }] }
+  const rawBonus = String(attack.bonus ?? '0').trim().replace(/^\+/, '') || '0'
+  const bonus = Number.isFinite(Number(rawBonus)) ? String(Number(rawBonus)) : '0'
+  return {
+    type: 'ability',
+    id: `attack_${index}`,
+    label: attack.name,
+    range,
+    comps: [
+      { type: 'action.attackRoll', on: 'OnUse', emit: 'OnStrikeHit', bonus, defenseStat: 'armour' },
+      { type: 'action.damage', on: 'OnStrikeHit', amount: dice, damageType }
+    ]
+  }
 }
 
 registerBlueprintProvider({
@@ -32,6 +43,7 @@ registerBlueprintProvider({
   module: 'dnd',
   label: 'D&D monsters',
   catalog: () => catalogFrom(gameDefs.catalog()),
+  has: (id) => compendium.all(MONSTER).some((m) => m.id === id),
   search: (query, limit) => {
     const q = query.trim().toLowerCase()
     return compendium

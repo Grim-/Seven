@@ -38,6 +38,7 @@ export class Item extends Action {
     weight: { kind: 'number' as const, default: 0, min: 0, description: 'Weight.', section: 'Trade and carrying' },
     maxStack: { kind: 'number' as const, default: 1, min: 1, description: 'How many fit in one stack.', section: 'Trade and carrying' },
     usedUp: { kind: 'flag' as const, default: false, description: 'One is used up each time it is used.', section: 'Use' },
+    action: { kind: 'choice' as const, default: 'action', choices: ['action', 'bonus', 'free'], description: 'What using this item takes in a battle turn.', section: 'Use' },
     grantsWhen: { kind: 'choice' as const, default: 'worn', choices: ['worn', 'carried'], description: 'When the abilities inside it can be used: while it is worn or wielded, or while it is carried.', section: 'Use' }
   }
   count = 1

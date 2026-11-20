@@ -269,7 +269,7 @@ export interface PlaceVisitor {
   name: string
   image: string | null
   line: string
-  dnd: Pick<DndStats, 'hp' | 'ac' | 'stats' | 'conditions'> | null
+  dnd: (Pick<DndStats, 'hp' | 'ac' | 'stats' | 'conditions'> & { speed?: number; hitDice?: DndStats['hitDice'] }) | null
   game?: EntityRecord | null
   gameRules?: string
   faction?: string | null
@@ -283,8 +283,13 @@ export interface TokenVisitor extends PlaceVisitor {
   hp: { cur: number; max: number } | null
 }
 
-export function asToken(visitor: PlaceVisitor, token: string, source: string): TokenVisitor {
-  return { ...visitor, token, source, hp: visitor.dnd ? { cur: visitor.dnd.hp.cur, max: visitor.dnd.hp.max } : null }
+export function asToken(visitor: PlaceVisitor, token: string, source: string, hp?: { cur: number; max: number } | null): TokenVisitor {
+  return {
+    ...visitor,
+    token,
+    source,
+    hp: hp !== undefined ? hp : (visitor.dnd ? { cur: visitor.dnd.hp.cur, max: visitor.dnd.hp.max } : null)
+  }
 }
 
 export interface MapMeta {
@@ -622,6 +627,54 @@ export function placePath(places: Record<string, Record<string, unknown>>, key: 
     out.unshift(at)
   }
   return out
+}
+
+export function localPlaceMermaid(places: Record<string, Record<string, unknown>>, currentKey: string): string | null {
+  const cur = places[currentKey]
+  if (!cur) return null
+  const safeId = (k: string) => `p_${k.replace(/[^a-zA-Z0-9_]/g, '_')}`
+  const safeLabel = (s: string) => s.replace(/"/g, "'").replace(/\r?\n/g, ' ').trim()
+  const nameOf = (k: string) => safeLabel(String(places[k]?.Name || k))
+
+  const exitsRaw = Array.isArray(cur.Exits) ? cur.Exits : []
+  const exits = exitsRaw
+    .map((raw) => {
+      if (typeof raw === 'string') return { text: raw.trim(), ref: null as string | null }
+      if (!raw || typeof raw !== 'object') return null
+      const r = raw as { text?: unknown; ref?: unknown }
+      const text = typeof r.text === 'string' ? r.text.trim() : ''
+      const ref = typeof r.ref === 'string' && r.ref.trim() ? r.ref.trim() : null
+      return text || ref ? { text: text || 'exit', ref } : null
+    })
+    .filter((e): e is { text: string; ref: string | null } => e !== null)
+
+  const parentKey = typeof cur.Inside === 'string' && cur.Inside && cur.Inside !== currentKey && cur.Inside in places ? cur.Inside : null
+  if (!parentKey && !exits.length) return null
+
+  const curId = safeId(currentKey)
+  const lines: string[] = ['flowchart LR']
+  if (parentKey) {
+    lines.push(`  subgraph ${safeId(parentKey)}["${nameOf(parentKey)}"]`)
+    lines.push(`    ${curId}["${nameOf(currentKey)} (HERE)"]`)
+    lines.push('  end')
+  } else {
+    lines.push(`  ${curId}["${nameOf(currentKey)} (HERE)"]`)
+  }
+
+  exits.forEach((ex, idx) => {
+    const edgeLabel = safeLabel(ex.text)
+    if (ex.ref && ex.ref in places) {
+      const targetId = safeId(ex.ref)
+      lines.push(`  ${curId} -->|"${edgeLabel}"| ${targetId}["${nameOf(ex.ref)}"]`)
+    } else if (ex.ref) {
+      const targetId = safeId(ex.ref)
+      lines.push(`  ${curId} -->|"${edgeLabel}"| ${targetId}["${safeLabel(ex.ref)}"]`)
+    } else {
+      lines.push(`  ${curId} -->|"${edgeLabel}"| exit_${idx}["${edgeLabel}"]`)
+    }
+  })
+
+  return lines.join('\n')
 }
 
 export function placesIn(where: string, world: string, places: Record<string, unknown>): string[] {

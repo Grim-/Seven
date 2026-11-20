@@ -38,7 +38,8 @@ const EVENTS: EventName[] = [
   'mapObjects.changed',
   'triggerActions.changed',
   'maps.changed',
-  'saves.changed'
+  'saves.changed',
+  'almanacs.changed'
 ]
 
 export function onLibraryChange(fn: () => void): () => void {

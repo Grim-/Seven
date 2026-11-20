@@ -4,8 +4,9 @@ import type { EventName } from '@shared/protocol'
 import { on } from './ipc'
 import { onLibraryChange } from './library'
 
-export function useLive<T>(fetch: () => Promise<T>, event: EventName, deps?: unknown[]): T | null {
+export function useLive<T>(fetch: () => Promise<T>, event: EventName | EventName[], deps?: unknown[]): T | null {
   const [value, setValue] = useState<T | null>(null)
+  const key = Array.isArray(event) ? event.join('|') : event
   useEffect(() => {
     let live = true
     const load = () =>
@@ -13,12 +14,13 @@ export function useLive<T>(fetch: () => Promise<T>, event: EventName, deps?: unk
         .then((v) => live && setValue(v))
         .catch(noteFailure('app', 'Could not load live data'))
     load()
-    const off = on(event, load)
+    const list = Array.isArray(event) ? event : [event]
+    const offs = list.map((e) => on(e, load))
     return () => {
       live = false
-      off()
+      for (const off of offs) off()
     }
-  }, [event, ...(deps ?? [])])
+  }, [key, ...(deps ?? [])])
   return value
 }
 

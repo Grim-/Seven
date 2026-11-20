@@ -1,7 +1,7 @@
 {
   "id": "web",
-  "name": "Web",
-  "description": "Search the web with a search engine of your choice, read pages and documents, and follow RSS and Atom feeds. Every search asks you first with the exact query (you can edit it); reading a page asks unless the site is on your allowed list. Read only, capped per reply, and every request is logged in Data > Web log.",
+  "name": "Web & Browser",
+  "description": "Search the web, read pages/documents/RSS feeds, and use the built-in browser in Seven's side panel (with right-click image saving). Every search asks you first; reading a page or saving images asks unless the site is on your allowed list. Every request is logged in Data > Web log.",
   "version": "1.0.0",
   "apiVersion": 1,
   "permission": "custom",

@@ -1,6 +1,7 @@
 import type { ClockConfig } from './clock'
 import type { ComponentDef } from './registry'
 import type { Template } from './GameEntity'
+import type { RefillRule } from '../components/refill'
 
 export interface StatDef {
   id: string
@@ -9,8 +10,7 @@ export interface StatDef {
   default: number
   min: number
   max: number
-  regenPerSecond: number
-  regenScaledBy: string | null
+  refill: RefillRule
   colour: string | null
 }
 
@@ -26,6 +26,17 @@ export interface TimeDef {
   label: string
   clock: ClockConfig
   roundSeconds: number
+  shortRestSeconds: number
+  longRestSeconds: number
+  longRestGapSeconds: number
+  dawnHour: number
+  defaultExitSeconds: number
+  initiativeCheck: string
+  parleyCheck: string
+  parleyDefenseCheck: string
+  speedStat: string
+  encounterJoinRadius: number
+  tileFeet: number
 }
 
 export interface CheckDef {

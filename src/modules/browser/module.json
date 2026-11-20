@@ -1,9 +1,0 @@
-{
-  "id": "browser",
-  "name": "Browser",
-  "description": "A browser in Seven's side panel, so you can see what agents open. Right-click any picture to save it into your library. Agents can open pages for you, list the pictures on a page and save the ones you want (asking first, like Web, for sites not on Web's allowed list).",
-  "version": "1.0.0",
-  "apiVersion": 1,
-  "needsWorkspace": false,
-  "permission": "custom"
-}

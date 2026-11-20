@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Eye, ImagePlus, Plus, Sparkles, UserRound } from 'lucide-react'
+import { Activity, Aperture, Eye, ImagePlus, Plus, UserRound } from 'lucide-react'
 import type { CharacterSheet } from '@shared/types'
 import { showName } from '@shared/ids'
 import { Button, InlineTitle, SaveState, Segmented, Select, moved, useReorder, useAutosavedState } from '../../ui'
@@ -8,6 +8,7 @@ import { toast } from '../../../store/toasts'
 import { useAgents } from '../../../store/agents'
 import { Markdown } from '../../chat/Markdown'
 import { AssetMedia } from '../../pictures/AssetMedia'
+import { generateImage } from '../../pictures/GenerateImageModal'
 import { InsideSlateContext } from '../../entries/EntryCard'
 import { pickPicture } from '../PicturePicker'
 import { rollAll } from '../useRolls'
@@ -16,6 +17,7 @@ import { FieldCard } from './FieldCard'
 import { SheetHeader } from './SheetHeader'
 import { failed } from '../../../lib/notify'
 import { cn } from '../../../lib/cn'
+import { sheetImageContext, useRegisterImageContext } from '../../../lib/imagePromptContext'
 import { sheetFacets, type SheetDraft, type SheetFacet } from './facets'
 import { StoryTab } from './story/StoryTab'
 import { useModuleList } from '../../../registries/useModuleList'
@@ -67,6 +69,11 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
   const [changedTabs, setChangedTabs] = useState<string[]>([])
   const agents = useAgents((s) => s.list)
   const wornBy = useMemo(() => agents.filter((a) => a.sheet === start.id).map((a) => a.name), [agents, start.id])
+  const sheetContext = useMemo(
+    () => sheetImageContext({ ...liveSheet, ...sheet, title: showName(sheet.title) }),
+    [liveSheet, sheet]
+  )
+  useRegisterImageContext(sheetContext)
 
   // Live reactive sync when an agent tool call or external action edits this character sheet
   useEffect(() => {
@@ -293,7 +300,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
           <button
             type="button"
             title={image ? 'Change portrait' : 'Add a portrait'}
-            onClick={() => void pickPicture(image).then((r) => r && setPicture(r.id))}
+            onClick={() => void pickPicture(image, { what: 'a character portrait', context: sheetContext }).then((r) => r && setPicture(r.id))}
             className="group/portrait relative h-16 w-16 shrink-0 overflow-hidden border border-line-strong bg-black/60 cursor-pointer"
           >
             {image ? (
@@ -312,7 +319,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
               <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-accent-soft">Character</span>
               {changedTabs.length > 0 && (
                 <span className="flex items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-mono text-[8.5px] font-bold uppercase tracking-[0.14em] text-accent animate-pulse">
-                  <Sparkles className="h-2.5 w-2.5" />
+                  <Activity className="h-2.5 w-2.5" />
                   LIVE EDIT
                 </span>
               )}
@@ -330,6 +337,21 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Aperture />}
+              onClick={() =>
+                void generateImage({
+                  title: `Portrait for ${showName(sheet.title)}`,
+                  sourceAssetId: image ?? undefined,
+                  context: sheetContext
+                }).then((r) => r && setPicture(r.id))
+              }
+              title="Generate character portrait using sheet fields"
+            >
+              Portrait
+            </Button>
             <Button
               size="sm"
               variant="ghost"
@@ -357,7 +379,15 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
           error={saver.error}
           previewing={preview !== null}
           onRename={(title) => change({ ...sheet, title })}
-          onPortrait={() => void pickPicture(image).then((r) => r && setPicture(r.id))}
+          onPortrait={() => void pickPicture(image, { what: 'a character portrait', context: sheetContext }).then((r) => r && setPicture(r.id))}
+          onClearPortrait={() => setPicture(null)}
+          onGeneratePortrait={() =>
+            void generateImage({
+              title: `Portrait for ${showName(sheet.title)}`,
+              sourceAssetId: image ?? undefined,
+              context: sheetContext
+            }).then((r) => r && setPicture(r.id))
+          }
           onAddField={() => {
             setTab('sheet')
             setAdding(true)

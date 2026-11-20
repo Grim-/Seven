@@ -1,0 +1,85 @@
+{
+  "seven": "export",
+  "version": 3,
+  "protection": "none",
+  "savedAt": 1795142887344,
+  "about": {
+    "kind": "card_layout",
+    "label": "Card layout",
+    "title": "basic_layout",
+    "also": []
+  },
+  "entries": [
+    {
+      "kind": "card_layout",
+      "id": "basic_layout",
+      "title": "basic_layout",
+      "value": {
+        "title": "basic_layout",
+        "type": "cards:layout",
+        "body": "",
+        "fields": [],
+        "records": [],
+        "data": {
+          "name": "basic_layout",
+          "color": "#2dd4bf",
+          "fields": [
+            {
+              "id": "fmwodj2dakii4",
+              "label": "ART",
+              "type": "picture",
+              "place": "art",
+              "options": []
+            },
+            {
+              "id": "fmwodj9zieu2i",
+              "label": "Main Label",
+              "type": "text",
+              "place": "title",
+              "options": []
+            },
+            {
+              "id": "fmwodjh7612h9",
+              "label": "secondary line",
+              "type": "text",
+              "place": "type_line",
+              "options": []
+            },
+            {
+              "id": "fmwodjq8yj492",
+              "label": "body",
+              "type": "longtext",
+              "place": "body",
+              "options": []
+            },
+            {
+              "id": "fmwodju0kvfpx",
+              "label": "Footer",
+              "type": "text",
+              "place": "footer",
+              "options": []
+            },
+            {
+              "id": "fmwodjxboidd3",
+              "label": "TYPE",
+              "type": "text",
+              "place": "badge_left",
+              "options": []
+            },
+            {
+              "id": "fmwodk8y03it4",
+              "label": "New field",
+              "type": "text",
+              "place": "bar",
+              "options": []
+            }
+          ]
+        },
+        "image": null,
+        "view": null,
+        "voice": null
+      },
+      "isDependency": false
+    }
+  ]
+}

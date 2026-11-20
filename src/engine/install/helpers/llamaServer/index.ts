@@ -5,13 +5,23 @@ import path from 'node:path'
 import type { ParamSchema } from '@shared/game/core/params'
 import { registerHelper, type Choice, type Settings } from '../../registry'
 import { appFolder } from '../../paths'
-import { githubReleases } from '../../github'
+import { githubReleases, githubSource } from '../../github'
 import { settingsOf } from '../../store'
-import { readMachine } from './machine'
+import { readMachine, toChoices } from '../../machine'
 import { variantsByRank } from './variants/registry'
-import { verifyServer } from './verify'
-import { unpackServer } from './unpack'
+import { verifyServer, unpackServer } from '../../serverBinary'
+import { registerAttribution } from '../../../credits'
 import './variants/builtin'
+
+registerAttribution({
+  id: 'llama-cpp',
+  name: 'llama.cpp',
+  category: 'Local Runtime',
+  license: 'MIT',
+  url: 'https://github.com/ggml-org/llama.cpp',
+  usedFor: 'Optional local text and chat model runner (llama-server), downloaded on demand via Helper installers.',
+  source: 'helper:llama-server'
+})
 
 export const LLAMA_SERVER = 'llama-server'
 export const LLAMA_SERVER_PROGRAM = 'llama-server.exe'
@@ -61,34 +71,18 @@ function defaultRoot(): string {
 }
 
 async function choices(assets: Choice['assets'], settings: Settings): Promise<Choice[]> {
-  const machine = await readMachine(settings)
-  return variantsByRank().flatMap((v) =>
-    v.choices(assets, machine, settings).map((c) => ({
-      build: c.build,
-      label: c.label,
-      unavailable: c.unavailable,
-      notes: c.notes,
-      assets: c.assets,
-      size: c.assets.reduce((n, a) => n + a.size, 0),
-      files: c.assets.map((a) => ({ name: a.name, size: a.size }))
-    }))
-  )
+  const machine = await readMachine(settings, LLAMA_SERVER)
+  return toChoices(variantsByRank().flatMap((v) => v.choices(assets, machine, settings)))
 }
 
 registerHelper({
   id: LLAMA_SERVER,
   title: 'llama-server',
-  about: "llama.cpp's server, which runs your local models. Seven downloads the Windows build you pick from the official llama.cpp releases, keeps every version you install, and runs the one you make active.",
+  about: 'Runs local text and chat models on your machine.',
   program: LLAMA_SERVER_PROGRAM,
   schema: SCHEMA,
   defaultRoot,
-  source: (settings) => {
-    try {
-      return new URL(String(settings.releasesUrl)).host
-    } catch {
-      return String(settings.releasesUrl)
-    }
-  },
+  source: githubSource,
   releases: (settings, signal) => githubReleases(String(settings.releasesUrl), Number(settings.releasesCount), signal),
   choices: (release, settings) => choices(release.assets, settings),
   unpack: (files, staging) => unpackServer(files, staging, LLAMA_SERVER_PROGRAM),

@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react'
+import { useRef, type CSSProperties, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '../../lib/cn'
@@ -58,10 +58,10 @@ export function EmptyState({ title, children, action }: { title: string; childre
   )
 }
 
-export function Tooltip({ title, body, children, side = 'top' }: { title: string; body?: ReactNode; children: ReactNode; side?: 'top' | 'bottom' }) {
+export function Tooltip({ title, body, children, side = 'top', className, style }: { title: string; body?: ReactNode; children: ReactNode; side?: 'top' | 'bottom'; className?: string; style?: CSSProperties }) {
   const ref = useRef<HTMLSpanElement>(null)
   return (
-    <span ref={ref} className="inline-flex" onMouseEnter={() => ref.current && showTip(ref.current, title, body, side)} onMouseLeave={() => hideTip('component')}>
+    <span ref={ref} style={style} className={cn('inline-flex', className)} onMouseEnter={() => ref.current && showTip(ref.current, title, body, side)} onMouseLeave={() => hideTip('component')}>
       {children}
     </span>
   )

@@ -8,6 +8,7 @@
   "toolPermissions": {
     "find": "none",
     "read_kind": "none",
+    "inspect_schema": "none",
     "show": "none",
     "pick_random": "none",
     "story_recall": "none",

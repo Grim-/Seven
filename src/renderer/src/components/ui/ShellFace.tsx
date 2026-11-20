@@ -1,4 +1,5 @@
-import type { CSSProperties, MouseEvent, ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { ShellSweep } from './ShellParts'
 
@@ -28,6 +29,7 @@ export interface ShellFaceProps {
   color?: string | null
   frame?: FaceFrame
   edit?: FaceEdit
+  expandable?: boolean
   className?: string
 }
 
@@ -67,8 +69,28 @@ function Region({ slot, edit, className, children, inline = false }: { slot: Fac
   )
 }
 
-export function ShellFace({ title, label, tags = [], marks = [], aside, art, type, body, sections, stats = [], foot, corners, color, frame = 'notched', edit, className }: ShellFaceProps) {
+export function ShellFace({ title, label, tags = [], marks = [], aside, art, type, body, sections, stats = [], foot, corners, color, frame = 'notched', edit, expandable = false, className }: ShellFaceProps) {
   const style = (color ? { '--c': color } : {}) as CSSProperties
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [overflows, setOverflows] = useState(false)
+
+  useEffect(() => {
+    if (!expandable || edit) {
+      setOverflows(false)
+      return
+    }
+    const el = contentRef.current
+    if (!el) return
+    const check = () => {
+      if (!expanded) setOverflows(el.scrollHeight > el.clientHeight + 2)
+    }
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [expandable, edit, expanded, body, sections])
+
   if (frame === 'playing' && !edit) {
     const [left, right] = corners ?? [[], []]
     return (
@@ -88,8 +110,15 @@ export function ShellFace({ title, label, tags = [], marks = [], aside, art, typ
     )
   }
   const head = edit || label || tags.length || marks.length || aside
+  const showExpand = expandable && !edit && (overflows || expanded)
   return (
-    <div className={cn('shell-slate shell-face', className)} data-frame={edit ? 'notched' : frame} style={style}>
+    <div
+      className={cn('shell-slate shell-face', className)}
+      data-frame={edit ? 'notched' : frame}
+      data-expanded={expanded ? 'true' : undefined}
+      data-editing={edit ? 'true' : undefined}
+      style={style}
+    >
       <ShellSweep />
       {head && (
         <div className="shell-face-head">
@@ -113,10 +142,46 @@ export function ShellFace({ title, label, tags = [], marks = [], aside, art, typ
       <Region slot="type" edit={edit} className="shell-face-type">
         {type}
       </Region>
-      <Region slot="body" edit={edit} className="shell-face-body">
-        {body}
-      </Region>
-      {sections && <div className="shell-face-sections">{sections}</div>}
+      {edit ? (
+        <>
+          <Region slot="body" edit={edit} className="shell-face-body">
+            {body}
+          </Region>
+          {sections && <div className="shell-face-sections">{sections}</div>}
+        </>
+      ) : (
+        <div ref={contentRef} className="shell-face-content">
+          <Region slot="body" edit={edit} className="shell-face-body">
+            {body}
+          </Region>
+          {sections && <div className="shell-face-sections">{sections}</div>}
+          {showExpand && !expanded && <div className="shell-face-fade" />}
+          {showExpand && (
+            <button
+              type="button"
+              className="shell-face-expand"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                setExpanded((v) => !v)
+              }}
+              title={expanded ? 'Collapse card to standard height' : 'Expand card to read all content'}
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp className="h-3 w-3" />
+                  <span>Less</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-3 w-3" />
+                  <span>More</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      )}
       <Region slot="stats" edit={edit} className="shell-face-stats">
         {stats.length
           ? stats.map((s) => (

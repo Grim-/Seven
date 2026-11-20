@@ -1,10 +1,13 @@
 import { useState } from 'react'
-import { Images, ImagePlus, Grid, X } from 'lucide-react'
+import { Aperture, Images, ImagePlus, Grid, X } from 'lucide-react'
+import type { ImagePromptContext } from '@shared/types'
 import type { Size } from '@shared/shapes'
 import type { MapObjectGraphicSource } from '@shared/game/mapObjects'
 import { Button } from '../ui'
 import { AssetMedia } from '../pictures/AssetMedia'
+import { generateImage } from '../pictures/GenerateImageModal'
 import { pickPicture } from '../data/PicturePicker'
+import { useActiveImageContext } from '../../lib/imagePromptContext'
 import { choosePictures } from '../../lib/importFiles'
 import { TilePicker, type TilePickResult } from './TilePicker'
 
@@ -12,6 +15,7 @@ interface MapObjectGraphicPickerProps {
   image: string
   size: Size
   graphicSource?: MapObjectGraphicSource
+  context?: ImagePromptContext | null
   onChange: (image: string, size: Size, graphicSource?: MapObjectGraphicSource) => void
 }
 
@@ -19,14 +23,28 @@ export function MapObjectGraphicPicker({
   image,
   size,
   graphicSource,
+  context,
   onChange
 }: MapObjectGraphicPickerProps) {
   const [tilePickerOpen, setTilePickerOpen] = useState(false)
+  const activeContext = useActiveImageContext()
+  const effectiveContext = context ?? activeContext
 
   const handlePickSeven = async () => {
-    const res = await pickPicture(image || null, { what: 'an object sprite' })
+    const res = await pickPicture(image || null, { what: 'an object sprite', context: effectiveContext })
     if (res?.id) {
       onChange(res.id, { w: 32, h: 32 }, { type: 'seven', assetId: res.id })
+    }
+  }
+
+  const handleGenerate = async () => {
+    const generated = await generateImage({
+      title: effectiveContext ? `Sprite for ${effectiveContext.title}` : 'Generate object sprite',
+      sourceAssetId: image && !image.startsWith('data:') ? image : undefined,
+      context: effectiveContext
+    })
+    if (generated?.id) {
+      onChange(generated.id, { w: 32, h: 32 }, { type: 'seven', assetId: generated.id })
     }
   }
 
@@ -94,6 +112,15 @@ export function MapObjectGraphicPicker({
               onClick={() => void handlePickDisk()}
             >
               Image from Disk...
+            </Button>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Aperture className="h-3.5 w-3.5" />}
+              onClick={() => void handleGenerate()}
+            >
+              Generate sprite…
             </Button>
 
             <Button

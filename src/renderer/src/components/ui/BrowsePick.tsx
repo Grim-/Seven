@@ -14,12 +14,16 @@ export function BrowseList({
   options,
   value,
   onPick,
+  onClear,
+  clearLabel = 'None',
   allowCustom = false,
   placeholder = 'Filter'
 }: {
   options: BrowseOption[]
   value: string | null
   onPick: (value: string) => void
+  onClear?: () => void
+  clearLabel?: string
   allowCustom?: boolean
   placeholder?: string
 }) {
@@ -31,6 +35,7 @@ export function BrowseList({
     () => options.filter((o) => !q || `${o.value} ${o.label} ${o.group} ${o.note ?? ''}`.toLowerCase().includes(q)),
     [options, q]
   )
+  const showClear = Boolean(onClear && (!q || `${clearLabel} none clear reset all`.toLowerCase().includes(q)))
   const exactMatch = Boolean(trimmed && options.some((o) => o.value.toLowerCase() === q || o.label.toLowerCase() === q))
   const canUseCustom = allowCustom && Boolean(trimmed) && !exactMatch
   const groups = [...new Set(shown.map((o) => o.group))]
@@ -41,9 +46,18 @@ export function BrowseList({
       setAt((n) => Math.max(0, Math.min(ordered.length - 1, n + (e.key === 'ArrowDown' ? 1 : -1))))
     }
     if (e.key === 'Enter') {
-      if (ordered[at]) onPick(ordered[at].value)
-      else if (canUseCustom) onPick(trimmed)
+      const picked = ordered[at]
+      if (picked) {
+        if (onClear && picked.value === value) onClear()
+        else onPick(picked.value)
+      } else if (canUseCustom) {
+        onPick(trimmed)
+      }
     }
+  }
+  const selectOption = (opt: BrowseOption) => {
+    if (onClear && opt.value === value) onClear()
+    else onPick(opt.value)
   }
   return (
     <div className="flex min-h-0 flex-col gap-2">
@@ -59,6 +73,16 @@ export function BrowseList({
         className="h-8 border border-line/60 bg-black/40 px-2.5 text-[13px] text-white outline-none placeholder:text-faint focus:border-accent/70"
       />
       <div className="max-h-[60vh] min-h-0 overflow-y-auto">
+        {showClear && onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="mb-1 flex w-full items-center justify-between border-b border-line/50 px-2.5 py-1.5 text-left text-[12.5px] text-dim hover:bg-cyan/[0.08] hover:text-white"
+          >
+            <span className="truncate">{clearLabel}</span>
+            <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Clear</span>
+          </button>
+        )}
         {canUseCustom && (
           <button
             type="button"
@@ -73,20 +97,32 @@ export function BrowseList({
             <span className="sticky top-0 bg-black/95 py-1 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-accent-soft">{group}</span>
             {shown
               .filter((o) => o.group === group)
-              .map((o) => (
-                <button
-                  key={`${group}:${o.value}`}
-                  type="button"
-                  onClick={() => onPick(o.value)}
-                  className={cn('flex flex-col px-2.5 py-1.5 text-left hover:bg-cyan/[0.08]', ordered[at]?.value === o.value && 'bg-accent/15', o.value === value && 'border-l-2 border-l-cyan')}
-                >
-                  <span className="truncate text-[13px] text-white">{o.label}</span>
-                  {o.note && <span className="truncate text-[11.5px] text-dim">{o.note}</span>}
-                </button>
-              ))}
+              .map((o) => {
+                const selected = o.value === value
+                return (
+                  <button
+                    key={`${group}:${o.value}`}
+                    type="button"
+                    onClick={() => selectOption(o)}
+                    className={cn(
+                      'flex flex-col px-2.5 py-1.5 text-left hover:bg-cyan/[0.08]',
+                      ordered[at]?.value === o.value && 'bg-accent/15',
+                      selected && 'border-l-2 border-l-cyan'
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[13px] text-white">{o.label}</span>
+                      {selected && onClear && (
+                        <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-cyan">Unselect</span>
+                      )}
+                    </div>
+                    {o.note && <span className="truncate text-[11.5px] text-dim">{o.note}</span>}
+                  </button>
+                )
+              })}
           </div>
         ))}
-        {!shown.length && !canUseCustom && <span className="block px-2.5 py-2 text-[12.5px] text-dim">Nothing matches.</span>}
+        {!shown.length && !canUseCustom && !showClear && <span className="block px-2.5 py-2 text-[12.5px] text-dim">Nothing matches.</span>}
       </div>
     </div>
   )
@@ -98,6 +134,7 @@ export function BrowsePick({
   placeholder,
   onChange,
   allowCustom = false,
+  clearable = true,
   className
 }: {
   value: string | null
@@ -105,6 +142,7 @@ export function BrowsePick({
   placeholder: string
   onChange: (value: string | null) => void
   allowCustom?: boolean
+  clearable?: boolean
   className?: string
 }) {
   const chosen = options.find((o) => o.value === value)
@@ -135,6 +173,15 @@ export function BrowsePick({
             value={value}
             allowCustom={allowCustom}
             placeholder={allowCustom ? 'Filter or type custom…' : 'Filter'}
+            clearLabel={placeholder}
+            onClear={
+              clearable && hasValue
+                ? () => {
+                    onChange(null)
+                    close()
+                  }
+                : undefined
+            }
             onPick={(next) => {
               onChange(next)
               close()
@@ -142,7 +189,7 @@ export function BrowsePick({
           />
         )}
       </Popover>
-      {hasValue && (
+      {hasValue && clearable && (
         <button type="button" title="Clear" onClick={() => onChange(null)} className="ml-1 shrink-0 px-1 text-faint hover:text-white">
           <X className="h-3.5 w-3.5" />
         </button>

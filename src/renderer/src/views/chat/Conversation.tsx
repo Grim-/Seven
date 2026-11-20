@@ -5,6 +5,7 @@ import { Thread } from '../../components/chat/Thread'
 import { AgentSide } from '../../components/chat/AgentSide'
 import { ContextMeter, InstructionsBanner } from '../../components/chat/ContextMeter'
 import { PromptPeek } from '../../components/chat/PromptPeek'
+import { SceneBadgeButton, SceneStrip } from '../../components/chat/SceneStrip'
 import { ChatSettings } from '../../components/chat/ChatSettings'
 import { ChatTabletop } from '../../components/chat/ChatTabletop'
 import { useBoardSurfaces, useChatDashboard, useTabletopMode } from '../../components/chat/tabletopStore'
@@ -38,6 +39,7 @@ export function Conversation({ lead }: { lead?: ReactNode }) {
   const extras = (
     <>
       {(active ? active.incognito : agent?.incognito) && <IncognitoMark />}
+      <SceneBadgeButton session={active ?? null} />
       <PromptPeek />
       {!active && (
         <div className="w-48">
@@ -116,6 +118,7 @@ export function Conversation({ lead }: { lead?: ReactNode }) {
           )}
           <VaultVeil agentId={agentId ?? null} />
           <ChatTabletop sessionId={activeId} agent={agent ?? null}>
+            <SceneStrip session={active ?? null} />
             <InstructionsBanner />
             <Thread
               key={activeId ?? 'new'}

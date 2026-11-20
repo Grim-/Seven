@@ -1,4 +1,5 @@
 import type { ShellViewProps } from './shellTypes'
+import { Pressable } from './Pressable'
 import { ShellAddTile, enterStyle, shellState } from './ShellParts'
 
 export function ShellGallery({ items, adds, bind, scale }: ShellViewProps) {
@@ -7,9 +8,14 @@ export function ShellGallery({ items, adds, bind, scale }: ShellViewProps) {
       {items.map((item, i) => {
         const b = bind(item)
         return (
-          <button key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i, b.props.style)} className="shell-holo shell-enter group px-2.5 pb-2.5 pt-3">
+          <Pressable key={item.key} {...b.props} {...shellState(b)} title={item.title} style={enterStyle(i, b.props.style)} className="shell-holo shell-enter group relative cursor-pointer px-2.5 pb-2.5 pt-3 text-left">
             <span className="shell-corner left-0 top-0 border-l border-t" />
             <span className="shell-corner bottom-0 right-0 border-b border-r" />
+            {item.action && (
+              <span className="absolute right-2 top-2 z-10" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                {item.action}
+              </span>
+            )}
             {item.thumb ? (
               <span className="shell-clip relative block aspect-[4/3] w-full overflow-hidden">
                 {item.thumb}
@@ -28,7 +34,7 @@ export function ShellGallery({ items, adds, bind, scale }: ShellViewProps) {
               <span className={b.picked ? 'shell-cursor' : undefined}>{item.title}</span>
             </span>
             {!item.thumb && item.subtitle && <span className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{item.subtitle}</span>}
-          </button>
+          </Pressable>
         )
       })}
       {adds.map((a) => (

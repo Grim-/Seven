@@ -2,6 +2,7 @@ import { componentClass, type ComponentDef } from './registry'
 
 export type ParamKind =
   | 'number'
+  | 'duration'
   | 'text'
   | 'choice'
   | 'formula'
@@ -41,7 +42,7 @@ export type ParamSchema = Record<string, ParamSpec>
 
 function clean(spec: ParamSpec, raw: unknown): unknown {
   if (raw === undefined || raw === null) return spec.default
-  if (spec.kind === 'number') {
+  if (spec.kind === 'number' || spec.kind === 'duration') {
     const n = typeof raw === 'number' ? raw : Number(raw)
     if (!Number.isFinite(n)) return spec.default
     return Math.min(spec.max ?? Infinity, Math.max(spec.min ?? -Infinity, n))

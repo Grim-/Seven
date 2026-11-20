@@ -30,6 +30,6 @@ If you have builder access, you can create, modify, and delete any world record:
 - `world_create(type, id, values)`: Create a new record. Fails if the id already exists.
 - `world_set_property(type, id, field, value)`: Set basic attributes, descriptions, or status on any record.
 - `world_entries(type, id, field, add/edit/remove/clear)`: Manage list and log entries across any record. Fixed entries are preserved.
-- `world_add_action(type, id, field, action/actions)`: Attach interactive actions with skill/stat checks, pass/fail narrative outcomes, and card gains/losses to any object, place, or character.
-- `world_add_decision(type, id, field, decision/decisions)`: Attach branching decision points with clear options, decider rules (user vs. agent), and card swap outcomes.
+- `world_add_action(type, id, field, actions)`: Attach interactive actions with skill/stat checks, pass/fail narrative outcomes, and card gains/losses to any object, place, or character.
+- `world_add_decision(type, id, field, decisions)`: Attach branching decision points with clear options, decider rules (user vs. agent), and card swap outcomes.
 - `world_delete(type, id)`: Deletes any record. Asks the user for confirmation first.

@@ -2,7 +2,7 @@ import { HARM, type EffectGroup } from '../../effectGroups'
 import { entryLink, registerComponent, type Component, type GameEntity, type TooltipRow } from '../../core'
 import { ITEM_TEMPLATES } from '../../templateKinds'
 import { Ability } from '../Abilities'
-import { ActionPiece, actionValue, type ActionEvent, type UseContext } from '../Action'
+import { ActionPiece, actionValue, expectedActionValue, type ActionEvent, type UseContext } from '../Action'
 import { Item } from '../Inventory'
 import { Health } from '../Health'
 import { Weapon } from '../item/Weapon'
@@ -63,6 +63,16 @@ export class WeaponHit extends ActionPiece {
     const bonus = String(this.params.bonus).trim()
     const damage = weapon ? `${String(weapon.params.damage)}${bonus && bonus !== '0' ? ` + ${bonus}` : ''}` : 'the weapon\'s damage'
     return [{ label: 'Hits', value: times > 1 ? `${times} × ${damage}` : damage }]
+  }
+
+  score(ctx: UseContext): number {
+    const weapon = this.weapon()
+    const health = ctx.target?.comp(Health)
+    if (!this.action || !weapon || !ctx.target || !health || health.isDead) return 0
+    const times = Math.max(1, Math.floor(Number(this.params.times) || 1))
+    const raw = Math.max(0, expectedActionValue(`(${String(weapon.params.damage)}) + (${String(this.params.bonus)})`, { ...ctx, action: this.action }))
+    const expected = health.resolve(raw, { type: String(weapon.params.damageType), cause: weapon.item?.id ?? 'weapon', source: ctx.user }) * times
+    return expected * (expected >= health.get() ? 1.5 : 1)
   }
 }
 

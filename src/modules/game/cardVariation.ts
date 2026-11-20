@@ -6,8 +6,8 @@ import { cleanGameplay, BLANK_GAMEPLAY, GAMEPLAY_LANES, HIT_EVENT, MISS_EVENT } 
 import { effectsWords } from '@shared/game/effectWords'
 import { runEffects } from '../../engine/effects/run'
 import type { CheckSchema } from '../../engine/tools/checkSchema'
-import { LIVE_CHECKS, LIVE_DEFENCES } from '../../engine/tools/checkSchema'
-import { effectDefListSchema, normalizeEffectDefs } from '../../engine/tools/effectSchema'
+import { LIVE_DEFENCES } from '../../engine/tools/checkSchema'
+import { effectItemSchema, normalizeEffectDefs } from '../../engine/tools/effectSchema'
 import { ToolError } from '../../engine/tools/types'
 import { cardVariationDefs } from '../../engine/cards/variations'
 import { triggerActionsStore } from '../../engine/triggerActions/store'
@@ -46,8 +46,8 @@ cardVariationDefs.add({
       hit: { type: ['string', 'null'], description: 'trigger action' },
       miss: { type: ['string', 'null'], description: 'trigger action' },
       effects: {
-        oneOf: [{ type: 'null' }, { type: 'array', items: effectDefListSchema(c === LIVE_CHECKS) }],
-        description: 'Inline effects from registered effect components'
+        oneOf: [{ type: 'null' }, { type: 'array', items: effectItemSchema() }],
+        description: 'Inline effects (same piece shape as set_trigger_action.effects)'
       }
     }
   }),

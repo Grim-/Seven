@@ -49,11 +49,12 @@ function headers(how: HeaderRead): Record<string, string> {
   return how.tokens?.huggingFace ? { Authorization: `Bearer ${how.tokens.huggingFace}` } : {}
 }
 
-async function open(source: string, how: HeaderRead): Promise<{ meta: GgufMeta; dataOffset: number }> {
+async function open(source: string, how: HeaderRead): Promise<{ meta: GgufMeta; tensorNames: string[]; dataOffset: number }> {
   const { url, local } = location(source)
   const read = await gguf(url, local ? { allowLocalFile: true } : { additionalFetchHeaders: headers(how) })
   const offset = Number((read as { tensorDataOffset?: bigint | number }).tensorDataOffset ?? 0)
-  return { meta: nest(read.metadata as unknown as Record<string, unknown>), dataOffset: Number.isFinite(offset) ? offset : 0 }
+  const tensorNames = Array.isArray(read.tensorInfos) ? read.tensorInfos.map((t) => t.name).filter((n): n is string => typeof n === 'string') : []
+  return { meta: nest(read.metadata as unknown as Record<string, unknown>), tensorNames, dataOffset: Number.isFinite(offset) ? offset : 0 }
 }
 
 async function fileSize(source: string, how: HeaderRead): Promise<number | null> {
@@ -75,7 +76,7 @@ async function weights(source: string, how: HeaderRead, dataOffset: number): Pro
 
 export async function readHeader(source: string, how: HeaderRead): Promise<ModelInfo> {
   const own = await open(source, how)
-  const view = viewOf(own.meta)
+  const view = viewOf(own.meta, own.tensorNames)
   const split = resolveSplit(view)
   if (!how.size || (split && split.part > 0)) return classify(view, null)
   if (!split || split.parts <= 1 || !PART.test(source)) return classify(view, await weights(source, how, own.dataOffset))

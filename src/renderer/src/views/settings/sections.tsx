@@ -1,4 +1,4 @@
-import { ArchiveRestore, Brain, Command, FolderOpen, Info, Keyboard, Lock, Palette, ShieldCheck, UserRound, Volume2 } from 'lucide-react'
+import { ArchiveRestore, Brain, Command, Download, FolderOpen, Info, Keyboard, Lock, Palette, Scale, ShieldCheck, UserRound, Volume2 } from 'lucide-react'
 import { registerSettings } from '../../registries/settings'
 import { MemoryPanel } from '../MemoryPanel'
 import { PermissionsPanel } from '../PermissionsPanel'
@@ -11,6 +11,8 @@ import { Keybinds } from './Keybinds'
 import { Startup } from './Startup'
 import { FilesFolders } from './FilesFolders'
 import { Upkeep } from './Upkeep'
+import { Helpers } from './Helpers'
+import { Credits } from './Credits'
 import { About } from './About'
 
 function Vault() {
@@ -57,5 +59,23 @@ export function registerCoreSettings(): void {
   registerSettings({ id: 'memory', group: 'Agents', label: 'Memory and context', hint: 'Memory limits, search, model state', icon: <Brain />, words: ['pinned memories', 'model state', 'memory search model', 'embedding'], Page: MemoryPanel })
   registerSettings({ id: 'permissions', group: 'Agents', label: 'Permissions', hint: 'Allow, deny, protect', icon: <ShieldCheck />, words: ['allowed commands', 'denied commands', 'protected paths', 'shell'], Page: PermissionsPanel })
   registerSettings({ id: 'vault', group: 'Security', label: 'Vault', hint: 'Encryption, keys, vaults', icon: <Lock />, words: ['passphrase', 'lock', 'keys', 'api keys', 'vaults', 'switch vault', 'encryption'], Page: Vault })
+  registerSettings({
+    id: 'helpers',
+    group: 'Seven',
+    label: 'Helper installers',
+    hint: 'llama-server, sd-server, versions and updates',
+    icon: <Download />,
+    words: ['helpers', 'installers', 'llama-server', 'sd-server', 'llama.cpp', 'stable-diffusion.cpp', 'cuda', 'vulkan', 'cpu', 'versions', 'updates', 'binaries'],
+    Page: Helpers
+  })
+  registerSettings({
+    id: 'credits',
+    group: 'Seven',
+    label: 'Credits & Attribution',
+    hint: 'Bundled data, local runtimes and licenses',
+    icon: <Scale />,
+    words: ['credits', 'attribution', 'licenses', 'srd', 'dnd', 'cc-by-4.0', 'llama.cpp', 'stable-diffusion.cpp', 'piper', 'electron'],
+    Page: Credits
+  })
   registerSettings({ id: 'about', group: 'Seven', label: 'About', hint: 'Version', icon: <Info />, words: ['version'], Page: About })
 }

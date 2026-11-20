@@ -8,7 +8,7 @@ import { worlds } from './store'
 export function watchJourneys(): void {
   onWhereChange((sheet, where) => {
     const save = saves.holding(sheet)
-    if (!save || saves.currentId(save.world) !== save.id || !worlds.exists(save.world) || !worlds.schema(save.world).types[PLACE_TYPE_KEY]) return
+    if (!save || saves.currentId(save.world) !== save.id || !worlds.exists(save.world)) return
     const places = worlds.entities(save.world, PLACE_TYPE_KEY, false)
     for (const key of placesIn(where, save.world, places)) worlds.addJourney(save.world, sheet, 'moved', `Went to ${placePath(places, key).map((k) => String(places[k]?.Name || k)).join(' › ')}`)
   })

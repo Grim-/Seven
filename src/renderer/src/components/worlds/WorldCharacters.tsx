@@ -15,6 +15,7 @@ import {
 import type { WorldMeta } from '@shared/world'
 import type { PlaceVisitor, Standing, WorldMapUse } from '@shared/maps'
 import type { StoredFaction } from '@shared/game/factions'
+import { recordHealth } from '@shared/game/components'
 import { getFactionStance, STANCE_BADGE } from '@shared/game/factions'
 import { showName } from '@shared/ids'
 import { DND_STATS, modifier, type DndStat } from '@shared/dnd'
@@ -25,6 +26,7 @@ import { failed } from '../../lib/notify'
 import { toast } from '../../store/toasts'
 import { openSevenLink } from '../../lib/links'
 import { SheetPortrait } from '../data/SheetPortrait'
+import { useGameCatalog } from '../game/useGameCatalog'
 import { AddWorldCharacterModal } from './AddWorldCharacterModal'
 import { cn } from '../../lib/cn'
 
@@ -62,6 +64,7 @@ export function WorldCharacters({ world }: Props) {
       `world-chars.${world.id}.${sheetIds.join(',')}`
     ) ?? []
 
+  const catalog = useGameCatalog()
   const playerVisitor = visitors.find((v) => v.sheet === world.player)
   const playerFactionId = playerVisitor?.faction || 'player_party'
 
@@ -163,7 +166,8 @@ export function WorldCharacters({ world }: Props) {
             filteredVisitors.map((v) => {
               const isPlayer = world.player === v.sheet
               const isSelected = activeSheetId === v.sheet
-              const hp = v.dnd?.hp ? `${v.dnd.hp.cur}/${v.dnd.hp.max} HP` : null
+              const curHp = recordHealth(v.game, catalog) ?? v.dnd?.hp
+              const hp = curHp ? `${curHp.cur}/${curHp.max} HP` : null
               const targetFactionId = v.faction || (isPlayer ? 'player_party' : 'monsters')
               const stance = getFactionStance(factions, playerFactionId, targetFactionId)
               const stanceBadge = STANCE_BADGE[stance]
@@ -223,7 +227,7 @@ export function WorldCharacters({ world }: Props) {
             const isPlayer = world.player === v.sheet
             const info = standingMap.get(v.sheet)
             const mapName = info ? info.mapId : 'Unknown'
-            const hp = v.dnd?.hp
+            const hp = recordHealth(v.game, catalog) ?? v.dnd?.hp
             const hpPercent = hp && hp.max > 0 ? Math.max(0, Math.min(100, (hp.cur / hp.max) * 100)) : 100
             const targetFactionId = v.faction || (isPlayer ? 'player_party' : 'monsters')
             const stance = getFactionStance(factions, playerFactionId, targetFactionId)
@@ -315,7 +319,7 @@ export function WorldCharacters({ world }: Props) {
                         <Heart className="h-3.5 w-3.5 text-alert" /> Hit Points
                       </span>
                       <span className="font-bold text-white text-[12px]">
-                        {hp ? `${hp.cur} / ${hp.max}` : 'Unset'} {hp?.temp ? `(+${hp.temp})` : ''}
+                        {hp ? `${hp.cur} / ${hp.max}` : 'Unset'} {hp && 'temp' in hp && hp.temp ? `(+${hp.temp})` : ''}
                       </span>
                     </div>
                     {hp && (

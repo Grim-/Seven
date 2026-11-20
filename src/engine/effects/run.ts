@@ -12,6 +12,7 @@ import { triggerActionEffects } from '@shared/game/triggerActions'
 import { effectCatalog } from './catalog'
 import { worldAct } from './acts'
 import { placedThing } from './placed'
+import { dropLostConcentration } from '../../modules/game/characters'
 import './acts/flag'
 import './acts/loot'
 
@@ -164,6 +165,7 @@ export function runEffects(req: EffectRun): EffectOutcome {
     }
     action.fire('OnUse', ctx)
     if (req.event && req.event !== 'OnUse') action.fire(req.event, ctx)
+    dropLostConcentration(acted === user ? [user.entity] : [user.entity, acted.entity])
     if (!dry) {
       user.persist()
       if (acted !== user) acted.persist()

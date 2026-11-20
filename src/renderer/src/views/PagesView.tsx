@@ -5,7 +5,7 @@ import { create } from 'zustand'
 import MiniSearch from 'minisearch'
 import { ArrowUpToLine, BookOpen, ChevronDown, ChevronRight, Download, File, Folder, FolderInput, FolderOpen, FolderPlus, Hash, History, Plus, Star, Upload, X } from 'lucide-react'
 import { pageKindOf, type LibrarySection, type PageMeta } from '@shared/types'
-import { AddressPane, Button, DropOverlay, EmptyState, ListPane, ListToggle, MainPane, PaneHeader, ReadingPane, Split, VirtualList, openMenu, type MenuItem } from '../components/ui'
+import { AddressPane, Button, DropOverlay, EmptyState, ListPane, ListToggle, MainPane, PaneHeader, ReadingPane, Split, TokenFilterInput, VirtualList, openMenu, parseTokenFilter, type MenuItem } from '../components/ui'
 import { openPortableImportFromFiles } from '../components/portability/portabilityStore'
 import { useFileDrop } from '../lib/useFileDrop'
 import { dropFiles } from '../lib/dropFiles'
@@ -205,6 +205,8 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
   const icons = useKindIcons()
   const types = usePageTypes()
   const [filter, setFilter] = useState('')
+  const [typeFilters, setTypeFilters] = useState<string[]>([])
+  const [tagFilters, setTagFilters] = useState<string[]>([])
   const [dragging, setDragging] = useState<string[]>([])
   const [over, setOver] = useState<string | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -269,9 +271,49 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
     select(p.id)
   }
 
-  const q = filter.trim().toLowerCase()
+  const availableTypes = useMemo(() => {
+    const counts = new Map<string, { id: string; count: number; isAsset: boolean }>()
+    const bump = (id: string, isAsset: boolean) => {
+      const prev = counts.get(id)
+      counts.set(id, { id, count: (prev?.count ?? 0) + 1, isAsset })
+    }
+    for (const p of pages) {
+      const k = pageKindOf(p.type)
+      if (k !== 'folder') bump(k, false)
+    }
+    for (const a of assets) bump(a.kind, true)
+    return [...counts.values()].sort((a, b) => b.count - a.count || a.id.localeCompare(b.id))
+  }, [pages, assets])
+
+  const assetKindSet = useMemo(() => new Set(availableTypes.filter((t) => t.isAsset).map((t) => t.id)), [availableTypes])
+  const inlineFilters = useMemo(() => parseTokenFilter(filter), [filter])
+
+  const q = inlineFilters.text
+  const activeTypes = useMemo(() => [...new Set([...typeFilters, ...inlineFilters.types])], [typeFilters, inlineFilters.types])
+  const activeTags = useMemo(() => [...new Set([...tagFilters, ...inlineFilters.tags])], [tagFilters, inlineFilters.tags])
+  const activePageTypes = useMemo(() => activeTypes.filter((t) => !assetKindSet.has(t)), [activeTypes, assetKindSet])
+  const activeAssetTypes = useMemo(() => activeTypes.filter((t) => assetKindSet.has(t)), [activeTypes, assetKindSet])
+  const hasTypeFilter = activeTypes.length > 0
+  const hasTagFilter = activeTags.length > 0
+  const hasAnyPill = hasTypeFilter || hasTagFilter
+
+  const matchedAssets = useMemo(() => {
+    if (!activeAssetTypes.length) return []
+    return assets
+      .filter((a) => {
+        if (!activeAssetTypes.includes(a.kind)) return false
+        if (hasTagFilter) {
+          const aTags = (tagMap[`file/${a.id}`] ?? []).map((x) => x.toLowerCase())
+          if (!activeTags.every((t) => aTags.includes(t))) return false
+        }
+        return !q || a.name.toLowerCase().includes(q)
+      })
+      .sort((a, b) => b.createdAt - a.createdAt)
+  }, [assets, activeAssetTypes, hasTagFilter, activeTags, tagMap, q])
+
   const visible = useMemo(() => {
-    if (!q) return null
+    if (!q && !hasAnyPill) return null
+    if (hasTypeFilter && activePageTypes.length === 0) return new Set<string>()
     const keep = new Set<string>()
     const near = new Set<string>()
     if (q.length > 2) {
@@ -280,12 +322,18 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
       for (const r of index.search(q)) near.add(String(r.id))
     }
     for (const p of pages) {
-      if (!p.title.toLowerCase().includes(q) && !near.has(p.id)) continue
+      const k = pageKindOf(p.type)
+      if (activePageTypes.length && !activePageTypes.includes(k)) continue
+      if (hasTagFilter) {
+        const pTags = (tagMap[`${k}/${p.id}`] ?? []).map((x) => x.toLowerCase())
+        if (!activeTags.every((t) => pTags.includes(t))) continue
+      }
+      if (q && !p.title.toLowerCase().includes(q) && !near.has(p.id)) continue
       keep.add(p.id)
       for (const a of ancestorsOf(p.id, byId)) keep.add(a.id)
     }
     return keep
-  }, [q, pages, byId])
+  }, [q, hasAnyPill, hasTypeFilter, hasTagFilter, activePageTypes, activeTags, pages, byId, tagMap])
 
   const made = (parent: string | null) => (id: string) => {
     select(id)
@@ -473,8 +521,13 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
     if (recentItems.length > 0 && addSection(RECENT, <History className="h-3.5 w-3.5 shrink-0 text-dim" />, 'Recent', recentItems.length, Boolean(q) || !shut[RECENT], () => toggleShut(RECENT))) {
       for (const item of recentItems) lines.push(quickRow(item, 'recent'))
     }
-    const showFilesHead = favItems.length > 0 || recentItems.length > 0
-    if (!showFilesHead || addSection(FILES_ROOT, <FolderOpen className="h-3.5 w-3.5 shrink-0 text-dim" />, 'Files', roots.length, Boolean(q) || !shut[FILES_ROOT], () => toggleShut(FILES_ROOT))) {
+    const showFilesHead = favItems.length > 0 || recentItems.length > 0 || matchedAssets.length > 0
+    if (matchedAssets.length > 0 && addSection('__assets', <File className="h-3.5 w-3.5 shrink-0 text-cyan" />, `Media / Files (${activeAssetTypes.join(', ')})`, matchedAssets.length, true, () => undefined)) {
+      for (const a of matchedAssets) {
+        lines.push(quickRow({ kind: 'file', id: a.id, label: a.name, icon: 'file' }, 'asset'))
+      }
+    }
+    if ((!hasTypeFilter || activePageTypes.length > 0) && (!showFilesHead || addSection(FILES_ROOT, <FolderOpen className="h-3.5 w-3.5 shrink-0 text-dim" />, 'Files', roots.length, Boolean(q) || hasAnyPill || !shut[FILES_ROOT], () => toggleShut(FILES_ROOT)))) {
       for (const p of roots) addPage(p, 0, '')
     }
   }
@@ -525,29 +578,17 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
           <Button size="sm" variant="ghost" icon={<Download />} title="Export" onClick={(e) => exportMenuAt(e, section, openPage)} />
         </PaneHeader>
         <div className="px-2 pt-2">
-          <input
+          <TokenFilterInput
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            onKeyDown={(e) => e.key === 'Escape' && setFilter('')}
-            placeholder="Filter by name"
-            spellCheck={false}
-            className="h-7 w-full border border-line/40 bg-transparent px-2 text-[12.5px] text-white outline-none placeholder:text-faint focus:border-accent/50"
+            onChange={setFilter}
+            types={typeFilters}
+            onTypesChange={setTypeFilters}
+            tags={tagFilters}
+            onTagsChange={setTagFilters}
+            typeOptions={availableTypes}
+            tagOptions={tagList.map(([id, count]) => ({ id, count }))}
+            placeholder="Filter by name, type:image, or #tag"
           />
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {[
-              { id: ALL, label: 'All' },
-              ...(tagList.length ? [{ id: BY_TAG, label: 'By tag' }] : []),
-              ...tagList.map(([t, n]) => ({ id: t, label: `#${t} ${n}` }))
-            ].map((pill) => (
-              <button
-                key={pill.id}
-                onClick={() => setTab(pill.id)}
-                className={cn('border px-1.5 py-0.5 font-mono text-[10.5px]', tab === pill.id ? 'border-accent bg-accent/15 text-white' : 'border-line/50 text-dim hover:border-accent/60 hover:text-white')}
-              >
-                {pill.label}
-              </button>
-            ))}
-          </div>
           {picked.length > 0 && (
             <div className="mt-1.5 flex items-center gap-1 border border-teal/40 bg-teal/[0.06] px-1.5 py-1">
               <span className="flex-1 font-mono text-[10.5px] text-teal">{picked.length} picked</span>

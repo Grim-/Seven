@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Copy, Play, Plus, Save, Sliders, User } from 'lucide-react'
 import { WorldPlay } from '../components/worlds/WorldPlay'
+import { AdventureIntro } from '../components/play/AdventureIntro'
 import { useLive } from '../lib/useLive'
 import { engine } from '../lib/ipc'
 import { askText, Button, EmptyState, Modal, StatusBadge, Select } from '../components/ui'
@@ -45,6 +46,7 @@ export function PlayView() {
 
   const worldSaves = useWorldSaves(activeWorldId ?? '')
   const [confirmedSaveId, setConfirmedSaveId] = useState<string | null>(null)
+  const [showNewAdventure, setShowNewAdventure] = useState(false)
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
 
@@ -99,24 +101,9 @@ export function PlayView() {
   }
 
   const handleCreateNewSave = () => {
-    if (!activeWorldId) return
-    const charToPlay = effectivePlayerId
-    if (!charToPlay) {
-      toast.info('No Character Selected', 'Please select a character to play as first.')
-      setShowPlayerModal(true)
-      return
-    }
-    askText('Create New Save', 'Save name', `Save ${sortedSaves.length + 1}`, async (name) => {
-      try {
-        await engine('worlds.setPlayer', { id: activeWorldId, sheet: charToPlay })
-        const s = await engine('saves.create', { world: activeWorldId, name, copy: false })
-        toast.success('Save created', name)
-        setConfirmedSaveId(s.id)
-        setShowSaveModal(false)
-      } catch (err) {
-        failed('Could not create save')(err)
-      }
-    })
+    setShowSaveModal(false)
+    setConfirmedSaveId(null)
+    setShowNewAdventure(true)
   }
 
   const handleQuickSave = () => {
@@ -237,9 +224,26 @@ export function PlayView() {
         </div>
       </header>
 
+      {/* NEW ADVENTURE QUICK-START INTRO (FRESH WORLD OR NEW SAVE) */}
+      {!confirmedSaveId && (!latestSave || showNewAdventure) && activeWorldId && (
+        <AdventureIntro
+          world={worlds.find((w) => w.id === activeWorldId) ?? worlds[0]}
+          latestSave={latestSave}
+          saveCount={sortedSaves.length}
+          onContinueSave={(id) => {
+            setShowNewAdventure(false)
+            void handleSelectSave(id)
+          }}
+          onStarted={(id) => {
+            setShowNewAdventure(false)
+            setConfirmedSaveId(id)
+          }}
+        />
+      )}
+
       {/* SAVE LAUNCHER MODAL (OFFERS LAST PLAYED SAVE BEFORE STARTING) */}
       <Modal
-        open={!confirmedSaveId}
+        open={!confirmedSaveId && Boolean(latestSave) && !showNewAdventure}
         title="START ADVENTURE"
         onClose={() => {}}
         wide={false}
@@ -558,7 +562,7 @@ export function PlayView() {
       {/* MAIN GAME EXPLORE VIEW (MOUNTED ONLY WHEN SAVE IS CONFIRMED) */}
       {confirmedSaveId && activeWorldId ? (
         <WorldPlay world={activeWorldId} />
-      ) : (
+      ) : (!latestSave || showNewAdventure) && activeWorldId ? null : (
         <div className="flex flex-1 items-center justify-center font-mono text-[12px] text-faint">
           Select a save file above to enter the game world.
         </div>

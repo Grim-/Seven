@@ -2,6 +2,8 @@ import { BUFF_TEMPLATES, CHARACTER_TEMPLATES, ITEM_TEMPLATES, catalogFrom, defTy
 import {
   Abilities,
   Buffs,
+  Concentrating,
+  Concentration,
   CharacterClass,
   Classes,
   Equipment,
@@ -19,16 +21,19 @@ import {
   usableAbilities,
   type PendingClassUnlock
 } from '@shared/game/components'
+import { DND_POOL_STATS } from '@shared/dnd'
 import type { Point } from '@shared/shapes'
+import type { EffectTargetRef } from '@shared/effects'
 import type { StoryMemory } from '@shared/story'
 import { GameEntity, createComponent, spawn, type Catalog, type EntityRecord } from '@shared/game/core'
-import { getSheet, registerSheetSection, setGame, setMind } from '../../engine/library/sheets'
+import { getSheet, registerSheetSection, setDnd, setGame, setMind } from '../../engine/library/sheets'
 import { ToolError } from '../../engine/tools/types'
 import { noteFailure } from '../../engine/util/report'
 import { gameDefs } from './store'
 import { setEffectCatalog } from '../../engine/effects/catalog'
 import { saveInPlay } from '../../engine/worlds/playLayer'
 import { saves } from '../../engine/worlds/saves'
+import { assertOutOfCombat } from '../../engine/worlds/battleGate'
 
 function catalog(): Catalog {
   return catalogFrom(gameDefs.catalog())
@@ -145,6 +150,7 @@ export function joinCharacter(sheet: string, template: string): EntityRecord {
 export function saveCharacter(sheet: string, record: EntityRecord): EntityRecord {
   const s = getSheet(sheet)
   if (!s.game) throw new ToolError(`${s.title} is not in the game.`)
+  assertOutOfCombat(saves.holding(s.id), 'overwrite a character sheet')
   if (record.uid !== s.game.uid) throw new ToolError(`That game record belongs to another character.`)
   const cat = catalog()
   const clean = GameEntity.fromRecord(record, cat).toRecord()
@@ -207,25 +213,78 @@ registerSheetSection((sheet) => {
   }
 })
 
-export function tickCharacters(sheets: string[], seconds: number): number {
-  let ticked = 0
+export interface TimeSpan {
+  from: number
+  seconds: number
+  roundSeconds: number
+  dawns: number
+  source: string
+  skipTurnSignals?: boolean
+}
+
+function runSpan(entity: GameEntity, span: TimeSpan): void {
+  if (entity.at !== null && entity.at < span.from) entity.comp(Buffs)?.dropExpired(span.from - entity.at)
+  const rounds = span.skipTurnSignals ? 0 : Math.floor(span.seconds / Math.max(1, span.roundSeconds))
+  for (let round = 1; round <= rounds; round++) {
+    entity.emit('OnTurnStart', { round })
+    entity.tickSim(span.roundSeconds)
+    entity.emit('OnTurnEnd', { round })
+  }
+  const rest = span.seconds - rounds * span.roundSeconds
+  if (rest > 0) entity.tickSim(rest)
+  for (let i = 0; i < span.dawns; i++) entity.emit('OnDawn', {})
+  entity.emit('OnTimePassed', { seconds: span.seconds, source: span.source })
+  entity.at = span.from + span.seconds
+}
+
+export function signalCharacters(sheets: string[], signal: string): void {
   for (const id of sheets) {
     try {
       const s = getSheet(id)
       if (!s.game) continue
       const entity = GameEntity.fromRecord(s.game, catalog())
       entity.start()
-      entity.tickSim(seconds)
+      entity.emit(signal, {})
       const record = entity.toRecord()
       entity.stop()
       setGame(s.id, record)
-      ticked++
     } catch (err) {
-      noteFailure(err, 'game', `Could not advance timers for character ${id}`)
-      continue
+      noteFailure(err, 'game', `Could not send ${signal} to character ${id}`)
     }
   }
-  return ticked
+}
+
+export function dropLostConcentration(live: GameEntity[]): void {
+  const held = new Map(live.map((e) => [e.uid, e.comp(Concentrating)?.buff ?? '']))
+  for (const e of live) {
+    const buffs = e.comp(Buffs)
+    for (const b of buffs?.held ?? []) {
+      if (b.comp(Concentration) && b.source && held.has(b.source) && held.get(b.source) !== b.id) buffs?.removeBuff(b)
+    }
+  }
+}
+
+export function advanceCharacters(sheets: string[], span: TimeSpan): number {
+  const live: { sheet: string; entity: GameEntity }[] = []
+  for (const id of sheets) {
+    try {
+      const s = getSheet(id)
+      if (!s.game) continue
+      const entity = GameEntity.fromRecord(s.game, catalog())
+      entity.start()
+      runSpan(entity, span)
+      live.push({ sheet: s.id, entity })
+    } catch (err) {
+      noteFailure(err, 'game', `Could not advance time for character ${id}`)
+    }
+  }
+  dropLostConcentration(live.map((l) => l.entity))
+  for (const { sheet, entity } of live) {
+    const record = entity.toRecord()
+    entity.stop()
+    setGame(sheet, record)
+  }
+  return live.length
 }
 
 export function giveItem(sheet: string, item: string, count: number, gold: number): { given: number; gold: number } {
@@ -293,33 +352,94 @@ export function characterMisfits(sheet: string): string[] {
   return misfitsOf(s.game, has).map((m) => `${defType(m.kind)?.label ?? m.kind} ${m.id}`)
 }
 
-export function useAbility(sheet: string, ability: string, target: string | null, at: Point | null, distance: number): string {
+export function gameCatalog(): Catalog {
+  return catalog()
+}
+
+export interface AbilityTarget {
+  entity: GameEntity
+  title: string
+  persist: () => void
+}
+
+export function sheetTarget(id: string, cat: Catalog): AbilityTarget {
+  const t = getSheet(id)
+  let before = t.game
+  let entity: GameEntity
+  if (before) {
+    entity = GameEntity.fromRecord(before, cat)
+  } else {
+    const firstTpl = gameDefs.list(CHARACTER_TEMPLATES)[0]
+    const starter = firstTpl ? cat.entity(CHARACTER_TEMPLATES, firstTpl.id) : null
+    entity = starter ? spawn({ ...starter, name: t.title }, cat) : new GameEntity(t.id, { kind: CHARACTER_TEMPLATES, id: '' }, t.title, cat)
+    ensureCharacterDefaults(entity)
+    if (t.dnd && t.dnd.hp.max > 0) {
+      const stats = entity.comp(Stats)
+      if (stats) {
+        for (const [k, v] of Object.entries(t.dnd.stats)) stats.setBase(k, v)
+        const healthStat = String(entity.comp(Health)?.params.stat || DND_POOL_STATS.hp)
+        stats.setBase(healthStat, t.dnd.hp.max)
+        if (cat.stat(DND_POOL_STATS.ac)) stats.setBase(DND_POOL_STATS.ac, t.dnd.ac)
+        if (cat.stat(DND_POOL_STATS.speed)) stats.setBase(DND_POOL_STATS.speed, t.dnd.speed)
+      }
+      if (t.dnd.hp.cur > 0) entity.comp(Health)?.set(t.dnd.hp.cur)
+    }
+    before = entity.toRecord()
+  }
+  return {
+    entity,
+    title: t.title,
+    persist: () => {
+      const next = entity.toRecord()
+      setGame(t.id, next)
+      if (t.dnd) {
+        const hp = entity.comp(Health)
+        if (hp) setDnd(t.id, { ...t.dnd, hp: { ...t.dnd.hp, cur: Math.max(0, Math.round(hp.get())) } })
+      }
+      if (t.game) diffAndLogProgression(t.id, before, next, cat)
+    }
+  }
+}
+
+export function creatureTarget(uid: string, world: string | null, cat: Catalog): AbilityTarget {
+  const save = world ? saveInPlay(world, true) : null
+  const creature = save?.creatures.find((c) => c.uid === uid)
+  if (!world || !creature) throw new ToolError('That creature is not in this save.')
+  const entity = GameEntity.fromRecord(creature, cat)
+  return {
+    entity,
+    title: creature.name,
+    persist: () => {
+      const now = saveInPlay(world, true)
+      if (!now) return
+      const next = entity.toRecord()
+      saves.write({ ...now, creatures: now.creatures.map((c) => (c.uid === uid ? { ...c, ...next } : c)) })
+    }
+  }
+}
+
+export function useAbility(sheet: string, ability: string, target: EffectTargetRef | null, world: string | null, at: Point | null, distance: number): string {
   const s = getSheet(sheet)
   if (!s.game) throw new ToolError(`${s.title} is not in the game.`)
   const cat = catalog()
   const user = GameEntity.fromRecord(s.game, cat)
-  const t = target && target !== s.id ? getSheet(target) : null
-  if (t && !t.game) throw new ToolError(`${t.title} is not in the game.`)
-  const other = t?.game ? GameEntity.fromRecord(t.game, cat) : null
+  const self = target?.sheet === s.id
+  const other = self || !target ? null : target.sheet ? sheetTarget(target.sheet, cat) : target.creature ? creatureTarget(target.creature, world, cat) : null
   user.start()
-  other?.start()
+  other?.entity.start()
   try {
     const found = usableAbilities(user).find((a) => a.uid === ability || a.id === ability || String(a.params.label ?? '').toLowerCase() === ability.toLowerCase())
     if (!found) throw new ToolError(`${s.title} can't use that now.`)
-    const done = found.use({ user, target: target === s.id ? user : other, at, distance })
+    const done = found.use({ user, target: self ? user : (other?.entity ?? null), at, distance })
     if (done !== true) throw new ToolError(done)
     const nextUser = user.toRecord()
     setGame(s.id, nextUser)
     diffAndLogProgression(s.id, s.game, nextUser, cat)
-    if (t && other) {
-      const nextOther = other.toRecord()
-      setGame(t.id, nextOther)
-      diffAndLogProgression(t.id, t.game, nextOther, cat)
-    }
-    return `${s.title} used ${String(found.params.label || found.id)}${t ? ` on ${t.title}` : ''}.`
+    other?.persist()
+    return `${s.title} used ${String(found.params.label || found.id)}${other ? ` on ${other.title}` : ''}.`
   } finally {
     user.stop()
-    other?.stop()
+    other?.entity.stop()
   }
 }
 
@@ -613,7 +733,7 @@ export function inspectCharacterGame(sheet: string): string {
     if (abilities.length) {
       lines.push(
         `Abilities: ${abilities
-          .map((a) => `${String(a.params.label || a.id)} [${a.id}]${a.cooling > 0 ? ` (cooldown ${Math.round(a.cooling)}s)` : ''}`)
+          .map((a) => `${String(a.params.label || a.id)} [${a.id}]`)
           .join(', ')}`
       )
     }

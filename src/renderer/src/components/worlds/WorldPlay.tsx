@@ -1,35 +1,33 @@
-import { useState, useEffect, useMemo, type ReactNode } from 'react'
-import { Footprints, MessageSquarePlus, Swords, UserPlus } from 'lucide-react'
-import { asToken, mapArea, mapInPlay, placePath, type MapData, type PlaceVisitor, type WorldMapUse } from '@shared/maps'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Flame, Footprints, MessageSquarePlus, Swords, UserPlus } from 'lucide-react'
+import { usableAbilities } from '@shared/game/components'
+import { GameEntity } from '@shared/game/core'
+import { mapArea, mapInPlay, placePath, type MapData, type PlaceVisitor, type WorldMapUse } from '@shared/maps'
 import { showName } from '@shared/ids'
 import { placedKey } from '@shared/effects'
 import type { MapToken } from '../maps/TokenLayer'
-import { ActionBar, Button, EmptyState, Eyebrow, Modal, ShellTabs, openMenu, type MenuItem } from '../ui'
+import type { EffectTargetRef } from '@shared/effects'
+import { ActionBar, Button, EmptyState, Eyebrow, Modal, Popover, ShellTabs, openMenu, type MenuItem } from '../ui'
+import { SlateContainer } from '../entries/EntrySlate'
 import { Markdown } from '../chat/Markdown'
 import { EntryPicker } from '../library/EntryPicker'
 import { bringHere } from '../play/bringHere'
 import { engine } from '../../lib/ipc'
 import { useLive, useLibraryData } from '../../lib/useLive'
+import { useKindEntries } from '../../views/data/useKindEntries'
 import { openEntry } from '../../lib/library'
 import { startChatItems } from '../../views/data/entryMenu'
 import { useEscapeLayer } from '../../lib/escape'
 import { PlayStage, type ClockControls, type StageNavigation } from './PlayStage'
 import type { ClockView } from '../../game/explore/WorldClock'
 import type { View } from '../../game/engine/Camera'
-import { ClockHud } from '../play/hud/ClockHud'
-import { GameMenu, GameScreens } from '../play/screens'
-import {
-  UnitCardStack,
-  type UnitCardData,
-  CompactCombatLog,
-  AgentNarrationStream,
-  InitiativeRibbon,
-  TacticalActionDeck,
-  CombatTurnHud,
-  PlayerChatOverlay,
-  SpeechBubbleOverlay
-} from '../play/hud'
+import { GameScreens } from '../play/screens'
+import { CombatTurnHud } from '../play/hud'
+import { usePlayScene } from '../play/scenes/sceneStore'
+import type { PlayAim, PlayHud } from '../play/scenes/PlayScene'
+import { useLatest } from '../../game/react/useLatest'
 import { SavePicker } from '../play/SavePicker'
+import { entryMenuAt } from '../../views/data/entryMenu'
 import { useCurrentSave } from '../play/useSaves'
 import { useTriggerPlay } from '../play/triggers/useTriggerPlay'
 import { isTypingTarget, matchesKeybind } from '../../store/keybinds'
@@ -47,7 +45,6 @@ import { usePresenceData } from '../maps/usePresence'
 import { WorldMapLoad } from '../maps/WorldMapView'
 import { objectHandlers } from '../maps/objectActions'
 import { useMapTokens } from '../maps/useMapTokens'
-import { JourneyStrip } from './Journey'
 import { failed } from '../../lib/notify'
 import { toast } from '../../store/toasts'
 import type { PlaceData } from '../maps/usePlaceRecords'
@@ -59,31 +56,31 @@ import { CardHand } from '../cards/CardHand'
 import { playCard } from '../cards/playCard'
 import { cardForms } from '../cards/cardForms'
 import { useDeckInUse } from '../cards/useDeckInUse'
-import { defaultDialogueTree, combatParleyDialogueTree } from '@shared/game/dialogue'
+import { defaultDialogueTree } from '@shared/game/dialogue'
 import { useDialogue } from '../play/dialogue/dialogueStore'
 import { useGameState } from '../play/state/gameStateStore'
-import { combatantFromVisitor } from '@shared/game/state/BattleStateMachine'
 
 const agentsOf = (here: PlaceVisitor[]) => here.flatMap((v) => (v.agent ? [v.agent] : []))
 
-function PlayPanel({ children, actions }: { children: ReactNode; actions: MenuItem[] }) {
-  return (
-    <div className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-24px)] w-[340px] flex-col border border-line/70 bg-black/95 shadow-[-12px_0_24px_rgba(0,0,0,0.5)]">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">{children}</div>
-      <ActionBar items={actions} className="shrink-0 border-t border-line/40 p-2.5" />
-    </div>
-  )
-}
-
-function PlayCard({ world, placeKey, data, player }: { world: string; placeKey: string; data: PlaceData; player: string | null }) {
+function PlayCard({ world, placeKey, data, player, onClose }: { world: string; placeKey: string; data: PlaceData; player: string | null; onClose: () => void }) {
+  const [expanded, setExpanded] = useState(true)
   const { places, here } = data
   const place = places[placeKey] ?? {}
   const now = typeof place.Now === 'string' ? place.Now : ''
   const there = here[placeKey] ?? []
+  const breadcrumb = placePath(places, placeKey).map((k) => placeName(places, k)).join(' › ')
+  const actions: MenuItem[] = [{ label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(sceneLink(`@place:${placeKey}`, player) ?? '', agentsOf(there)) }]
   return (
-    <PlayPanel actions={[{ label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(sceneLink(`@place:${placeKey}`, player) ?? '', agentsOf(there)) }]}>
-        <div className="font-mono text-[11px] text-dim">{placePath(places, placeKey).map((k) => placeName(places, k)).join(' › ')}</div>
-        <div className="text-[15px] font-semibold uppercase tracking-[0.06em] text-white">{placeName(places, placeKey)}</div>
+    <SlateContainer
+      title={placeName(places, placeKey)}
+      tag="PLACE"
+      subtitle={breadcrumb}
+      expanded={expanded}
+      onToggleExpand={() => setExpanded((v) => !v)}
+      onRemove={onClose}
+      className="pointer-events-auto absolute right-3 top-3 z-20 flex max-h-[calc(100%-24px)] w-[340px] flex-col"
+    >
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
         {now ? <Markdown text={now} className="border border-cyan/25 bg-cyan/[0.04] px-2.5 py-1.5 text-[13px] leading-relaxed text-white/90" /> : <span className="text-[12px] text-faint">Nothing is happening here.</span>}
         {there.length > 0 && (
           <div className="flex flex-col gap-1.5">
@@ -94,11 +91,13 @@ function PlayCard({ world, placeKey, data, player }: { world: string; placeKey: 
           </div>
         )}
         <PlayList play={placePlay(world, placeKey, place, player, agentsOf(there))} />
-    </PlayPanel>
+      </div>
+      <ActionBar items={actions} className="shrink-0 border-t border-line/40 p-2.5" />
+    </SlateContainer>
   )
 }
 
-function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: string; map: MapData; use: WorldMapUse; uses: WorldMapUse[]; data: PlaceData; player: string | null; at: string | null; onGo: (map: string) => void }) {
+function PlayMap({ world, map, use, uses, data, player, at, onGo, embedded = false }: { world: string; map: MapData; use: WorldMapUse; uses: WorldMapUse[]; data: PlaceData; player: string | null; at: string | null; onGo: (map: string) => void; embedded?: boolean }) {
   const [looking, setLooking] = useState<string | null>(at)
   const [who, setWho] = useState<string | null>(null)
   const [time, setTime] = useState<ClockView | null>(null)
@@ -114,15 +113,16 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
   const flagState = JSON.stringify([save?.flags ?? {}, save?.thingFlags ?? {}])
   const shownMap = useMemo(() => mapInPlay(map, use, save?.flags ?? {}, (id) => save?.thingFlags[placedKey({ map: map.id, id })] ?? {}), [map, use.layerGating, use.propGating, flagState])
 
+  const timeDef = catalog ? (catalog.time(save?.clockId ?? '') ?? catalog.times()[0] ?? null) : null
+  const roundSeconds = timeDef?.roundSeconds ?? 0
+  const tileFeet = timeDef?.tileFeet ?? 5
   const battle = useGameState((s) => s.battle)
-  const attackTarget = useGameState((s) => s.attackTarget)
-  const startBattle = useGameState((s) => s.startBattle)
-  const endBattle = useGameState((s) => s.endBattle)
-  const inCombat = battle !== null && battle.status === 'active'
+  const sheets = useKindEntries('sheet')
 
   // Auto-place player character at map center if not yet positioned on this map
   useEffect(() => {
-    if (!player || !world || !map) return
+    if (!player || !world || !map || !sheets) return
+    if (!sheets.some((s) => s.id === player)) return
     if (!use.stand[player]) {
       const area = mapArea(map)
       const at = {
@@ -138,40 +138,20 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
       }
       void engine('worlds.saveMapUse', { id: world, use: next }).catch(failed('Could not auto-place player token'))
     }
-  }, [player, world, map, use])
+  }, [player, world, map, use, sheets])
 
-  // Derive interactive creature tokens from map spawners
-  const spawnerTokens = useMemo<MapToken[]>(() => {
-    const list = map.spawners ?? []
-    if (!list.length) return []
-    return list.map((s) => {
-      const isHostile = s.disposition === 'hostile'
-      const isNeutral = s.disposition === 'neutral'
-      const line = `${isHostile ? 'HOSTILE' : isNeutral ? 'NEUTRAL' : 'FRIENDLY'} · ${s.monsterId || 'Creature'}`
-      return {
-        at: s.at,
-        visitor: asToken({
-          sheet: `spawner:${s.id}`,
-          name: s.name,
-          image: null,
-          line,
-          dnd: {
-            hp: { cur: 15, max: 15, temp: 0 },
-            ac: 13,
-            stats: { str: 12, dex: 12, con: 12, int: 8, wis: 10, cha: 8 },
-            conditions: []
-          },
-          faction: s.faction ?? (isHostile ? 'monsters' : 'neutral'),
-          agent: null
-        }, `spawner:${s.id}`, 'spawner')
-      }
-    })
-  }, [map.spawners])
+  // Wake real creature spawners for this map & save on enter
+  useEffect(() => {
+    if (!world || !map.id || !save?.id) return
+    void engine('worlds.wakeSpawners', { world, map: map.id, entering: true }).catch(failed('Could not wake map spawners'))
+  }, [world, map.id, save?.id])
 
   const pickPlace = (key: string | null) => {
     setWho(null)
     setLooking(key)
   }
+
+  const pickWhoRef = useRef<(id: string) => void>(() => undefined)
 
   const people = useMapTokens({
     world,
@@ -179,31 +159,116 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
     places: data.places,
     player,
     editing: false,
-    onSelect: (sheet) => pickWho(sheet),
+    onSelect: (sheet) => pickWhoRef.current(sheet),
     save: (next) => void engine('worlds.saveMapUse', { id: world, use: next }).catch(failed('Could not save it')),
     onWalk: nav ? (t) => nav.walkTo(t) : undefined,
     onApproach: nav ? (t, cb) => nav.smartApproach(t, cb) : undefined
   })
 
-  const allTokens = useMemo(() => {
-    const sheetSet = new Set(people.tokens.map((t) => t.visitor.sheet))
-    return [...people.tokens, ...spawnerTokens.filter((st) => !sheetSet.has(st.visitor.sheet))]
-  }, [people.tokens, spawnerTokens])
+  const allTokens = people.tokens
+  const latestTokens = useLatest(allTokens)
+  const tokensSig = allTokens
+    .map((t) => `${t.visitor.sheet}:${t.visitor.token}:${t.at.x},${t.at.y}:${t.visitor.hp?.cur ?? ''}/${t.visitor.hp?.max ?? ''}:${JSON.stringify(t.visitor.game ?? null)}`)
+    .join('|')
+  const activeParticipant = battle?.status === 'active' ? (battle.queue[battle.activeTurnIndex] ?? null) : null
+  const isMyTurn = !battle || battle.status !== 'active' || Boolean(activeParticipant?.isPlayer)
 
-  const pickWho = (sheet: string) => {
+  useEffect(() => {
+    useGameState.getState().syncFromSave({
+      world,
+      map: map.id,
+      tileWidth: map.tile.w,
+      tileFeet,
+      record: save?.battle ?? null,
+      tokens: latestTokens.current,
+      tokensSig,
+      catalog,
+      timeDef
+    })
+  }, [world, map.id, map.tile.w, tileFeet, save?.battle, tokensSig, catalog, timeDef, latestTokens])
+
+  // Clear active targeting if combat turn passes away from the party
+  useEffect(() => {
+    if (!isMyTurn && aim) setAim(null)
+  }, [isMyTurn, activeParticipant?.id])
+
+  const combatActor =
+    battle?.status === 'active' && activeParticipant?.isPlayer
+      ? allTokens.find((t) => (activeParticipant.sheet && t.visitor.sheet === activeParticipant.sheet) || t.visitor.token === activeParticipant.id) ?? null
+      : null
+
+  const actor =
+    combatActor ??
+    allTokens.find((t) => t.visitor.sheet === (screenSheet ?? player) && t.visitor.game) ??
+    allTokens.find((t) => t.visitor.source !== 'creature' && t.visitor.game) ??
+    allTokens.find((t) => t.visitor.sheet === (screenSheet ?? player)) ??
+    null
+
+  const aimRange = useMemo(() => {
+    if (!aim || !actor?.visitor.game || !catalog) return 0
+    const found = usableAbilities(GameEntity.fromRecord(actor.visitor.game, catalog)).find((a) => a.uid === aim.uid || a.id === aim.uid)
+    return found ? found.reach() : 0
+  }, [aim, actor?.visitor.game, catalog])
+
+  const refOf = (picked: { sheet: string | null; token?: string }): EffectTargetRef | null =>
+    picked.sheet ? { sheet: picked.sheet } : picked.token ? { creature: picked.token } : null
+  const castAt = (aimed: PlayAim, user: MapToken, picked: { sheet: string | null; token?: string; at: { x: number; y: number }; label: string }) => {
+    if (!user.visitor.sheet) return
+    if (
+      battle?.status === 'active' &&
+      (!isMyTurn || (activeParticipant && activeParticipant.sheet !== user.visitor.sheet && activeParticipant.id !== user.visitor.token))
+    ) {
+      toast.info('Combat Turn', 'Wait for your turn before casting.')
+      return
+    }
+    const feet = (Math.hypot(picked.at.x - user.at.x, picked.at.y - user.at.y) / Math.max(1, map.tile.w)) * tileFeet
+    void engine('game.useAbility', { sheet: user.visitor.sheet, ability: aimed.uid, target: refOf(picked), world, at: picked.at, distance: Math.round(feet) })
+      .then((said) => toast.info(aimed.label, said))
+      .catch(failed(`Could not use ${aimed.label}`))
+  }
+
+  const isSelfToken = (t: MapToken | undefined | null) => Boolean(player && t && t.visitor.sheet === player)
+
+  const pickWho = (id: string) => {
+    const picked = allTokens.find((t) => t.visitor.token === id || t.visitor.sheet === id)
+    if (aim && actor && picked) {
+      castAt(aim, actor, { sheet: picked.visitor.sheet, token: picked.visitor.token, at: picked.at, label: picked.visitor.name })
+      setAim(null)
+      return
+    }
+    // Never select the player's own character as an interaction/combat target
+    if ((player && id === player) || isSelfToken(picked)) {
+      if (who !== null) {
+        setWho(null)
+        useDialogue.getState().closeDialogue()
+      }
+      return
+    }
+    // Clicking the already-selected target unselects it
+    const alreadySelected =
+      who !== null &&
+      (who === id || (picked ? who === picked.visitor.token || (Boolean(picked.visitor.sheet) && who === picked.visitor.sheet) : false))
+    if (alreadySelected) {
+      setWho(null)
+      useDialogue.getState().closeDialogue()
+      return
+    }
     setLooking(null)
-    setWho(sheet)
-    const targetToken = allTokens.find((t) => t.visitor.sheet === sheet)
-    if (targetToken && targetToken.visitor.sheet !== player) {
-      const tree = defaultDialogueTree(targetToken.visitor.sheet, targetToken.visitor.name)
-      useDialogue.getState().startDialogue(tree, targetToken.visitor.name)
+    setWho(id)
+    if (picked && picked.visitor.sheet && picked.visitor.sheet !== player && (!battle || battle.status !== 'active')) {
+      const tree = defaultDialogueTree(picked.visitor.sheet, picked.visitor.name)
+      useDialogue.getState().startDialogue(tree, picked.visitor.name)
     }
   }
+  pickWhoRef.current = pickWho
 
   const triggers = useTriggerPlay({ world, map, use, uses, save, catalog, tokens: allTokens, onGo })
   useWorldViewHost({ world, map, save, catalog, tokens: allTokens, goTo: triggers.goTo, stand: triggers.stand })
   const shown = looking && data.places[looking] ? looking : null
-  const token = who ? (allTokens.find((t) => t.visitor.sheet === who) ?? null) : null
+  const token =
+    who && who !== player
+      ? (allTokens.find((t) => (t.visitor.token === who || t.visitor.sheet === who) && t.visitor.sheet !== player) ?? null)
+      : null
   const deck = useDeckInUse(player ? { character: player } : null)
   const where = worldWhere(at ? `@place:${at}` : null, at ? agentsOf(data.here[at] ?? []) : [], world, player)
   useEscapeLayer(shown !== null || token !== null, () => {
@@ -211,15 +276,17 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
     useDialogue.getState().closeDialogue()
   })
   useEscapeLayer(aim !== null, () => setAim(null))
-  const actor = allTokens.find((t) => t.visitor.sheet === (screenSheet ?? player) && t.visitor.game) ?? allTokens.find((t) => t.visitor.game) ?? allTokens.find((t) => t.visitor.sheet === (screenSheet ?? player)) ?? null
-  const target = (picked: { sheet: string | null; at: { x: number; y: number }; label: string }) => {
+  const target = (picked: { sheet: string | null; token?: string; at: { x: number; y: number }; label: string }) => {
     if (!aim || !actor) return false
-    const feet = (Math.hypot(picked.at.x - actor.at.x, picked.at.y - actor.at.y) / Math.max(1, map.tile.w)) * 5
-    void engine('game.useAbility', { sheet: actor.visitor.sheet, ability: aim.uid, target: picked.sheet, at: picked.at, distance: Math.round(feet) })
-      .then((said) => toast.info(aim.label, said))
-      .catch(failed(`Could not use ${aim.label}`))
+    castAt(aim, actor, picked)
     setAim(null)
     return true
+  }
+  const aimAbility = (aimed: PlayAim | null) => {
+    if (aimed && actor && token && (token.visitor.token || token.visitor.sheet) !== (actor.visitor.token || actor.visitor.sheet)) {
+      return castAt(aimed, actor, { sheet: token.visitor.sheet, token: token.visitor.token, at: token.at, label: token.visitor.name })
+    }
+    setAim(aimed)
   }
 
   // Fallback hotkey listener for character sheet when character uses standard sheet rather than game defs
@@ -241,83 +308,37 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
     return () => window.removeEventListener('keydown', onKey)
   }, [catalog, allTokens, screenSheet, player])
 
-  // Symmetric CRPG Encounter Stacks: Allies (Party) and Hostiles (Enemies)
-  const partyUnits: UnitCardData[] = useMemo(() => {
-    if (inCombat && battle) {
-      return battle.queue
-        .filter((c) => c.isPlayer)
-        .map((c) => ({
-          id: c.id,
-          name: c.name,
-          sheet: c.sheet,
-          image: c.image ?? allTokens.find((t) => t.visitor.sheet === c.sheet)?.visitor.image ?? null,
-          hp: c.hp,
-          ac: c.ac,
-          isPlayer: true,
-          isActiveTurn: battle.queue[battle.activeTurnIndex]?.id === c.id,
-          isSelected: who === c.id || who === c.sheet,
-          faction: c.faction ?? 'PLAYER'
-        }))
-    }
-
-    const partyTokens = allTokens
-      .filter((t) => t.visitor.game || t.visitor.sheet === player)
-      .sort((a, b) => Number(b.visitor.sheet === player) - Number(a.visitor.sheet === player))
-
-    return partyTokens.map((t) => ({
-      id: t.visitor.sheet,
-      name: t.visitor.name,
-      sheet: t.visitor.sheet,
-      image: t.visitor.image ?? null,
-      subtitle: t.visitor.line || null,
-      ac: t.visitor.dnd?.ac ?? 14,
-      hp: t.visitor.dnd?.hp ? { cur: t.visitor.dnd.hp.cur, max: t.visitor.dnd.hp.max } : { cur: 25, max: 25 },
-      conditions: t.visitor.dnd?.conditions ?? [],
-      isPlayer: t.visitor.sheet === player,
-      isActiveTurn: t.visitor.sheet === player,
-      isSelected: who === t.visitor.sheet,
-      faction: t.visitor.faction ?? 'PARTY'
-    }))
-  }, [inCombat, battle, allTokens, player, who])
-
-  const hostileUnits: UnitCardData[] = useMemo(() => {
-    if (inCombat && battle) {
-      return battle.queue
-        .filter((c) => !c.isPlayer)
-        .map((c) => ({
-          id: c.id,
-          name: c.name,
-          sheet: c.sheet,
-          image: c.image ?? allTokens.find((t) => t.visitor.sheet === c.sheet)?.visitor.image ?? null,
-          hp: c.hp,
-          ac: c.ac ?? 12,
-          isPlayer: false,
-          isActiveTurn: battle.queue[battle.activeTurnIndex]?.id === c.id,
-          isSelected: who === c.id || who === c.sheet,
-          faction: c.faction ?? 'HOSTILE'
-        }))
-    }
-
-    if (token && token.visitor.sheet !== player) {
-      return [
-        {
-          id: token.visitor.sheet,
-          name: token.visitor.name,
-          sheet: token.visitor.sheet,
-          image: token.visitor.image ?? null,
-          subtitle: token.visitor.line || null,
-          ac: token.visitor.dnd?.ac ?? 12,
-          hp: token.visitor.dnd?.hp ? { cur: token.visitor.dnd.hp.cur, max: token.visitor.dnd.hp.max } : { cur: 15, max: 15 },
-          conditions: token.visitor.dnd?.conditions ?? [],
-          isPlayer: false,
-          isSelected: true,
-          faction: token.visitor.faction ?? 'CREATURE'
-        }
-      ]
-    }
-
-    return []
-  }, [inCombat, battle, allTokens, token, player, who])
+  const scene = usePlayScene((s) => s.scene)
+  const hud: PlayHud = {
+    world,
+    saveId: save?.id ?? null,
+    mapId: map.id,
+    embedded,
+    tokens: allTokens,
+    camera,
+    player,
+    partyIds: save?.party?.length ? save.party : (player ? [player] : []),
+    who,
+    setWho,
+    pickWho,
+    target: token,
+    actor,
+    catalog,
+    screen,
+    setScreen,
+    screenSheet,
+    nav,
+    time,
+    clock,
+    aim,
+    setAim: aimAbility,
+    roundSeconds,
+    placeKey: shown ?? at,
+    placeName: (shown ?? at) ? placeName(data.places, (shown ?? at)!) : null,
+    placeCard: shown ? <PlayCard world={world} placeKey={shown} data={data} player={player} onClose={() => pickPlace(null)} /> : null,
+    cardHand: deck ? <CardHand entries={deck.entries} buttons formsFor={(card) => cardForms(card, where)} onPlay={(card, form) => void playCard(card, deck.ref, where, form)} className="!absolute inset-x-0 bottom-0" /> : null
+  }
+  const latestHud = useLatest(hud)
 
   // Target interaction hotkeys
   useEffect(() => {
@@ -333,50 +354,27 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
         useDialogue.getState().closeDialogue()
       } else if (matchesKeybind('tactical.targetTalk', e)) {
         e.preventDefault()
-        const tree = inCombat
-          ? combatParleyDialogueTree(token.visitor.sheet, token.visitor.name)
-          : defaultDialogueTree(token.visitor.sheet, token.visitor.name)
-        useDialogue.getState().startDialogue(tree, token.visitor.name)
+        scene.talk(token)
       } else if (matchesKeybind('tactical.targetApproach', e)) {
         e.preventDefault()
-        if (nav) nav.walkTo(token.at)
+        if (nav) nav.smartApproach(token.at, () => undefined)
       } else if (e.code === sheetCode && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault()
         openEntry('sheet', token.visitor.sheet)
       } else if (matchesKeybind('tactical.targetAttack', e)) {
         e.preventDefault()
-        if (inCombat) {
-          attackTarget(token.visitor.sheet)
-        } else {
-          const playerTok = allTokens.find((tok) => tok.visitor.sheet === player)
-          const playerCombatant = playerTok
-            ? combatantFromVisitor(playerTok.visitor, playerTok.at, true)
-            : {
-                id: player ?? 'player',
-                sheet: player ?? undefined,
-                name: 'Player Character',
-                isPlayer: true,
-                hp: { cur: 12, max: 12 },
-                ac: 14,
-                speedMax: 30,
-                at: token.at,
-                attacks: [{ name: 'Strike', bonus: 4, damage: '1d8 + 2' }],
-                faction: 'player'
-              }
-          const targetCombatant = combatantFromVisitor(token.visitor, token.at, false)
-          startBattle([playerCombatant, targetCombatant])
-        }
+        scene.act(token, latestHud.current)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [token, player, nav, inCombat, attackTarget, startBattle, allTokens])
+  }, [token, player, nav, scene])
 
   const combinedTokenHandlers = useMemo(
     () => ({
       mine: player,
       onPick: (t: MapToken) => {
-        pickWho(t.visitor.sheet)
+        pickWhoRef.current(t.visitor.token)
       },
       onMenu: (t: MapToken, e: any) => {
         if (t.visitor.sheet.startsWith('spawner:')) {
@@ -384,36 +382,18 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
             {
               label: 'Engage in Combat',
               icon: <Swords className="h-4 w-4 text-alert" />,
-              onSelect: () => {
-                const playerTok = allTokens.find((tok) => tok.visitor.sheet === player)
-                const playerCombatant = playerTok
-                  ? combatantFromVisitor(playerTok.visitor, playerTok.at, true)
-                  : {
-                      id: player ?? 'player',
-                      sheet: player ?? undefined,
-                      name: 'Player Character',
-                      isPlayer: true,
-                      hp: { cur: 12, max: 12 },
-                      ac: 14,
-                      speedMax: 30,
-                      at: t.at,
-                      attacks: [{ name: 'Strike', bonus: 4, damage: '1d8 + 2' }],
-                      faction: 'player'
-                    }
-                const targetCombatant = combatantFromVisitor(t.visitor, t.at, false)
-                startBattle([playerCombatant, targetCombatant])
-              }
+              onSelect: () => scene.act(t, latestHud.current)
             },
             {
               label: `Talk to ${showName(t.visitor.name)}`,
               icon: <MessageSquarePlus className="h-4 w-4 text-cyan" />,
-              onSelect: () => pickWho(t.visitor.sheet)
+              onSelect: () => pickWhoRef.current(t.visitor.token)
             },
             {
               label: 'Move towards creature',
               icon: <Footprints className="h-4 w-4" />,
               onSelect: () => {
-                if (nav) nav.walkTo(t.at)
+                if (nav) nav.smartApproach(t.at, () => undefined)
               }
             }
           ])
@@ -423,7 +403,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
       },
       onMove: people.handlers.onMove
     }),
-    [player, allTokens, nav, people.handlers, startBattle]
+    [player, allTokens, nav, people.handlers, scene, pickWhoRef]
   )
 
   return (
@@ -435,6 +415,11 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
         onTrigger={triggers.fire}
         onTime={setTime}
         onClock={setClock}
+        onWalked={(sheet, feet) => {
+          scene.walked(latestHud.current, sheet, feet)
+          void engine('worlds.wakeSpawners', { world, map: map.id, entering: false }).catch(failed('Could not wake proximity spawners'))
+        }}
+        onBattleMove={(at) => void useGameState.getState().moveActor(at)}
         map={shownMap}
         shapes={use.shapes}
         places={data.places}
@@ -457,6 +442,8 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
         onTarget={target}
         onCamera={setCamera}
         aiming={Boolean(aim)}
+        aimRange={aimRange}
+        activeActorId={actor?.visitor.token || actor?.visitor.sheet || null}
         battle={battle}
         tokenHandlers={combinedTokenHandlers}
         objects={objectHandlers(
@@ -539,171 +526,8 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo }: { world: str
       {/* 1. TACTICAL COMBAT TURN OVERLAYS (VICTORY / DEFEAT MODALS) */}
       <CombatTurnHud />
 
-      {/* 2. DIEGETIC IN-WORLD SPEECH BUBBLES */}
-      <SpeechBubbleOverlay tokens={allTokens} camera={camera} />
-
-      {/* 3. TOP BAR CENTER: INITIATIVE RIBBON */}
-      {inCombat && battle && (
-        <InitiativeRibbon
-          battle={battle}
-          selectedCombatantId={who}
-          onSelectCombatant={(id) => setWho(id)}
-          onFlee={() => endBattle('flee')}
-          className="absolute left-1/2 top-2.5 -translate-x-1/2 z-30"
-        />
-      )}
-
-      {/* 4. CINEMATIC DM BROADCAST BANNER (BELOW TOP BAR) */}
-      <AgentNarrationStream className="absolute left-1/2 top-12 -translate-x-1/2 z-20" />
-
-      {/* 5. SYMMETRIC LEFT EDGE: ALLIED PARTY STACK */}
-      <div className="pointer-events-none absolute left-3 top-12 z-20 flex flex-col items-start gap-1.5">
-        <UnitCardStack
-          side="left"
-          title="PARTY"
-          units={partyUnits}
-          activeId={inCombat && battle ? battle.queue[battle.activeTurnIndex]?.id : player}
-          selectedId={who}
-          onSelect={pickWho}
-        />
-        {catalog && allTokens.some((t) => t.visitor.game) ? (
-          <GameMenu open={screen} onOpen={setScreen} />
-        ) : (
-          (screenSheet || player) && (
-            <div className="pointer-events-auto flex gap-1.5 mt-0.5">
-              <button
-                type="button"
-                onClick={() => openEntry('sheet', (screenSheet ?? player)!)}
-                className="flex items-center gap-1.5 border border-line/60 bg-black/90 px-2.5 py-1 font-mono text-[11px] font-bold text-white hover:border-accent hover:text-accent transition-colors cursor-pointer"
-              >
-                <span className="border border-line/60 bg-line/20 px-1 text-[9px] text-cyan">C</span>
-                <span>CHARACTER SHEET</span>
-              </button>
-            </div>
-          )
-        )}
-      </div>
-
-      {/* 6. SYMMETRIC RIGHT EDGE: HOSTILE ENCOUNTER STACK */}
-      {hostileUnits.length > 0 && (
-        <div className="pointer-events-none absolute right-3 top-12 z-20 flex flex-col items-end gap-1.5">
-          <UnitCardStack
-            side="right"
-            title={inCombat ? 'HOSTILES' : 'TARGET'}
-            units={hostileUnits}
-            activeId={inCombat && battle ? battle.queue[battle.activeTurnIndex]?.id : null}
-            selectedId={who}
-            onSelect={(id) => setWho(id)}
-            onClear={() => {
-              setWho(null)
-              useDialogue.getState().closeDialogue()
-            }}
-          />
-          {token && token.visitor.sheet !== player && (
-            <div className="pointer-events-auto flex w-60 flex-col gap-1 mt-1 font-mono">
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const tree = inCombat
-                      ? combatParleyDialogueTree(token.visitor.sheet, token.visitor.name)
-                      : defaultDialogueTree(token.visitor.sheet, token.visitor.name)
-                    useDialogue.getState().startDialogue(tree, token.visitor.name)
-                  }}
-                  title="Talk with entity (T)"
-                  className="flex-1 flex items-center justify-center gap-1 border border-line/60 bg-black/90 py-1 text-[10px] font-bold text-dim hover:border-purple hover:text-purple transition-colors cursor-pointer"
-                >
-                  <span className="text-[8.5px] text-faint">[T]</span>
-                  <span>TALK</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (nav) nav.walkTo(token.at)
-                  }}
-                  title="Approach entity (A)"
-                  className="flex-1 flex items-center justify-center gap-1 border border-line/60 bg-black/90 py-1 text-[10px] font-bold text-dim hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
-                >
-                  <span className="text-[8.5px] text-faint">[A]</span>
-                  <span>APPROACH</span>
-                </button>
-              </div>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => openEntry('sheet', token.visitor.sheet)}
-                  title="Inspect sheet (C)"
-                  className="flex-1 flex items-center justify-center gap-1 border border-line/60 bg-black/90 py-1 text-[10px] font-bold text-dim hover:border-accent hover:text-accent transition-colors cursor-pointer"
-                >
-                  <span className="text-[8.5px] text-faint">[C]</span>
-                  <span>INSPECT</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (inCombat) {
-                      attackTarget(token.visitor.sheet)
-                    } else {
-                      const playerTok = allTokens.find((t) => t.visitor.sheet === player)
-                      const playerCombatant = playerTok
-                        ? combatantFromVisitor(playerTok.visitor, playerTok.at, true)
-                        : {
-                            id: player ?? 'player',
-                            sheet: player ?? undefined,
-                            name: 'Player Character',
-                            isPlayer: true,
-                            hp: { cur: 12, max: 12 },
-                            ac: 14,
-                            speedMax: 30,
-                            at: token.at,
-                            attacks: [{ name: 'Strike', bonus: 4, damage: '1d8 + 2' }],
-                            faction: 'player'
-                          }
-                      const targetCombatant = combatantFromVisitor(token.visitor, token.at, false)
-                      startBattle([playerCombatant, targetCombatant])
-                    }
-                  }}
-                  title={inCombat ? 'Attack target (F)' : 'Engage in combat (F)'}
-                  className="flex-1 flex items-center justify-center gap-1 border border-alert/70 bg-alert/15 py-1 text-[10px] font-bold text-alert hover:border-alert hover:bg-alert hover:text-white transition-all cursor-pointer shadow-[0_0_8px_rgba(255,77,77,0.25)]"
-                >
-                  <span className="text-[8.5px] text-alert/70">[F]</span>
-                  <span>{inCombat ? 'ATTACK' : 'ENGAGE'}</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 7. FLOATING BOTTOM-LEFT EXPANDABLE PLAYER CHAT */}
-      <PlayerChatOverlay
-        playerSheet={player}
-        playerName={actor?.visitor.name ?? 'Alistair Finch'}
-        targetSheet={token?.visitor.sheet ?? null}
-        targetName={token?.visitor.name ?? null}
-        placeKey={shown}
-      />
-
-      {/* 8. PASSIVE UNOBTRUSIVE COMBAT LOG AT BOTTOM-RIGHT */}
-      <CompactCombatLog className="absolute bottom-3 right-3 z-30" />
-
-      {/* 9. CLOCK HUD */}
-      {time && <ClockHud view={time} controls={clock} offsetRight={Boolean(shown)} />}
-
-      {/* 10. DENSE 3-ROW CRPG TACTICAL ACTION DECK AT BOTTOM-CENTER */}
-      <TacticalActionDeck
-        visitor={actor?.visitor ?? null}
-        catalog={catalog}
-        aiming={aim?.uid ?? null}
-        onAim={setAim}
-        selectedTargetId={who}
-        onAttack={(tid, att) => attackTarget(tid, att)}
-      />
-
-      {aim && <div className="pointer-events-none absolute left-1/2 top-20 z-20 -translate-x-1/2 border border-cyan/60 bg-black/90 px-3 py-1.5 font-mono text-[12px] text-cyan">{aim.label}: click a character, an object, or right-click a spot · Esc cancels</div>}
-      {shown && <PlayCard world={world} placeKey={shown} data={data} player={player} />}
-      {deck && <CardHand entries={deck.entries} buttons formsFor={(card) => cardForms(card, where)} onPlay={(card, form) => void playCard(card, deck.ref, where, form)} className="!absolute inset-x-0 bottom-0" />}
-      {catalog && <GameScreens open={screen} sheet={screenSheet ?? player} tokens={allTokens} catalog={catalog} onOpen={setScreen} onSheet={setScreenSheet} onAim={setAim} />}
+      <scene.Screen hud={hud} />
+      {catalog && <GameScreens open={screen} sheet={screenSheet ?? player} partyIds={hud.partyIds} tokens={allTokens} catalog={catalog} onOpen={setScreen} onSheet={setScreenSheet} onAim={aimAbility} />}
     </div>
   )
 }
@@ -765,12 +589,14 @@ export function WorldPlay({ world, embedded = false }: { world: string; embedded
   const at = here ? (Object.entries(here).find(([, list]) => list.some((v) => v.sheet === player))?.[0] ?? null) : null
   const [picked, setPicked] = useState<string | null>(null)
   const [showTopPickModal, setShowTopPickModal] = useState(false)
+  const worldEventsList = useLive(() => engine('worldEvents.list', { worldId: world }), 'worldEvents.changed') ?? []
+  const activeEventCount = worldEventsList.filter((e) => e.status === 'active').length
   const home = uses?.find((u) => at && u.shapes[at])?.map ?? uses?.[0]?.map ?? null
   const current = uses?.find((u) => u.map === picked)?.map ?? home
   const names = useLive(() => engine('maps.list'), 'maps.changed')
   if (uses && !uses.length) return <EmptyState title="Nothing to play on yet">Use a map in this world's Maps tab, draw its places, and put your character in one with Start here.</EmptyState>
   return (
-    <div className={`flex min-h-0 flex-1 flex-col ${embedded ? 'h-full gap-0' : 'gap-2'}`}>
+    <div className={`relative flex min-h-0 flex-1 flex-col ${embedded ? 'h-full gap-0' : 'gap-2'}`}>
         {!embedded && (
           <div className="flex items-center gap-3">
             <You
@@ -778,6 +604,45 @@ export function WorldPlay({ world, embedded = false }: { world: string; embedded
               onPick={() => setShowTopPickModal(true)}
             />
             <span className="flex-1" />
+            <Popover
+              align="end"
+              trigger={
+                <span className="inline-flex h-6 cursor-pointer items-center gap-1.5 border border-line/70 bg-black/80 px-2 font-mono text-[10px] font-bold uppercase tracking-wider text-dim hover:border-accent hover:text-white">
+                  <Flame className={activeEventCount > 0 ? 'h-3 w-3 text-accent animate-pulse' : 'h-3 w-3'} />
+                  <span>Events{activeEventCount > 0 ? ` (${activeEventCount})` : ''}</span>
+                </span>
+              }
+              className="w-72 p-2 font-mono text-[11px]"
+            >
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between border-b border-line/50 pb-1">
+                  <span className="text-[9.5px] font-bold uppercase tracking-wider text-accent">World Events</span>
+                  <button
+                    type="button"
+                    onClick={() => openEntry('world_event', '__new')}
+                    className="border border-line/60 px-1.5 py-0.5 text-[9px] uppercase text-cyan hover:border-cyan cursor-pointer"
+                  >
+                    + New
+                  </button>
+                </div>
+                {worldEventsList.length === 0 ? (
+                  <span className="py-2 text-center text-[10px] text-faint">No world events yet.</span>
+                ) : (
+                  worldEventsList.map((ev) => (
+                    <button
+                      key={ev.id}
+                      type="button"
+                      onClick={() => openEntry('world_event', ev.id)}
+                      onContextMenu={(e) => entryMenuAt(e, 'world_event', ev.id, ev.title, [])}
+                      className="flex w-full items-center justify-between gap-2 border border-line/40 bg-black/60 px-2 py-1.5 text-left hover:border-accent hover:text-white cursor-pointer"
+                    >
+                      <span className="truncate text-white">{ev.title}</span>
+                      <span className="shrink-0 text-[8.5px] uppercase text-dim">{ev.status}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </Popover>
             <SavePicker world={world} />
             {uses && uses.length > 1 && <ShellTabs value={current ?? ''} options={uses.map((u) => ({ value: u.map, label: names?.find((m) => m.id === u.map)?.name ?? u.map }))} onChange={setPicked} />}
           </div>
@@ -821,10 +686,9 @@ export function WorldPlay({ world, embedded = false }: { world: string; embedded
         )}
         {current && here && (
           <WorldMapLoad key={current} world={world} mapId={current}>
-            {(map, use, data) => <PlayMap world={world} map={map} use={use} uses={uses ?? []} data={data} player={player} at={at} onGo={setPicked} />}
+            {(map, use, data) => <PlayMap world={world} map={map} use={use} uses={uses ?? []} data={data} player={player} at={at} onGo={setPicked} embedded={embedded} />}
           </WorldMapLoad>
         )}
-        {!embedded && player && <JourneyStrip world={world} sheet={player} />}
     </div>
   )
 }

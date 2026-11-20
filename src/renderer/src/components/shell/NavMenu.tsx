@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { Globe } from 'lucide-react'
 import { showName } from '@shared/ids'
-import { viewsIn } from '../../views/registry'
+import { useViewsIn } from '../../views/registry'
 import { showBrowser } from '../side/BrowserTab'
 import { useTools } from '../../store/tools'
 import { useApp } from '../../store/app'
@@ -48,11 +48,13 @@ export function NavMenu() {
   const sheet = useSheet(NAV_SHEET)
   const view = useApp((s) => s.view)
   const setView = useApp((s) => s.setView)
-  const views = useMemo(() => [...viewsIn('tabs'), ...viewsIn('settings')], [])
-  const links = useMemo(() => viewsIn('tabs').flatMap((t) => t.menu ?? []), [])
+  const tabViews = useViewsIn('tabs')
+  const settingsViews = useViewsIn('settings')
+  const views = useMemo(() => [...tabViews, ...settingsViews], [tabViews, settingsViews])
+  const links = useMemo(() => tabViews.flatMap((t) => t.menu ?? []), [tabViews])
   const favourites = useFavourites()
   const track = usePlayer((s) => s.queue[s.index])
-  const browserOn = useTools((s) => s.list.some((m) => m.id === 'browser' && m.state === 'on'))
+  const browserOn = useTools((s) => s.list.some((m) => m.id === 'web' && m.state === 'on'))
   const vaultOn = useVault((s) => s.status.configured)
   const go = (run: () => void) => {
     sheet.close()

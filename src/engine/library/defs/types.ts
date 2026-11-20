@@ -134,6 +134,8 @@ export interface Kind {
   exportAtRoot?: boolean
   pageTypes?: string[]
   lasting?: boolean
+  inKindList?: boolean
+  actionsStayWhenHidden?: boolean
   portability?: KindPortabilityMeta
   pack?(id: string, options?: Record<string, unknown>): unknown
   uses?(id: string, options?: Record<string, unknown>): EntryRef[]
@@ -197,6 +199,7 @@ export function kindFlags(k: Kind): KindFlags {
 
 export function checkPart(k: Kind, part: string | null): string | null {
   if (!part || !k.linkParts) return null
-  if (!k.linkParts.some((p) => p.name === part)) throw new ToolError(`A ${k.label.toLowerCase()} has no #${part}. Link it with one of: ${k.linkParts.map((p) => `#${p.name}`).join(', ')}, or with no # part for the whole entry.`)
+  if (!k.linkParts.some((p) => p.name === part || (p.name.endsWith(':') && part.toLowerCase().startsWith(p.name.toLowerCase()))))
+    throw new ToolError(`A ${k.label.toLowerCase()} has no #${part}. Link it with one of: ${k.linkParts.map((p) => `#${p.name}`).join(', ')}, or with no # part for the whole entry.`)
   return part
 }

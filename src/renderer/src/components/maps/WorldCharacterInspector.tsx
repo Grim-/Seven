@@ -15,11 +15,13 @@ import {
 import type { PlaceVisitor, Standing } from '@shared/maps'
 import type { WorldEntity } from '@shared/world'
 import type { StoredFaction } from '@shared/game/factions'
+import { recordHealth } from '@shared/game/components'
 import { getFactionStance, STANCE_BADGE } from '@shared/game/factions'
 import { showName } from '@shared/ids'
 import { DND_STATS, modifier, type DndStat } from '@shared/dnd'
 import { Button, Select } from '../ui'
 import { SheetPortrait } from '../data/SheetPortrait'
+import { useGameCatalog } from '../game/useGameCatalog'
 import { placeName } from './placeShapes'
 import { openSevenLink } from '../../lib/links'
 import { engine } from '../../lib/ipc'
@@ -56,13 +58,14 @@ export function WorldCharacterInspector({
   onRemoveFromMap,
   onClose
 }: Props) {
+  const catalog = useGameCatalog()
   const factions: StoredFaction[] = useLive(() => engine('factions.list'), 'factions.changed') ?? []
   const playerFactionId = isPlayer ? (visitor.faction || 'player_party') : 'player_party'
   const targetFactionId = visitor.faction || (isPlayer ? 'player_party' : 'monsters')
   const stance = getFactionStance(factions, playerFactionId, targetFactionId)
   const stanceBadge = STANCE_BADGE[stance]
 
-  const hp = visitor.dnd?.hp
+  const hp = recordHealth(visitor.game, catalog) ?? visitor.dnd?.hp
   const hpPercent = hp && hp.max > 0 ? Math.max(0, Math.min(100, (hp.cur / hp.max) * 100)) : 100
 
   const placeOptions = [
@@ -161,7 +164,7 @@ export function WorldCharacterInspector({
                   <Heart className="h-3.5 w-3.5 text-alert" /> Hit Points
                 </span>
                 <span className="font-bold text-white">
-                  {hp.cur} / {hp.max} HP {hp.temp > 0 ? `(+${hp.temp} temp)` : ''}
+                  {hp.cur} / {hp.max} HP {'temp' in hp && hp.temp > 0 ? `(+${hp.temp} temp)` : ''}
                 </span>
               </div>
               <div className="h-1.5 w-full overflow-hidden bg-black/60 border border-line/30">

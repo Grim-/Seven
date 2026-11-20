@@ -2,9 +2,9 @@ import { Container, Graphics } from 'pixi.js'
 import { asToken, mapArea, type MapData, type ObjectLayerData, type PlaceVisitor } from '@shared/maps'
 import { formHas, shapeBounds, smallestAt, type Point, type ShapeForm } from '@shared/shapes'
 import type { TriggerDef } from '@shared/game/triggers'
-import { NavGrid, findPath } from '@shared/game/nav'
+import { buildNavGrid, findPath, type NavGrid } from '@shared/game/nav'
 import { GameEntity, type Catalog, type ClockState } from '@shared/game/core'
-import { resourcesOf } from '@shared/game/components'
+import { recordHealth, resourcesOf } from '@shared/game/components'
 import type { MapToken } from '../../components/maps/TokenLayer'
 import type { GameEngine } from '../engine/GameEngine'
 import type { PointerHit } from '../engine/Input'
@@ -20,7 +20,6 @@ import { MoveMarker } from './MoveMarker'
 import { Walk } from './Walk'
 import { WorldClock, type ClockView } from './WorldClock'
 import type { BattleState, Combatant } from '@shared/game/state/BattleStateMachine'
-import { useGameState } from '../../components/play/state/gameStateStore'
 import { toast } from '../../store/toasts'
 
 export interface ExploreData {
@@ -32,11 +31,16 @@ export interface ExploreData {
   mine: string | null
   selected: string | null
   catalog: Catalog | null
-  save: { id: string; clockId: string; clock: ClockState } | null
+  save: { id: string; clockId: string; clock: ClockState; longRestAt: number | null } | null
   triggers: TriggerDef[]
   used: string[]
+  thingFlags?: Record<string, Record<string, string | number | boolean>>
+  tileFeet?: number
   aiming?: boolean
+  aimRange?: number
+  activeActorId?: string | null
   battle?: BattleState | null
+  hostileFactions?: ReadonlySet<string>
 }
 
 export interface ExploreEvents {
@@ -44,10 +48,9 @@ export interface ExploreEvents {
   token: { token: MapToken; hit: PointerHit }
   tokenMenu: { token: MapToken; hit: PointerHit }
   tokenMove: { sheet: string; at: Point }
-  arrive: { sheet: string; at: Point; place: string | null }
-  tick: { seconds: number }
+  battleMove: { at: Point }
+  arrive: { sheet: string; at: Point; place: string | null; feet: number }
   time: ClockView | null
-  clockSave: { save: string; clockId: string; clock: ClockState }
   trigger: { id: string; sheet: string }
   object: { object: ObjectLayerData; hit: PointerHit }
   objectMenu: { object: ObjectLayerData; hit: PointerHit }
@@ -121,14 +124,14 @@ export class ExploreScene implements Scene {
     this.label = new PlaceLabel(engine)
     engine.input.blank = {
       tap: (hit) => {
-        if (this.data.battle && this.data.battle.status === 'active') {
+        if (!this.data.aiming && this.data.battle && this.data.battle.status === 'active') {
           this.walkTo(hit.world)
         } else {
           this.events.emit('place', { key: smallestAt(this.data.shapes, hit.world), hit })
         }
       },
       menu: (hit) => {
-        if (!this.walkTo(hit.world)) {
+        if (this.data.aiming || !this.walkTo(hit.world)) {
           this.events.emit('blankMenu', { hit })
         }
       },
@@ -189,19 +192,16 @@ export class ExploreScene implements Scene {
     const catalog = this.data.catalog
     const def = save && catalog ? (catalog.time(save.clockId) ?? catalog.times()[0] ?? null) : null
     const key = save && def ? `${save.id}:${def.id}:${JSON.stringify(def.clock)}` : ''
-    if (key === this.clockFor) return
-    this.clock?.save()
+    if (key === this.clockFor) {
+      if (save) this.clock?.set(save.clock, save.longRestAt)
+      return
+    }
     this.clockFor = key
-    const id = save?.id ?? ''
     this.clock =
       save && def
-        ? new WorldClock(def, save.clock, {
-            tick: (seconds) => this.events.emit('tick', { seconds }),
-            show: (view) => {
-              this.events.emit('time', view)
-              this.shade()
-            },
-            save: (clockId, clock) => this.events.emit('clockSave', { save: id, clockId, clock })
+        ? new WorldClock(def, save.clock, save.longRestAt, (view) => {
+            this.events.emit('time', view)
+            this.shade()
           })
         : null
     if (!this.clock) this.events.emit('time', null)
@@ -216,21 +216,11 @@ export class ExploreScene implements Scene {
     this.engine?.invalidate()
   }
 
-  setSpeed(speed: number): void {
-    this.clock?.setSpeed(speed)
-    this.engine?.invalidate()
-  }
-
-  setPaused(paused: boolean): void {
-    this.clock?.setPaused(paused)
-    this.engine?.invalidate()
-  }
-
   private grid(): NavGrid {
     const map = this.data.map
-    const key = `${map.id}:${map.updatedAt}`
+    const key = `${map.id}:${map.updatedAt}:${JSON.stringify(this.data.thingFlags ?? {})}`
     if (!this.nav || this.navFor !== key) {
-      this.nav = NavGrid.covering(mapArea(map), map.tile)
+      this.nav = buildNavGrid(map, this.data.thingFlags ?? {})
       this.navFor = key
     }
     return this.nav
@@ -252,17 +242,18 @@ export class ExploreScene implements Scene {
   }
 
   walkTo(target: Point, onArrive?: () => void): boolean {
-    const view = this.data.mine ? this.tokens.get(this.data.mine) : undefined
-    if (!view) return false
-
     const battle = this.data.battle
     const inCombat = Boolean(battle && battle.status === 'active')
+    const activeActor = inCombat && battle ? battle.queue[battle.activeTurnIndex] : null
+    const walkerKey = inCombat && activeActor ? (activeActor.sheet || activeActor.id) : this.data.mine
+    const view = walkerKey ? this.tokens.get(walkerKey) : undefined
+    if (!view) return false
+    const tileFeet = this.data.tileFeet ?? 5
 
     // Turn-based combat movement gating
     if (inCombat && battle) {
-      const activeActor = battle.queue[battle.activeTurnIndex]
       if (!activeActor || !activeActor.isPlayer) {
-        toast.info('Combat Turn', 'Waiting for enemy action to complete')
+        toast.info('Combat Turn', 'Waiting for enemy turn to finish')
         return false
       }
       if (battle.economy.movementRemaining <= 0) {
@@ -276,9 +267,8 @@ export class ExploreScene implements Scene {
         return true
       }
 
-      // Discrete 5ft increments per tile
       const tilesCount = path.length - 1
-      const distanceFeet = tilesCount * 5
+      const distanceFeet = tilesCount * tileFeet
 
       if (distanceFeet > battle.economy.movementRemaining) {
         toast.info('Movement Budget', `Destination requires ${distanceFeet} FT (${battle.economy.movementRemaining} FT remaining)`)
@@ -288,13 +278,13 @@ export class ExploreScene implements Scene {
       const aimed = this.triggerAt(target)
       this.aim = aimed && aimed.fires === 'interact' ? aimed.id : null
       this.inside = this.zonesAt(view.at)
+      const dest = path[path.length - 1]
 
       this.walk = {
         view,
         walk: new Walk(view.at, path, WALK_TILES_PER_SECOND * this.data.map.tile.w),
         onArrive: () => {
-          // Deduct traveled feet from economy upon arrival
-          useGameState.getState().spendMovement(distanceFeet)
+          this.events.emit('battleMove', { at: dest })
           onArrive?.()
         }
       }
@@ -325,22 +315,99 @@ export class ExploreScene implements Scene {
     return true
   }
 
-  smartApproach(target: Point, onReach: () => void, reachDistance = this.data.map.tile.w * 1.5): boolean {
+  private tokenNear(point: Point, excludeKey?: string): TokenView | null {
+    const minHit = this.data.map.tile.w * 0.5
+    let closest: TokenView | null = null
+    let bestDist = Infinity
+    for (const view of this.tokens.values()) {
+      if (excludeKey && view.key === excludeKey) continue
+      const d = Math.hypot(view.at.x - point.x, view.at.y - point.y)
+      const hitRadius = Math.max(minHit, view.worldSize / 2)
+      if (d <= hitRadius && d < bestDist) {
+        bestDist = d
+        closest = view
+      }
+    }
+    return closest
+  }
+
+  private trimPathToStop(start: Point, path: Point[], target: Point, stopDist: number): Point[] {
+    if (path.length === 0) return path
+    const trimmed: Point[] = []
+    let prev = start
+    for (const pt of path) {
+      const dPt = Math.hypot(pt.x - target.x, pt.y - target.y)
+      if (dPt <= stopDist) {
+        const dPrev = Math.hypot(prev.x - target.x, prev.y - target.y)
+        if (dPrev > stopDist) {
+          const segLen = Math.hypot(pt.x - prev.x, pt.y - prev.y)
+          if (segLen > 0.001) {
+            // Find exact point along prev->pt where distance to target equals stopDist
+            const dx = pt.x - prev.x
+            const dy = pt.y - prev.y
+            const fx = prev.x - target.x
+            const fy = prev.y - target.y
+            const a = dx * dx + dy * dy
+            const b = 2 * (fx * dx + fy * dy)
+            const c = fx * fx + fy * fy - stopDist * stopDist
+            const disc = Math.max(0, b * b - 4 * a * c)
+            const t = Math.max(0, Math.min(1, (-b - Math.sqrt(disc)) / (2 * a)))
+            trimmed.push({ x: prev.x + dx * t, y: prev.y + dy * t })
+          }
+        }
+        return trimmed
+      }
+      trimmed.push(pt)
+      prev = pt
+    }
+    return trimmed
+  }
+
+  smartApproach(target: Point, onReach: () => void, reachDistance?: number): boolean {
     const view = this.data.mine ? this.tokens.get(this.data.mine) : undefined
     if (!view) {
       onReach()
       return false
     }
+    const targetView = this.tokenNear(target, view.key)
+    const gap = Math.max(4, this.data.map.tile.w * 0.2)
+    const minStop = targetView
+      ? (view.worldSize + targetView.worldSize) / 2 + gap
+      : view.worldSize / 2 + gap
+    const stopDist = reachDistance !== undefined ? Math.max(reachDistance, minStop) : minStop
+
     const distance = Math.hypot(view.at.x - target.x, view.at.y - target.y)
-    if (distance <= reachDistance) {
+    if (distance <= stopDist) {
       onReach()
       return true
     }
+
     const grid = this.grid()
     const cell = grid.cellOf(target)
     const openCell = grid.nearestOpen(cell[0], cell[1])
     const dest = openCell ? grid.centre(openCell[0], openCell[1]) : target
-    return this.walkTo(dest, onReach)
+    const rawPath = findPath(grid, view.at, dest)
+    if (!rawPath) {
+      this.marker?.show(target, false)
+      this.engine?.invalidate()
+      return true
+    }
+    const path = this.trimPathToStop(view.at, rawPath, target, stopDist)
+    if (path.length === 0) {
+      onReach()
+      return true
+    }
+    const aimed = this.triggerAt(target)
+    this.aim = aimed && aimed.fires === 'interact' ? aimed.id : null
+    this.inside = this.zonesAt(view.at)
+    this.walk = {
+      view,
+      walk: new Walk(view.at, path, WALK_TILES_PER_SECOND * this.data.map.tile.w),
+      onArrive: onReach
+    }
+    this.marker?.show(this.walk.walk.end, true)
+    this.engine?.invalidate()
+    return true
   }
 
   stopWalk(): void {
@@ -370,8 +437,9 @@ export class ExploreScene implements Scene {
 
   private tokenLook(visitor: PlaceVisitor) {
     const theme = this.engine.theme
-    if (visitor.sheet === this.data.mine) return theme.accent
-    if (visitor.faction === 'monsters' || visitor.line?.startsWith('HOSTILE')) return theme.alert
+    if (visitor.sheet && visitor.sheet === this.data.mine) return theme.accent
+    if ('source' in visitor && visitor.source === 'creature') return theme.alert
+    if (visitor.faction && this.data.hostileFactions?.has(visitor.faction)) return theme.alert
     return visitor.agent ? theme.purple : theme.cyan
   }
 
@@ -382,12 +450,12 @@ export class ExploreScene implements Scene {
     const base = this.data.map.tile.w * 2
     const seen = new Set<string>()
     for (const token of this.data.tokens) {
-      const sheet = token.visitor.sheet
-      const isMine = sheet === this.data.mine
+      const key = token.visitor.token || token.visitor.sheet
+      const isMine = Boolean(token.visitor.sheet && token.visitor.sheet === this.data.mine)
       const visible = !token.visitor.hidden || isMine
-      seen.add(sheet)
+      seen.add(key)
       const border = this.tokenLook(token.visitor)
-      const known = this.tokens.get(sheet)
+      const known = this.tokens.get(key)
       if (known) {
         known.setBorder(border)
         known.setBars(this.barsOf(token))
@@ -413,24 +481,29 @@ export class ExploreScene implements Scene {
         },
         drag: {
           move: (at) => {
+            if (this.data.battle?.status === 'active') return
             if (this.walk?.view === view) this.stopWalk()
             view.drag(at)
           },
           drop: (at) => {
+            if (this.data.battle?.status === 'active') {
+              view.snapBack()
+              return
+            }
             view.drop()
-            this.events.emit('tokenMove', { sheet, at: { x: Math.round(at.x), y: Math.round(at.y) } })
+            this.events.emit('tokenMove', { sheet: key, at: { x: Math.round(at.x), y: Math.round(at.y) } })
           },
           cancel: () => view.snapBack()
         }
       })
-      this.tokens.set(sheet, view)
+      this.tokens.set(key, view)
       this.tokenLayer.addChild(view.root)
     }
-    for (const [sheet, view] of this.tokens) {
-      if (seen.has(sheet)) continue
+    for (const [key, view] of this.tokens) {
+      if (seen.has(key)) continue
       if (this.walk?.view === view) this.stopWalk()
       view.destroy()
-      this.tokens.delete(sheet)
+      this.tokens.delete(key)
     }
     this.syncMarkers()
     this.syncBattle()
@@ -442,10 +515,9 @@ export class ExploreScene implements Scene {
       if (this.inBattle) {
         this.inBattle = false
         this.prevTurnActorId = ''
-        this.battleGrid.clear()
-        this.battleRadius.clear()
         this.resetCamera()
       }
+      this.drawReachableTiles(undefined, 0)
       return
     }
 
@@ -466,20 +538,34 @@ export class ExploreScene implements Scene {
       }
     }
 
-    // Render discrete reachable grid tiles via BFS
+    // Render discrete reachable grid tiles via BFS and aim reach ring when targeting
     this.drawReachableTiles(activeActor, battle.economy.movementRemaining)
   }
 
   private drawReachableTiles(activeActor: Combatant | undefined, movementRemaining: number): void {
     this.battleGrid.clear()
     this.battleRadius.clear()
-    if (!activeActor?.at || movementRemaining <= 0) return
-
     const tileW = this.data.map.tile.w || 32
     const tileH = this.data.map.tile.h || 32
+    const tileFeet = this.data.tileFeet ?? 5
+
+    if (this.data.aiming && (this.data.aimRange ?? 0) > 0) {
+      const casterKey = this.data.activeActorId || activeActor?.sheet || activeActor?.id || this.data.mine
+      const casterView = casterKey ? this.tokens.get(casterKey) : undefined
+      if (casterView) {
+        const pxRadius = ((this.data.aimRange ?? 0) / Math.max(1, tileFeet)) * tileW
+        this.battleRadius
+          .circle(casterView.at.x, casterView.at.y, pxRadius)
+          .fill({ color: 0x00d8f6, alpha: 0.04 })
+          .stroke({ width: 1.5, color: 0x00d8f6, alpha: 0.55 })
+      }
+    }
+
+    if (!activeActor?.at || movementRemaining <= 0) return
+
     const grid = this.grid()
     const startCell = grid.cellOf(activeActor.at)
-    const maxTiles = Math.floor(movementRemaining / 5)
+    const maxTiles = Math.floor(movementRemaining / tileFeet)
 
     if (maxTiles <= 0) return
 
@@ -614,7 +700,10 @@ export class ExploreScene implements Scene {
       if (!form) continue
       const b = shapeBounds(form)
       const list = visitors.filter((v) => !standing.has(v.sheet))
-      list.forEach((visitor, i) => wanted.set(`${place}/${visitor.sheet}`, { visitor: asToken(visitor, visitor.sheet, 'sheet'), at: { x: b.x + b.w / 2 + (i - (list.length - 1) / 2) * (MARKER_SIDE + MARKER_GAP), y: b.y + b.h / 2 } }))
+      list.forEach((visitor, i) => {
+        const gHp = recordHealth(visitor.game, this.data.catalog)
+        wanted.set(`${place}/${visitor.sheet}`, { visitor: asToken(visitor, visitor.sheet, 'sheet', gHp ? { cur: gHp.cur, max: gHp.max } : undefined), at: { x: b.x + b.w / 2 + (i - (list.length - 1) / 2) * (MARKER_SIDE + MARKER_GAP), y: b.y + b.h / 2 } })
+      })
     }
     for (const [key, token] of wanted) {
       const known = this.markers.get(key)
@@ -634,28 +723,27 @@ export class ExploreScene implements Scene {
   }
 
   update(dt: number): void {
-    this.clock?.update(dt)
     const going = this.walk
     if (!going) return
     const at = going.walk.step(dt)
     going.view.walkTo(at, going.walk.distance / this.data.map.tile.w)
     this.follow(at)
     const now = this.zonesAt(at)
-    for (const t of this.live()) if (t.fires === 'enter' && now.has(t.id) && !this.inside.has(t.id)) this.events.emit('trigger', { id: t.id, sheet: going.view.sheet })
+    for (const t of this.live()) if (t.fires === 'enter' && now.has(t.id) && !this.inside.has(t.id)) this.events.emit('trigger', { id: t.id, sheet: going.view.key })
     this.inside = now
     this.engine.invalidate()
     if (!going.walk.done) return
     const callback = going.onArrive
     this.stopWalk()
     const end = { x: Math.round(at.x), y: Math.round(at.y) }
-    this.events.emit('arrive', { sheet: going.view.sheet, at: end, place: smallestAt(this.data.shapes, end) })
-    if (this.aim && now.has(this.aim)) this.events.emit('trigger', { id: this.aim, sheet: going.view.sheet })
+    this.events.emit('arrive', { sheet: going.view.key, at: end, place: smallestAt(this.data.shapes, end), feet: (going.walk.distance / this.data.map.tile.w) * (this.data.tileFeet ?? 5) })
+    if (this.aim && now.has(this.aim)) this.events.emit('trigger', { id: this.aim, sheet: going.view.key })
     this.aim = null
     callback?.()
   }
 
   active(): boolean {
-    return Boolean(this.walk || (this.clock && !this.clock.paused))
+    return Boolean(this.walk)
   }
 
   visualActive(): boolean {
@@ -680,7 +768,6 @@ export class ExploreScene implements Scene {
 
   exit(): void {
     this.gone = true
-    this.clock?.save()
     this.clock = null
     this.walk = null
     this.engine.input.blank = {}

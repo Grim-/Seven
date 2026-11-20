@@ -19,9 +19,13 @@ import { PAGE_WIDGET } from '../pageWidget'
 import { flattenText, scoreDoc, type SearchField } from '../query'
 import { findRepo, getRepo, repoIds, repoMarkdown, REPO_TYPES, rollRepo, drawRepo } from '../repos'
 import { findSheet, getSheet, SHEET_TYPE, sheetIds, sheetLine, sheetMarkdown } from '../sheets'
+import { takeOut } from '../../worlds/party'
+import { worlds } from '../../worlds/store'
 import { findSlideshow, getSlideshow, slideshowIds, slideshowText } from '../slideshows'
 import { GENERATED, generatedPages, generatedTitle, guardGenerated, isWikiIndex, pageLine, readGenerated, specialPage, specialPages, WIKI_INDEX } from './generated'
 import { filesIn, folderListing, readPage, readPageView, withTags, workoutPageKind } from './pageHelpers'
+import { registerKind, registerKindSource, type OwnedKind } from '../kindRegistry'
+import { registerModuleKind } from '../moduleKinds'
 import { ENTRY_WIDGET, kindRt } from './runtime'
 import { has, rollLinkActions, withJson, type Kind, type KindField } from './types'
 
@@ -93,8 +97,7 @@ export const pageKind: Kind = {
     return [
       ...generated,
       ...data.pages
-        .search(query, limit * 2)
-        .filter((h) => !metas.get(h.id)?.type)
+        .search(query, limit, (p) => !p.type)
         .map((h) => {
           const meta = metas.get(h.id)
           return { kind: 'page', id: h.id, title: h.title, excerpt: h.snippet || undefined, at: meta?.updatedAt }
@@ -186,10 +189,12 @@ export const fileKind: Kind = {
     if (!trimmed) return assets.slice(0, limit).map((a) => ({ kind: 'file', id: a.id, title: a.name, at: a.createdAt }))
     return assets
       .flatMap((a) => {
+        const folderPath = a.parent ? data.pages.pathOf(a.parent) : ''
         const m = scoreDoc(trimmed, {
           title: a.name,
           labels: ['file', 'files', a.kind],
           fields: [
+            ...(folderPath ? [{ name: 'Folder', value: folderPath }] : []),
             { name: 'Id', value: a.id },
             { name: 'Kind', value: a.kind },
             ...(a.description ? [{ name: 'Description', value: a.description }] : [])
@@ -466,7 +471,17 @@ export const sheetKind: Kind = {
   },
   handTo: SHEET_HAND_TO,
   full: (id) => withTags(sheetMarkdown(id), id),
-  remove: (id) => void data.pages.delete(id),
+  remove: (id) => {
+    try {
+      takeOut(id)
+    } catch {
+      // Not in a save
+    }
+    for (const w of worlds.list()) {
+      if (w.player === id) worlds.setPlayer(w.id, null)
+    }
+    void data.pages.delete(id)
+  },
   rename: (id, name) => void data.pages.write({ ref: id, title: name })
 }
 
@@ -517,13 +532,13 @@ const ADDON_ALIASES: Record<string, string[]> = {
   'weather:forecast': ['weather', 'forecast']
 }
 
-export function addonKinds(): Kind[] {
+function addonKinds(): OwnedKind[] {
   return modules.pageTypes().map(({ module, spec }) => {
     const type = `${module}:${spec.type}`
     const sourceName = modules.nameOf(module)
     const kind = pageKindOf(type)
     const aliases = ADDON_ALIASES[type]
-    return {
+    const owned: Kind = {
       kind,
       ...(aliases ? { aliases } : {}),
       family: 'page:addon',
@@ -588,5 +603,17 @@ export function addonKinds(): Kind[] {
           })()
         : {})
     }
+    return { kind: owned, module }
   })
 }
+
+registerKind(10, pageKind)
+registerKind(20, folderKind)
+registerKind(30, sheetKind)
+registerKind(40, slideshowKind)
+registerKind(50, repoKind)
+registerKindSource('addons', 60, addonKinds)
+registerKind(70, fileKind)
+registerModuleKind('workout', workoutEntryKind, 80)
+registerModuleKind('workout', exerciseKind, 90)
+registerKind(290, boardKind)

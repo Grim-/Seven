@@ -6,7 +6,8 @@ export interface ChoiceFilter<T> {
   kind: 'choice'
   id: string
   label: string
-  options: { value: string; label: string }[]
+  layout?: 'segmented' | 'select'
+  options: { value: string; label: string; group?: string; note?: string }[]
   test: (item: T, value: string) => boolean | null
 }
 

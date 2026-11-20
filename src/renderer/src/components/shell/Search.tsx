@@ -14,7 +14,7 @@ import { askNewFolder, askNewPage } from '../data/PageView'
 import { openWorkout } from '../workout/Workout'
 import { fillComposer } from '../chat/Thread'
 import { showPage } from '../../views/PagesView'
-import { viewsIn } from '../../views/registry'
+import { useViewsIn } from '../../views/registry'
 import { failed } from '../../lib/notify'
 import { focusedConversation, openChat } from '../../lib/conversation'
 import { useHasForm } from '../../lib/form'
@@ -67,6 +67,8 @@ function useActions(open: boolean): Action[] {
   const setView = useApp((s) => s.setView)
   const vault = useVault((s) => s.status)
   const workoutOn = useTools((s) => s.list.some((m) => m.id === 'workout' && m.state === 'on'))
+  const tabViews = useViewsIn('tabs')
+  const settingsViews = useViewsIn('settings')
   const commands = useCommands((s) => s.list)
   const loadCommands = useCommands((s) => s.load)
 
@@ -75,7 +77,7 @@ function useActions(open: boolean): Action[] {
   }, [open, loadCommands])
 
   return useMemo(() => {
-    const out: Action[] = [...viewsIn('tabs'), ...viewsIn('settings')]
+    const out: Action[] = [...tabViews, ...settingsViews]
       .filter((v) => v.id !== view)
       .map((v) => ({ id: `view:${v.id}`, group: 'Go to', label: v.label, icon: v.icon, keywords: ['open', 'go', 'view'], run: () => setView(v.id) }))
     out.push({
@@ -108,7 +110,7 @@ function useActions(open: boolean): Action[] {
         }
       })
     return out
-  }, [view, setView, vault.configured, vault.unlocked, workoutOn, commands])
+  }, [tabViews, settingsViews, view, setView, vault.configured, vault.unlocked, workoutOn, commands])
 }
 
 function matching(actions: Action[], query: string): Action[] {

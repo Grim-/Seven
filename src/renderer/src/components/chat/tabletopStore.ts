@@ -21,6 +21,7 @@ export interface TabletopModeState {
   showPlayTable: boolean
   peekTable: boolean
   pinnedChat: boolean
+  showDecks: boolean
   creatorSheetId?: string | null
 }
 
@@ -108,7 +109,8 @@ const DEFAULT_MODE: TabletopModeState = {
   editingGrid: false,
   showPlayTable: false,
   peekTable: false,
-  pinnedChat: false,
+  pinnedChat: true,
+  showDecks: true,
   creatorSheetId: null
 }
 
@@ -128,6 +130,7 @@ export function useTabletopMode(): [TabletopModeState, (patch: Partial<TabletopM
     showPlayTable: Boolean(mode?.showPlayTable),
     peekTable: Boolean(mode?.peekTable),
     pinnedChat: Boolean(mode?.pinnedChat),
+    showDecks: mode?.showDecks !== false,
     creatorSheetId: typeof mode?.creatorSheetId === 'string' ? mode.creatorSheetId : null
   }
   const update = (patch: Partial<TabletopModeState>) => {
@@ -147,6 +150,7 @@ export function setTabletopMode(patch: Partial<TabletopModeState>): void {
     showPlayTable: patch.showPlayTable ?? Boolean(current.showPlayTable),
     peekTable: patch.peekTable ?? Boolean(current.peekTable),
     pinnedChat: patch.pinnedChat ?? Boolean(current.pinnedChat),
+    showDecks: patch.showDecks ?? current.showDecks !== false,
     creatorSheetId: patch.creatorSheetId !== undefined ? patch.creatorSheetId : (current.creatorSheetId ?? null)
   })
 }

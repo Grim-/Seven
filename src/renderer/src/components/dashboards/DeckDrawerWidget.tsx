@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type MouseEvent } from 'react'
-import { ArrowDownToLine, Eye, EyeOff, Hand, Layers, Play, RotateCcw, Shuffle, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowDownToLine, Eye, EyeOff, Hand, Layers, Play, RotateCcw, Shuffle, Trash2 } from 'lucide-react'
 import { addCards, totalOf, userSide, type DeckEntry, type DeckRef } from '@shared/cardDecks'
 import { showName, toId } from '@shared/ids'
 import type { WidgetSource } from '@shared/types'
@@ -201,7 +201,7 @@ function DrawPedestal({
       </button>
 
       <div className="flex flex-wrap justify-end gap-1 @[340px]:w-full @[340px]:justify-center">
-        <Button size="sm" variant="primary" icon={<Sparkles />} disabled={empty} onClick={() => onDraw(1)} title="Draw 1 card">
+        <Button size="sm" variant="primary" icon={<Layers />} disabled={empty} onClick={() => onDraw(1)} title="Draw 1 card">
           Draw
         </Button>
         <Button size="sm" variant="ghost" disabled={empty || (!isSet && remaining < 2)} onClick={() => onDraw(3)} title="Draw up to 3 cards">

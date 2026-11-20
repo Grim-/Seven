@@ -32,7 +32,10 @@ const useBrowser = create<BrowserState>((set) => ({
   setLast: (last) => set({ last })
 }))
 
+const webOn = () => useTools.getState().list.some((m) => m.id === 'web' && m.state === 'on')
+
 export function showBrowser(url: string | null, switchView = false): void {
+  if (!webOn()) return
   const app = useApp.getState()
   const prefs = app.settings?.sidePanel
   if (prefs) void app.updateSettings({ sidePanel: { ...prefs, open: true, tab: 'browser' } })
@@ -168,6 +171,6 @@ registerSideTab({
   label: 'Browser',
   icon: <Globe className="h-3.5 w-3.5" />,
   order: 40,
-  visible: () => useTools.getState().list.some((m) => m.id === 'browser' && m.state === 'on'),
+  visible: webOn,
   render: () => <BrowserTab />
 })

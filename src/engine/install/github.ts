@@ -1,4 +1,13 @@
-import type { StoredRelease } from './registry'
+import type { Settings, StoredRelease } from './registry'
+
+/** Return the hostname (or raw string if invalid) for a helper's releasesUrl setting. */
+export function githubSource(settings: Settings): string {
+  try {
+    return new URL(String(settings.releasesUrl)).host
+  } catch {
+    return String(settings.releasesUrl)
+  }
+}
 
 interface GithubRelease {
   tag_name: string

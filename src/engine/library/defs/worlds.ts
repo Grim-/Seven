@@ -1,16 +1,21 @@
+import { almanacMarkdown, formatAlmanacClock } from '@shared/almanac'
 import { notFound } from '@shared/errors'
 import { storedFactionText } from '@shared/game/factions'
 import { storedLootTableText } from '@shared/game/lootTables'
 import { storedMapObjectText } from '@shared/game/mapObjects'
 import { storedTriggerActionText } from '@shared/game/triggerActions'
-import { layerNames, mapObjects, placePath, placeRef, placeTree, type MapData, type ObjectLayerData, type PlaceNode } from '@shared/maps'
+import { stripRef } from '@shared/ids'
+import { layerNames, localPlaceMermaid, mapObjects, placePath, placeRef, placeTree, type MapData, type ObjectLayerData, type PlaceNode } from '@shared/maps'
 import { smallestAt } from '@shared/shapes'
-import { linkFor } from '@shared/text'
+import { linkFor, splitLink } from '@shared/text'
 import { pageKindOf } from '@shared/types'
 import { PLACE_TYPE, PLACE_TYPE_KEY, plainValue, type WorldChange, type WorldType } from '@shared/world'
 import { agentAccess } from '../../agents/access'
+import { almanacs } from '../../almanac/store'
 import { data } from '../../data/hub'
 import { factions } from '../../factions/store'
+import { worldEvents } from '../../worlds/events'
+import { worldEventMetaMarkdown, worldEventPublicMarkdown } from '@shared/game/worldEvents'
 import { lootTablesStore } from '../../lootTables/store'
 import { mapObjectsStore } from '../../mapObjects/store'
 import { maps } from '../../maps/store'
@@ -27,8 +32,9 @@ import type { Exported } from '../exporters'
 import { storePacking } from '../packing'
 import { scoreDoc } from '../query'
 import { getSheet } from '../sheets'
+import { registerKind, registerKindSource } from '../kindRegistry'
 import { ENTRY_WIDGET, kindRt } from './runtime'
-import { has, rollLinkActions, USER, withJson, type Kind, type KindChildInput, type KindField, type KindHit } from './types'
+import { accessOf, has, rollLinkActions, USER, withJson, type Kind, type KindChildInput, type KindField, type KindHit } from './types'
 
 function worldHits(query: string, limit: number): KindHit[] {
   const trimmed = query.trim()
@@ -93,7 +99,7 @@ function mapOf(id: string): MapData {
 const usedBy = (id: string) => worlds.usingMap(id).map((w) => w.name)
 
 function worldPlaces(world: string): Record<string, Record<string, unknown>> {
-  return worlds.schema(world).types[PLACE_TYPE_KEY] ? worlds.entities(world, PLACE_TYPE_KEY, false) : {}
+  return worlds.exists(world) ? worlds.entities(world, PLACE_TYPE_KEY, false) : {}
 }
 
 const objectCenter = (o: ObjectLayerData) => ({ x: o.offset.x + (o.size.w * o.scale) / 2, y: o.offset.y + (o.size.h * o.scale) / 2 })
@@ -152,6 +158,8 @@ function placeCard(id: string): string {
   const inside = Object.keys(places).filter((k) => places[k]?.Inside === key)
   const extra = Object.entries(p).filter(([k, v]) => !(k in PLACE_TYPE.fields) && v !== '' && v !== null && !(Array.isArray(v) && !v.length))
   const drawn = worlds.mapUses(world).filter((u) => u.shapes[key])
+  const looks = typeof p.Looks === 'string' ? p.Looks.trim() : ''
+  const mermaid = localPlaceMermaid(places, key)
   const here = (whoIsHere(world)[key] ?? []).map((v) => {
     const agent = v.agent ? agentAccess.get(v.agent) : null
     return `- ${linkFor('sheet', v.sheet)} (${v.name}) — ${v.line}${agent ? ` (played by ${linkFor('agent', agent.name)})` : ''}`
@@ -159,10 +167,12 @@ function placeCard(id: string): string {
   return [
     `path: ${path.join(' › ')}`,
     `world: ${worlds.meta(world).name}`,
+    ...(looks ? [`looks: ${looks}`] : []),
     `files: ${String(p.Files || '').trim() || 'none'}`,
     `now: ${String(p.Now || '').trim() || 'nothing happening'}${changedText(changes.Now)}`,
     ...extra.map(([k, v]) => `${k.replace(/_/g, ' ').toLowerCase()}: ${Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : String(v)}`),
     here.length ? `here:\n${here.join('\n')}` : 'here: nobody',
+    ...(mermaid ? [`local exits (1-hop topology only):\n\`\`\`mermaid\n${mermaid}\n\`\`\``] : []),
     String(p.Actions || '').trim() ? `actions (attempts; roll one with action_check):\n${String(p.Actions).trim()}` : '',
     String(p.Decisions || '').trim() ? `decisions (choices, never rolled; when the user decides, ask them with ask_user):\n${String(p.Decisions).trim()}` : '',
     inside.length ? `inside it: ${inside.map((k) => `@place:${k}`).join(' ')}` : '',
@@ -718,6 +728,116 @@ export const lootTableKind: Kind = {
   })
 }
 
+export const almanacKind: Kind = {
+  presents: { chat: true, widget: ENTRY_WIDGET },
+  ...storePacking({
+    find: (id) => {
+      const a = almanacs.find(id)
+      return a ? { ...a, name: a.title } : null
+    },
+    names: () => almanacs.list().map((a) => a.title),
+    save: ({ id, name, ...rest }) => {
+      const saved = almanacs.save({ ...rest, title: name }, typeof id === 'string' ? id : undefined)
+      return { ...saved, name: saved.title }
+    }
+  }),
+  uses(id) {
+    const alm = almanacs.get(id)
+    if (!alm) return []
+    const refs: { kind: string; id: string }[] = []
+    if (alm.worldId) refs.push({ kind: 'world', id: alm.worldId })
+    for (const c of alm.cast) {
+      const link = splitLink(c)
+      if (link.kind && link.ref) refs.push({ kind: link.kind, id: stripRef(link.ref) })
+    }
+    return refs
+  },
+  kind: 'almanac',
+  aliases: ['almanacs', 'campaign', 'chronicle'],
+  family: 'world',
+  group: 'Worlds',
+  label: 'Almanac',
+  plural: 'Almanacs',
+  icon: 'book-open',
+  description: 'top-level world-time story chronicles, active threads, and archived roleplay chats',
+  parts: ['almanac'],
+  textParts: ['almanac'],
+  linkParts: [
+    { name: 'public', description: 'public chronicle omitting secret notes (for newspapers & in-world lore)' },
+    { name: 'day:', description: 'entries on a world day or range, e.g. #day:14 or #day:12-14' },
+    { name: 'where:', description: 'entries at a place, e.g. #where:rust_anchorage' },
+    { name: 'entry:', description: 'full drill-down & archived chat transcript of an entry, e.g. #entry:alm_1' }
+  ],
+  exportable: true,
+  export(id) {
+    const alm = almanacs.get(id)
+    if (!alm) throw notFound(new ToolError(`No almanac ${id}`))
+    return withJson(almanacKind, id, alm)
+  },
+  actions: ['find', 'read', 'show'],
+  available: (ctx) => !accessOf(ctx).hidden.includes('almanac'),
+  search(query, limit) {
+    const q = query.toLowerCase()
+    return almanacs
+      .list()
+      .filter(
+        (a) =>
+          !q ||
+          has(a.title, q) ||
+          has(a.id, q) ||
+          a.threads.some((t) => has(t.text, q)) ||
+          a.entries.some((e) => has(e.title, q) || has(e.summary, q) || has(e.where, q) || has(e.outcome, q))
+      )
+      .slice(0, limit)
+      .map((a) => ({
+        kind: 'almanac',
+        id: a.id,
+        title: a.title,
+        tags: [],
+        updatedAt: a.updatedAt,
+        excerpt: `${formatAlmanacClock(a.currentTime)} · ${a.entries.length} entries · ${a.threads.filter((t) => !t.done).length} active threads`
+      }))
+  },
+  resolve(ref) {
+    return almanacs.find(stripRef(ref))?.id ?? null
+  },
+  line(id) {
+    const a = almanacs.get(id)
+    if (!a) return id
+    const active = a.threads.filter((t) => (t.status ?? (t.done ? 'resolved' : 'active')) !== 'resolved').length
+    return `${formatAlmanacClock(a.currentTime)} · ${a.entries.length} entries · ${active} active thread(s)`
+  },
+  card(id) {
+    const a = almanacs.get(id)
+    if (!a) throw notFound(new ToolError(`No almanac ${id}`))
+    return almanacMarkdown(a)
+  },
+  full(id, options) {
+    const a = almanacs.get(id)
+    if (!a) throw notFound(new ToolError(`No almanac ${id}`))
+    return almanacMarkdown(a, { part: options?.part ?? null })
+  },
+  fields(id) {
+    const a = almanacs.get(id)
+    if (!a) return []
+    return [
+      { name: 'public', text: almanacMarkdown(a, { part: 'public', includeSecrets: false }) },
+      ...a.entries.map((e) => ({ name: e.id, text: almanacMarkdown(a, { part: `entry:${e.id}` }) }))
+    ]
+  },
+  title(id) {
+    return almanacs.get(id)?.title ?? id
+  },
+  remove(id) {
+    almanacs.remove(id)
+  },
+  rename(id, title) {
+    const a = almanacs.get(id)
+    if (!a) throw notFound(new ToolError(`No almanac ${id}`))
+    almanacs.save({ ...a, title }, a.id)
+  }
+}
+
 export function nexusKinds(taken: Set<string>, claimed: Set<string>): Kind[] {
   const types = new Map<string, WorldType>()
   for (const w of worlds.list()) {
@@ -762,3 +882,80 @@ export function nexusKinds(taken: Set<string>, claimed: Set<string>): Kind[] {
     return k
   })
 }
+
+export const worldEventKind: Kind = {
+  kind: 'world_event',
+  family: 'world',
+  group: 'Worlds',
+  label: 'World Event',
+  plural: 'World Events',
+  icon: 'flame',
+  description: 'Scoped world events (global, map, area, or place) with faction figureheads, diegetic rumours, and scored or player-picked TriggerAction outcomes.',
+  parts: ['public', 'meta'],
+  textParts: ['public', 'meta'],
+  exportable: true,
+  actions: [],
+  available: () => true,
+  search(query, limit) {
+    const q = query.trim().toLowerCase()
+    return worldEvents
+      .list()
+      .filter((e) => !q || e.title.toLowerCase().includes(q) || e.id.includes(q) || e.tags.some((t) => t.includes(q)) || e.worldId.toLowerCase().includes(q))
+      .slice(0, limit)
+      .map((e) => ({
+        kind: 'world_event',
+        id: e.id,
+        title: e.title,
+        line: `${e.status} · ${e.scope.level}${e.scope.refId ? `: ${e.scope.refId}` : ''}${e.worldId ? ` · ${e.worldId}` : ''}`,
+        tags: e.tags
+      }))
+  },
+  resolve(ref) {
+    return worldEvents.find(stripRef(ref))?.id ?? null
+  },
+  line(id) {
+    const e = worldEvents.find(id)
+    if (!e) return id
+    return `${e.status} · ${e.scope.level}${e.scope.refId ? `: ${e.scope.refId}` : ''}${e.worldId ? ` · ${e.worldId}` : ''}`
+  },
+  card(id) {
+    return worldEventPublicMarkdown(worldEvents.get(id))
+  },
+  full(id, options) {
+    const ev = worldEvents.get(id)
+    return options?.part === 'meta' ? worldEventMetaMarkdown(ev) : worldEventPublicMarkdown(ev)
+  },
+  fields(id) {
+    const ev = worldEvents.get(id)
+    return [
+      { name: 'public', text: worldEventPublicMarkdown(ev) },
+      { name: 'meta', text: worldEventMetaMarkdown(ev) }
+    ]
+  },
+  title(id) {
+    return worldEvents.find(id)?.title ?? id
+  },
+  remove(id) {
+    worldEvents.remove(id)
+  },
+  rename(id, title) {
+    const ev = worldEvents.get(id)
+    worldEvents.save({ ...ev, title }, ev.id)
+  }
+}
+
+registerKind(110, worldKind, 'world')
+registerKind(112, almanacKind, 'world')
+registerKindSource(
+  'world-types',
+  115,
+  (others) => nexusKinds(new Set(others.map((k) => k.kind)), new Set(others.flatMap((k) => (k.worldType ? [k.worldType] : [])))).map((kind) => ({ kind, module: 'world' })),
+  true
+)
+registerKind(120, mapKind, 'world')
+registerKind(130, placeKind, 'world')
+registerKind(140, objectKind, 'world')
+registerKind(150, factionKind, 'world')
+registerKind(160, triggerActionKind, 'game')
+registerKind(165, worldEventKind, 'world')
+registerKind(170, lootTableKind, 'world')

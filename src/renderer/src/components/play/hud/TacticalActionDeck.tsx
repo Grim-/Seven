@@ -1,31 +1,33 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import {
   Flame,
-  Droplets,
   Zap,
   Shield,
   Heart,
-  Skull,
   Sparkles,
   Swords,
-  FlaskConical,
-  Scroll,
   Footprints,
   MessageSquarePlus,
-  HandHelping,
-  ShieldAlert,
   Lock,
   Unlock,
   Plus,
   Minus,
   Crosshair,
-  EyeOff,
   Radio,
   Layers
 } from 'lucide-react'
-import { Classes, Equipment, Inventory, Item, Traits, usableAbilities, type Ability, type Trait } from '@shared/game/components'
+import { actionHasGroup, Classes, Equipment, Inventory, Item, Stats, Traits, Weapon, usableAbilities, type Ability, type Trait } from '@shared/game/components'
+import { HARM } from '@shared/game/effectGroups'
 import { GameEntity, type Catalog } from '@shared/game/core'
 import type { PlaceVisitor } from '@shared/maps'
+import {
+  canSpendTurnCost,
+  findDefenseRollAbility,
+  findMovementAbility,
+  runAbilityUse,
+  runItemUse,
+  slotThemeFor
+} from '../state/combatGate'
 import { useGameState } from '../state/gameStateStore'
 import { useDialogue } from '../dialogue/dialogueStore'
 import { defaultDialogueTree, combatParleyDialogueTree } from '@shared/game/dialogue'
@@ -55,38 +57,6 @@ import { noteFailure } from '../../../store/problems'
 import { readStored, writeStored } from '../../../lib/stored'
 
 const name = (a: Ability) => String(a.params.label || a.id)
-
-function getSlotTheme(rawName: string) {
-  const n = rawName.toLowerCase()
-  if (n.includes('fire') || n.includes('flame') || n.includes('burn') || n.includes('pyro')) {
-    return { Icon: Flame, color: 'text-amber-400', border: 'border-amber-500/70', bg: 'bg-amber-500/15' }
-  }
-  if (n.includes('cold') || n.includes('ice') || n.includes('frost') || n.includes('water')) {
-    return { Icon: Droplets, color: 'text-sky-400', border: 'border-sky-500/70', bg: 'bg-sky-500/15' }
-  }
-  if (n.includes('light') || n.includes('shock') || n.includes('thunder') || n.includes('zap') || n.includes('spark')) {
-    return { Icon: Zap, color: 'text-yellow-400', border: 'border-yellow-500/70', bg: 'bg-yellow-500/15' }
-  }
-  if (n.includes('shield') || n.includes('ward') || n.includes('armor') || n.includes('protect') || n.includes('guard')) {
-    return { Icon: Shield, color: 'text-cyan', border: 'border-cyan/70', bg: 'bg-cyan/15' }
-  }
-  if (n.includes('heal') || n.includes('cure') || n.includes('restor') || n.includes('life')) {
-    return { Icon: Heart, color: 'text-emerald-400', border: 'border-emerald-500/70', bg: 'bg-emerald-500/15' }
-  }
-  if (n.includes('potion') || n.includes('draught') || n.includes('elixir') || n.includes('flask')) {
-    return { Icon: FlaskConical, color: 'text-emerald-400', border: 'border-emerald-500/70', bg: 'bg-emerald-500/15' }
-  }
-  if (n.includes('scroll') || n.includes('tome') || n.includes('parchment') || n.includes('book')) {
-    return { Icon: Scroll, color: 'text-purple', border: 'border-purple/70', bg: 'bg-purple/15' }
-  }
-  if (n.includes('necro') || n.includes('death') || n.includes('decay') || n.includes('curse') || n.includes('dark')) {
-    return { Icon: Skull, color: 'text-purple', border: 'border-purple/70', bg: 'bg-purple/15' }
-  }
-  if (n.includes('sword') || n.includes('slash') || n.includes('strike') || n.includes('dagger') || n.includes('weapon')) {
-    return { Icon: Swords, color: 'text-red-400', border: 'border-red-500/70', bg: 'bg-red-500/15' }
-  }
-  return { Icon: Sparkles, color: 'text-cyan', border: 'border-cyan/70', bg: 'bg-cyan/15' }
-}
 
 export type DeckCategory = 'ALL' | 'COMMON' | 'CLASS' | 'ITEMS' | 'PASSIVES' | 'META'
 
@@ -143,6 +113,7 @@ export function TacticalActionDeck({
   }
 
   const battle = useGameState((s) => s.battle)
+  const tileFeet = useGameState((s) => s.tileFeet)
   const dashAction = useGameState((s) => s.dashAction)
   const dodgeAction = useGameState((s) => s.dodgeAction)
   const endTurn = useGameState((s) => s.endTurn)
@@ -155,17 +126,21 @@ export function TacticalActionDeck({
     actionUsed: false,
     bonusActionUsed: false,
     reactionUsed: false,
-    movementRemaining: 30,
+    movementRemaining: 0,
     isDodging: false
   }
 
-  // Target combatant
-  const targetCombatant = inCombat && selectedTargetId
-    ? battle?.queue.find((c) => c.id === selectedTargetId) ?? null
-    : null
-
   // Game act for slottable actions & items
   const sheet = visitor?.sheet ?? ''
+  // Target combatant (never self)
+  const targetCombatant = inCombat && selectedTargetId
+    ? battle?.queue.find(
+        (c) =>
+          (c.id === selectedTargetId || (Boolean(c.sheet) && c.sheet === selectedTargetId)) &&
+          c.id !== activeActor?.id &&
+          (!sheet || c.sheet !== sheet)
+      ) ?? null
+    : null
   const hasGame = Boolean(visitor && visitor.game && catalog)
   const { shown, act } = useGameAct(sheet, visitor?.game ?? (null as any), catalog ?? (null as any))
   const entity = useMemo(() => {
@@ -191,24 +166,14 @@ export function TacticalActionDeck({
     ]
   }, [entity])
 
-  // Derive class label dynamically from held classes first, falling back to sheet line
+  // Derive class label dynamically from held classes first, falling back to first header segment of visitor.line
   const dynamicClassName = useMemo(() => {
     const active = heldClasses.filter((c) => c.isActive())
     if (active.length === 1) return active[0].title.toUpperCase()
     if (active.length > 1) return `${active[0].title.toUpperCase()} +${active.length - 1}`
     if (heldClasses.length > 0) return heldClasses[0].title.toUpperCase()
-    if (visitor?.line) {
-      const raw = visitor.line.split(',')[0] ?? ''
-      const words = raw.split(' ')
-      const knownClasses = [
-        'Cleric', 'Wizard', 'Fighter', 'Rogue', 'Paladin', 'Ranger',
-        'Warlock', 'Sorcerer', 'Druid', 'Monk', 'Bard', 'Barbarian',
-        'Netrunner', 'Solo', 'Techie', 'Fixer', 'Merc'
-      ]
-      const found = words.find((w) => knownClasses.some((c) => c.toLowerCase() === w.toLowerCase()))
-      if (found) return found.toUpperCase()
-    }
-    return 'CLASS'
+    const head = (visitor?.line.split(',')[0] ?? '').trim()
+    return head ? head.toUpperCase() : 'CLASS'
   }, [heldClasses, visitor?.line])
 
   // Active buffs & conditions from visitor dnd stats
@@ -231,67 +196,88 @@ export function TacticalActionDeck({
 
   const slots = useActionSlots(sheet || null, abilities, 48)
 
+  const world = useGameState((s) => s.world)
+
+  const strikeAbility = useMemo(
+    () =>
+      abilities.find(
+        (a) =>
+          actionHasGroup(a, HARM) &&
+          (rangedMode ? a.reach() > tileFeet : Boolean(a.item?.comps.some((c) => c instanceof Weapon)) || a.params.unarmedOnly || a.reach() <= tileFeet)
+      ) ?? abilities.find((a) => actionHasGroup(a, HARM)),
+    [abilities, rangedMode, tileFeet]
+  )
+  const dashAbility = useMemo(() => (entity ? findMovementAbility(entity) : undefined), [entity])
+  const dodgeAbility = useMemo(() => (entity ? findDefenseRollAbility(entity, catalog ?? null) : undefined), [entity, catalog])
+
   const useSlot = (slot: ActionSlotDef | null) => {
     if (!slot) return
-    if (inCombat && economy.actionUsed) {
-      toast.info('Action Economy', 'Standard action already expended this turn')
-      return
-    }
-
     if (slot.kind === 'ability') {
       const a = abilities.find((x) => x.uid === slot.uid || x.id === slot.id)
-      if (a && a.reach() > 0) return onAim(aiming === a.uid ? null : { uid: a.uid, label: name(a) })
-      if (!act) return
-      act((e) => {
-        const found = usableAbilities(e).find((x) => x.uid === slot.uid || x.id === slot.id)
-        return found ? found.use({ user: e, target: e, at: null, distance: 0 }) : 'it is gone'
+      if (!a) return
+      runAbilityUse({
+        sheet,
+        entity,
+        ability: a,
+        world,
+        battle,
+        aiming,
+        onAim,
+        act
       })
     } else if (slot.kind === 'item') {
-      if (!act) return
-      act((e) => {
-        const bag = e.comp(Inventory)?.items ?? []
-        const worn = e.comp(Equipment)?.comps.filter((c): c is Item => c instanceof Item) ?? []
-        const all = [...bag, ...worn]
-        const found = all.find((i) => i.uid === slot.uid || i.id === slot.id)
-        if (!found) return 'item not found'
-        if (!found.usable()) return 'item cannot be used'
-        return found.use({ user: e, target: e, at: null, distance: 0 })
+      const foundItem = allItems.find((i) => i.uid === slot.uid || i.id === slot.id)
+      if (!foundItem) return
+      runItemUse({
+        sheet,
+        item: foundItem,
+        label: itemName(foundItem),
+        world,
+        battle,
+        act
       })
     }
   }
 
-  // Maneuver triggers
+  // Maneuver triggers using actor's real abilities & turn economy
   const executeStrike = () => {
+    if (!strikeAbility) {
+      toast.info('No Attack', 'No usable attack ability found.')
+      return
+    }
+    const cost = String(strikeAbility.params.action || 'action')
+    if (!canSpendTurnCost(battle, sheet, cost)) {
+      toast.info('Turn Economy', !isPlayerTurn ? 'Not your turn' : 'Action already used this turn')
+      return
+    }
     if (!inCombat || !targetCombatant) {
-      toast.info('Targeting', 'Select a hostile target on map or right panel first')
+      onAim(aiming === strikeAbility.uid ? null : { uid: strikeAbility.uid, label: name(strikeAbility) })
       return
     }
-    if (economy.actionUsed) {
-      toast.info('Action Economy', 'Action already expended this turn')
-      return
-    }
-    if (onAttack) onAttack(targetCombatant.id, rangedMode ? 'Ranged Shot' : 'Strike')
+    if (onAttack) onAttack(targetCombatant.id, strikeAbility.uid)
   }
 
   const executeDash = () => {
-    if (inCombat) {
-      if (economy.actionUsed) {
-        toast.info('Action Economy', 'Action already expended')
-        return
-      }
-      dashAction()
-    } else {
-      toast.info('Maneuver', 'Dash: Sprint speed engaged (+30 FT)')
+    if (!inCombat) {
+      toast.info('Combat Only', 'Dash is used during tactical combat turns')
+      return
     }
+    const cost = String(dashAbility?.params.action || 'action')
+    if (!canSpendTurnCost(battle, sheet, cost)) {
+      toast.info('Turn Economy', !isPlayerTurn ? 'Not your turn' : `${cost === 'bonus' ? 'Bonus action' : 'Action'} already used this turn`)
+      return
+    }
+    void dashAction()
   }
 
   const executeDodge = () => {
-    if (inCombat) {
-      if (economy.actionUsed || economy.isDodging) return
-      dodgeAction()
-    } else {
-      toast.info('Maneuver', 'Dodge: Defensive stance activated')
+    if (!inCombat) {
+      toast.info('Combat Only', 'Dodge is used during tactical combat turns')
+      return
     }
+    const cost = String(dodgeAbility?.params.action || 'action')
+    if (!canSpendTurnCost(battle, sheet, cost) || economy.isDodging) return
+    void dodgeAction()
   }
 
   const executeParley = () => {
@@ -323,7 +309,7 @@ export function TacticalActionDeck({
       const k = e.key.toLowerCase()
 
       if (k === '1' || matchesKeybind('tactical.targetAttack', e)) {
-        if (latestRef.current.inCombat && latestRef.current.isPlayerTurn && latestRef.current.targetCombatant) {
+        if (latestRef.current.inCombat && latestRef.current.isPlayerTurn) {
           e.preventDefault()
           latestRef.current.executeStrike()
         }
@@ -336,11 +322,6 @@ export function TacticalActionDeck({
         if (latestRef.current.inCombat && latestRef.current.isPlayerTurn) {
           e.preventDefault()
           latestRef.current.executeDodge()
-        }
-      } else if (k === '4' || matchesKeybind('tactical.disengage', e)) {
-        if (latestRef.current.inCombat && latestRef.current.isPlayerTurn) {
-          e.preventDefault()
-          toast.info('Maneuver', 'Disengage: Movement prevents opportunity attacks')
         }
       } else if (matchesKeybind('tactical.parley', e)) {
         if (latestRef.current.targetCombatant) {
@@ -425,7 +406,10 @@ export function TacticalActionDeck({
     }
   }
 
-  const maxSpeed = activeActor?.speedMax ?? 30
+  const timeDef = useGameState((s) => s.timeDef)
+  const speedStat = timeDef?.speedStat ?? ''
+  const defaultSpeed = speedStat ? (catalog?.stat(speedStat)?.default ?? 0) : 0
+  const maxSpeed = activeActor?.speedMax ?? (speedStat ? entity?.comp(Stats)?.value(speedStat) : undefined) ?? defaultSpeed
   const speedRem = inCombat ? economy.movementRemaining : maxSpeed
   const speedPercent = Math.max(0, Math.min(100, (speedRem / Math.max(1, maxSpeed)) * 100))
 
@@ -611,153 +595,110 @@ export function TacticalActionDeck({
           )}
         >
           {/* 1. STRIKE (ATTACK) */}
+          {(() => {
+            const strikeCost = String(strikeAbility?.params.action || 'action')
+            const canStrike = Boolean(strikeAbility) && (!inCombat || canSpendTurnCost(battle, sheet, strikeCost))
+            const strikeAiming = Boolean(aiming && strikeAbility && aiming === strikeAbility.uid)
+            const strikeBadge = strikeCost === 'bonus' ? 'BON' : strikeCost === 'free' ? 'FREE' : 'ACT'
+            return (
+              <button
+                type="button"
+                onClick={executeStrike}
+                disabled={!canStrike}
+                title={
+                  targetCombatant
+                    ? `${strikeAbility ? name(strikeAbility) : 'Attack'} ${targetCombatant.name} (${strikeBadge} · [1/F])`
+                    : `${strikeAbility ? name(strikeAbility) : 'Attack'} — click to aim, then pick a target (${strikeBadge} · [1/F])`
+                }
+                className={cn(
+                  'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
+                  strikeAiming
+                    ? 'border-cyan bg-cyan/30 text-cyan shadow-[0_0_14px_rgba(0,216,246,0.8)] animate-pulse cursor-pointer'
+                    : canStrike
+                    ? 'border-red-500/70 bg-red-500/15 text-red-400 hover:border-red-400 hover:scale-105 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.25)]'
+                    : 'border-line/40 bg-black/60 text-faint cursor-not-allowed'
+                )}
+              >
+                <Swords className="h-4 w-4" />
+                <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">1</span>
+                <span className="absolute top-0.5 right-0.5 text-[7px] text-red-400">{strikeBadge}</span>
+              </button>
+            )
+          })()}
+
+          {/* 2. DASH */}
+          {(() => {
+            const dashCost = String(dashAbility?.params.action || 'action')
+            const canDash = Boolean(dashAbility) && (!inCombat || canSpendTurnCost(battle, sheet, dashCost))
+            const dashBadge = dashCost === 'bonus' ? 'BON' : dashCost === 'free' ? 'FREE' : 'ACT'
+            return (
+              <button
+                type="button"
+                onClick={executeDash}
+                disabled={!canDash && inCombat}
+                title={`${dashAbility ? name(dashAbility) : 'Dash'} (${dashBadge} · [2/C])`}
+                className={cn(
+                  'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
+                  canDash
+                    ? 'border-line/60 bg-black/60 text-white hover:border-cyan hover:text-cyan hover:scale-105 cursor-pointer'
+                    : 'border-line/30 bg-black/40 text-faint cursor-not-allowed'
+                )}
+              >
+                <Footprints className="h-4 w-4 text-cyan" />
+                <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">C</span>
+                <span className="absolute top-0.5 right-0.5 text-[7px] text-cyan">{dashBadge}</span>
+              </button>
+            )
+          })()}
+
+          {/* 3. DODGE */}
+          {(() => {
+            const dodgeCost = String(dodgeAbility?.params.action || 'action')
+            const canDodge = Boolean(dodgeAbility) && (!inCombat || canSpendTurnCost(battle, sheet, dodgeCost)) && !economy.isDodging
+            const dodgeBadge = dodgeCost === 'bonus' ? 'BON' : dodgeCost === 'free' ? 'FREE' : 'ACT'
+            return (
+              <button
+                type="button"
+                onClick={executeDodge}
+                disabled={inCombat && !canDodge}
+                title={`${dodgeAbility ? name(dodgeAbility) : 'Dodge'} (${dodgeBadge} · [3/Z])`}
+                className={cn(
+                  'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
+                  economy.isDodging
+                    ? 'border-accent bg-accent/20 text-accent cursor-default'
+                    : canDodge
+                    ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent hover:scale-105 cursor-pointer'
+                    : 'border-line/30 bg-black/40 text-faint cursor-not-allowed'
+                )}
+              >
+                <Shield className="h-4 w-4 text-accent" />
+                <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">Z</span>
+                <span className="absolute top-0.5 right-0.5 text-[7px] text-accent">{dodgeBadge}</span>
+              </button>
+            )
+          })()}
+
+          {/* 4. PARLEY (META DIALOGUE) */}
           <button
             type="button"
-            onClick={executeStrike}
-            disabled={inCombat && (!isPlayerTurn || economy.actionUsed || !targetCombatant)}
+            onClick={executeParley}
+            disabled={!targetCombatant}
             title={
               targetCombatant
-                ? `Strike ${targetCombatant.name} with weapon (Action · [1/F])`
-                : 'Strike: Select a target entity first (Action · [1/F])'
+                ? `Parley: Negotiate, intimidate, or deceive ${targetCombatant.name} (Meta · [P])`
+                : 'Parley: Select an entity to open emergent dialogue (Meta · [P])'
             }
             className={cn(
               'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
-              targetCombatant && (!inCombat || (isPlayerTurn && !economy.actionUsed))
-                ? 'border-red-500/70 bg-red-500/15 text-red-400 hover:border-red-400 hover:scale-105 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.25)]'
-                : 'border-line/40 bg-black/60 text-faint cursor-not-allowed'
-            )}
-          >
-            <Swords className="h-4 w-4" />
-            <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">1</span>
-            <span className="absolute top-0.5 right-0.5 text-[7px] text-red-400">ACT</span>
-          </button>
-
-          {/* 2. DASH */}
-          <button
-            type="button"
-            onClick={executeDash}
-            disabled={inCombat && (!isPlayerTurn || economy.actionUsed)}
-            title="Dash: Doubles movement speed for this turn (Action · [2/C])"
-            className={cn(
-              'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
-              !inCombat || (isPlayerTurn && !economy.actionUsed)
-                ? 'border-line/60 bg-black/60 text-white hover:border-cyan hover:text-cyan hover:scale-105 cursor-pointer'
+              targetCombatant
+                ? 'border-purple/70 bg-purple/15 text-purple hover:border-purple hover:bg-purple hover:text-black hover:scale-105 cursor-pointer shadow-[0_0_10px_rgba(180,100,255,0.3)]'
                 : 'border-line/30 bg-black/40 text-faint cursor-not-allowed'
             )}
           >
-            <Footprints className="h-4 w-4 text-cyan" />
-            <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">C</span>
-            <span className="absolute top-0.5 right-0.5 text-[7px] text-cyan">ACT</span>
+            <MessageSquarePlus className="h-4 w-4 text-purple" />
+            <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-purple">P</span>
+            <span className="absolute top-0.5 right-0.5 text-[7px] text-purple">META</span>
           </button>
-
-          {/* 3. DODGE */}
-          <button
-            type="button"
-            onClick={executeDodge}
-            disabled={inCombat && (!isPlayerTurn || economy.actionUsed || economy.isDodging)}
-            title="Dodge: Attackers suffer disadvantage against you (Action · [3/Z])"
-            className={cn(
-              'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
-              economy.isDodging
-                ? 'border-accent bg-accent/20 text-accent cursor-default'
-                : !inCombat || (isPlayerTurn && !economy.actionUsed)
-                ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent hover:scale-105 cursor-pointer'
-                : 'border-line/30 bg-black/40 text-faint cursor-not-allowed'
-            )}
-          >
-            <Shield className="h-4 w-4 text-accent" />
-            <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">Z</span>
-            <span className="absolute top-0.5 right-0.5 text-[7px] text-accent">ACT</span>
-          </button>
-
-          {/* 4. DISENGAGE */}
-          <button
-            type="button"
-            onClick={() => {
-              if (inCombat) {
-                if (economy.actionUsed) return
-                toast.info('Maneuver', 'Disengage: Movement prevents attacks of opportunity')
-              }
-            }}
-            disabled={inCombat && (!isPlayerTurn || economy.actionUsed)}
-            title="Disengage: Movement does not provoke opportunity attacks (Action · [4/X])"
-            className={cn(
-              'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
-              !inCombat || (isPlayerTurn && !economy.actionUsed)
-                ? 'border-line/60 bg-black/60 text-white hover:border-white hover:scale-105 cursor-pointer'
-                : 'border-line/30 bg-black/40 text-faint cursor-not-allowed'
-            )}
-          >
-            <ShieldAlert className="h-4 w-4 text-dim" />
-            <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">X</span>
-            <span className="absolute top-0.5 right-0.5 text-[7px] text-dim">ACT</span>
-          </button>
-
-          {/* 5. HELP (Shown if >= 3 rows) */}
-          {rowCount >= 3 && (
-            <button
-              type="button"
-              onClick={() => toast.info('Help', 'Aid an allied companion')}
-              title="Help: Grant advantage on an ally next ability or attack ([5/V])"
-              className="group relative flex h-9 w-9 items-center justify-center border border-line/60 bg-black/60 font-mono text-[10px] font-bold text-white hover:border-ok hover:text-ok hover:scale-105 cursor-pointer transition-all"
-            >
-              <HandHelping className="h-4 w-4 text-ok" />
-              <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">V</span>
-              <span className="absolute top-0.5 right-0.5 text-[7px] text-ok">ACT</span>
-            </button>
-          )}
-
-          {/* 6. PARLEY (META DIALOGUE - Shown if >= 3 rows) */}
-          {rowCount >= 3 && (
-            <button
-              type="button"
-              onClick={executeParley}
-              disabled={!targetCombatant}
-              title={
-                targetCombatant
-                  ? `Parley: Negotiate, intimidate, or deceive ${targetCombatant.name} (Meta · [P])`
-                  : 'Parley: Select an entity to open emergent dialogue (Meta · [P])'
-              }
-              className={cn(
-                'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
-                targetCombatant
-                  ? 'border-purple/70 bg-purple/15 text-purple hover:border-purple hover:bg-purple hover:text-black hover:scale-105 cursor-pointer shadow-[0_0_10px_rgba(180,100,255,0.3)]'
-                  : 'border-line/30 bg-black/40 text-faint cursor-not-allowed'
-              )}
-            >
-              <MessageSquarePlus className="h-4 w-4 text-purple" />
-              <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-purple">P</span>
-              <span className="absolute top-0.5 right-0.5 text-[7px] text-purple">META</span>
-            </button>
-          )}
-
-          {/* 7. HIDE / STEALTH (Shown if 4 rows) */}
-          {rowCount === 4 && (
-            <button
-              type="button"
-              onClick={() => toast.info('Stealth', 'Hide: Attempt stealth check against enemy passive perception')}
-              title="Hide: Conceal yourself to gain advantage on unseen strikes"
-              className="group relative flex h-9 w-9 items-center justify-center border border-line/60 bg-black/60 font-mono text-[10px] font-bold text-white hover:border-sky-400 hover:text-sky-400 hover:scale-105 cursor-pointer transition-all"
-            >
-              <EyeOff className="h-4 w-4 text-sky-400" />
-              <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">H</span>
-              <span className="absolute top-0.5 right-0.5 text-[7px] text-sky-400">ACT</span>
-            </button>
-          )}
-
-          {/* 8. SHOVE (Shown if 4 rows) */}
-          {rowCount === 4 && (
-            <button
-              type="button"
-              onClick={() => toast.info('Shove', 'Shove: Push enemy back 5 FT or knock prone (Athletics check)')}
-              title="Shove: Physical contest to push target or knock prone (Bonus Action)"
-              className="group relative flex h-9 w-9 items-center justify-center border border-line/60 bg-black/60 font-mono text-[10px] font-bold text-white hover:border-amber-400 hover:text-amber-400 hover:scale-105 cursor-pointer transition-all"
-            >
-              <Crosshair className="h-4 w-4 text-amber-400" />
-              <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">S</span>
-              <span className="absolute top-0.5 right-0.5 text-[7px] text-amber-400">BON</span>
-            </button>
-          )}
         </div>
 
         {/* MCRN TERMINAL DIVIDER 1 (RED ACCENT GRIPPER) */}
@@ -809,7 +750,6 @@ export function TacticalActionDeck({
               const sourceClass = String(a?.params.sourceClass || '')
               const sourceClassTitle = sourceClass ? classTitleOf(sourceClass) : ''
               const ready = a && entity ? a.canUse({ user: entity, target: entity, at: null, distance: 0 }) : 'restricted or unavailable'
-              const cooling = a ? a.cooling > 0 : false
               const rows = a && catalog
                 ? [
                     ...Object.entries(a.cost).map(([s, n]) => ({ label: catalog.stat(s)?.label ?? s, value: String(n) })),
@@ -839,9 +779,11 @@ export function TacticalActionDeck({
               )
 
               const label = a ? name(a) : slot.label
-              const theme = getSlotTheme(label)
+              const theme = slotThemeFor(a?.comps)
               const Icon = theme.Icon
               const isUpcastable = Boolean(a && Object.keys(a.cost).length > 0)
+              const canSpendCost = a ? canSpendTurnCost(battle, sheet, String(a.params.action || 'action')) : true
+              const slotAvailable = ready === true && canSpendCost
 
               return (
                 <button
@@ -869,7 +811,7 @@ export function TacticalActionDeck({
                     'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
                     isLocked ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
                     isOver && 'border-cyan bg-cyan/25 scale-105 shadow-[0_0_12px_rgba(0,216,246,0.6)]',
-                    ready === true
+                    slotAvailable
                       ? cn(theme.border, theme.bg, theme.color, 'hover:scale-105 hover:border-cyan')
                       : 'border-line/40 bg-black/60 text-faint opacity-50',
                     aiming && a && aiming === a.uid && 'border-cyan bg-cyan/30 text-cyan shadow-[0_0_14px_rgba(0,216,246,0.8)] animate-pulse'
@@ -877,7 +819,7 @@ export function TacticalActionDeck({
                 >
                   <Icon className="h-4 w-4 transition-transform group-hover:scale-110" />
 
-                  {sourceClassTitle && !cooling && (
+                  {sourceClassTitle && (
                     <span
                       className="absolute bottom-0.5 left-0.5 border border-cyan/40 bg-black/85 px-0.5 text-[6.5px] font-bold uppercase text-cyan leading-none"
                       title={`Class ability: ${sourceClassTitle}`}
@@ -896,11 +838,6 @@ export function TacticalActionDeck({
                     </span>
                   )}
 
-                  {cooling && a && (
-                    <span className="absolute inset-x-0 bottom-0 bg-black/90 text-center text-[8px] font-bold text-dim">
-                      {gameTime(a.cooling)}
-                    </span>
-                  )}
                 </button>
               )
             }
@@ -957,7 +894,7 @@ export function TacticalActionDeck({
             const tip = item ? itemTip(item) : null
             const itemLabel = item ? itemName(item) : slot.label
             const count = item?.count ?? 0
-            const theme = getSlotTheme(itemLabel)
+            const theme = slotThemeFor(item?.comps, true)
             const Icon = theme.Icon
 
             return (

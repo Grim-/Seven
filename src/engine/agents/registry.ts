@@ -1,5 +1,6 @@
 import { noteFailure } from '../util/report'
 import { notFound } from '@shared/errors'
+import type { AgentPreset } from './presets'
 import { isAssetId } from '@shared/ids'
 import { CORE_MODULES } from '@shared/toolnames'
 import type { WorldBinding } from '@shared/world'
@@ -185,7 +186,7 @@ export class AgentRegistry extends EventEmitter {
         modules: [...CORE_MODULES, 'ui'],
         permissionMode: 'ask',
         context: { ...DEFAULT_CONTEXT },
-        look: { ...DEFAULT_LOOK },
+        look: { ...DEFAULT_LOOK, avatar: { kind: 'avatar', id: 'ascii_face' } },
         createdAt: now,
         updatedAt: now
       })
@@ -267,6 +268,34 @@ export class AgentRegistry extends EventEmitter {
 
   getOrDefault(id: string): AgentProfile {
     return this.agents.get(id) ?? this.get(DEFAULT_AGENT_ID)
+  }
+
+  /** Provisions a module-registered agent preset once without ever overwriting an existing user-edited profile. */
+  ensurePreset(preset: AgentPreset): AgentProfile {
+    const existing = this.agents.get(preset.id)
+    if (existing) return existing
+    const now = Date.now()
+    const folder = this.folders && this.foldersReady() ? this.folders.make(preset.name) : undefined
+    const agent: AgentProfile = {
+      id: preset.id,
+      name: preset.name,
+      description: preset.description,
+      modelId: null,
+      systemPrompt: preset.systemPrompt,
+      sampling: {},
+      workspace: null,
+      modules: cleanModules(preset.modules),
+      permissionMode: cleanMode(preset.permissionMode),
+      context: { ...DEFAULT_CONTEXT },
+      look: { ...DEFAULT_LOOK },
+      roleplay: preset.roleplay === true,
+      ...(folder !== undefined ? { folder } : {}),
+      createdAt: now,
+      updatedAt: now
+    }
+    this.write(agent)
+    this.emit('changed', this.list())
+    return agent
   }
 
   save(draft: AgentDraft): AgentProfile {
