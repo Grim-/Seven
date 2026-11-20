@@ -68,6 +68,8 @@ You can run your own local chat and image models on your hardware, or just plug 
 ## Roadmap
 ** Much more thorough themeing support
 
+** Proper language key support to enable UI translations to other languages
+
 ** Experimental 2D top down RPG implementation
 
 ** Improving the data modelling and tools for agents and roleplay.
