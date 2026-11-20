@@ -2,13 +2,12 @@
 
 > Seven is a local desktop app for running AI agents at home — built for roleplay, writing, worldbuilding, and visual/interactive stuff, not coding.
 
-
 NOTE: This is a pre-release version, while mostly working and stable and tested, there might be bugs and other problems, I welcome feedback and idea's how to improve Seven to provide a richer writing and roleplay experience.
 
 
 Almost every agent tool out there is a terminal wrapper built for writing software. Seven is purposely not that. I built it primarily for myself because I wanted somewhere to actually *do* things with agents visually — have character sheets, notes, cards, random tables, maps, and images sitting right there on screen where both you and the agent can see and edit them, all saved locally on your own machine.
 <img width="1920" height="1050" alt="main_demo_image_1" src="https://github.com/user-attachments/assets/133609c3-b61c-4d9a-b647-834d8674a711" />
-
+<img width="1920" height="1050" alt="main_demo_image_2" src="https://github.com/user-attachments/assets/d894ff23-f7b2-4d23-9094-45e2aabc2021" />
 
 
 ---
@@ -45,7 +44,7 @@ You can run your own local chat and image models on your hardware, or just plug 
 4. **Switch Chat to Tabletop** — hit the mode button on the chat bar (or <kbd>Shift+V</kbd>), pick **Tabletop**, and **right-click the background** to place a slate or change the surface backdrop.
 5. **Explore a bit** — type `@` anywhere to link things, hit <kbd>Ctrl+K</kbd> to search and jump anywhere, click your own or the agent's portrait, and right-click stuff. There are a lot of buttons — try them.
 <img width="1920" height="1050" alt="main_demo_image_0" src="https://github.com/user-attachments/assets/89b9418e-8803-4e45-ac6a-823e6b3d4056" />
-
+<img width="1920" height="1050" alt="seven_example_pageediting" src="https://github.com/user-attachments/assets/533c8127-52c2-4219-b3ae-2fcd9b8173aa" />
 
 
 Note : Seven will always be free and open source, a donation link *may* be added a later date but is *neve*r required and is *never mentioned anywhere inside the application*.
