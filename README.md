@@ -72,6 +72,8 @@ You can run your own local chat and image models on your hardware, or just plug 
 
 ** Improving the data modelling and tools for agents and roleplay.
 
+** Test and release the android local network companion app.
+
 Note : Seven will always be free and open source, a donation link *may* be added a later date but is *neve*r required and is *never mentioned anywhere inside the application*.
 
 
