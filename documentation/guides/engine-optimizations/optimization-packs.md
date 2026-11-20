@@ -1,6 +1,6 @@
 # Optimization packs
 
-Built, not yet run. Seven ships three packs in `packs/` at the repo root (copied next to `seven.exe` when packaged): MoE experts in RAM when the model is bigger than VRAM, an 8-bit context cache on GPUs under 8 GB, and the vision adapter in RAM on GPUs under 6 GB. Your own packs go in `packs` in Seven's app data folder; the Packs page imports into it, deletes from it and opens it.
+Seven ships three packs in `packs/` at the repo root (copied next to `seven.exe` when packaged): MoE experts in RAM when the model is bigger than VRAM, an 8-bit context cache on GPUs under 8 GB, and the vision adapter in RAM on GPUs under 6 GB. Your own packs go in `packs` in Seven's app data folder; the Packs page imports into it, deletes from it and opens it.
 
 ## Why
 
@@ -72,12 +72,4 @@ Starting set of conditions: `model` (traits), `architecture`, `paramsAboveB`/`pa
 - IPC: `packs.list` (for a model: matching, not matching, invalid, with reasons), `packs.set` (that model's ordered on-list), `packs.import` (a file into your folder) and `packs.remove` (one of your packs). Agents see nothing of packs.
 - Renderer: `components/models/settings/PacksPage.tsx`, the "From pack" marker in `ParamRow` through `TunableRow`.
 
-## Build order
 
-1. Pack file format, validation and the packs folder; facts; the condition registry with the starting conditions.
-2. Effective config and its use in `serverArgs`, `needsRestart` and the settings pages.
-3. Packs page, the "From pack" marker, search.
-
-## To decide
-
-- Whether packs may also set reply settings (sampling, thinking) or only load settings. Built: any model setting.
