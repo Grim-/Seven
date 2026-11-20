@@ -46,5 +46,7 @@ You can run your own local chat and image models on your hardware, or just plug 
 <img width="1920" height="1050" alt="main_demo_image_0" src="https://github.com/user-attachments/assets/89b9418e-8803-4e45-ac6a-823e6b3d4056" />
 <img width="1920" height="1050" alt="seven_example_pageediting" src="https://github.com/user-attachments/assets/533c8127-52c2-4219-b3ae-2fcd9b8173aa" />
 
+<img width="1839" height="985" alt="seven_making_a_card" src="https://github.com/user-attachments/assets/d5261ec3-fe52-48cb-90ac-796bc371da2b" />
+<img width="1839" height="985" alt="seven_composer" src="https://github.com/user-attachments/assets/6af32811-5f0f-4496-ba96-fd2a7d298de2" />
 
 Note : Seven will always be free and open source, a donation link *may* be added a later date but is *neve*r required and is *never mentioned anywhere inside the application*.
