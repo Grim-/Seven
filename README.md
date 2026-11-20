@@ -77,6 +77,6 @@ You can run your own local chat and image models on your hardware, or just plug 
 Note : Seven will always be free and open source, a donation link *may* be added a later date but is *neve*r required and is *never mentioned anywhere inside the application*.
 
 
-You can download this card and drop it into Seven to import the character Vesper! (And you can export anything like this too)
+You can download this card and drop it into Seven to import the character Vesper! (And you can export anything like this too or as json or markdown in most cases)
 
 <img width="321" height="404" alt="vesper" src="https://github.com/user-attachments/assets/355d6946-43f4-47fe-b6ab-66a5dee32168" />
