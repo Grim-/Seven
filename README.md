@@ -10,7 +10,7 @@ Note:Note: Seven makes use of agentic coding, but I would not call it vibe coded
 Note:Note:Note: This is partially LLM wrote page but I'd hazard to say only 20% where I struggle with formatting.
 
 
-NOTE:WARNING: You are advised to use the edit_file tool with care, attempts have been to limit what destructive calls and box it into a workspace folder, however if enabled, a clever agent can find a way to mess up, further  all tool calls *should* require permission every single time for anything outside of seven, this is disabled by default and not recommended unless you're really sure.
+NOTE:WARNING: You are advised to use the edit_file tool with care, attempts have been to limit what destructive calls and box it into a workspace folder, however if enabled, a clever agent can find a way to mess up, further  all tool calls *should* require permission every single time for anything outside of seven, this module is disabled by default and not recommended unless you're really sure.
 
 Almost every agent tool out there is a terminal wrapper built for writing software. Seven is purposely not that. I built it primarily for myself because I wanted somewhere to actually *do* things with agents visually — have character sheets, notes, cards, random tables, maps, and images sitting right there on screen where both you and the agent can see and edit them, all saved locally on your own machine.
 <img width="1920" height="1050" alt="main_demo_image_1" src="https://github.com/user-attachments/assets/133609c3-b61c-4d9a-b647-834d8674a711" />
