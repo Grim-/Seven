@@ -28,7 +28,7 @@ import type { CardSwap, DeckOwner, DeckRef } from './cardDecks'
 import type { Ambience, AmbienceCue, Theme } from './theme'
 import type { Avatar, AvatarInput } from './avatars'
 import type { StoredFaction } from './game/factions'
-import type { ResolvedAttribution } from './types'
+import type { BundledTileset, ResolvedAttribution } from './types'
 import type { StoredMapObject } from './game/mapObjects'
 import type { StoredTriggerAction } from './game/triggerActions'
 import type { StoredLootTable, ResolvedLootDrop } from './game/lootTables'
@@ -323,7 +323,7 @@ export interface EngineRequests {
   'maps.create': Req<{ name: string }, MapData>
   'maps.save': Req<{ map: MapData }, MapData>
   'maps.import': Req<{ path: string; map: string | null }, MapData>
-  'maps.ensureDefaultTileset': Req<void, AssetMeta | null>
+  'maps.ensureDefaultTileset': Req<void, BundledTileset | null>
   'worlds.maps': Req<{ id: string }, WorldMapUse[]>
   'worlds.useMap': Req<{ id: string; map: string }, WorldMapUse[]>
   'worlds.dropMap': Req<{ id: string; map: string }, WorldMapUse[]>

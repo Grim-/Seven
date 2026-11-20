@@ -35,12 +35,13 @@ export function listBundledPacks(): string[] {
   return files
 }
 
-export async function installStarterPacks(): Promise<{ installed: string[]; skipped: string[] }> {
-  if (secure.enabled && !secure.unlocked) return { installed: [], skipped: [] }
+export async function installStarterPacks(): Promise<{ installed: string[]; skipped: string[]; imported: string[] }> {
+  if (secure.enabled && !secure.unlocked) return { installed: [], skipped: [], imported: [] }
 
   const installedRecord = readJson<Record<string, number>>(TRACKING_FILE, {})
   const installed: string[] = []
   const skipped: string[] = []
+  const imported: string[] = []
 
   for (const filePath of listBundledPacks()) {
     const base = path.basename(filePath)
@@ -49,15 +50,21 @@ export async function installStarterPacks(): Promise<{ installed: string[]; skip
       continue
     }
     try {
-      await portabilityImport({
+      const result = await portabilityImport({
         source: { path: filePath },
-        defaultMode: 'copy',
+        defaultMode: 'skip',
         keepPicture: false
       })
+      const hadMissingModule = result.skipped.some((s) => s.reason.startsWith('Missing module'))
+      if (hadMissingModule && result.imported.length === 0) {
+        skipped.push(base)
+        continue
+      }
       installedRecord[base] = Date.now()
       installed.push(base)
+      for (const item of result.imported) imported.push(item.title)
     } catch (err) {
-      if (isVaultLocked(err)) return { installed, skipped }
+      if (isVaultLocked(err)) return { installed, skipped, imported }
       noteFailure(err, 'portability', `Could not install starter pack "${base}"`)
     }
   }
@@ -70,5 +77,5 @@ export async function installStarterPacks(): Promise<{ installed: string[]; skip
     }
   }
 
-  return { installed, skipped }
+  return { installed, skipped, imported }
 }

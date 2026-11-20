@@ -2089,3 +2089,13 @@ export interface ResolvedAttribution extends AttributionEntry {
   moduleName?: string
   moduleDisabled?: boolean
 }
+
+export interface BundledTileset {
+  asset: AssetMeta
+  name: string
+  tile: { w: number; h: number }
+  columns: number
+  count: number
+  margin: number
+  spacing: number
+}

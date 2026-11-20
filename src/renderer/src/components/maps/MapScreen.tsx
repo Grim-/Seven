@@ -331,22 +331,22 @@ function MapEditor({ source }: { source: MapData }) {
         config.type === 'dungeon'
           ? resolveDungeonTiles(result as any, { firstGid: 1 })
           : resolveOverworldTiles(result as any, { firstGid: 1 })
-      const asset = await engine('maps.ensureDefaultTileset')
-      if (asset) {
-        useData.getState().onAsset(asset.id, asset)
+      const bundled = await engine('maps.ensureDefaultTileset')
+      if (bundled) {
+        useData.getState().onAsset(bundled.asset.id, bundled.asset)
       }
-      let terrainTileset = draft.tilesets.find((t) => t.name === 'terrain-map-v7')
-      if (!terrainTileset && asset) {
+      let terrainTileset = bundled ? draft.tilesets.find((t) => t.name === bundled.name) : undefined
+      if (!terrainTileset && bundled) {
         terrainTileset = {
           id: crypto.randomUUID(),
-          name: 'terrain-map-v7',
-          image: asset.id,
+          name: bundled.name,
+          image: bundled.asset.id,
           first: 1,
-          tile: { w: 32, h: 32 },
-          columns: 124,
-          count: 20956,
-          margin: 0,
-          spacing: 0
+          tile: bundled.tile,
+          columns: bundled.columns,
+          count: bundled.count,
+          margin: bundled.margin,
+          spacing: bundled.spacing
         }
       }
       const groundLayer: TileLayerData = {

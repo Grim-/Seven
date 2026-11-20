@@ -1,0 +1,10 @@
+{
+  "name": "terrain-map-v7",
+  "image": "terrain-map-v7.png",
+  "tileWidth": 32,
+  "tileHeight": 32,
+  "columns": 124,
+  "tileCount": 20956,
+  "margin": 0,
+  "spacing": 0
+}

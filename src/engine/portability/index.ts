@@ -599,8 +599,10 @@ export async function portabilityImport(req: PortableImportRequest): Promise<Por
       return
     }
     const existingId = k.resolve(e.title, USER)
-    const defaultMode: PortableConflictResolution = existingId && e.isDependency ? 'skip' : (req.defaultMode ?? 'copy')
-    const mode = resolutionMap.get(index) ?? defaultMode
+    const conflictMode: PortableConflictResolution = existingId
+      ? (e.isDependency ? 'skip' : (req.defaultMode ?? 'copy'))
+      : 'copy'
+    const mode = resolutionMap.get(index) ?? conflictMode
     if (mode === 'skip') {
       if (existingId) made.push({ kind: e.kind, old: e.id, id: existingId })
       skipped.push({ title: e.title, reason: existingId ? 'Reused existing entry' : 'Skipped by user' })

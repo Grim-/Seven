@@ -180,7 +180,7 @@ export interface PortableImportRequest {
   targetKind?: string | null
   password?: string
   resolutions?: PortableImportResolution[]
-  defaultMode?: CarryMode
+  defaultMode?: PortableConflictResolution
   keepPicture?: boolean
   keepPictureOnly?: boolean
 }

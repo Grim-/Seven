@@ -431,7 +431,18 @@ function warmIndexes(): void {
 }
 
 const runStarterPacks = (): void => {
-  void modules.ready().then(() => installStarterPacks())
+  void modules.ready().then(async () => {
+    const res = await installStarterPacks()
+    if (res.imported.length > 0) {
+      const names = res.imported.slice(0, 6).join(', ')
+      const more = res.imported.length > 6 ? ` (+${res.imported.length - 6} more)` : ''
+      emit('ui.notify', {
+        sessionId: '',
+        title: `Imported ${res.imported.length} starter item${res.imported.length === 1 ? '' : 's'}`,
+        message: `${names}${more}`
+      })
+    }
+  })
 }
 
 vaultEvents.on('unlocked', () => {
