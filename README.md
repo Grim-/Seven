@@ -7,7 +7,7 @@ NOTE: This is a pre-release version, while mostly working and stable and tested,
 Note:Note: Seven makes use of agentic coding, but I would not call it vibe coded I have been a developer long before the advent of LLM's, and have applied the best practices, patterns and designs that I could reasonably apply to keep Seven modular and flexible, pains (oh great pain..) has been taken to ensure the important parts of the app have been reviewed, all of the app has been personally test by me. However this does not mean there may not be issues and I am happy to address these but I am full time carer developing this for my own use, as such I welcome any help or additions, please use the discussions tab if you want to help in anyway or have suggestions.
 
 
-Note:Note:Note: This is partially LLM wrote but I'd hazard to say only 20% where I struggle with formatting.
+Note:Note:Note: This is partially LLM wrote page but I'd hazard to say only 20% where I struggle with formatting.
 
 
 Almost every agent tool out there is a terminal wrapper built for writing software. Seven is purposely not that. I built it primarily for myself because I wanted somewhere to actually *do* things with agents visually — have character sheets, notes, cards, random tables, maps, and images sitting right there on screen where both you and the agent can see and edit them, all saved locally on your own machine.
