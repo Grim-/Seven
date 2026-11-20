@@ -741,7 +741,7 @@ function WidgetSlate({
       onContextMenu={handleContextMenu}
       className={cn(
         'pointer-events-auto absolute',
-        pose.expanded ? (active ? 'z-35' : 'z-30') : 'z-10'
+        pose.expanded ? (active ? 'z-[55]' : 'z-[50]') : 'z-[45]'
       )}
     >
       {slateNode}
@@ -1161,7 +1161,7 @@ export function BoardTabletop({
 
       <div
         key={`${activeSlot.id}:${layoutMode}`}
-        className={isGrid ? 'pointer-events-auto relative z-25 min-h-full w-full' : 'pointer-events-none absolute inset-0'}
+        className={isGrid ? 'pointer-events-auto relative z-[45] min-h-full w-full' : 'pointer-events-none absolute inset-0'}
       >
         {isGrid ? (
           <div ref={gridContainerRef} className="min-h-full w-full">
