@@ -4,13 +4,20 @@
 
 NOTE: This is a pre-release version, while mostly working and stable and tested, there might be bugs and other problems, I welcome feedback and idea's how to improve Seven to provide a richer writing and roleplay experience.
 
-Note:Note: Seven makes use of agentic coding, but I would not call it vibe coded I have been a developer long before the advent of LLM's, and have applied the best practices, patterns and designs that I could reasonably apply to keep Seven modular and flexible, pains (oh great pain..) has been taken to ensure the important parts of the app have been reviewed, all of the app has been personally test by me. However this does not mean there may not be issues and I am happy to address these but I am full time carer developing this for my own use, as such I welcome any help or additions, please use the discussions tab if you want to help in anyway or have suggestions.
+Note: Note: Seven makes use of agentic coding, but I would not call it vibe coded I have been a developer long before the advent of LLM's, and have applied the best practices, patterns and designs that I could reasonably apply to keep Seven modular and flexible, pains (oh great pain..) has been taken to ensure the important parts of the app have been reviewed, all of the app has been personally test by me. However this does not mean there may not be issues and I am happy to address these but I am full time carer developing this for my own use, as such I welcome any help or additions, please use the discussions tab if you want to help in anyway or have suggestions.
 
 
-Note:Note:Note: This is partially LLM wrote page but I'd hazard to say only 20% where I struggle with formatting.
+Note: Note: Note: This is partially LLM wrote page but I'd hazard to say only 20% where I struggle with formatting.
 
 
-NOTE:WARNING: You are advised to use the edit_file tool with care, attempts have been to limit what destructive calls and box it into a workspace folder, however if enabled, a clever agent can find a way to mess up, further  all tool calls *should* require permission every single time for anything outside of seven, this module is disabled by default and not recommended unless you're really sure.
+NOTE: WARNING: You are advised to use the edit_file tool with care, attempts have been to limit what destructive calls and box it into a workspace folder, however if enabled, a clever agent can find a way to mess up, further  all tool calls *should* require permission every single time for anything outside of seven, this module is disabled by default and not recommended unless you're really sure.
+
+
+## Known Issues
+Current remote models cannot properly invoke the vision tool.
+Hydration of certain kind values and actions injected into the prompt is currently broken due to an update to the prompt freezing mechanism, this powers the linking mechanism and currently causes a prompt refresh if a linked stat changes due to a buff. Expect this to be fixed before anything else.
+
+
 
 Almost every agent tool out there is a terminal wrapper built for writing software. Seven is purposely not that. I built it primarily for myself because I wanted somewhere to actually *do* things with agents visually — have character sheets, notes, cards, random tables, maps, and images sitting right there on screen where both you and the agent can see and edit them, all saved locally on your own machine.
 <img width="1920" height="1050" alt="main_demo_image_1" src="https://github.com/user-attachments/assets/133609c3-b61c-4d9a-b647-834d8674a711" />
@@ -80,16 +87,7 @@ You can run your own local chat and image models on your hardware, or just plug 
 ** Test and release the android local network companion app.
 
 
-
-## Known Issues
-Current remote models cannot properly invoke the vision tool.
-Hydration of certain kind values and actions injected into the prompt is currently broken, a fix will be released shortly !
-
 Note : Seven will always be free and open source, a donation link *may* be added a later date but is *neve*r required and is *never mentioned anywhere inside the application*.
-
-
-
-
 
 
 You can download this card and drop it into Seven to import the character Vesper! (And you can export anything like this too or as json or markdown in most cases)
