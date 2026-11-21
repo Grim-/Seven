@@ -16,7 +16,9 @@ NOTE: WARNING: You are advised to use the edit_file tool with care, attempts hav
 
 ## Known Issues
 - Current remote models cannot properly invoke the vision tool.
+
 - Hydration of certain kind values and actions injected into the prompt is currently broken due to an update to the prompt freezing mechanism, this powers the linking mechanism and currently causes a prompt refresh if a linked stat changes due to a buff. Expect this to be fixed before anything else.
+(Experimental PlayMode Agent-DM Mode broke this with its changes!)
 
 
 ## On with the good stuff
