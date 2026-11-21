@@ -83,7 +83,7 @@ You can run your own local chat and image models on your hardware, or just plug 
 
 ## Known Issues
 Current remote models cannot properly invoke the vision tool.
-
+Hydration of certain kind values and actions injected into the prompt is currently broken, a fix will be released shortly !
 
 Note : Seven will always be free and open source, a donation link *may* be added a later date but is *neve*r required and is *never mentioned anywhere inside the application*.
 
