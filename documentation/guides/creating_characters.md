@@ -3,13 +3,10 @@
 A link works in any field, and it's read fresh every time an agent reads the entry.
 So a character sheet doesn't have to describe one person. It can describe a kind of person, and come out different each time. 
 
-See [Small pages, linked together](linking.md) for the idea behind it.
 
 Let's build one: a wildling druid.
 
 <img width="1920" height="1050" alt="image" src="https://github.com/user-attachments/assets/32575fb5-f7ee-49a0-9083-0ef272d04ad9" />
-
-
 
 
 ## The body
