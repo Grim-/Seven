@@ -55,3 +55,10 @@ And here we have one random feral druid.
 <img width="1920" height="1050" alt="image" src="https://github.com/user-attachments/assets/fa41b1f9-5964-4ee4-a9f8-ceccc04f55d6" />
 <img width="1920" height="1050" alt="image" src="https://github.com/user-attachments/assets/d03254e6-1f78-4819-8284-58fe640f149e" />
 
+
+Same character sheet, new chat, vaguely the same but different wilding druid. Hopefully this provides an idea of how you can using links and various repos, and custom character sheets and stats enable varied behaviours in the agents characters, and interact with them via roleplay or the systemic gameplay of cards (which can be used on agents with a variety of effects - including buffs and debuffs that affect stats!)
+
+
+<img width="1920" height="1050" alt="image" src="https://github.com/user-attachments/assets/fbbbe8f1-240e-47f0-b32d-9bdafcd4ff50" />
+
+
