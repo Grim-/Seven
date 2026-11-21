@@ -21,7 +21,9 @@ Start with a basic character sheet and add a few fields:
 | Traits | `@repo:character_traits:value` |
 | Backstory | `@page:raised_alone_in_the_woods` |
 
-Every time the sheet goes into an agent's prompt, the repos roll again. Red-haired half-orc one scene, silver-haired elf the next. The backstory is a page you wrote once, so she always grew up alone in the woods.
+Every time the sheet goes into an agent's prompt, the repos roll again. Red-haired half-orc one scene, silver-haired elf the next. 
+
+The backstory is a page you wrote once, so she always grew up alone in the woods.
 
 <img width="1920" height="1050" alt="image" src="https://github.com/user-attachments/assets/6326c5e0-747c-4bf3-b5bb-4b90f0c635dd" />
 
@@ -53,7 +55,9 @@ And here we have one random feral druid.
 <img width="1920" height="1050" alt="image" src="https://github.com/user-attachments/assets/d03254e6-1f78-4819-8284-58fe640f149e" />
 
 
-Same character sheet, new chat, vaguely the same but different wilding druid. Hopefully this provides an idea of how you can using links and various repos, and custom character sheets and stats enable varied behaviours in the agents characters, and interact with them via roleplay or the systemic gameplay of cards (which can be used on agents with a variety of effects - including buffs and debuffs that affect stats!)
+Same character sheet, new chat, vaguely the same but different wilding druid.
+
+Hopefully this provides an idea of how you can using links and various repos, and custom character sheets and stats enable varied behaviours in the agents characters, and interact with them via roleplay or the systemic gameplay of cards (which can be used on agents with a variety of effects - including buffs and debuffs that affect stats!)
 
 
 <img width="1920" height="1050" alt="image" src="https://github.com/user-attachments/assets/fbbbe8f1-240e-47f0-b32d-9bdafcd4ff50" />
