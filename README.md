@@ -92,6 +92,8 @@ You can run your own local chat and image models on your hardware, or just plug 
 
 ** Proper language key support to enable UI translations to other languages
 
+** Demo data for the various kinds you can import via cards.
+
 ** Experimental 2D top down RPG implementation
 
 ** Improving the data modelling and tools for agents and roleplay.
