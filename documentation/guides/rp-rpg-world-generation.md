@@ -1,5 +1,9 @@
 # RP-RPG World Generation Guide (For Outside Agents)
 
+
+NOTE : NOT YET FULLY IMPLEMENTED - You can ignore this page for the moment but it provides an idea of you can go from prompt to world creation -> map generation -> filling the world with a sufficient model.
+
+
 Use this guide to instruct an **outside AI agent** (Claude, GPT, Gemini, Cursor, etc.) to generate a complete, cohesive **RP-RPG vertical slice** as an **importable Seven JSON bundle** (`PortableJsonEnvelope` v3) that you can import directly into Seven (`Data → Import` or `resources/packs/`) and tweak in the UI.
 
 > **Why this format**: Outside agents don't have access to Seven's runtime tools, and map generation is deferred for later. Everything below compiles into a single valid `.json` file that Seven's importer unpacks into **Character Sheets**, **Trigger Actions**, **Game Pieces**, **Places (`Looks` + `Exits`)**, **Custom Lore**, and **World Opening (`launch`)**.
