@@ -69,6 +69,7 @@ You can run your own local chat and image models on your hardware, or just plug 
 
 ## Roadmap
 ** Much more thorough themeing support
+<img width="2752" height="1536" alt="themeslices" src="https://github.com/user-attachments/assets/dfe71158-92ed-45ae-9065-c31efc8ce10f" />
 
 ** Proper language key support to enable UI translations to other languages
 
