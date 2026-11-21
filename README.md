@@ -1,7 +1,5 @@
 # Seven
 
-> Seven is a local desktop app for running AI agents at home — built for roleplay, writing, worldbuilding, and visual/interactive stuff, not coding.
-
 NOTE: This is a pre-release version, while mostly working and stable and tested, there might be bugs and other problems, I welcome feedback and idea's how to improve Seven to provide a richer writing and roleplay experience.
 
 
@@ -20,6 +18,10 @@ NOTE: WARNING: You are advised to use the edit_file tool with care, attempts hav
 - Current remote models cannot properly invoke the vision tool.
 - Hydration of certain kind values and actions injected into the prompt is currently broken due to an update to the prompt freezing mechanism, this powers the linking mechanism and currently causes a prompt refresh if a linked stat changes due to a buff. Expect this to be fixed before anything else.
 
+
+## On with this good stuff
+
+> Seven is a local desktop app for running AI agents at home — built for roleplay, writing, worldbuilding, and visual/interactive stuff, not coding.
 
 
 Almost every agent tool out there is a terminal wrapper built for writing software. 
