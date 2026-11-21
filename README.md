@@ -83,6 +83,8 @@ You can run your own local chat and image models on your hardware, or just plug 
 
 4: You can click the various image fields such as a character sheet and if you have sd-server installed and set up (you need to use the download and find a proper image generation model) it can directly pass in the character sheet fields generate the image and assign it.
 
+5: I am building a series of to the point guides showing different ways you can use the various kinds of seven, and the customization features.
+
 
 ## Roadmap
 ** Much more thorough themeing support
