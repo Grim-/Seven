@@ -21,7 +21,9 @@ Start with a basic character sheet and add a few fields:
 | Traits | `@repo:character_traits:value` |
 | Backstory | `@page:raised_alone_in_the_woods` |
 
-Every time the sheet goes into an agent's prompt, the repos roll again. Red-haired half-orc one scene, silver-haired elf the next. 
+Choose what stays. :value stays a live link and picks a fresh result each time the sheet is loaded into a new scene. :roll rolls immediately right where you type it and bakes the result into the sheet as plain text—handy if you want to lock in a random name or trait for good. 
+
+So you can have a Red-haired half-orc one scene or silver-haired elf the next.
 
 The backstory is a page you wrote once, so she always grew up alone in the woods.
 
