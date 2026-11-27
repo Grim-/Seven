@@ -83,12 +83,16 @@ You can run your own local chat and image models on your hardware, or just plug 
 
 4: You can click the various image fields such as a character sheet and if you have sd-server installed and set up (you need to use the download and find a proper image generation model) it can directly pass in the character sheet fields generate the image and assign it.
 
+5: I am building a series of to the point guides showing different ways you can use the various kinds of seven, and the customization features. These are not yet all complete, but can be found at https://github.com/Grim-/Seven/tree/main/documentation/guides 
+
 
 ## Roadmap
 ** Much more thorough themeing support
 <img width="2752" height="1536" alt="themeslices" src="https://github.com/user-attachments/assets/dfe71158-92ed-45ae-9065-c31efc8ce10f" />
 
 ** Proper language key support to enable UI translations to other languages
+
+** Demo data for the various kinds you can import via cards.
 
 ** Experimental 2D top down RPG implementation
 

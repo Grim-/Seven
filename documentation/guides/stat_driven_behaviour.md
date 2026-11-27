@@ -1,6 +1,6 @@
 # Stats and rules: make your own mechanics
 
-Seven doesn't decide what your game tracks. You do. A stat can be Strength or Health, but it can just as easily be Anger, Trust, Fear or how drunk someone is. Link it into a short rules page and the agent plays by it. See [Small pages, linked together](linking.md) for the idea behind it.
+Seven doesn't decide what your game tracks. You do. A stat can be Strength or Health, but it can just as easily be Anger, Trust, Fear or how drunk someone is. Link it into a short rules page and the agent plays by it.
 
 ## 1. A stat that explains itself
 
