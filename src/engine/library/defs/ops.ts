@@ -551,7 +551,7 @@ export function claimLink(seen: Set<string>, kind: string, ref: string, part: st
 
 function linksToHydrate(text: string, mentions: boolean): { kind: string; ref: string; part: string | null }[] {
   const alone = new RegExp(`^${referencePattern().source}$`, 'i')
-  return text.split('\n').flatMap((line) => {
+  return text.split('\n').flatMap((line): { kind: string; ref: string; part: string | null }[] => {
     const m = alone.exec(line.trim())
     if (m && !m[4] && m[5]?.toLowerCase() !== 'random') return [{ kind: m[2], ref: m[3], part: m[5] ?? null }]
     if (!mentions) return []

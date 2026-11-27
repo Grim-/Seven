@@ -451,6 +451,8 @@ export const REMOTE_ENGINE: Record<EngineRequestName, RemoteLevelId> = {
   'npcs.copyToSheet': 'full',
   'npcs.promoteToSheet': 'full',
   'npcs.copyFromSheet': 'full',
+  'relations.backs': 'chat',
+  'relations.put': 'full',
   'library.rollText': 'chat',
   'library.remove': 'full',
   'library.clearKind': 'full',
