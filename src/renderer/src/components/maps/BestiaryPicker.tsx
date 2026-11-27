@@ -53,7 +53,7 @@ export function BestiaryPicker({ world, map, at, onDone }: { world: string; map:
         <Select value={from} options={sources.map((s) => ({ value: s.id, label: s.label }))} onChange={setSource} className="h-8 w-44 text-[12px]" />
         <SearchBox value={query} onChange={setQuery} placeholder="Search" className="flex-1" />
       </div>
-      <div className="flex max-h-64 flex-col divide-y divide-line/30 overflow-y-auto border border-line/40 bg-black/40">
+      <div className="flex max-h-64 flex-col divide-y divide-line/30 overflow-y-auto border border-line/40 tone-panel-40">
         {rows.length === 0 && <div className="p-3 text-center text-[11px] text-dim">Nothing matches.</div>}
         {rows.map((row) => (
           <button
@@ -64,10 +64,10 @@ export function BestiaryPicker({ world, map, at, onDone }: { world: string; map:
               pick(row)
               spawn()
             }}
-            className={cn('flex items-center justify-between gap-3 p-2 text-left', picked?.id === row.id ? 'border-l-2 border-l-cyan bg-cyan/10 text-white' : 'text-faint hover:bg-panel hover:text-white')}
+            className={cn('flex items-center justify-between gap-3 p-2 text-left', picked?.id === row.id ? 'border-l-2 border-l-secondary-ink bg-secondary-ink/10 text-ink' : 'text-faint hover:bg-ink/5 hover:text-ink')}
           >
-            <span className="truncate font-mono text-[12px] font-bold">{row.name}</span>
-            <span className="flex shrink-0 gap-3 font-mono text-[10px] text-dim">
+            <span className="truncate font-ui text-[12px] font-bold">{row.name}</span>
+            <span className="flex shrink-0 gap-3 font-ui text-[10px] text-dim">
               {row.facts.map((f) => (
                 <span key={f.label}>
                   {f.label} {f.value}

@@ -71,7 +71,7 @@ function ImageServerPanel({ state }: { state: InstallHelperState }) {
       </div>
       {host.args.length > 0 && (
         <Fold label="Command line">
-          <div className="px-3.5 pb-3 font-mono text-[11.5px] text-white/85">{host.args.join(' ')}</div>
+          <div className="px-3.5 pb-3 font-ui text-[11.5px] text-ink/85">{host.args.join(' ')}</div>
         </Fold>
       )}
       <Fold label="Log" count={host.log.length}>

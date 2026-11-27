@@ -60,12 +60,12 @@ export function WorldTriggers({ world }: Props) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 font-mono select-none">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 font-ui select-none">
       {/* HEADER & FILTERS */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-2.5">
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-cyan" />
-          <span className="text-[12px] font-bold uppercase tracking-wider text-white">
+          <Zap className="h-4 w-4 text-secondary-ink" />
+          <span className="text-[12px] font-bold caps-5 text-ink">
             WORLD TRIGGERS
           </span>
           <span className="text-[11px] text-dim">
@@ -103,14 +103,14 @@ export function WorldTriggers({ world }: Props) {
             return (
               <div
                 key={`${mapId}-${t.id}`}
-                className="flex flex-col justify-between border border-line/60 bg-black/60 p-3 hover:border-line"
+                className="flex flex-col justify-between border border-line/60 tone-well-60 p-3 hover:border-line"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-[13px] font-bold text-white truncate">
+                    <span className="text-[13px] font-bold text-ink truncate">
                       {t.name}
                     </span>
-                    <span className="border border-cyan/40 bg-cyan/15 px-1.5 py-0.5 text-[9px] font-bold text-cyan uppercase tracking-wider">
+                    <span className="border border-secondary-ink/40 bg-secondary-ink/15 px-1.5 py-0.5 text-[9px] font-bold text-secondary-ink caps-5 ">
                       {def?.label ?? t.type}
                     </span>
                   </div>
@@ -129,9 +129,9 @@ export function WorldTriggers({ world }: Props) {
 
                   {/* CONDITIONS */}
                   <div className="mt-2 flex flex-col gap-0.5 text-[10.5px] text-dim">
-                    {t.needsItem && <div>Requires item: <strong className="text-white">{t.needsItem}</strong></div>}
-                    {t.needsFlag && <div>Requires flag: <strong className="text-white">{t.needsFlag}</strong></div>}
-                    {t.setsFlag && <div>Sets flag: <strong className="text-cyan">{t.setsFlag}</strong></div>}
+                    {t.needsItem && <div>Requires item: <strong className="text-ink">{t.needsItem}</strong></div>}
+                    {t.needsFlag && <div>Requires flag: <strong className="text-ink">{t.needsFlag}</strong></div>}
+                    {t.setsFlag && <div>Sets flag: <strong className="text-secondary-ink">{t.setsFlag}</strong></div>}
                   </div>
                 </div>
 

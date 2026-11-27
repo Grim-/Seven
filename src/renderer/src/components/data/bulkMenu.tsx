@@ -1,14 +1,14 @@
 import { ArrowUpToLine, FolderInput, Hash, Minus, Plus, Trash2, X } from 'lucide-react'
 import { isAssetId, showName } from '@shared/ids'
 import { pageKindOf, type PageMeta } from '@shared/types'
-import { askText, confirmDelete, type MenuItem } from '../ui'
+import { askPick, askText, confirmDelete, type MenuItem } from '../ui'
 import { engine } from '../../lib/ipc'
 import { failed } from '../../lib/notify'
-import { useData } from '../../store/data'
+import { entryRef, useData } from '../../store/data'
 
 function entryOf(id: string): string {
   if (isAssetId(id)) return `file/${id}`
-  return `${pageKindOf(useData.getState().pages.find((p) => p.id === id)?.type)}/${id}`
+  return entryRef(pageKindOf(useData.getState().pages.find((p) => p.id === id)?.type), id)
 }
 
 export function moveEntries(ids: string[], parent: string | null): Promise<void> {
@@ -39,19 +39,25 @@ export function tagItems(ids: string[]): MenuItem[] {
   ]
 }
 
-export function moveItems(ids: string[], then?: (parent: string | null) => void): MenuItem[] {
+export function askMoveUnder(ids: string[], then?: (parent: string | null) => void): void {
   const picked = new Set(ids)
   const targets = useData
     .getState()
     .pages.filter((p: PageMeta) => !picked.has(p.id))
     .sort((a, b) => a.title.localeCompare(b.title))
-  return targets.length ? targets.map((t) => ({ label: showName(t.title), onSelect: () => void moveEntries(ids, t.id).then(() => then?.(t.id)) })) : [{ label: 'No other pages', disabled: true }]
+  if (!targets.length) return
+  const options = targets.map((t) => ({
+    value: t.id,
+    label: showName(t.title),
+    group: t.type === 'folder' ? 'Folders' : 'Pages'
+  }))
+  askPick('Move under…', options, (targetId) => moveEntries(ids, targetId).then(() => then?.(targetId)), 'Filter folders or pages…')
 }
 
 export function bulkItems(ids: string[], options: { onMoved?: (parent: string | null) => void; onClear?: () => void } = {}): MenuItem[] {
   return [
     { label: 'Tags', icon: <Hash />, children: tagItems(ids) },
-    { label: 'Move under', icon: <FolderInput />, children: moveItems(ids, options.onMoved) },
+    { label: 'Move under…', icon: <FolderInput />, onSelect: () => askMoveUnder(ids, options.onMoved) },
     { label: 'Move to top level', icon: <ArrowUpToLine />, onSelect: () => void moveEntries(ids, null).then(() => options.onMoved?.(null)) },
     ...(options.onClear ? [{ label: 'Clear selection', icon: <X />, onSelect: options.onClear }] : []),
     { label: '', separator: true },

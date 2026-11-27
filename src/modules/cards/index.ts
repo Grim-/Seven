@@ -20,6 +20,7 @@ import { addCard, addSet, deckCards, setDeckOwner, takeCard } from '../../engine
 import { playCardForAgent } from '../../engine/cards/play'
 import { agentAccess } from '../../engine/agents/access'
 import { worlds } from '../../engine/worlds/store'
+import { bindingOrNull } from '../../engine/worlds/ops'
 import { ifMissing } from '../../engine/util/report'
 import { CardError, cleanCard, cleanDeck, cleanLayout, cleanSet, type CardData, type CardSetData } from './clean'
 import html from './cards.html?raw'
@@ -128,7 +129,7 @@ const factory: ModuleFactory = (sdk) =>
     private chatDeck(ctx: ToolContext): DeckRef {
       if (!ctx.sessionId || !ctx.agentId) throw new sdk.ToolError('Cards can only be given or taken in a chat with an agent.')
       const agent = agentAccess.get(ctx.agentId)
-      const world = agent?.world?.worldId ?? null
+      const world = bindingOrNull(ctx.agentId)?.worldId ?? null
       return userSide(chatPlayer(agent, world ? ifMissing(() => worlds.meta(world).player, null) : null))
     }
 

@@ -1,4 +1,5 @@
 import { stripRef, toId } from '@shared/ids'
+import { PLACE_TYPE_KEY, worldLink } from '@shared/world'
 import { cleanElements } from '@shared/chatElements'
 import { allRepos, getRepo, saveRepo } from './library/repos'
 import { guideModules, guideText, moduleGuidePreview } from './chat/context'
@@ -7,10 +8,12 @@ import { places } from './user/places'
 import { HUB_TOKEN, hubFileInfo, hubFiles, hubRepoFacts, searchHub } from './model/hub'
 import { downloads } from './model/downloads'
 import { serviceKeys } from './model/keys'
-import { getSheet, saveSheet, setSheetFaction, sheetIds } from './library/sheets'
+import { getSheet, saveSheet, setSheetFaction, setSheetImage, sheetIds } from './library/sheets'
+import { putRelation, relationBacks } from './library/relationsHeld'
 import { customCommands } from './commands/custom'
 import type { EngineRequestName, EngineRequests, EngineWireRequest, Events } from '@shared/protocol'
-import type { AgentProfile, CompanionRole, DownloadItem, ImageModelConfig } from '@shared/types'
+import { agentSheets, type AgentProfile, type CompanionRole, type DownloadItem, type ImageModelConfig, type ModelKind } from '@shared/types'
+import { missingRecipeSlots, resolveImageArchSpec } from '@shared/imageModels'
 import { ModelRegistry } from './model/registry'
 import { ModelHost } from './model/host'
 import { ImageHost } from './image/host'
@@ -33,7 +36,8 @@ import { DEFAULT_RULES, PermissionStore } from './permissions/rules'
 import { CheckpointStore } from './checkpoints/store'
 import { detectShell } from './tools/shell'
 import { data } from './data/hub'
-import { kindFolders } from './data/kindFolders'
+import { saveFolders } from './data/saveFolders'
+import { placeAnswer, placeFile, placeIn, placeRows } from './data/placement'
 import { importToLibrary } from './data/importing'
 import { EXERCISES_FORMAT, WORKOUTS_FORMAT, workout } from './workout/store'
 import { createSlideshow, saveSlideshow } from './library/slideshows'
@@ -61,7 +65,7 @@ import { commandInfo, commandsFor, runCommand } from './commands/registry'
 import type { Ambience, AmbienceCue, Theme } from '@shared/theme'
 import type { Avatar } from '@shared/avatars'
 import { tags as tagStore } from './library/tags'
-import { setGuideSource, specialPages, USER, allKinds, kinds as libraryKinds, clearKind, kindInfo, removeEntry, renameEntry, rollText, drawEntry, drawableEntries, previewEntry, find as libraryFind, overview as libraryOverview, resolveEntry, partView, timelineRows, describeEvent, resolveRoutineEntry, entryInside } from './library/kinds'
+import { setGuideSource, specialPages, USER, allKinds, clearKind, kindInfo, removeEntry, renameEntry, duplicateEntry, rollText, drawEntry, drawableEntries, previewEntry, find as libraryFind, overview as libraryOverview, resolveEntry, partView, timelineRows, describeEvent, resolveRoutineEntry, entryInside, kindOfPageType, entryExists } from './library/kinds'
 import { contextPrefs } from './chat/prefs'
 import { modules } from './modules/registry'
 import { setAgentAccess } from './agents/access'
@@ -81,6 +85,7 @@ import { ChatSearch } from './search'
 import { linkedFolders } from './folders/store'
 import { reminders } from './reminders/store'
 import { exportToFolder } from './library/folderExport'
+import { syncModuleKinds } from './library/moduleKinds'
 import { apiProbe, apiTest, listRemoteModels } from './model/apiChat'
 import { timeline } from './timeline/store'
 import { routines } from './routines/store'
@@ -107,11 +112,31 @@ import { entryField, entryFields, resolveIncludes } from './library/includes'
 import { mapReaders } from './maps/mapReaders'
 import { visitorsOf, whoIsHere } from './worlds/presence'
 import { worldEvents } from './worlds/events'
+import './worlds/eventPart'
+import './worlds/placePart'
+import './worlds/factionPart'
+import './worlds/knowledgePart'
+import './worlds/npcPart'
+import { npcs } from './worlds/npcs'
+import { stampNpcs } from './worlds/npcStamp'
+import {
+  copyNpcToSheet,
+  copySheetToNpc,
+  hasSaveNpcOverrides,
+  promoteNpcToSheet,
+  resetNpcInSave,
+  writeNpcToTemplate
+} from './worlds/npcLifecycle'
+import { actorLink } from '@shared/worldNpcs'
+import './effects/acts/event'
+import { backupConversions, pendingConversions, runConversions } from './conversions'
 import { journalAction, watchJourneys } from './worlds/journeys'
 import { toolsets } from './toolsets/store'
 import { skills } from './skills'
 import { setBrowserOpener, setChatNudge, setViewNotifier } from './modules/sdk'
 import { setBindingResolver } from './worlds/ops'
+import { characterBinding, destinations, moveCharacter, placeCharacter, removeCharacter, whereabouts, worldOfSheet } from './worlds/members'
+import { chatWorld, sheetsOutside } from './worlds/chatWorld'
 import type { ChatMessage, ModuleInfo } from '@shared/types'
 import os from 'node:os'
 import path from 'node:path'
@@ -135,9 +160,13 @@ import { spawnCreature, updateCreature } from './worlds/creatures'
 import { wakeMapSpawners } from './worlds/spawners'
 import { blueprintSources, searchBlueprints, spawnBlueprint } from './worlds/blueprints'
 import { saveInPlay } from './worlds/playLayer'
-import { adoptOldPlay, bring, copyWorldSave, createNewWorldSave, removeSave, removeWorldSaves, takeOut, travel } from './worlds/party'
+import { addPartyMember, adoptOldPlay, bring, copyWorldSave, createNewWorldSave, removePartyMember, removeSave, removeWorldSaves, setParty, takeOut, travel, travelParty } from './worlds/party'
 import { decisions, storyActions } from '../modules/decisions/store'
 import { factions } from './factions/store'
+import { grantKnowledge, knowledge, worldsOfSheet } from './worlds/knowledge'
+import { campaignHold, saveHold } from './library/holds'
+import { cleanHold } from '@shared/characterHold'
+import { splitKnowledgeRef } from '@shared/worldKnowledge'
 import { mapObjectsStore } from './mapObjects/store'
 import { triggerActionsStore } from './triggerActions/store'
 import { runEffects } from './effects/run'
@@ -189,7 +218,11 @@ process.on('uncaughtException', (err) => {
 data.setEmitter(emit)
 registerCoreAttributions()
 creditsEvents.on('changed', () => emit('credits.changed', {}))
-modules.on('changed', (list: ModuleInfo[]) => emit('tools.changed', list))
+modules.on('changed', (list: ModuleInfo[]) => {
+  const gone = syncModuleKinds(new Set(list.filter((m) => m.state === 'on' || m.state === 'loading').map((m) => m.id)), modules.pageTypesOff())
+  for (const kind of gone) emit('kind.removed', { kind })
+  emit('tools.changed', list)
+})
 registerWorkoutExport()
 registerEntryExports()
 void modules.start()
@@ -242,6 +275,8 @@ const agentFolder = (): string | null => {
 }
 data.pages.setDefaultParent(agentFolder)
 data.assets.setDefaultParent(agentFolder)
+data.pages.setPlacer((type) => placeIn(kindOfPageType(type), agentFolder()))
+data.assets.setPlacer((source) => placeFile(source.tool, agentFolder()))
 const sessions = new SessionStore()
 sessions.useIncognito((agentId) => agents.getOrDefault(agentId).incognito === true)
 const requests = new UiRequests()
@@ -261,7 +296,11 @@ setGuideSource({
 
 setupCommands({ runner, sessions, agents })
 
-setBindingResolver((agentId) => (agentId ? (agents.getOrDefault(agentId).world ?? null) : null))
+setBindingResolver((agentId) => {
+  if (!agentId) return null
+  const agent = agents.getOrDefault(agentId)
+  return characterBinding([...new Set([agent.sheet, ...(agent.sheets ?? [])].filter((s): s is string => !!s))])
+})
 
 const ROLE_CONFIG_KEY: Partial<Record<CompanionRole, keyof Pick<ImageModelConfig, 'vae' | 'tae' | 'clipL' | 'clipG' | 't5xxl' | 'llm' | 'llmVision'>>> = {
   vae: 'vae',
@@ -278,13 +317,60 @@ downloads.on('changed', (list) => emit('downloads.changed', list))
 downloads.on('completed', ({ item, files }: { item: DownloadItem; files: { target: string; role?: CompanionRole }[] }) => {
   void (async () => {
     const folders = [...new Set([...models.list().map((m) => m.folder).filter((f): f is string => Boolean(f)), item.folder])]
-    const list = await models.scan(folders)
-    const byPath = new Map(list.map((m) => [path.resolve(m.path).toLowerCase(), m]))
+    models.scan(folders)
+    // CRITICAL: fillInfo() MUST complete BEFORE auto-matching companions or checking model kinds,
+    // otherwise newly downloaded diffusion checkpoints & companions have info=undefined and won't
+    // show up in Image Generator or match VAE/CLIP/T5/LLM slots!
+    await models.fillInfo()
+    const list = models.allEntries()
+    const byPath = new Map(list.filter((m) => !m.remote && m.path).map((m) => [path.resolve(m.path).toLowerCase(), m]))
     const primaryTarget = files.find((f) => f.role === 'model')?.target ?? item.path
     const mainEntry =
       (item.targetModelId ? list.find((m) => m.id === item.targetModelId) : undefined) ??
       (primaryTarget ? byPath.get(path.resolve(primaryTarget).toLowerCase()) : undefined)
     if (!mainEntry) return
+
+    const ROLE_KIND: Partial<Record<CompanionRole, ModelKind>> = {
+      vae: 'vae',
+      tae: 'vae',
+      clipL: 'text_encoder',
+      clipG: 'text_encoder',
+      t5xxl: 'text_encoder',
+      llm: 'text_encoder',
+      llmVision: 'projector',
+      lora: 'lora'
+    }
+    for (const f of files) {
+      const roleKind = f.role ? ROLE_KIND[f.role] : undefined
+      if (!roleKind) continue
+      const companionEntry = byPath.get(path.resolve(f.target).toLowerCase())
+      if (companionEntry && companionEntry.info?.kind !== roleKind) {
+        models.setKind(companionEntry.id, roleKind)
+      }
+    }
+
+    if (item.expectedKind && item.expectedKind !== 'image') {
+      if (mainEntry.info?.kind !== item.expectedKind) {
+        models.setKind(mainEntry.id, item.expectedKind)
+      }
+      return
+    }
+
+    const hasCompanionRoles = files.some(
+      (f) => f.role === 'vae' || f.role === 'tae' || f.role === 'clipL' || f.role === 'clipG' || f.role === 't5xxl' || f.role === 'llm'
+    )
+    const isPackOrImageDownload =
+      item.expectedKind === 'image' ||
+      Boolean(item.imageConfig) ||
+      hasCompanionRoles ||
+      mainEntry.info?.kind === 'image'
+
+    if (!isPackOrImageDownload) return
+
+    if (mainEntry.info?.kind !== 'image') {
+      models.setKind(mainEntry.id, 'image')
+    }
+
     const patch: Partial<ImageModelConfig> = { ...(item.imageConfig ?? {}) }
     for (const f of files) {
       const slotKey = f.role ? ROLE_CONFIG_KEY[f.role] : undefined
@@ -293,7 +379,24 @@ downloads.on('completed', ({ item, files }: { item: DownloadItem; files: { targe
       patch[slotKey] = entry?.id ?? f.target
     }
     if (Object.keys(patch).length > 0) models.setImageConfig(mainEntry.id, patch)
-    models.autoMatchImageCompanions(mainEntry.id)
+    const finalCfg = models.autoMatchImageCompanions(mainEntry.id)
+
+    if (!models.getDefaultImageModel()) {
+      models.setDefaultImageModel(mainEntry.id)
+    }
+
+    const refreshed = models.list().find((m) => m.id === mainEntry.id) ?? mainEntry
+    const spec = resolveImageArchSpec(refreshed.info?.architecture, refreshed.name)
+    const missingSlots =
+      spec && finalCfg.mode !== 'model'
+        ? missingRecipeSlots(spec, finalCfg).map((s) => s.label)
+        : []
+
+    emit('image.modelInstalled', {
+      modelId: refreshed.id,
+      modelName: refreshed.name,
+      missingSlots
+    })
   })().catch((err: unknown) => noteFailure(err, 'models', `Could not finish setting up downloaded files for ${item.name}`))
 })
 host.on('state', (state) => emit('model.state', state))
@@ -302,7 +405,7 @@ setAgentAccess(agents)
 sessions.on('changed', (list) => emit('sessions.changed', list))
 
 function refreshIdleInstructions(id: string): void {
-  if (runner.isRunning(id) || runner.isCompacting(id) || !sessions.loadContext(id).instructions) return
+  if (runner.isRunning(id) || runner.isCompacting(id) || !sessions.loadContext(id).instructions || sessions.messages(id).length) return
   try {
     runner.refreshInstructions(id)
   } catch (err) {
@@ -332,9 +435,12 @@ board.onChange(() => emit('board.changed', {}))
 compendium.on('changed', () => emit('dnd.changed', {}))
 gameDefs.on('changed', () => emit('game.changed', {}))
 saves.on('changed', (world: string) => emit('saves.changed', { world }))
+saves.on('changed', (world: string) => worldEvents.checkTriggers(world))
 decisions.on('changed', () => emit('decisions.changed', {}))
 storyActions.on('changed', () => emit('storyActions.changed', {}))
 factions.on('changed', () => emit('factions.changed', {}))
+npcs.on('changed', (world: string) => emit('npcs.changed', { world }))
+knowledge.on('changed', (world: string) => emit('knowledge.changed', { world }))
 worldEvents.on('changed', () => emit('worldEvents.changed', {}))
 mapObjectsStore.on('changed', () => emit('mapObjects.changed', {}))
 triggerActionsStore.on('changed', () => emit('triggerActions.changed', {}))
@@ -344,7 +450,12 @@ board.setNames((id) => agents.list().find((a) => a.id === id)?.name ?? 'an agent
 scripts.onChange(() => emit('python.changed', {}))
 storyRuns.on('changed', () => emit('stories.changed', {}))
 themes.on('changed', (list: Theme[]) => emit('themes.changed', list))
+themes.on('deleted', (id: string) => {
+  for (const a of agents.list()) if (a.theme === id) agents.save({ ...a, theme: null })
+  emit('themes.deleted', { id })
+})
 avatars.on('changed', (list: Avatar[]) => emit('avatars.changed', list))
+timeline.on('forgot', (kind: string, id: string) => emit('entry.removed', { kind, id }))
 themes.on('ambience', (sessionId: string, ambience: Ambience) => emit('ambience.changed', { sessionId, ambience }))
 themes.on('cue', (cue: AmbienceCue) => emit('ambience.cue', cue))
 data.setToolCheck((id) => modules.isOn(id))
@@ -536,6 +647,8 @@ const handlers: Handlers = {
   'models.imageConfig.reset': ({ id }) => models.resetImageConfig(id),
   'models.imageConfig.autoMatch': ({ id }) => models.autoMatchImageCompanions(id),
   'models.imageCompanions': () => models.imageCompanions(),
+  'models.defaultImage.get': () => models.getDefaultImageModel(),
+  'models.defaultImage.set': ({ id }) => models.setDefaultImageModel(id),
   'image.status': () => imageHost.getState(),
   'image.load': ({ id }) => imageHost.load(id),
   'image.unload': () => imageHost.unload(),
@@ -543,7 +656,12 @@ const handlers: Handlers = {
   'image.edit': (req) => imageHost.edit(req),
   'image.cancel': () => imageHost.cancel(),
   'image.history.list': () => imageHistory.list(),
-  'image.history.remove': ({ id }) => imageHistory.remove(id),
+  'image.history.remove': ({ id, deleteAsset }) => {
+    const target = deleteAsset ? imageHistory.list().find((e) => e.id === id) : undefined
+    const next = imageHistory.remove(id)
+    if (deleteAsset && target?.assetId) data.assets.delete(target.assetId)
+    return next
+  },
   'image.history.clear': () => imageHistory.clear(),
   'models.template.get': ({ id }) => models.getTemplate(id),
   'models.template.set': ({ id, choice }) => {
@@ -599,18 +717,28 @@ const handlers: Handlers = {
   'worlds.create': ({ name, schema }) => worlds.create(name, schema ?? undefined),
   'worlds.rename': ({ id, name }) => worlds.rename(id, name),
   'worlds.setPlayer': ({ id, sheet }) => worlds.setPlayer(id, sheet),
+  'worlds.addCharacter': ({ id, sheet, map }) => placeCharacter(id, sheet, map),
+  'worlds.removeCharacter': ({ sheet }) => removeCharacter(sheet),
+  'worlds.ofSheet': ({ sheet }) => worldOfSheet(sheet),
+  'worlds.whereabouts': ({ sheet }) => whereabouts(sheet),
+  'worlds.destinations': () => destinations(),
+  'worlds.moveCharacter': ({ sheet, world, map, place }) => moveCharacter(sheet, world, map, place),
   'worldEvents.list': (args) => worldEvents.list(args?.worldId ?? null),
   'worldEvents.get': ({ id, worldId }) => worldEvents.get(id, worldId ?? null),
   'worldEvents.save': ({ event, previousId }) => worldEvents.save(event, previousId ?? null),
-  'worldEvents.delete': ({ id }) => {
-    worldEvents.remove(id)
+  'worldEvents.delete': ({ id, worldId }) => {
+    worldEvents.remove(id, worldId ?? null)
     return true
   },
   'worldEvents.setStatus': ({ id, status, worldId }) => worldEvents.setStatus(id, status, worldId ?? null),
   'worldEvents.resolve': ({ id, worldId, outcomeId, transcriptSummary }) =>
     worldEvents.resolve(id, { worldId: worldId ?? null, outcomeId, transcriptSummary }),
+  'conversions.pending': (args) => pendingConversions(args?.domain ?? null),
+  'conversions.backup': ({ ids, target }) => backupConversions(ids, target),
+  'conversions.run': ({ ids, choices }) => runConversions(ids, choices ?? {}),
   'worlds.setTags': ({ id, tags }) => worlds.setTags(id, tags),
   'worlds.setLaunch': ({ id, launch }) => worlds.setLaunch(id, launch),
+  'worlds.setKnowledgeCues': ({ id, on }) => worlds.setKnowledgeCues(id, on),
   'actions.roll': ({ action, character, pick, world, deck }) => {
     const clean = cleanAction(action)
     const result = rollFor(clean, character, pick ?? null)
@@ -636,7 +764,7 @@ const handlers: Handlers = {
           kind: 'travel',
           title: text.slice(0, 72) || 'Journey Event',
           summary: text,
-          who: [`@sheet:${stripRef(sheet).replace(/^sheet:/i, '')}`]
+          who: [actorLink(stripRef(sheet))]
         })
       } catch (err) {
         noteFailure(err, 'almanac', 'Could not mirror journey entry to Almanac')
@@ -675,10 +803,58 @@ const handlers: Handlers = {
   'worlds.editPost': ({ id, index, message }) => worlds.editPost(id, index, message),
   'worlds.flags': ({ id }) => worlds.flags(id),
   'worlds.setFlag': ({ id, key, value }) => worlds.setFlag(id, key, value),
-  'factions.list': () => factions.list(),
-  'factions.get': ({ id }) => factions.get(id),
-  'factions.save': ({ faction, previousId }) => factions.save(faction, previousId ?? null),
-  'factions.delete': ({ id }) => { factions.remove(id); return true },
+  'npcs.list': (args) => npcs.list(args?.world ?? null, args?.layer ?? 'play'),
+  'npcs.get': ({ id, world, layer }) => npcs.get(id, world ?? null, layer ?? 'play'),
+  'npcs.save': ({ world, npc, previousId }) => npcs.saveTemplate(world, npc, previousId ?? null),
+  'npcs.delete': ({ world, id, saveOnly }) => {
+    if (saveOnly) {
+      npcs.removeInSave(world, id)
+      return true
+    }
+    if (npcs.hasTemplate(world, id)) npcs.removeTemplate(world, id)
+    else npcs.removeInSave(world, id)
+    return true
+  },
+  'npcs.hasOverrides': ({ world, id }) => hasSaveNpcOverrides(world, id),
+  'npcs.stamp': (req) => stampNpcs(req),
+  'npcs.writeToTemplate': ({ world, id, asArchetype }) => writeNpcToTemplate(world, id, { asArchetype }),
+  'npcs.resetInSave': ({ world, id }) => resetNpcInSave(world, id),
+  'npcs.copyToSheet': ({ world, id, layer }) => copyNpcToSheet(world, id, layer ?? 'play'),
+  'npcs.promoteToSheet': ({ world, id }) => promoteNpcToSheet(world, id),
+  'npcs.copyFromSheet': (req) =>
+    copySheetToNpc(req.world, req.sheet, {
+      archetype: req.archetype,
+      place: req.place,
+      map: req.map,
+      faction: req.faction,
+      customTitle: req.customTitle
+    }),
+  'factions.list': (args) => factions.list(args?.world ?? null, args?.layer ?? 'template'),
+  'factions.get': ({ id, world, layer }) => factions.get(id, world ?? null, layer ?? 'template'),
+  'factions.save': ({ faction, world, previousId }) => factions.save(faction, world ?? null, previousId ?? null),
+  'factions.delete': ({ id, world }) => {
+    factions.remove(id, world ?? null)
+    return true
+  },
+  'factions.seedStarters': ({ world }) => factions.seedStarters(world),
+  'knowledge.list': ({ world }) => knowledge.list(world),
+  'knowledge.get': ({ ref }) => {
+    const parts = splitKnowledgeRef(ref)
+    return parts && worlds.exists(parts.world) ? knowledge.find(parts.world, parts.id) : null
+  },
+  'knowledge.save': ({ world, entry, previousId }) => knowledge.save(world, entry, previousId ?? null),
+  'knowledge.forSheet': ({ sheet }) => ({
+    worlds: worldsOfSheet(sheet).map((id) => ({ id, name: worlds.meta(id).name, entries: knowledge.list(id) }))
+  }),
+  'knowledge.grant': ({ sheet, campaign, ref }) => grantKnowledge(sheet, campaign, ref),
+  'holds.ofSheet': ({ sheet, campaign }) =>
+    campaign
+      ? [{ id: campaign, title: almanacs.get(campaign)?.title ?? campaign, hold: campaignHold(sheet, campaign) }]
+      : almanacs.list().flatMap((a) => (a.holds?.[sheet] ? [{ id: a.id, title: a.title, hold: a.holds[sheet] }] : [])),
+  'holds.save': ({ sheet, campaign, hold }) => {
+    saveHold(sheet, campaign, cleanHold(hold))
+    return true
+  },
   'mapObjects.list': () => mapObjectsStore.list(),
   'mapObjects.get': ({ id }) => mapObjectsStore.get(id),
   'mapObjects.save': ({ object, previousId }) => mapObjectsStore.save(object, previousId ?? null),
@@ -700,7 +876,7 @@ const handlers: Handlers = {
   'almanacs.recordEntry': ({ id, entry }) => almanacs.recordEntry(id, entry),
   'almanacs.archiveChat': (opts) => almanacs.archiveChat(opts),
   'sessions.setScene': ({ id, scene }) => {
-    const cleaned = scene ? cleanSessionScene(scene) : null
+    const cleaned = scene ? cleanSessionScene({ ...scene, worldId: sessions.get(id).scene?.worldId ?? null }) : null
     if (cleaned?.almanacId) {
       const alm = almanacs.find(cleaned.almanacId)
       if (alm && cleaned.characters.length) {
@@ -749,6 +925,9 @@ const handlers: Handlers = {
   'sessions.bindGameplay': ({ sessionId, agentId, worldId, saveId, mapId, placeKey, playerSheet, title }) => {
     const wantedWorld = String(worldId || '').trim()
     if (!wantedWorld) throw new Error('worldId is required to bind a Gameplay Chat')
+    const chatAgent = agents.getOrDefault(sessionId ? sessions.get(sessionId).agentId : (agentId ?? ''))
+    const outside = sheetsOutside(wantedWorld, [...new Set([...agentSheets(chatAgent), ...(playerSheet ? [String(playerSheet).trim()] : [])])])
+    if (outside.length) throw new Error(`Not in ${worlds.meta(wantedWorld).name}: ${outside.map((o) => `${getSheet(o.sheet).title}${o.world ? ` (in ${worlds.meta(o.world).name})` : ''}`).join(', ')}. Put them in this world first.`)
     const created = !sessionId
     const meta = sessionId ? sessions.get(sessionId) : sessions.create(agents.getOrDefault(agentId ?? '').id)
     const wantedSave = saveId ? String(saveId).trim() : null
@@ -758,7 +937,11 @@ const handlers: Handlers = {
       null
     const cleanPlace = placeKey ? String(placeKey).trim() : null
     const cleanPlayer = playerSheet ? String(playerSheet).trim() : null
-    const where = cleanPlace ? (cleanPlace.startsWith('@place:') ? cleanPlace : `@place:${cleanPlace}`) : (matchingAlmanac?.opening?.startingWhere ?? '')
+    const where = cleanPlace
+      ? cleanPlace.startsWith('@')
+        ? cleanPlace
+        : worldLink(wantedWorld, PLACE_TYPE_KEY, cleanPlace)
+      : (matchingAlmanac?.opening?.startingWhere ?? '')
     const scene = cleanSessionScene({
       almanacId: matchingAlmanac?.id ?? '',
       mode: 'gameplay',
@@ -812,7 +995,7 @@ const handlers: Handlers = {
       mode: 'gameplay',
       saveId: save?.id ?? scene.saveId ?? null,
       placeKey: livePlaceKey,
-      where: livePlaceKey ? `@place:${livePlaceKey}` : scene.where,
+      where: livePlaceKey ? worldLink(worldId, PLACE_TYPE_KEY, livePlaceKey) : scene.where,
       worldTime: save?.clock?.time ?? scene.worldTime ?? null,
       parentSessionId: prev.id,
       handoffNumber: nextHandoff,
@@ -856,11 +1039,15 @@ const handlers: Handlers = {
     refreshIdleInstructions(updated.id)
     return updated
   },
+  'sessions.world': ({ id }) => {
+    const session = sessions.get(id)
+    return chatWorld(session.scene, agents.getOrDefault(session.agentId))
+  },
   'sessions.startMetaScene': ({ worldId, eventId, agentId }) => {
     const wantedWorld = String(worldId || '').trim()
     const wantedEvent = String(eventId || '').trim()
     const ev = worldEvents.get(wantedEvent, wantedWorld || null)
-    const effectiveWorld = wantedWorld || ev.worldId
+    const effectiveWorld = ev.worldId || wantedWorld
     const save = effectiveWorld ? saves.current(effectiveWorld) : null
     const meta = sessions.create(agents.getOrDefault(agentId ?? '').id)
     const leaders = [
@@ -1008,6 +1195,7 @@ const handlers: Handlers = {
   'contextPrefs.get': () => contextPrefs.get(),
   'contextPrefs.set': (patch) => contextPrefs.set(patch),
   'sessions.refreshInstructions': ({ id }) => runner.refreshInstructions(id),
+  'sessions.saveCache': ({ id }) => runner.saveCache(id),
   'sessions.context': ({ id }) => ({ usage: runner.usageFor(id), instructionsChanged: runner.instructionsChanged(id) }),
   'agents.contextUsage': ({ agentId }) => runner.draftUsage(agentId),
   'sessions.prompt': ({ id, agentId }) => runner.promptView(id, agentId),
@@ -1065,6 +1253,10 @@ const handlers: Handlers = {
   'saves.remove': ({ id }) => removeSave(id),
   'saves.bring': ({ id, sheet }) => bring(id, sheet),
   'saves.takeOut': ({ sheet }) => takeOut(sheet),
+  'saves.setParty': ({ id, members }) => setParty(id, members),
+  'saves.addPartyMember': ({ id, sheet, place, map }) => addPartyMember(id, sheet, place, map),
+  'saves.removePartyMember': ({ id, sheet }) => removePartyMember(id, sheet),
+  'saves.travelParty': ({ id, map, place }) => travelParty(id, map, place),
   'saves.adopt': ({ world }) => adoptOldPlay(world),
   'saves.travel': ({ sheet, id, map, place }) => travel(sheet, id, map, place),
   'saves.spawnCreature': ({ world, map, creature, faction, at }) => spawnCreature(world, map, creature, faction, at),
@@ -1138,7 +1330,7 @@ const handlers: Handlers = {
   'python.save': ({ id, name, code, description }) => scripts.save({ id, name, code, description }),
   'python.delete': ({ id }) => (scripts.delete(id), true),
   'python.run': async ({ id }) => (await scripts.run(id)).script,
-  'library.find': ({ query, kind }) => libraryFind(query, kind, 2000, USER),
+  'library.find': ({ query, kind, limit }) => libraryFind(query, kind, limit ?? 2000, USER),
   'library.reindex': () => {
     clearIndexes()
     warmIndexes()
@@ -1155,6 +1347,7 @@ const handlers: Handlers = {
   'library.guides': () => specialPages(USER),
   'library.clearKind': ({ kind }) => clearKind(kind),
   'library.rename': ({ entry, name }) => renameEntry(entry, name),
+  'library.duplicate': ({ entry }) => duplicateEntry(entry),
   'library.rollText': ({ text }) => rollText(text),
   'slideshows.save': ({ id, title, data: value }) => (id ? saveSlideshow(id, value) : createSlideshow(title, value)),
   'carry.save': (input) => carrySave(input),
@@ -1173,6 +1366,9 @@ const handlers: Handlers = {
   'repos.save': (input) => saveRepo(input),
   'sheets.save': (input) => saveSheet(input),
   'sheets.setFaction': ({ id, faction }) => setSheetFaction(id, faction),
+  'sheets.setImage': ({ id, image }) => setSheetImage(id, image),
+  'relations.backs': ({ owner, refs }) => relationBacks(owner, refs),
+  'relations.put': ({ holder, entry }) => putRelation(holder, entry),
   'library.remove': ({ entry }) => (removeEntry(entry), true),
   'tags.set': ({ entry, tags }) => {
     const { kind, id } = resolveEntry(entry, null, USER)
@@ -1184,6 +1380,7 @@ const handlers: Handlers = {
   },
   'tags.list': ({ kind }) => tagStore.counts(kind ?? undefined),
   'tags.map': () => tagStore.map(),
+  'library.has': ({ kind, id }) => entryExists(kind, id),
   'library.resolve': ({ entry }) => {
     const { kind, id } = resolveEntry(entry, null, USER)
     return { kind: kind.kind, id }
@@ -1200,16 +1397,19 @@ const handlers: Handlers = {
   'library.inside': ({ entry }) => entryInside(entry),
   'library.field': ({ entry, field }) => entryField(entry, field),
   'data.pages.list': () => data.pages.list(),
-  'data.kindFolders.list': () => {
-    const folders = kindFolders.getAll()
-    return libraryKinds(USER)
-      .filter((k) => Boolean(k.pageTypes?.length) && k.kind !== 'page' && k.kind !== 'folder')
-      .map((k) => ({ kind: k.kind, label: k.label, plural: k.plural, folder: folders[k.kind] ?? '' }))
-  },
-  'data.kindFolders.set': ({ kind, folder }) => kindFolders.set(kind, folder),
+  'saveFolders.list': () => placeRows(),
+  'saveFolders.answer': ({ target, type }) => placeAnswer(target ?? kindOfPageType(type ?? null)),
+  'saveFolders.set': ({ target, place }) => saveFolders.set(target, place),
   'data.pages.get': ({ id }) => data.pages.get(id),
   'data.pages.find': ({ id }) => ifMissing(() => data.pages.get(id), null),
-  'data.pages.create': ({ title, body, fields, type, parent }) => data.pages.create({ title, body, fields, type, parent: parent ?? null }),
+  'data.pages.create': ({ title, body, fields, type, parent, folder, tags }) => {
+    const page =
+      folder === undefined
+        ? data.pages.create({ title, body, fields, type, parent: parent ?? null })
+        : data.pages.create({ title, body, fields, type, parent: folder ? data.pages.makeFolders(folder) : null, fixedParent: true })
+    if (tags?.length) tagStore.set(kindOfPageType(type), page.id, tags)
+    return page
+  },
   'data.pages.write': ({ id, title, body }) => data.pages.write({ ref: id, title, body }),
   'data.pages.append': ({ ref, text }) => data.pages.write({ ref, title: ref, body: text, mode: 'append' }),
   'data.pages.view': ({ id, view }) => data.pages.setView(id, view),

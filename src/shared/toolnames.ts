@@ -10,7 +10,14 @@ export const RENAMED_TOOLS: Record<string, string> = {
   page_write: 'add_page',
   page_update: 'update_page',
   workout_log: 'log_exercise',
-  exercise_write: 'add_exercise'
+  exercise_write: 'add_exercise',
+  remember: 'agent_remember',
+  recall: 'agent_recall',
+  story_recall: 'character_search_knowledge',
+  add_character_memory: 'character_learn_memory',
+  add_story_log: 'character_learn_event',
+  set_story_where: 'character_set_state',
+  set_character_relationship: 'character_set_relation'
 }
 
 export function currentToolName(name: string): string {

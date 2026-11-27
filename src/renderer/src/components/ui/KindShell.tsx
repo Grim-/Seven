@@ -138,7 +138,7 @@ function ToolButton({
       onClick={onClick}
       className={cn(
         'flex h-6 w-6 items-center justify-center',
-        active ? 'text-accent' : 'text-dim hover:text-white'
+        active ? 'text-accent' : 'text-dim hover:text-ink'
       )}
     >
       {children}
@@ -361,7 +361,7 @@ export function KindShell({
     <div
       tabIndex={pickable ? -1 : undefined}
       onKeyDown={handleKeyDown}
-      className="flex min-h-0 flex-1 flex-col border border-line/60 bg-black/70 outline-none"
+      className="flex min-h-0 flex-1 flex-col border border-line/60 tone-panel-70 outline-none"
     >
       <div className="flex shrink-0 items-center gap-2 border-b border-line/40 px-2.5 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -375,7 +375,7 @@ export function KindShell({
                   type="button"
                   onClick={selectAll}
                   title="Select all items (Ctrl+A · Ctrl+click · Shift+click)"
-                  className="border border-line/50 px-2 py-0.5 font-mono text-[10.5px] text-dim hover:border-accent/50 hover:text-accent"
+                  className="border border-line/50 px-2 py-0.5 font-ui text-[10.5px] text-dim hover:border-accent/50 hover:text-accent"
                 >
                   Select all
                 </button>
@@ -425,7 +425,7 @@ export function KindShell({
             const inGroup = shown.filter((item) => (item.group ?? 0) === i)
             return (
               <section key={g.label} className="mb-4 flex flex-col gap-2">
-                <div className="flex items-baseline gap-2 border-b border-line/40 pb-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-accent-soft">
+                <div className="flex items-baseline gap-2 border-b border-line/40 pb-1 font-label text-[10.5px] font-bold caps-16 text-accent-soft">
                   {g.label}
                   <span className="font-normal text-faint">{inGroup.length}</span>
                 </div>

@@ -9,7 +9,7 @@ export function DraftElements() {
   const elements = useSessions((s) => draftOf(s, key).elements)
   if (!elements.length) return null
   return (
-    <div className="chat-elements border-t border-line/60 bg-black/40 px-3 pt-2">
+    <div className="chat-elements border-t border-line/60 tone-panel-40 px-3 pt-2">
       {elements.map((element, i) => {
         const type = chatElementType(element)
         if (!type) return null

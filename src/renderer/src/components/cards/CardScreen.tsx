@@ -120,13 +120,13 @@ function Editor({ pageId, title, start }: { pageId: string; title: string; start
             <button
               type="button"
               onClick={clearCardArt}
-              className="self-start font-mono text-[10.5px] uppercase tracking-wider text-dim hover:text-alert cursor-pointer"
+              className="self-start font-label text-[10.5px] caps-5 text-dim hover:text-alert cursor-pointer"
             >
               × Clear card art
             </button>
           )}
           {!layout && (card.layout ? <AlertBox>There is no card layout called {showName(card.layout)} any more. Pick another layout.</AlertBox> : <div className="text-[12.5px] text-dim">{layouts.length ? 'Pick a layout to fill in this card.' : 'Make a card layout first (New page → Card layout), then pick it here.'}</div>)}
-          {layout && !picked && <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Click a part of the card to fill it</span>}
+          {layout && !picked && <span className="font-label text-[10px] caps-12 text-faint">Click a part of the card to fill it</span>}
           {layout && picked && (here.length ? <Values label={PLACE_LABELS[placeFor(picked)]} hint={picked === 'body' ? 'Flavour text. The prompt is added under it on the card.' : undefined} fields={here} values={card.values} onChange={setValue} /> : <span className="text-[12.5px] text-dim">This layout puts nothing here. Add a field here on the layout.</span>)}
           {offCard.length > 0 && <Values label="Not on the card" hint="Cards still hold these values, and agents read them." fields={offCard} values={card.values} onChange={setValue} />}
         </div>

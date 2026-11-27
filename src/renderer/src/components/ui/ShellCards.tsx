@@ -25,15 +25,15 @@ export function ShellCards({ items, adds, bind, scale }: ShellViewProps) {
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="flex min-w-0 items-center gap-2">
                 {item.tag && <span className="shell-tag">{item.tag}</span>}
-                <span className={`min-w-0 flex-1 truncate font-mono text-[12.5px] font-semibold uppercase tracking-[0.05em] text-white ${b.picked ? 'shell-cursor' : ''}`}>{item.title}</span>
-                {asideOf(item) && <span className="shrink-0 font-mono text-[10px] text-faint">{asideOf(item)}</span>}
+                <span className={`min-w-0 flex-1 truncate font-ui text-[12.5px] font-semibold caps-5 text-ink ${b.picked ? 'shell-cursor' : ''}`}>{item.title}</span>
+                {asideOf(item) && <span className="shrink-0 font-ui text-[10px] text-faint">{asideOf(item)}</span>}
                 {item.action && (
                   <span className="shrink-0" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                     {item.action}
                   </span>
                 )}
               </span>
-              {item.subtitle && <span className="truncate font-mono text-[10.5px] uppercase tracking-[0.08em] text-accent-soft">{item.subtitle}</span>}
+              {item.subtitle && <span className="truncate font-label text-[10.5px] caps-8 text-accent-soft">{item.subtitle}</span>}
               <TraitChips traits={item.traits} />
               {item.excerpt && <span className="line-clamp-3 text-[12px] leading-snug text-dim">{item.excerpt}</span>}
             </span>
@@ -41,7 +41,7 @@ export function ShellCards({ items, adds, bind, scale }: ShellViewProps) {
         )
       })}
       {adds.map((a) => (
-        <button key={a.label} onClick={a.onClick} className="shell-add flex min-h-16 items-center justify-center gap-2 font-mono text-[11px] uppercase tracking-[0.1em] [&_svg]:h-4 [&_svg]:w-4">
+        <button key={a.label} onClick={a.onClick} className="shell-add flex min-h-16 items-center justify-center gap-2 font-label text-[11px] caps-10 [&_svg]:h-4 [&_svg]:w-4">
           {a.icon}
           {a.label}
         </button>

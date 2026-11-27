@@ -34,9 +34,9 @@ export function ImageContextSnippets({
   }
 
   return (
-    <div className="flex flex-col gap-1.5 border border-line/60 bg-black/35 px-3 py-2">
+    <div className="flex flex-col gap-1.5 border border-line/60 tone-panel-35 px-3 py-2">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-accent">
+        <span className="font-label text-[10px] font-bold caps-14 text-accent">
           {context.title}
         </span>
         <span className="text-[11px] text-faint">Click fields to add to prompt</span>
@@ -66,10 +66,10 @@ export function ImageContextSnippets({
               title={s.text}
               onClick={() => onPromptChange(appendSnippet(prompt, s.text))}
               className={cn(
-                'inline-flex max-w-[16rem] items-center gap-1 border px-2 py-0.5 font-mono text-[11px] transition-colors',
+                'inline-flex max-w-[16rem] items-center gap-1 border px-2 py-0.5 font-ui text-[11px] transition-colors',
                 active
                   ? 'border-accent/60 bg-accent/15 text-accent'
-                  : 'border-line/70 bg-black/40 text-dim hover:border-line-hover hover:text-white'
+                  : 'border-line/70 tone-well-40 text-dim hover:border-line-hover hover:text-ink'
               )}
             >
               {active ? <Check className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0 text-faint" />}

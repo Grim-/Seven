@@ -2,10 +2,12 @@ import { notFound } from '@shared/errors'
 import fs from 'node:fs'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
-import { CHANGES_KEY, PLACE_TYPE, PLACE_TYPE_KEY, STARTER_SCHEMA, cleanWorldLaunch, inspectSchema, normalEntity, worldId, type WorldChanges, type WorldEntity, type WorldLaunch, type WorldMeta, type WorldPost, type WorldSchema, type WorldType } from '@shared/world'
+import { CHANGES_KEY, PLACE_TYPE, PLACE_TYPE_KEY, REGION_TYPE, REGION_TYPE_KEY, STARTER_SCHEMA, cleanWorldLaunch, inspectSchema, normalEntity, worldId, type WorldChanges, type WorldEntity, type WorldLaunch, type WorldMeta, type WorldPost, type WorldSchema, type WorldType } from '@shared/world'
 import { dataRoot } from '../util/paths'
 import { readJson, removePath, writeJson } from '../util/fs'
-import { cleanMap, cleanMapUses, cleanShapes, type JourneyEntry, type JourneyKind, type Standing, type WorldMapUse } from '@shared/maps'
+import { shapeBounds } from '@shared/shapes'
+import { cleanMap, cleanMapUses, cleanShapes, forgetMapThing, mapThingKey, PLACE_THING, REGION_THING, type JourneyEntry, type JourneyKind, type Standing, type WorldMapUse } from '@shared/maps'
+import { STARTER_FACTIONS } from '@shared/game/factions'
 import { maps } from '../maps/store'
 import { currentActor } from '../timeline/actor'
 import { timeline } from '../timeline/store'
@@ -46,7 +48,7 @@ class WorldStore extends EventEmitter {
     return path.join(ROOT, id)
   }
 
-  private manifest(id: string): { name: string; updatedAt: number; player?: string | null; rules?: string; tags?: unknown; flags?: Record<string, string | number | boolean>; launch?: unknown } {
+  private manifest(id: string): { name: string; updatedAt: number; player?: string | null; rules?: string; tags?: unknown; flags?: Record<string, string | number | boolean>; launch?: unknown; knowledgeCues?: unknown } {
     return readJson(path.join(this.dir(id), 'manifest.json'), { name: id, updatedAt: 0 })
   }
 
@@ -90,6 +92,13 @@ class WorldStore extends EventEmitter {
     return this.meta(id)
   }
 
+  setKnowledgeCues(id: string, on: boolean): WorldMeta {
+    const m = this.manifest(id)
+    writeJson(path.join(this.dir(id), 'manifest.json'), { ...m, knowledgeCues: on, updatedAt: Date.now() })
+    this.emit('changed', id)
+    return this.meta(id)
+  }
+
   setLaunch(id: string, launch: Partial<WorldLaunch>): WorldMeta {
     const m = this.manifest(id)
     const next = cleanWorldLaunch({ ...cleanWorldLaunch(m.launch), ...launch })
@@ -128,7 +137,7 @@ class WorldStore extends EventEmitter {
 
   allTypeKeys(): string[] {
     if (!fs.existsSync(ROOT)) return []
-    const out = new Set<string>([PLACE_TYPE_KEY])
+    const out = new Set<string>([REGION_TYPE_KEY, PLACE_TYPE_KEY])
     for (const d of fs.readdirSync(ROOT, { withFileTypes: true })) {
       if (!d.isDirectory() || !this.exists(d.name)) continue
       for (const k of Object.keys(this.schema(d.name).types)) out.add(k)
@@ -149,6 +158,7 @@ class WorldStore extends EventEmitter {
       tags: Array.isArray(m.tags) ? m.tags.filter((t): t is string => typeof t === 'string') : [],
       flags: m.flags && typeof m.flags === 'object' ? m.flags : {},
       launch: cleanWorldLaunch(m.launch),
+      ...(m.knowledgeCues === true ? { knowledgeCues: true } : {}),
       updatedAt: m.updatedAt
     }
   }
@@ -163,6 +173,7 @@ class WorldStore extends EventEmitter {
     writeJson(path.join(dir, 'schema.json'), schema)
     writeJson(path.join(dir, 'manifest.json'), { name: name.trim() || id, updatedAt: Date.now() })
     writeJson(path.join(dir, 'board.json'), [])
+    writeJson(path.join(dir, 'factions.json'), STARTER_FACTIONS)
     this.emit('changed', id)
     return this.meta(id)
   }
@@ -219,10 +230,11 @@ class WorldStore extends EventEmitter {
   }
 
   type(id: string, typeKey: string): WorldType {
+    if (typeKey === REGION_TYPE_KEY) return REGION_TYPE
     if (typeKey === PLACE_TYPE_KEY) return PLACE_TYPE
     const schema = this.schema(id)
     const t = schema.types[typeKey]
-    if (!t) throw new WorldError(`There is no type "${typeKey}". Set type to one of: ${[PLACE_TYPE_KEY, ...Object.keys(schema.types)].join(', ')}.`)
+    if (!t) throw new WorldError(`There is no type "${typeKey}". Set type to one of: ${[REGION_TYPE_KEY, PLACE_TYPE_KEY, ...Object.keys(schema.types)].join(', ')}.`)
     return t
   }
 
@@ -284,8 +296,7 @@ class WorldStore extends EventEmitter {
     return Object.fromEntries(Object.entries(this.rawType(id, typeKey, layer)).map(([key, v]) => [key, ((v as Record<string, unknown>)?.[CHANGES_KEY] ?? {}) as WorldChanges]))
   }
 
-  remove(id: string, typeKey: string, key: string, layer: WorldLayer = 'template'): boolean {
-    const k = worldId(key)
+  private deleteRecordOnly(id: string, typeKey: string, k: string, layer: WorldLayer): boolean {
     if (!(k in this.rawType(id, typeKey, layer))) return false
     if (layer === 'play') this.playLayer().setRecord(id, typeKey, k, null)
     else {
@@ -297,6 +308,12 @@ class WorldStore extends EventEmitter {
     return true
   }
 
+  remove(id: string, typeKey: string, key: string, layer: WorldLayer = 'template'): boolean {
+    if (layer === 'template' && typeKey === PLACE_TYPE_KEY) return this.removePlace(id, key)
+    if (layer === 'template' && typeKey === REGION_TYPE_KEY) return this.removeRegion(id, key)
+    return this.deleteRecordOnly(id, typeKey, worldId(key), layer)
+  }
+
   removePlace(id: string, key: string): boolean {
     const places = this.rawType(id, PLACE_TYPE_KEY, 'template')
     const k = worldId(key)
@@ -305,8 +322,49 @@ class WorldStore extends EventEmitter {
     const parent = typeof place.Inside === 'string' && place.Inside !== k ? place.Inside : ''
     for (const [child, v] of Object.entries(places)) if (child !== k && (v as Record<string, unknown>)?.Inside === k) this.put(id, PLACE_TYPE_KEY, child, { Inside: parent })
     const uses = this.mapUses(id)
-    if (uses.some((u) => u.shapes[k])) this.saveMapUses(id, uses.map((u) => ({ ...u, shapes: Object.fromEntries(Object.entries(u.shapes).filter(([key]) => key !== k)) })))
-    return this.remove(id, PLACE_TYPE_KEY, k)
+    const placeThing = mapThingKey(PLACE_THING, k)
+    if (uses.some((u) => Boolean(u.shapes[k] || u.spawns?.[k] || u.layerOf?.[placeThing]))) {
+      this.saveMapUses(
+        id,
+        uses.map((u) => ({
+          ...forgetMapThing(u, placeThing),
+          shapes: Object.fromEntries(Object.entries(u.shapes).filter(([sk]) => sk !== k)),
+          spawns: Object.fromEntries(Object.entries(u.spawns ?? {}).filter(([sk]) => sk !== k))
+        }))
+      )
+    }
+    return this.deleteRecordOnly(id, PLACE_TYPE_KEY, k, 'template')
+  }
+
+  removeRegion(id: string, key: string): boolean {
+    const regions = this.rawType(id, REGION_TYPE_KEY, 'template')
+    const k = worldId(key)
+    const region = regions[k] as Record<string, unknown> | undefined
+    if (!region) return false
+    const parent = typeof region.Parent === 'string' && region.Parent !== k ? region.Parent : ''
+    for (const [child, v] of Object.entries(regions)) {
+      if (child !== k && (v as Record<string, unknown>)?.Parent === k) {
+        this.put(id, REGION_TYPE_KEY, child, { Parent: parent })
+      }
+    }
+    const places = this.rawType(id, PLACE_TYPE_KEY, 'template')
+    for (const [pKey, v] of Object.entries(places)) {
+      if ((v as Record<string, unknown>)?.Region === k) {
+        this.put(id, PLACE_TYPE_KEY, pKey, { Region: parent })
+      }
+    }
+    const uses = this.mapUses(id)
+    const regionThing = mapThingKey(REGION_THING, k)
+    if (uses.some((u) => Boolean(u.regionShapes?.[k] || u.layerOf?.[regionThing]))) {
+      this.saveMapUses(
+        id,
+        uses.map((u) => ({
+          ...forgetMapThing(u, regionThing),
+          regionShapes: Object.fromEntries(Object.entries(u.regionShapes ?? {}).filter(([rk]) => rk !== k))
+        }))
+      )
+    }
+    return this.deleteRecordOnly(id, REGION_TYPE_KEY, k, 'template')
   }
 
   private usesFile(id: string): string {
@@ -347,12 +405,14 @@ class WorldStore extends EventEmitter {
     const uses = this.mapUses(id)
     if (uses.some((u) => u.map === mapId)) return uses
 
-    // Auto-create place entities in the world for any zones/shapes drawn on this map
     const existingPlaces = this.entities(id, PLACE_TYPE_KEY, true, 'template')
-    for (const [key] of Object.entries(targetMap.shapes ?? {})) {
+    const spawns: Record<string, { x: number; y: number }> = {}
+    for (const [key, form] of Object.entries(targetMap.shapes ?? {})) {
       if (!existingPlaces[key]) {
         this.put(id, PLACE_TYPE_KEY, key, { Name: key })
       }
+      const b = shapeBounds(form)
+      spawns[key] = { x: Math.round(b.x + b.w / 2), y: Math.round(b.y + b.h / 2) }
     }
 
     return this.saveMapUses(id, [
@@ -360,6 +420,8 @@ class WorldStore extends EventEmitter {
       {
         map: mapId,
         shapes: { ...(targetMap.shapes ?? {}) },
+        regionShapes: {},
+        spawns,
         stand: {},
         triggers: [...(targetMap.triggers ?? [])]
       }

@@ -1,0 +1,6 @@
+@layer components {
+  html[data-look-heading='rule'] :is(.prose-doc, .seven-md-doc .ProseMirror) :is(h1, h2) {
+    padding-bottom: 0.2em;
+    border-bottom: 1px solid var(--color-line);
+  }
+}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import type { CommandArg, CommandInfo, CustomCommand } from '@shared/types'
 import {
@@ -13,6 +13,7 @@ import { engine, on } from '../../lib/ipc'
 import { toast } from '../../store/toasts'
 import { useCommands } from '../../store/commands'
 import { LinkTextarea } from './LinkTextarea'
+import { CommandLine } from '../chat/CommandLine'
 import { rowMenu } from '../../views/data/entryMenu'
 import { useBusy } from '../../lib/useBusy'
 import { focusedConversation } from '../../lib/conversation'
@@ -27,7 +28,6 @@ interface Draft {
 }
 
 const BLANK: Draft = { id: null, name: '', summary: '', prompt: '', args: [] }
-const PIECE_TONE_STYLE = { '--tone': '#e08d47' } as CSSProperties
 
 function useCustom(): CustomCommand[] {
   const [list, setList] = useState<CustomCommand[]>([])
@@ -102,7 +102,7 @@ function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => voi
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
       <Field label="Name" hint="What you type after the slash.">
-        <Input value={draft.name} onChange={(e) => edit({ name: e.target.value })} placeholder="describe" className="font-mono" />
+        <Input value={draft.name} onChange={(e) => edit({ name: e.target.value })} placeholder="describe" className="font-ui" />
       </Field>
       <Field label="Summary" hint="One line, shown in the / list and /help.">
         <Input value={draft.summary} onChange={(e) => edit({ summary: e.target.value })} placeholder="Three takes on something, each different in tone and angle." />
@@ -111,7 +111,7 @@ function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => voi
         label="Variables"
         hint="Optional placeholders you can drop into the prompt as {name}, then fill with Tab or by clicking pills in chat."
       >
-        <div className="flex flex-col gap-2 border border-line/60 bg-black/30 p-2.5">
+        <div className="flex flex-col gap-2 border border-line/60 tone-panel-30 p-2.5">
           {draft.args.length === 0 ? (
             <div className="flex items-center justify-between gap-2 text-[12px] text-dim">
               <span>No variables defined yet (use {'{var_name}'} in Prompt or click Add variable).</span>
@@ -122,14 +122,14 @@ function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => voi
           ) : (
             <div className="flex flex-col gap-1.5">
               {draft.args.map((arg, idx) => (
-                <div key={idx} className="flex flex-wrap items-center gap-1.5 border border-line/50 bg-[#0d1117]/80 px-2 py-1.5">
-                  <span className="font-mono text-[10px] text-faint">#{idx + 1}</span>
+                <div key={idx} className="flex flex-wrap items-center gap-1.5 border border-line/50 tone-sidebar-80 px-2 py-1.5">
+                  <span className="font-ui text-[10px] text-faint">#{idx + 1}</span>
                   <Input
                     value={arg.name}
                     onChange={(e) => updateArg(idx, { name: e.target.value.replace(/\s+/g, '_').toLowerCase() })}
                     onBlur={() => updateArg(idx, { name: sanitizeArgName(arg.name) || `arg_${idx + 1}` })}
                     placeholder="variable_name"
-                    className="h-7 w-40 font-mono text-[12px]"
+                    className="h-7 w-40 font-ui text-[12px]"
                   />
                   <Input
                     value={arg.hint ?? ''}
@@ -147,7 +147,7 @@ function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => voi
                     type="button"
                     title="Insert into prompt"
                     onClick={() => insertPlaceholder(arg.name)}
-                    className="inline-flex h-7 items-center border border-[#e08d47]/45 bg-[#e08d47]/10 px-2 font-mono text-[11px] font-semibold text-white hover:border-[#e08d47] hover:bg-[#e08d47]/20"
+                    className="inline-flex h-7 items-center border border-tint-orange/45 bg-tint-orange/10 px-2 font-ui text-[11px] font-semibold text-ink hover:border-tint-orange hover:bg-tint-orange/20"
                   >
                     + {'{'}
                     {sanitizeArgName(arg.name) || '...'}
@@ -158,7 +158,7 @@ function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => voi
                     title="Move up"
                     disabled={idx === 0}
                     onClick={() => moveArg(idx, -1)}
-                    className="grid h-7 w-6 place-items-center text-dim hover:text-white disabled:opacity-30"
+                    className="grid h-7 w-6 place-items-center text-dim hover:text-ink disabled:opacity-30"
                   >
                     <ArrowUp className="h-3 w-3" />
                   </button>
@@ -167,7 +167,7 @@ function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => voi
                     title="Move down"
                     disabled={idx === draft.args.length - 1}
                     onClick={() => moveArg(idx, 1)}
-                    className="grid h-7 w-6 place-items-center text-dim hover:text-white disabled:opacity-30"
+                    className="grid h-7 w-6 place-items-center text-dim hover:text-ink disabled:opacity-30"
                   >
                     <ArrowDown className="h-3 w-3" />
                   </button>
@@ -196,7 +196,7 @@ function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => voi
                   key={name}
                   type="button"
                   onClick={() => addArg(name)}
-                  className="inline-flex items-center gap-1 border border-dashed border-[#e08d47]/55 px-1.5 py-0.5 font-mono text-[11px] text-white/90 hover:border-[#e08d47] hover:bg-[#e08d47]/15"
+                  className="inline-flex items-center gap-1 border border-dashed border-tint-orange/55 px-1.5 py-0.5 font-ui text-[11px] text-ink/90 hover:border-tint-orange hover:bg-tint-orange/15"
                 >
                   + {'{' + name + '}'}
                 </button>
@@ -220,10 +220,7 @@ function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => voi
       </Field>
       {draft.prompt.trim() && (
         <Field label="Pieces preview" hint="How this command's variable pills appear above the chat box.">
-          <div
-            style={PIECE_TONE_STYLE}
-            className="notch-sm border border-[#1c1f28] border-l-[3px] border-l-[var(--tone)] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--tone)_7%,#12151c),#12151c_60%)] px-3 py-2 text-[13.5px] leading-[28px] text-white/90"
-          >
+          <CommandLine compact>
             {segments.map((seg, i) => {
               if (seg.type === 'text') return <span key={i} className="whitespace-pre-wrap">{seg.value}</span>
               const def = varByName.get(seg.name.toLowerCase()) ?? { name: seg.name }
@@ -231,13 +228,13 @@ function Editor({ start, onSaved }: { start: Draft; onSaved: (id: string) => voi
                 <span
                   key={i}
                   title={def.hint || def.name}
-                  className="mx-0.5 inline-flex h-[24px] items-center border border-[color-mix(in_srgb,var(--tone)_45%,transparent)] bg-[color-mix(in_srgb,var(--tone)_10%,transparent)] px-2 font-mono text-[12.5px] font-semibold text-white"
+                  className="mx-0.5 inline-flex h-[24px] items-center border border-[color-mix(in_srgb,var(--tone)_45%,transparent)] bg-[color-mix(in_srgb,var(--tone)_10%,transparent)] px-2 font-ui text-[12.5px] font-semibold text-ink"
                 >
                   {def.default ? `${argLabel(def)} (${def.default})` : argLabel(def)}
                 </span>
               )
             })}
-          </div>
+          </CommandLine>
         </Field>
       )}
       <div className="flex items-center gap-2">
@@ -282,7 +279,7 @@ export function CommandsPanel({ initial }: { initial?: string | null }) {
       }
     >
       <div className="flex w-60 shrink-0 flex-col overflow-y-auto border-r border-line/40 pr-2">
-        <div className="px-2.5 pb-1 pt-0.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-soft">Yours</div>
+        <div className="px-2.5 pb-1 pt-0.5 font-label text-[10.5px] caps-14 text-accent-soft">Yours</div>
         {custom.length === 0 && <div className="px-2.5 py-1 text-[12px] text-faint">None yet.</div>}
         {custom.map((c) => (
           <ListRow
@@ -296,7 +293,7 @@ export function CommandsPanel({ initial }: { initial?: string | null }) {
             actions={<RowAction title="Delete" icon={<Trash2 />} danger onClick={() => remove(c)} />}
           />
         ))}
-        <div className="mt-3 px-2.5 pb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-soft">Built in</div>
+        <div className="mt-3 px-2.5 pb-1 font-label text-[10.5px] caps-14 text-accent-soft">Built in</div>
         {others.map((b) => (
           <ListRow key={b.name} active={!mine && shown?.name === b.name} onClick={() => setPick(b.name)} title={`/${b.name}`} mono subtitle={b.summary} />
         ))}
@@ -305,9 +302,9 @@ export function CommandsPanel({ initial }: { initial?: string | null }) {
         <Editor key={editing.id ?? '_new'} start={editing} onSaved={setPick} />
       ) : shown && 'usage' in shown ? (
         <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <div className="font-mono text-[14px] text-white">/{shown.name}</div>
+          <div className="font-ui text-[14px] text-ink">/{shown.name}</div>
           <div className="text-[12.5px] text-dim">Built in, so it can't be changed.</div>
-          <div className="whitespace-pre-wrap text-[13px] text-white/85">{shown.usage}</div>
+          <div className="whitespace-pre-wrap text-[13px] text-ink/85">{shown.usage}</div>
         </div>
       ) : (
         <EmptyState title="Commands">Pick one on the left, or make your own with New command.</EmptyState>

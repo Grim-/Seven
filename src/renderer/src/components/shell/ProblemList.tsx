@@ -28,12 +28,12 @@ function ProblemRow({ problem, open, onToggle, go }: { problem: Problem; open: b
   const error = problem.severity === 'error'
   const actions = problemActions(problem, go)
   return (
-    <div className={cn('border-l-2', error ? 'border-l-alert' : 'border-l-accent', open && 'bg-white/[0.03]')}>
+    <div className={cn('border-l-2', error ? 'border-l-alert' : 'border-l-accent', open && 'bg-ink/[0.03]')}>
       <button onClick={onToggle} onContextMenu={(e) => openMenu(e, problem.area, [...actions, { label: '', separator: true }, clearProblemsItem])} className="flex w-full items-start gap-2.5 px-3 py-1.5 text-left hover:bg-alert/[0.06] touch:py-2.5">
         <span className={cn('mt-0.5 flex h-3.5 w-3.5 shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5', error ? 'text-alert' : 'text-accent')}>{error ? <AlertOctagon /> : <AlertTriangle />}</span>
         <span className="min-w-0 flex-1">
-          <span className={cn('block text-[12.5px] text-white phone:text-[14px]', !open && 'truncate')}>{problem.message}</span>
-          <span className="block truncate font-mono text-[10.5px] text-dim phone:text-[12px]">
+          <span className={cn('block text-[12.5px] text-ink phone:text-[14px]', !open && 'truncate')}>{problem.message}</span>
+          <span className="block truncate font-ui text-[10.5px] text-dim phone:text-[12px]">
             {problem.area}
             {problem.request && <span className="text-faint"> · {problem.request}</span>}
             {problem.count > 1 && <span className="text-accent"> · x{problem.count}</span>} · {formatRelative(problem.lastAt)}

@@ -25,12 +25,12 @@ function Player({ assets }: { assets: AssetMeta[] }) {
     <div className="flex h-full flex-col gap-2">
       <audio ref={audio} src={urlOf(current)} controls className="w-full shrink-0" onEnded={() => index + 1 < assets.length && play(index + 1)} />
       {assets.length > 1 && (
-        <ol className="min-h-0 flex-1 overflow-y-auto font-mono text-[12px]">
+        <ol className="min-h-0 flex-1 overflow-y-auto font-ui text-[12px]">
           {assets.map((a, i) => (
             <li key={a.id}>
               <button
                 onClick={() => play(i)}
-                className={`w-full truncate px-2 py-1 text-left ${i === index ? 'bg-accent/10 text-accent' : 'text-white/80 hover:bg-white/[0.04]'}`}
+                className={`w-full truncate px-2 py-1 text-left ${i === index ? 'bg-accent/10 text-accent' : 'text-ink/80 hover:bg-ink/[0.04]'}`}
               >
                 {i + 1}. {a.name}
               </button>
@@ -53,10 +53,10 @@ function FileWidgetBody({ widget }: WidgetBodyProps) {
     if (only('image') && assets.length > 1) return <Gallery assets={images} />
     if (only('audio')) return <Player assets={assets} />
     if (assets.length === 1 && assets[0].kind === 'video')
-      return <video src={urlOf(assets[0])} controls className="min-h-0 flex-1 h-full w-full bg-black object-contain" />
+      return <video src={urlOf(assets[0])} controls className="min-h-0 flex-1 h-full w-full bg-panel object-contain" />
     if (assets.length === 1 && isPage(assets[0])) return <PageFrame asset={assets[0]} className="min-h-0 flex-1 h-full w-full" />
     if (assets.length === 1 && assets[0].kind === 'pdf')
-      return <iframe src={urlOf(assets[0])} title={assets[0].name} className="min-h-0 flex-1 h-full w-full border-0 bg-white" />
+      return <iframe src={urlOf(assets[0])} title={assets[0].name} className="min-h-0 flex-1 h-full w-full border-0 bg-page" />
   }
   if (assets.length === 1 && assets[0].kind === 'image')
     return (
@@ -83,13 +83,13 @@ function FileWidgetEditor({ source, onChange }: WidgetEditorProps) {
   const toggle = (id: string, on: boolean) => onChange({ ...source, assetIds: on ? [...ids, id] : ids.filter((x) => x !== id) })
   return (
     <Field label="Files">
-      <div className="flex max-h-48 flex-col gap-1 overflow-y-auto border border-line/40 bg-black/40 p-1.5">
+      <div className="flex max-h-48 flex-col gap-1 overflow-y-auto border border-line/40 tone-panel-40 p-1.5">
         {assets.length === 0 && <span className="text-[12.5px] text-dim">No files yet. Add some in Data.</span>}
         {assets.map((a) => (
-          <label key={a.id} className="flex cursor-pointer items-center gap-2 px-1 py-0.5 text-[12.5px] hover:bg-white/5">
+          <label key={a.id} className="flex cursor-pointer items-center gap-2 px-1 py-0.5 text-[12.5px] hover:bg-ink/5">
             <input type="checkbox" checked={ids.includes(a.id)} onChange={(e) => toggle(a.id, e.target.checked)} className="accent-[var(--color-accent)]" />
-            <span className="truncate text-white/90">{a.name}</span>
-            <span className="ml-auto font-mono text-[10.5px] text-faint">{a.kind}</span>
+            <span className="truncate text-ink/90">{a.name}</span>
+            <span className="ml-auto font-ui text-[10.5px] text-faint">{a.kind}</span>
           </label>
         ))}
       </div>

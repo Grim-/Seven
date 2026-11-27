@@ -43,7 +43,7 @@ function TextPreview({ asset, maxHeight }: { asset: AssetMeta; maxHeight: string
     }
   }, [asset])
   return (
-    <pre className={cn('overflow-auto border border-line/40 bg-black/70 px-2.5 py-1.5 font-mono text-[12px] leading-relaxed text-white/90', maxHeight)}>
+    <pre className={cn('overflow-auto border border-line/40 tone-panel-70 px-2.5 py-1.5 font-ui text-[12px] leading-relaxed text-ink/90', maxHeight)}>
       {text ?? 'Loading…'}
     </pre>
   )
@@ -69,18 +69,18 @@ export function AssetPreview({ asset, large = false }: { asset: AssetMeta; large
     case 'audio':
       return <audio src={url} controls className="w-full" />
     case 'video':
-      return <video src={url} controls className={cn('max-w-full border border-line/40 bg-black', maxHeight)} />
+      return <video src={url} controls className={cn('max-w-full border border-line/40 bg-panel', maxHeight)} />
     case 'pdf':
-      return <iframe src={url} title={asset.name} className={cn('w-full border border-line/40 bg-white', large ? 'h-[70vh]' : 'h-96')} />
+      return <iframe src={url} title={asset.name} className={cn('w-full border border-line/40 bg-page', large ? 'h-[70vh]' : 'h-96')} />
     case 'code':
     case 'text':
       return <TextPreview asset={asset} maxHeight={maxHeight} />
     default:
       return (
-        <div className="flex items-center gap-2 border border-line/40 bg-black/50 px-3 py-2">
+        <div className="flex items-center gap-2 border border-line/40 tone-panel-50 px-3 py-2">
           <FileIcon className="h-5 w-5 text-dim" />
-          <span className="font-mono text-[12.5px] text-white">{asset.name}</span>
-          <span className="font-mono text-[11px] text-faint">{formatBytes(asset.size)}</span>
+          <span className="font-ui text-[12.5px] text-ink">{asset.name}</span>
+          <span className="font-ui text-[11px] text-faint">{formatBytes(asset.size)}</span>
         </div>
       )
   }
@@ -91,8 +91,8 @@ export function AssetCard({ asset }: { asset: AssetMeta }) {
     <div className="flex flex-col gap-1.5">
       <AssetPreview asset={asset} />
       <div className="flex items-center gap-2">
-        <span className="min-w-0 truncate font-mono text-[11.5px] text-white/85">{asset.name}</span>
-        <span className="font-mono text-[10.5px] text-faint">{formatBytes(asset.size)}</span>
+        <span className="min-w-0 truncate font-ui text-[11.5px] text-ink/85">{asset.name}</span>
+        <span className="font-ui text-[10.5px] text-faint">{formatBytes(asset.size)}</span>
         <div className="ml-auto">
           <AssetActions asset={asset} />
         </div>
@@ -107,8 +107,8 @@ export function Gallery({ assets }: { assets: AssetMeta[] }) {
 
 function AssetById({ id }: { id: string }) {
   const asset = useAsset(id)
-  if (asset === undefined) return <div className="font-mono text-[11px] text-dim">Loading…</div>
-  if (!asset) return <div className="font-mono text-[11.5px] text-faint">A file that no longer exists ({id})</div>
+  if (asset === undefined) return <div className="font-ui text-[11px] text-dim">Loading…</div>
+  if (!asset) return <div className="font-ui text-[11.5px] text-faint">A file that no longer exists ({id})</div>
   return <AssetCard asset={asset} />
 }
 
@@ -118,7 +118,7 @@ export function LiveAssets({ assetIds, title }: { assetIds: string[]; title?: st
   const allImages = assets.length > 1 && assets.every((a) => a?.kind === 'image')
   return (
     <div className="flex flex-col gap-2">
-      {title && <div className="text-[13px] text-white/90">{title}</div>}
+      {title && <div className="text-[13px] text-ink/90">{title}</div>}
       {allImages ? (
         <Gallery assets={assets as AssetMeta[]} />
       ) : (

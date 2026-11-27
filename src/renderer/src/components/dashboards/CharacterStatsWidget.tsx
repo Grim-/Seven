@@ -97,7 +97,7 @@ function StatList({
 }) {
   const stats = entity.comp(Stats)
   if (!stats) {
-    return <div className="font-mono text-[11px] text-faint">This character has no Stats component yet.</div>
+    return <div className="font-ui text-[11px] text-faint">This character has no Stats component yet.</div>
   }
   const allDefs = catalog.stats()
   const chosen = filterIds.length
@@ -105,7 +105,7 @@ function StatList({
     : allDefs
 
   if (!chosen.length) {
-    return <div className="font-mono text-[11px] text-faint">No matching stats defined in the game catalog.</div>
+    return <div className="font-ui text-[11px] text-faint">No matching stats defined in the game catalog.</div>
   }
 
   return (
@@ -122,14 +122,14 @@ function StatList({
         const clamp = (n: number) => Math.round(Math.min(def.max, Math.max(def.min, n)) * 100) / 100
 
         return (
-          <div key={def.id} className="flex flex-col gap-1 border border-line/35 bg-black/45 px-2.5 py-1.5">
+          <div key={def.id} className="flex flex-col gap-1 border border-line/35 tone-panel-45 px-2.5 py-1.5">
             <div className="flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white/90" title={`${def.label} (${def.domain})`}>
+              <span className="min-w-0 flex-1 truncate font-label text-[11px] font-semibold caps-12 text-ink/90" title={`${def.label} (${def.domain})`}>
                 {def.label}
               </span>
               {delta !== 0 && (
                 <span
-                  className={cn('font-mono text-[10.5px]', delta > 0 ? 'text-teal' : 'text-alert')}
+                  className={cn('font-ui text-[10.5px]', delta > 0 ? 'text-secondary' : 'text-alert')}
                   title={`Base ${roundedBase} modified to ${roundedNow}`}
                 >
                   {roundedBase} → {roundedNow}
@@ -145,7 +145,7 @@ function StatList({
                   >
                     <Minus className="h-2.5 w-2.5" />
                   </button>
-                  <span className="min-w-8 text-center font-mono text-[12px] font-bold tabular-nums text-accent">
+                  <span className="min-w-8 text-center font-data text-[12px] font-bold tabular-nums text-accent">
                     {roundedNow}
                   </span>
                   <button
@@ -158,7 +158,7 @@ function StatList({
                   </button>
                 </div>
               ) : (
-                <span className="font-mono text-[12.5px] font-bold tabular-nums text-accent">{roundedNow}</span>
+                <span className="font-data text-[12.5px] font-bold tabular-nums text-accent">{roundedNow}</span>
               )}
             </div>
             {showBar && (
@@ -188,7 +188,7 @@ function CharacterStatsBody({ widget, compact }: WidgetBodyProps) {
     return <EmptyState title="Pick a character">Choose a character sheet in this widget's settings.</EmptyState>
   }
   if (loading || !catalog) {
-    return <div className="font-mono text-[11px] text-dim">Loading stats…</div>
+    return <div className="font-ui text-[11px] text-dim">Loading stats…</div>
   }
   if (!sheet) return <MissingWidget what="character" />
   if (!entity) {
@@ -215,13 +215,13 @@ function CharacterStatsBody({ widget, compact }: WidgetBodyProps) {
       <div className="flex items-center gap-2 border-b border-line/40 pb-1.5">
         <CharacterAvatar sheetId={sheet.id} size={compact ? 24 : 30} openOnClick />
         <div className="min-w-0 flex-1">
-          <div className="truncate font-mono text-[11.5px] font-bold uppercase tracking-[0.14em] text-white">
+          <div className="truncate font-label text-[11.5px] font-bold caps-14 text-ink">
             {showName(sheet.title)}
           </div>
-          {sheet.save && <div className="font-mono text-[9.5px] uppercase tracking-wider text-purple">In live save</div>}
+          {sheet.save && <div className="font-label text-[9.5px] caps-5 text-tint-purple">In live save</div>}
         </div>
         {filterIds.length > 0 && (
-          <span className="border border-line/50 px-1.5 py-0.5 font-mono text-[9.5px] text-dim">
+          <span className="border border-line/50 px-1.5 py-0.5 font-ui text-[9.5px] text-dim">
             {filterIds.length} pinned
           </span>
         )}
@@ -234,7 +234,7 @@ function CharacterStatsBody({ widget, compact }: WidgetBodyProps) {
           {buffs.map((b) => {
             const label = buffDefs.find((d) => d.id === b.id)?.name ?? b.id
             return (
-              <span key={b.uid} className="border border-cyan/40 bg-cyan/10 px-1.5 py-0.5 font-mono text-[9.5px] text-cyan">
+              <span key={b.uid} className="border border-secondary-ink/40 bg-secondary-ink/10 px-1.5 py-0.5 font-ui text-[9.5px] text-secondary-ink">
                 {label}
                 {b.stacks > 1 ? ` ×${b.stacks}` : ''}
               </span>
@@ -291,8 +291,8 @@ function CharacterStatsEditor({ source, onChange }: WidgetEditorProps) {
                 type="button"
                 onClick={() => toggleStat(def.id)}
                 className={cn(
-                  'border px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-wider transition-colors',
-                  on ? 'border-accent bg-accent/20 text-accent' : 'border-line/50 text-dim hover:border-line hover:text-white'
+                  'border px-2 py-0.5 font-label text-[10.5px] caps-5 transition-colors',
+                  on ? 'border-accent bg-accent/20 text-accent' : 'border-line/50 text-dim hover:border-line hover:text-ink'
                 )}
               >
                 {def.label}
@@ -303,7 +303,7 @@ function CharacterStatsEditor({ source, onChange }: WidgetEditorProps) {
             <button
               type="button"
               onClick={() => onChange({ ...source, stats: [] })}
-              className="border border-line/40 px-2 py-0.5 font-mono text-[10.5px] text-faint hover:text-white"
+              className="border border-line/40 px-2 py-0.5 font-ui text-[10.5px] text-faint hover:text-ink"
             >
               Show all
             </button>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useMotion } from '../../lib/skins/useMotion'
 
 const GLYPHS = '0123456789<>{}[]/\\|@#$%&*+=?'
 
@@ -13,12 +14,13 @@ function calm(): boolean {
 }
 
 export function DecodeText({ text, onMount = true, duration = 520, className }: { text: string; onMount?: boolean; duration?: number; className?: string }) {
-  const [shown, setShown] = useState(() => (onMount && !calm() ? scrambled(text) : text))
+  const { decode } = useMotion()
+  const [shown, setShown] = useState(() => (onMount && decode && !calm() ? scrambled(text) : text))
   const first = useRef(true)
   useEffect(() => {
     const initial = first.current
     first.current = false
-    if ((initial && !onMount) || calm() || !text) {
+    if ((initial && !onMount) || !decode || calm() || !text) {
       setShown(text)
       return
     }
@@ -36,6 +38,6 @@ export function DecodeText({ text, onMount = true, duration = 520, className }: 
     }
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
-  }, [text])
+  }, [text, decode])
   return <span className={className}>{shown}</span>
 }

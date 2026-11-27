@@ -77,7 +77,7 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
         </Button>
       }
     >
-      <div className="flex flex-col gap-4 font-mono select-none">
+      <div className="flex flex-col gap-4 font-ui select-none">
         <ShellTabs
           value={tab}
           onChange={setTab}
@@ -92,8 +92,8 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
         {/* TAB 1: CONTROLS & MOUSE */}
         {tab === 'controls' && (
           <div className="flex flex-col gap-3">
-            <div className="border border-line/60 bg-black/60 p-3">
-              <span className="font-bold text-white">PRIMARY MOUSE MOVEMENT</span>
+            <div className="border border-line/60 tone-panel-60 p-3">
+              <span className="font-bold text-ink caps">Primary mouse movement</span>
               <p className="mt-1 text-[11px] leading-relaxed text-dim">
                 In CRPG and tabletop tactical games, Left Click is reserved for selecting,
                 inspecting, and targeting. Right Click executes character movement.
@@ -117,10 +117,10 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
             </div>
 
             {/* FORCE MOVE MODIFIER */}
-            <div className="border border-line/60 bg-black/60 p-3">
+            <div className="border border-line/60 tone-panel-60 p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-white">FORCE MOVE MODIFIER (SHIFT)</span>
+                  <span className="font-bold text-ink">FORCE MOVE MODIFIER (SHIFT)</span>
                   <p className="text-[11px] text-dim">
                     Holding Shift + Right Click moves directly to that spot, ignoring targets,
                     objects, and interaction context menus.
@@ -136,8 +136,8 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
             </div>
 
             {/* INTERACTION RANGE */}
-            <div className="border border-line/60 bg-black/60 p-3">
-              <span className="font-bold text-white">SMART INTERACTION APPROACH</span>
+            <div className="border border-line/60 tone-panel-60 p-3">
+              <span className="font-bold text-ink caps">Smart interaction approach</span>
               <p className="mt-0.5 text-[11px] text-dim">
                 When choosing an action from an interaction menu (Talk, Open, Loot), your
                 character automatically pathfinds within 5 ft reach before executing the action.
@@ -150,10 +150,10 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
             </div>
 
             {/* CAMERA FOLLOW */}
-            <div className="border border-line/60 bg-black/60 p-3">
+            <div className="border border-line/60 tone-panel-60 p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-white">CAMERA FOLLOW PLAYER</span>
+                  <span className="font-bold text-ink caps">Camera follow player</span>
                   <p className="text-[11px] text-dim">
                     Keep the camera centered on your active character during movement.
                   </p>
@@ -172,7 +172,7 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
         {/* TAB 2: KEYBINDS */}
         {tab === 'keybinds' && (
           <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between border-b border-line/60 pb-1.5 text-[10px] uppercase tracking-wider text-faint">
+            <div className="flex items-center justify-between border-b border-line/60 pb-1.5 text-[10px] caps-5 text-faint">
               <span>ACTION &amp; SHORTCUT</span>
               <span>ASSIGNED KEY</span>
             </div>
@@ -190,8 +190,8 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
                     className="flex items-center justify-between py-2 text-[11.5px]"
                   >
                     <div className="flex flex-col">
-                      <span className="font-semibold text-white">{item.label}</span>
-                      <span className="text-[9.5px] uppercase tracking-wider text-dim">
+                      <span className="font-semibold text-ink">{item.label}</span>
+                      <span className="text-[9.5px] caps-5 text-dim">
                         {item.cat}
                       </span>
                     </div>
@@ -203,7 +203,7 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
                         </span>
                       ) : (
                         <>
-                          <span className="min-w-12 border border-line bg-black/60 px-2.5 py-1 text-center font-bold text-cyan">
+                          <span className="min-w-12 border border-line tone-panel-60 px-2.5 py-1 text-center font-bold text-secondary-ink">
                             {currentBind.display}
                           </span>
                           <Button
@@ -239,8 +239,8 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
         {/* TAB 3: DISPLAY & HUD */}
         {tab === 'display' && (
           <div className="flex flex-col gap-3">
-            <div className="border border-line/60 bg-black/60 p-3">
-              <span className="font-bold text-white">AMBIENT HUD IDLE TRANSPARENCY</span>
+            <div className="border border-line/60 tone-panel-60 p-3">
+              <span className="font-bold text-ink caps">Ambient hud idle transparency</span>
               <p className="mt-0.5 text-[11px] text-dim">
                 How translucent dialogue overlays and narration appear when idle.
               </p>
@@ -254,16 +254,16 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
                   onChange={(e) => update({ ambientOpacity: Number(e.target.value) })}
                   className="flex-1 accent-accent"
                 />
-                <span className="w-12 border border-line bg-black/60 px-2 py-0.5 text-center font-bold text-cyan">
+                <span className="w-12 border border-line tone-panel-60 px-2 py-0.5 text-center font-bold text-secondary-ink">
                   {settings.ambientOpacity}%
                 </span>
               </div>
             </div>
 
-            <div className="border border-line/60 bg-black/60 p-3">
+            <div className="border border-line/60 tone-panel-60 p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-white">SPEECH BUBBLES ALWAYS WIDE</span>
+                  <span className="font-bold text-ink caps">Speech bubbles always wide</span>
                   <p className="text-[11px] text-dim">
                     Render in-world speech bubbles in wide horizontal format by default.
                   </p>
@@ -277,10 +277,10 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
               </div>
             </div>
 
-            <div className="border border-line/60 bg-black/60 p-3">
+            <div className="border border-line/60 tone-panel-60 p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-white">SHOW COMBAT TURN STRIP</span>
+                  <span className="font-bold text-ink caps">Show combat turn strip</span>
                   <p className="text-[11px] text-dim">
                     Display initiative turn order and action economy bar during combat.
                   </p>
@@ -299,10 +299,10 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
         {/* TAB 4: RULES & AGENT */}
         {tab === 'agent' && (
           <div className="flex flex-col gap-3">
-            <div className="border border-line/60 bg-black/60 p-3">
+            <div className="border border-line/60 tone-panel-60 p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-white">AUTO-PAUSE ON DIALOGUE</span>
+                  <span className="font-bold text-ink caps">Auto-pause on dialogue</span>
                   <p className="text-[11px] text-dim">
                     Pause real-time world simulation when an NPC speaks or a decision is required.
                   </p>
@@ -316,10 +316,10 @@ export function GameplaySettingsModal({ open, onClose }: Props) {
               </div>
             </div>
 
-            <div className="border border-line/60 bg-black/60 p-3">
+            <div className="border border-line/60 tone-panel-60 p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-bold text-white">CHARACTER SHEET GROUNDING</span>
+                  <span className="font-bold text-ink caps">Character sheet grounding</span>
                   <p className="text-[11px] text-dim">
                     Inject full character sheets (Identity, Motivations, Speech, D&amp;D Stats)
                     into the LLM agent system prompt.

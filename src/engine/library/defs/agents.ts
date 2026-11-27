@@ -13,6 +13,7 @@ import { scoreDoc } from '../query'
 import { registerKind } from '../kindRegistry'
 import { ENTRY_WIDGET } from './runtime'
 import { clip, has, withJson, type Kind, type KindContext, type KindHit } from './types'
+import { bindingOrNull } from '../../worlds/ops'
 
 export const skillKind: Kind = {
   presents: { chat: true, widget: ENTRY_WIDGET },
@@ -95,7 +96,7 @@ export const memoryKind: Kind = {
   icon: 'brain',
   description: 'your own memories (pinned ones are in every chat); only you can read them',
   parts: [],
-  actions: ['remember', 'recall', 'forget'],
+  actions: ['agent_remember', 'agent_recall'],
   available: (ctx) => Boolean(ctx.agentId || ctx.user),
   title: (id) => agentAccess.get(id)?.name ?? id,
   search(query, limit, ctx) {
@@ -315,10 +316,11 @@ export const agentKind: Kind = {
     const a = visibleAgents(ctx).find((x) => x.id === id)
     if (!a) throw new ToolError(`No agent ${id}`)
     const maker = a.createdBy ? agentAccess.get(a.createdBy)?.name ?? 'another agent' : null
+    const home = bindingOrNull(a.id)
     const lines = [
       `# ${a.name}`,
       a.description || '(no description)',
-      `Tools: ${a.modules.length ? a.modules.join(', ') : 'none yet'}${a.toolsets?.length ? `; toolsets ${a.toolsets.join(', ')}` : ''}. Model: ${a.modelId ?? 'whichever is loaded'}.${a.roleplay ? ' Replies in roleplay style.' : ''}${a.world ? ` Lives in world ${a.world.worldId} as ${a.world.type} ${a.world.id}.` : ''}${maker ? ` Made by ${maker}.` : ''}`,
+      `Tools: ${a.modules.length ? a.modules.join(', ') : 'none yet'}${a.toolsets?.length ? `; toolsets ${a.toolsets.join(', ')}` : ''}. Model: ${a.modelId ?? 'whichever is loaded'}.${a.roleplay ? ' Replies in roleplay style.' : ''}${home ? ` Lives in world ${home.worldId} as ${home.type} ${home.id}.` : ''}${maker ? ` Made by ${maker}.` : ''}`,
       `Link: ${linkFor('agent', a.name)}`,
       a.systemPrompt.trim() ? `Instructions:\n${a.systemPrompt.trim().slice(0, 2000)}${a.systemPrompt.length > 2000 ? '\n...' : ''}` : 'No instructions.'
     ]

@@ -23,13 +23,13 @@ export function MuscleBalance({
             key={m.muscle}
             className="grid grid-cols-[8rem_minmax(0,1fr)_4.5rem_7rem] items-center gap-3 border-b border-line/20 px-3.5 py-1.5"
           >
-            <span className="truncate text-[13px] font-semibold capitalize text-white">
+            <span className="truncate text-[13px] font-semibold capitalize text-ink">
               {m.muscle}
             </span>
-            <div className="h-2.5 bg-white/5">
-              <div className="h-full bg-cyan" style={{ width: `${(m.sets / top) * 100}%` }} />
+            <div className="h-2.5 bg-ink/5">
+              <div className="h-full bg-secondary-ink" style={{ width: `${(m.sets / top) * 100}%` }} />
             </div>
-            <span className="text-right font-mono text-[12.5px] text-white">{m.sets} sets</span>
+            <span className="text-right font-ui text-[12.5px] text-ink">{m.sets} sets</span>
             <span className="text-right text-[12px] text-dim">
               {m.last ? agoText(m.last, today) : 'never'}
             </span>

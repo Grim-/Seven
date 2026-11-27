@@ -95,13 +95,13 @@ export function ObjectPlayManager({
   }
 
   return (
-    <div className="flex flex-col gap-4 font-mono select-none">
+    <div className="flex flex-col gap-4 font-ui select-none">
       {/* ──────────────────────────────────────────────────────────── */}
       {/* ACTIONS SECTION */}
       {/* ──────────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between border-b border-line/40 pb-1">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-accent uppercase">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-accent caps">
             <Dices className="h-3.5 w-3.5 text-accent" />
             <span>Interactive Actions (Checks &amp; Attempts)</span>
           </div>
@@ -111,27 +111,27 @@ export function ObjectPlayManager({
         {/* ACTIONS LIST */}
         <div className="flex flex-col gap-1.5">
           {actions.length === 0 ? (
-            <div className="border border-dashed border-line/40 bg-black/30 p-2.5 text-center text-[10.5px] text-faint">
+            <div className="border border-dashed border-line/40 tone-panel-30 p-2.5 text-center text-[10.5px] text-faint">
               No rollable actions configured yet.
             </div>
           ) : (
             actions.map((act, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between border border-line/60 bg-black/60 p-2 hover:border-accent/60 transition-colors"
+                className="flex items-center justify-between border border-line/60 tone-well-60 p-2 hover:border-accent/60 transition-colors"
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11.5px] font-bold text-white truncate">
+                    <span className="text-[11.5px] font-bold text-ink truncate">
                       {act.attempt}
                     </span>
-                    <span className="border border-line/60 bg-line/20 px-1 text-[8.5px] uppercase text-cyan">
+                    <span className="border border-line/60 bg-line/20 px-1 text-[8.5px] caps text-secondary-ink">
                       {act.needs}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 text-[9.5px] text-dim">
                     {act.checks.map((c, ci) => (
-                      <span key={ci} className="border border-line/40 bg-black/40 px-1 text-accent">
+                      <span key={ci} className="border border-line/40 tone-panel-40 px-1 text-accent">
                         {c.against ?? 'Chance'} DC {c.difficulty ?? 10}
                       </span>
                     ))}
@@ -143,7 +143,7 @@ export function ObjectPlayManager({
                     type="button"
                     onClick={() => setEditingActionIndex(i)}
                     title="Edit action check"
-                    className="p-1 text-dim hover:text-cyan transition-colors"
+                    className="p-1 text-dim hover:text-secondary-ink transition-colors"
                   >
                     <Edit2 className="h-3 w-3" />
                   </button>
@@ -197,8 +197,8 @@ export function ObjectPlayManager({
       {/* ──────────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2 border-t border-line/40 pt-3">
         <div className="flex items-center justify-between border-b border-line/40 pb-1">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-cyan uppercase">
-            <Signpost className="h-3.5 w-3.5 text-cyan" />
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-secondary-ink caps">
+            <Signpost className="h-3.5 w-3.5 text-secondary-ink" />
             <span>Interactive Decisions (Player Choices)</span>
           </div>
           <span className="text-[9.5px] text-faint">{decisions.length} Configured</span>
@@ -207,27 +207,27 @@ export function ObjectPlayManager({
         {/* DECISIONS LIST */}
         <div className="flex flex-col gap-1.5">
           {decisions.length === 0 ? (
-            <div className="border border-dashed border-line/40 bg-black/30 p-2.5 text-center text-[10.5px] text-faint">
+            <div className="border border-dashed border-line/40 tone-panel-30 p-2.5 text-center text-[10.5px] text-faint">
               No interactive choices configured yet.
             </div>
           ) : (
             decisions.map((dec, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between border border-line/60 bg-black/60 p-2 hover:border-cyan/60 transition-colors"
+                className="flex items-center justify-between border border-line/60 tone-well-60 p-2 hover:border-secondary-ink/60 transition-colors"
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11.5px] font-bold text-white truncate">
+                    <span className="text-[11.5px] font-bold text-ink truncate">
                       {dec.question}
                     </span>
-                    <span className="border border-cyan/40 bg-cyan/15 px-1 text-[8.5px] text-cyan">
+                    <span className="border border-secondary-ink/40 bg-secondary-ink/15 px-1 text-[8.5px] text-secondary-ink">
                       {dec.decider ? `Agent: ${dec.decider}` : 'You Decide'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 text-[9.5px] text-dim truncate">
                     {dec.options.map((opt, oi) => (
-                      <span key={oi} className="border border-line/30 bg-black/40 px-1">
+                      <span key={oi} className="border border-line/30 tone-panel-40 px-1">
                         {opt.text}
                       </span>
                     ))}
@@ -239,7 +239,7 @@ export function ObjectPlayManager({
                     type="button"
                     onClick={() => setEditingDecisionIndex(i)}
                     title="Edit decision"
-                    className="p-1 text-dim hover:text-cyan transition-colors"
+                    className="p-1 text-dim hover:text-secondary-ink transition-colors"
                   >
                     <Edit2 className="h-3 w-3" />
                   </button>
@@ -262,9 +262,9 @@ export function ObjectPlayManager({
           <Button
             size="sm"
             variant="ghost"
-            icon={<Plus className="h-3 w-3 text-cyan" />}
+            icon={<Plus className="h-3 w-3 text-secondary-ink" />}
             onClick={() => setIsBuildingNewDecision(true)}
-            className="flex-1 text-[10px] border border-cyan/40 hover:bg-cyan/10"
+            className="flex-1 text-[10px] border border-secondary-ink/40 hover:bg-secondary-ink/10"
           >
             Build Decision
           </Button>
@@ -301,7 +301,7 @@ export function ObjectPlayManager({
           }}
           wide
         >
-          <div className="p-4 font-mono select-none">
+          <div className="p-4 font-ui select-none">
             <ActionForm
               initial={
                 editingActionIndex !== null
@@ -345,7 +345,7 @@ export function ObjectPlayManager({
           }}
           wide
         >
-          <div className="p-4 font-mono select-none">
+          <div className="p-4 font-ui select-none">
             <DecisionForm
               initial={
                 editingDecisionIndex !== null

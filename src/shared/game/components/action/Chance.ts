@@ -1,6 +1,6 @@
 import { LUCK, type EffectGroup } from '../../effectGroups'
-import { registerComponent, roll, type TooltipRow } from '../../core'
-import { ActionPiece, chainScore, expectedActionValue, type ActionEvent, type EffectBranch, type UseContext } from '../Action'
+import { registerComponent, roll, type Component, type GameEntity, type TooltipRow } from '../../core'
+import { Action, ActionPiece, chainScore, expectedActionValue, type ActionEvent, type EffectBranch, type UseContext } from '../Action'
 
 export class Chance extends ActionPiece {
   static readonly type: string = 'action.chance'
@@ -18,6 +18,10 @@ export class Chance extends ActionPiece {
     { param: 'emit', label: 'Passed', tone: 'pass', always: true },
     { param: 'onFail', label: 'Failed', tone: 'fail', always: true }
   ]
+
+  canApply(host: Component | GameEntity): true | string {
+    return host instanceof Action ? true : 'this piece belongs inside an ability, item, reaction, or world event'
+  }
 
   tooltipRows(): TooltipRow[] {
     return [{ label: 'Chance', value: `${String(this.params.percent)} in 100` }]

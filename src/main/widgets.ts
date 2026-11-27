@@ -5,6 +5,8 @@ import crypto from 'node:crypto'
 import { isVaultLocked } from '@shared/sealed'
 import { mainSecure } from './vault'
 import { dataDir } from './paths'
+import { settings } from './settings'
+import { widgetLookCss } from '@shared/widgetLook'
 
 export const WIDGET_SCHEME = 'seven-widget'
 
@@ -41,33 +43,29 @@ const BRIDGE = `<script>
 </script>`
 
 const KIT = `<style>
-:root{--bg:#090a0d;--card:#11141c;--line:rgba(245,158,11,.35);--line-strong:rgba(245,158,11,.6);--accent:#ffc919;--accent-soft:#e39d07;--cyan:rgb(102,252,241);--alert:#ef4444;--ok:#34d399;--text:#fff;--dim:#a1a1aa;--faint:#52525b;--mono:ui-monospace,'Cascadia Mono',Consolas,monospace;--sans:'Segoe UI',Inter,system-ui,sans-serif}
-body{font-family:var(--sans);color:var(--text)}
-.s-panel{border:1px solid var(--line);background:rgba(0,0,0,.4);padding:10px 12px}
+.s-panel{border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 40%,transparent);padding:10px 12px}
 .s-panel+.s-panel{margin-top:8px}
-.s-title{font:600 15px var(--sans);color:var(--text)}
-.s-label{font:600 10.5px var(--mono);text-transform:uppercase;letter-spacing:.14em;color:var(--accent-soft)}
-.s-dim{color:var(--dim)}.s-faint{color:var(--faint)}.s-mono{font-family:var(--mono)}
+.s-title{font:600 15px var(--font-heading);color:var(--ink)}
+.s-label{font:600 10.5px var(--font-label);text-transform:var(--label-case);font-variant-caps:var(--label-variant);letter-spacing:var(--label-tracking);color:var(--accent-soft)}
+.s-dim{color:var(--dim)}.s-faint{color:var(--faint)}.s-mono{font-family:var(--font-mono)}
 .s-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .s-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--min,120px),1fr));gap:8px}
-.s-btn{height:28px;padding:0 10px;border:1px solid var(--line);background:rgba(0,0,0,.5);color:var(--accent);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
+.s-btn,.s-tab{height:28px;padding:0 10px;border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 50%,transparent);color:var(--accent);font:600 11px var(--font-ui);text-transform:var(--label-case);font-variant-caps:var(--label-variant);letter-spacing:var(--label-tracking);cursor:pointer}
 .s-btn:hover{border-color:var(--accent)}
-.s-btn.primary{border-color:var(--accent);background:rgba(255,201,25,.15);color:var(--text)}
-.s-btn.danger{color:var(--alert);border-color:rgba(239,68,68,.5)}
-.s-input,.s-textarea,.s-select{box-sizing:border-box;border:1px solid var(--line);background:rgba(0,0,0,.6);color:var(--text);font:13px var(--sans);padding:6px 8px;outline:none}
-.s-input:focus,.s-textarea:focus,.s-select:focus{border-color:var(--cyan)}
+.s-btn.primary,.s-tab.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--ink)}
+.s-btn.danger{color:var(--alert);border-color:color-mix(in srgb,var(--alert) 50%,transparent)}
+.s-input,.s-textarea,.s-select{box-sizing:border-box;border:1px solid var(--line);background:color-mix(in srgb,var(--well) 60%,transparent);color:var(--ink);font:13px var(--font-body);padding:6px 8px;outline:none}
+.s-input:focus,.s-textarea:focus,.s-select:focus{border-color:var(--secondary-ink)}
 .s-textarea{width:100%;min-height:80px;resize:vertical}
 .s-tabs{display:flex;gap:6px;flex-wrap:wrap}
-.s-tab{height:28px;padding:0 10px;border:1px solid var(--line);background:rgba(0,0,0,.5);color:var(--accent);font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
-.s-tab.on{border-color:var(--accent);background:rgba(255,201,25,.15);color:var(--text)}
-.s-chip{display:inline-flex;align-items:center;height:20px;padding:0 6px;border:1px solid rgba(255,201,25,.5);background:rgba(255,201,25,.1);color:var(--accent);font:600 11px var(--mono)}
-.s-stat{border:1px solid var(--line);background:rgba(0,0,0,.4);padding:6px;text-align:center}
-.s-stat b{display:block;font:600 18px var(--mono);color:var(--text)}
-.s-stat span{font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--accent-soft)}
-.s-note{border:1px solid var(--line);border-left:2px solid var(--accent);background:rgba(255,201,25,.04);padding:8px 10px}
+.s-chip{display:inline-flex;align-items:center;height:20px;padding:0 6px;border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent);font:600 11px var(--font-data)}
+.s-stat{border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 40%,transparent);padding:6px;text-align:center}
+.s-stat b{display:block;font:600 18px var(--font-data);color:var(--ink)}
+.s-stat span{font:600 10px var(--font-label);text-transform:var(--label-case);font-variant-caps:var(--label-variant);letter-spacing:var(--label-tracking);color:var(--accent-soft)}
+.s-note{border:1px solid var(--line);border-left:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 4%,transparent);padding:8px 10px}
 </style>`
 
-const TEMPLATE_BRIDGE = `${KIT}<script>
+const TEMPLATE_BRIDGE = `<script>
 (function () {
   var t = { fields: null, listeners: [] }
   t.onFields = function (fn) { t.listeners.push(fn); if (t.fields) fn(t.fields) }
@@ -116,7 +114,11 @@ export function hostPage(html: string): string {
   return token
 }
 
-const BASE = `<style>html,body{margin:0;padding:0;background:transparent;color:#fff;font:13px/1.45 system-ui,sans-serif}</style>`
+const ROOT = ":root{--bg:#090a0d;--card:#11141c;--panel:#000000;--surface:#090a0d;--well:#000000;--ink:#ffffff;--dim:#a1a1aa;--faint:#52525b;--line:rgba(245,158,11,.35);--line-strong:rgba(245,158,11,.6);--accent:#ffc919;--accent-soft:#e39d07;--on-accent:#000000;--secondary:rgb(0,229,255);--secondary-ink:rgb(102,252,241);--cyan:rgb(102,252,241);--alert:#ef4444;--ok:#34d399;--warn:#ffb900;--font-sans:'Segoe UI',Inter,system-ui,sans-serif;--font-mono:ui-monospace,'Cascadia Mono',Consolas,monospace;--font-ui:var(--font-mono);--font-label:var(--font-mono);--font-heading:var(--font-sans);--font-body:var(--font-sans);--font-data:var(--font-mono);--label-case:uppercase;--label-tracking:.08em;--label-variant:normal;--text:var(--ink);--mono:var(--font-mono);--sans:var(--font-sans)}"
+
+function base(): string {
+  return `<style>${ROOT}${widgetLookCss(settings.get().widgetLook)}html,body{margin:0;padding:0;background:transparent;color:var(--ink);font:13px/1.45 var(--font-body)}</style>`
+}
 
 export function widgetScheme(): Electron.CustomScheme {
   return { scheme: WIDGET_SCHEME, privileges: { standard: true, secure: true } }
@@ -124,7 +126,7 @@ export function widgetScheme(): Electron.CustomScheme {
 
 function page(html: string, network: boolean, bridge = BRIDGE): Response {
   const policy = csp(network)
-  const head = `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}">${BASE}${bridge}`
+  const head = `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}">${base()}${KIT}${bridge}`
   const body = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => `${m}${head}`) : `<!doctype html><html><head>${head}</head><body>${html}</body></html>`
   return new Response(body, { headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': policy, 'cache-control': 'no-store' } })
 }

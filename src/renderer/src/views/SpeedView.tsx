@@ -103,7 +103,7 @@ export function SpeedView() {
           </>
         }
       >
-        <p className="text-[13px] text-white/85">Every recorded reply speed for every model is deleted. This can't be undone.</p>
+        <p className="text-[13px] text-ink/85">Every recorded reply speed for every model is deleted. This can't be undone.</p>
       </Modal>
       <div className="min-h-0 flex-1 overflow-y-auto border border-line/40 bg-bg">
         <GridTable columns={columns} empty={summary && !rows.length ? 'No speed stats yet. Chat with a local model and its replies are counted here.' : false}>
@@ -112,7 +112,7 @@ export function SpeedView() {
             const sizes = entry ? modelTraits(entry.info, modelBytes(entry)).filter((t) => t.key === 'params' || t.key === 'bytes' || t.key === 'shape') : []
             return (
               <GridRow key={`${m.modelId}/${m.contextSize}/${m.gpuLayers ?? ''}`} onClick={entry ? () => open(m.modelId) : undefined}>
-                <span className="text-right font-mono text-[12px] text-faint">{i + 1}</span>
+                <span className="text-right font-ui text-[12px] text-faint">{i + 1}</span>
                 {entry ? (
                   <span
                     role="button"
@@ -124,22 +124,22 @@ export function SpeedView() {
                     }}
                     className="flex items-center justify-center"
                   >
-                    <Star className={cn('h-3.5 w-3.5', entry.favourite ? 'fill-accent text-accent' : 'text-faint hover:text-white')} />
+                    <Star className={cn('h-3.5 w-3.5', entry.favourite ? 'fill-accent text-accent' : 'text-faint hover:text-ink')} />
                   </span>
                 ) : (
                   <span />
                 )}
-                <span className="truncate text-[13px] text-white" title={entry ? m.modelName : `${m.modelName} is no longer in Models`}>
+                <span className="truncate text-[13px] text-ink" title={entry ? m.modelName : `${m.modelName} is no longer in Models`}>
                   {m.modelName}
                 </span>
                 <TraitChips traits={sizes} />
-                <span className="text-right font-mono text-[12px] text-white/85">{count(m.contextSize)}</span>
-                <span className="text-right font-mono text-[12px] text-white/85">{m.gpuLayers ?? '—'}</span>
-                <span className="text-right font-mono text-[12.5px] text-accent">{rate(m.genPerSecond)}</span>
-                <span className="text-right font-mono text-[12px] text-white/85">{rate(m.promptPerSecond)}</span>
-                <span className="text-right font-mono text-[12px] text-white/85">{secs(m.ttftMs)}</span>
-                <span className="text-right font-mono text-[12px] text-white/85">{m.turns}</span>
-                <span className="text-right font-mono text-[11px] text-faint">{formatRelative(m.lastAt)}</span>
+                <span className="text-right font-ui text-[12px] text-ink/85">{count(m.contextSize)}</span>
+                <span className="text-right font-ui text-[12px] text-ink/85">{m.gpuLayers ?? '—'}</span>
+                <span className="text-right font-ui text-[12.5px] text-accent">{rate(m.genPerSecond)}</span>
+                <span className="text-right font-ui text-[12px] text-ink/85">{rate(m.promptPerSecond)}</span>
+                <span className="text-right font-ui text-[12px] text-ink/85">{secs(m.ttftMs)}</span>
+                <span className="text-right font-ui text-[12px] text-ink/85">{m.turns}</span>
+                <span className="text-right font-ui text-[11px] text-faint">{formatRelative(m.lastAt)}</span>
               </GridRow>
             )
           })}

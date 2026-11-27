@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowDownAZ, ArrowDownWideNarrow, ArrowUpNarrowWide, Clock, Cloud, Copy, Cpu, Download, FilePlus, FolderOpen, Folders, Layers, Power, Search, Server, Shapes, Sparkles, Star, Trash2 } from 'lucide-react'
 import type { ModelEntry, ModelKind } from '@shared/types'
-import { presetForSpec, remoteHostLabel } from '@shared/remoteModels'
+import { isImageModel, presetForSpec, remoteHostLabel } from '@shared/remoteModels'
 import { modelTraitSet } from '@shared/modelParams'
 import { useProjector } from '../components/models/useProjector'
 import { MODEL_KINDS, type HubModel } from '@shared/types'
@@ -67,6 +67,39 @@ function useActions() {
   return { toggle, useForSearch, showFolder, copyPath, drop, star }
 }
 
+const MANUAL_KINDS: ModelKind[] = ['image', 'chat', 'embedding', 'lora', 'control_vector', 'vae', 'text_encoder', 'projector']
+
+function ModelKindPicker({ model, className = 'w-56' }: { model: ModelEntry; className?: string }) {
+  const current = model.info?.kind ?? null
+  const setKind = (nextKind: ModelKind | null) =>
+    void engine('models.kind', { id: model.id, kind: nextKind })
+      .then((next) => {
+        useModels.setState({ list: next })
+        toast.success(
+          nextKind ? `Marked as ${MODEL_KINDS[nextKind].label}` : 'Reset to auto-detected type',
+          model.name
+        )
+      })
+      .catch(failed('Could not change the model type'))
+
+  const kinds = current && !MANUAL_KINDS.includes(current) ? [...MANUAL_KINDS, current] : MANUAL_KINDS
+  return (
+    <BrowsePick
+      value={current}
+      clearable={Boolean(model.kindChosen)}
+      placeholder="Set model type…"
+      options={kinds.map((k) => ({
+        value: k,
+        label: MODEL_KINDS[k].label,
+        group: MODEL_KINDS[k].runnable ? 'Runnable models' : 'Adapters & companions',
+        ...(MODEL_KINDS[k].note ? { note: MODEL_KINDS[k].note } : {})
+      }))}
+      onChange={(v) => setKind(v as ModelKind | null)}
+      className={className}
+    />
+  )
+}
+
 function ModelFacts({ model }: { model: ModelEntry }) {
   const info = model.info
   return (
@@ -74,31 +107,7 @@ function ModelFacts({ model }: { model: ModelEntry }) {
       <div className="p-3.5">
           <FactGrid>
             <Fact label="Type">
-              {info ? (
-                <BrowsePick
-                  value={info.kind}
-                  clearable={Boolean(model.kindChosen)}
-                  placeholder="Type"
-                  options={(Object.keys(MODEL_KINDS) as ModelKind[])
-                    .filter((k) => MODEL_KINDS[k].listed || k === 'vae' || k === 'text_encoder' || k === 'lora' || k === info.kind)
-                    .map((k) => ({
-                      value: k,
-                      label: MODEL_KINDS[k].label,
-                      group: MODEL_KINDS[k].runnable ? 'Runnable models' : 'Companion weights',
-                      ...(MODEL_KINDS[k].note ? { note: MODEL_KINDS[k].note } : {})
-                    }))}
-                  onChange={(v) =>
-                    void engine('models.kind', { id: model.id, kind: v as ModelKind | null })
-                      .then((next) => useModels.setState({ list: next }))
-                      .catch(failed('Could not change the type'))
-                  }
-                  className="w-60"
-                />
-              ) : info === null ? (
-                'Unreadable'
-              ) : (
-                '…'
-              )}
+              <ModelKindPicker model={model} className="w-60" />
             </Fact>
             <Fact label="Architecture">{info?.architecture ?? '—'}</Fact>
             <Fact label="Parameters">{info?.sizeLabel ?? '—'}</Fact>
@@ -156,7 +165,7 @@ function ReloadBar({ model }: { model: ModelEntry }) {
     }
   }
   return (
-    <div className="flex items-center gap-3 border border-line border-l-2 border-l-accent bg-accent/5 px-3 py-2 text-[12.5px] text-white">
+    <div className="flex items-center gap-3 border border-line border-l-2 border-l-accent bg-accent/5 px-3 py-2 text-[12.5px] text-ink">
       <span className="flex-1">Settings changed since this model was loaded. Reload it to apply them.</span>
       <Button size="sm" variant="badge" onClick={() => void reload()}>
         Reload
@@ -168,13 +177,17 @@ function ReloadBar({ model }: { model: ModelEntry }) {
 function ModelDetail({ model }: { model: ModelEntry }) {
   const host = useModels((s) => s.host)
   const imageHost = useImageHost((s) => s.host)
+  const defaultImageModelId = useImageHost((s) => s.defaultModelId)
+  const setDefaultImageModel = useImageHost((s) => s.setDefaultModel)
+  const refreshDefaultImage = useImageHost((s) => s.refreshDefaultModel)
   const actions = useActions()
   const [searchModel, setSearchModel] = useState<string | null>(null)
   useEffect(() => {
     void engine('mind.prefs.get')
       .then((p) => setSearchModel(p.embeddingModelId))
       .catch(noteFailure('mind', 'Could not read the memory settings'))
-  }, [model.id])
+    void refreshDefaultImage().catch(noteFailure('models', 'Could not read default image model'))
+  }, [model.id, refreshDefaultImage])
   const info = model.info
   const projector = useProjector(model.id)
   const config = useModelConfig(model.id)
@@ -188,7 +201,7 @@ function ModelDetail({ model }: { model: ModelEntry }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 border-b border-line/50 pb-2.5">
-        <h2 className="mr-2 min-w-0 break-all font-mono text-[15px] font-bold leading-snug text-white">{model.name}</h2>
+        <h2 className="mr-2 min-w-0 break-all font-mono text-[15px] font-bold leading-snug text-ink">{model.name}</h2>
         <button
           title={model.favourite ? 'Remove from favourites' : 'Favourite: keep at the top of model lists'}
           onClick={() => actions.star(model)}
@@ -196,6 +209,7 @@ function ModelDetail({ model }: { model: ModelEntry }) {
         >
           <Star className="h-4 w-4" fill={model.favourite ? 'currentColor' : 'none'} />
         </button>
+        <ModelKindPicker model={model} className="w-40" />
         <TraitChips traits={modelTraits(info, modelBytes(model))} />
         <span className="ml-auto flex flex-wrap items-center gap-2">
           {isLoaded && <StatusBadge tone="ok">{imageHost.status === 'generating' && isImage ? 'Generating' : 'Loaded'}</StatusBadge>}
@@ -206,9 +220,28 @@ function ModelDetail({ model }: { model: ModelEntry }) {
             </>
           )}
           {isImage && (
-            <Button size="sm" variant="primary" icon={<Sparkles />} onClick={() => void generateImage({ modelId: model.id })}>
-              Generate image…
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant={defaultImageModelId === model.id ? 'badge' : 'ghost'}
+                icon={<Star className={defaultImageModelId === model.id ? 'text-accent' : undefined} />}
+                onClick={() =>
+                  void setDefaultImageModel(defaultImageModelId === model.id ? null : model.id)
+                    .then(() =>
+                      toast.success(
+                        defaultImageModelId === model.id ? 'Default image model cleared' : 'Default image model set',
+                        model.name
+                      )
+                    )
+                    .catch(failed('Could not set default image model'))
+                }
+              >
+                {defaultImageModelId === model.id ? 'Default for images' : 'Set as default'}
+              </Button>
+              <Button size="sm" variant="primary" icon={<Sparkles />} onClick={() => void generateImage({ modelId: model.id })}>
+                Generate image…
+              </Button>
+            </>
           )}
           {embedding ? (
             <Button size="sm" variant={searchModel === model.id ? 'secondary' : 'primary'} icon={<Search />} disabled={searchModel === model.id} onClick={() => (actions.useForSearch(model), setSearchModel(model.id))}>
@@ -239,6 +272,16 @@ function ModelDetail({ model }: { model: ModelEntry }) {
           <ModelFacts model={model} />
           {isImage && <ImageModelConfigPanel model={model} />}
           {embedding && <div className="text-[12.5px] text-dim">Embedding models aren't chatted with. Seven loads this one on the CPU when agents search their memory.</div>}
+          {info?.kind === 'lora' && (
+            <div className="border border-line/50 tone-panel-40 px-3.5 py-2.5 text-[12.5px] text-dim">
+              LoRA adapters modify a diffusion model&apos;s style or subject. Open the <strong className="text-ink">Image</strong> tab to attach this LoRA with a custom strength slider.
+            </div>
+          )}
+          {info?.kind === 'control_vector' && (
+            <div className="border border-line/50 tone-panel-40 px-3.5 py-2.5 text-[12.5px] text-dim">
+              Control vectors steer a local chat model&apos;s style or behavior without fine-tuning. Pass them to <span className="font-ui text-ink">llama-server</span> via model command-line arguments.
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -246,7 +289,7 @@ function ModelDetail({ model }: { model: ModelEntry }) {
 }
 
 export function ModelsView() {
-  const { list, host, add } = useModels()
+  const { list, host, add, focus, setFocus } = useModels()
   const imageHost = useImageHost((s) => s.host)
   const { state: sdInstall } = useInstallHelper('sd-server')
   const sdReady = Boolean(sdInstall?.active || String(sdInstall?.settings?.customExecutable ?? '').trim())
@@ -264,6 +307,15 @@ export function ModelsView() {
   }
 
   useEffect(() => {
+    if (!focus) return
+    setFolders(false)
+    setHub(null)
+    setTab('all')
+    setSelected(focus)
+    setFocus(null)
+  }, [focus, setFocus])
+
+  useEffect(() => {
     void engine('models.fillInfo').catch(noteFailure('models', 'Could not fill in the model details'))
   }, [list.length])
 
@@ -271,8 +323,12 @@ export function ModelsView() {
     const c = { all: list.length, favourites: 0, remote: 0, ...Object.fromEntries(Object.keys(MODEL_KINDS).map((k) => [k, 0])) } as Record<Tab, number>
     for (const m of list) {
       if (m.favourite) c.favourites++
-      if (m.remote) c.remote++
-      if (m.info) c[m.info.kind]++
+      if (m.remote) {
+        c.remote++
+        if (isImageModel(m)) c.image++
+      } else if (m.info) {
+        c[m.info.kind]++
+      }
     }
     return c
   }, [list])
@@ -304,14 +360,28 @@ export function ModelsView() {
     ]
   }, [byId])
 
-  const inTab = useMemo(() => list.filter((m) => (tab === 'all' ? true : tab === 'favourites' ? m.favourite : tab === 'remote' ? Boolean(m.remote) : m.info?.kind === tab)), [list, tab])
+  const inTab = useMemo(
+    () =>
+      list.filter((m) =>
+        tab === 'all'
+          ? true
+          : tab === 'favourites'
+            ? m.favourite
+            : tab === 'remote'
+              ? Boolean(m.remote)
+              : tab === 'image'
+                ? isImageModel(m)
+                : m.info?.kind === tab
+      ),
+    [list, tab]
+  )
   const filtered = useMemo(() => applyFilters(inTab, filters, filterValues), [inTab, filters, filterValues])
 
   const items = useMemo(
     (): ShellItem[] =>
       filtered.shown
         .map((m) => {
-          const isImage = m.info?.kind === 'image'
+          const isImage = isImageModel(m)
           const loaded = isImage
             ? imageHost.modelId === m.id && imageHost.status === 'ready'
             : host.modelId === m.id && host.status === 'ready'
@@ -322,15 +392,25 @@ export function ModelsView() {
           const fam = entryFamily(m)
           const arch = m.info?.architecture ?? null
           const what = m.remote
-            ? [fam, `${remotePreset?.label ?? m.remote.api} · ${m.remote.model}`].filter(Boolean).join(' · ')
+            ? [fam, `${remotePreset?.label ?? m.remote.api} · ${m.remote.model}`, isImage ? 'Image' : null].filter(Boolean).join(' · ')
             : [fam, arch && fam?.toLowerCase() !== arch.toLowerCase() ? arch : null, m.info ? MODEL_KINDS[m.info.kind].label : null].filter(Boolean).join(' · ')
           return {
             key: m.id,
             title: m.name,
             subtitle: `${m.favourite ? '★ ' : ''}${what}`,
             excerpt: m.remote ? `${remoteHostLabel(m.remote.api, m.remote.baseUrl)} · ${m.remote.hasKey ? 'Key saved' : 'No key set'}` : m.path,
-            icon: m.remote ? <Cloud className="h-4 w-4 text-teal" /> : <Cpu className="h-4 w-4" />,
-            tag: loaded ? 'LOADED' : loading ? (isImage && imageHost.status === 'generating' ? 'GENERATING' : 'LOADING') : m.remote ? (remotePreset?.label ?? m.remote.api).toUpperCase() : (m.info ? MODEL_KINDS[m.info.kind].label : 'MODEL').toUpperCase(),
+            icon: m.remote ? <Cloud className="h-4 w-4 text-secondary" /> : <Cpu className="h-4 w-4" />,
+            tag: loaded
+              ? 'LOADED'
+              : loading
+                ? isImage && imageHost.status === 'generating'
+                  ? 'GENERATING'
+                  : 'LOADING'
+                : m.remote
+                  ? isImage
+                    ? 'REMOTE IMAGE'
+                    : (remotePreset?.label ?? m.remote.api).toUpperCase()
+                  : (m.info ? MODEL_KINDS[m.info.kind].label : 'MODEL').toUpperCase(),
             traits: m.remote ? [] : modelTraits(m.info, modelBytes(m)),
             aside: m.remote ? (m.remote.hasKey ? 'key ok' : 'no key') : formatBytes(modelBytes(m)),
             updatedAt: m.lastUsedAt
@@ -356,12 +436,24 @@ export function ModelsView() {
         { label: '', separator: true },
         { label: 'Remove', icon: <Trash2 />, danger: true, onSelect: () => actions.drop(m) }
       ])
+    const setKind = (nextKind: ModelKind) =>
+      void engine('models.kind', { id: m.id, kind: nextKind })
+        .then((next) => {
+          useModels.setState({ list: next })
+          toast.success(`Marked as ${MODEL_KINDS[nextKind].label}`, m.name)
+        })
+        .catch(failed('Could not change the model type'))
+
     openMenu(e, m.name, [
       ...(isImage ? [{ label: 'Generate image…', icon: <Sparkles />, onSelect: () => void generateImage({ modelId: m.id }) }] : []),
       m.info?.kind === 'embedding'
         ? { label: 'Use for memory search', icon: <Search />, onSelect: () => actions.useForSearch(m) }
         : { label: isLoaded ? 'Unload' : 'Load', icon: <Power />, disabled: (isImage ? imageHost.status === 'loading' || imageHost.status === 'generating' : host.status === 'loading') || !isRunnable(m), onSelect: () => void actions.toggle(m) },
       { label: m.favourite ? 'Remove from favourites' : 'Favourite', icon: <Star />, onSelect: () => actions.star(m) },
+      { label: '', separator: true },
+      ...(!isImage ? [{ label: 'Mark as Image model', icon: <Sparkles />, onSelect: () => setKind('image') }] : []),
+      ...(m.info?.kind !== 'chat' ? [{ label: 'Mark as Chat model', icon: <Cpu />, onSelect: () => setKind('chat') }] : []),
+      ...(m.info?.kind !== 'lora' ? [{ label: 'Mark as LoRA', icon: <Layers />, onSelect: () => setKind('lora') }] : []),
       { label: '', separator: true },
       { label: 'Show folder', icon: <FolderOpen />, onSelect: () => actions.showFolder(m) },
       { label: 'Copy path', icon: <Copy />, onSelect: () => actions.copyPath(m) },
@@ -414,11 +506,11 @@ export function ModelsView() {
       />
       {folders && <ModelFolders className="shrink-0" />}
       {addingRemote && <AddRemoteModal onClose={() => setAddingRemote(false)} onAdded={open} />}
-      {host.status === 'error' && host.error && <div className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3.5 py-2.5 font-mono text-[12px] text-alert">{host.error}</div>}
-      {imageHost.status === 'error' && imageHost.error && <div className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3.5 py-2.5 font-mono text-[12px] text-alert">{imageHost.error}</div>}
+      {host.status === 'error' && host.error && <div className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3.5 py-2.5 font-ui text-[12px] text-alert">{host.error}</div>}
+      {imageHost.status === 'error' && imageHost.error && <div className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3.5 py-2.5 font-ui text-[12px] text-alert">{imageHost.error}</div>}
       {tab === 'image' && sdInstall && !sdReady && (
-        <div className="flex items-center gap-3 border border-line border-l-2 border-l-accent bg-accent/5 px-3.5 py-2.5 text-[12.5px] text-white">
-          <span className="flex-1">Local diffusion models need <span className="font-mono text-accent">sd-server</span>. Install a release build or point Seven at your own <span className="font-mono">sd-server.exe</span>.</span>
+        <div className="flex items-center gap-3 border border-line border-l-2 border-l-accent bg-accent/5 px-3.5 py-2.5 text-[12.5px] text-ink">
+          <span className="flex-1">Local diffusion models need <span className="font-ui text-accent">sd-server</span>. Install a release build or point Seven at your own <span className="font-ui">sd-server.exe</span>.</span>
           <Button size="sm" variant="primary" icon={<Server />} onClick={() => openHelperInstaller('sd-server')}>
             Install sd-server…
           </Button>

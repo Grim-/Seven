@@ -127,7 +127,7 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMe
           type="button"
           title="New folder"
           onClick={() => askNewFolder((id) => onOpen(id), folder)}
-          className="flex items-center gap-1 border border-line/50 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-dim hover:border-accent/60 hover:text-white transition-colors"
+          className="flex items-center gap-1 border border-line/50 tone-well-40 px-1.5 py-0.5 font-label text-[10px] font-bold caps-5 text-dim hover:border-accent/60 hover:text-ink transition-colors"
         >
           <FolderPlus className="h-3 w-3 text-accent-soft" />
           <span className="hidden sm:inline">Folder</span>
@@ -136,7 +136,7 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMe
           type="button"
           title="New page"
           onClick={(e) => newPageMenu(e, types, (id) => onOpen(id), folder)}
-          className="flex items-center gap-1 border border-line/50 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-dim hover:border-accent/60 hover:text-white transition-colors"
+          className="flex items-center gap-1 border border-line/50 tone-well-40 px-1.5 py-0.5 font-label text-[10px] font-bold caps-5 text-dim hover:border-accent/60 hover:text-ink transition-colors"
         >
           <FilePlus className="h-3 w-3 text-accent-soft" />
           <span className="hidden sm:inline">Page</span>
@@ -145,7 +145,7 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMe
           type="button"
           title="Add files"
           onClick={() => void chooseFiles(folder)}
-          className="flex items-center gap-1 border border-line/50 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-dim hover:border-accent/60 hover:text-white transition-colors"
+          className="flex items-center gap-1 border border-line/50 tone-well-40 px-1.5 py-0.5 font-label text-[10px] font-bold caps-5 text-dim hover:border-accent/60 hover:text-ink transition-colors"
         >
           <Upload className="h-3 w-3 text-accent-soft" />
           <span className="hidden sm:inline">Upload</span>
@@ -157,7 +157,7 @@ export function PageExplorer({ folder, header, onOpen, onOpenFile = onOpen, onMe
             type="button"
             title="Wiki index (all pages and folders)"
             onClick={() => onOpen(INDEX_ID)}
-            className="flex items-center gap-1 border border-line/40 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-dim hover:border-accent/60 hover:text-white transition-colors"
+            className="flex items-center gap-1 border border-line/40 tone-well-40 px-1.5 py-0.5 font-label text-[10px] font-bold caps-5 text-dim hover:border-accent/60 hover:text-ink transition-colors"
           >
             <BookOpen className="h-3 w-3 text-accent-soft" />
             <span className="hidden md:inline">{INDEX_TITLE}</span>

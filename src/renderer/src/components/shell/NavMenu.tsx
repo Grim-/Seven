@@ -7,8 +7,7 @@ import { useTools } from '../../store/tools'
 import { useApp } from '../../store/app'
 import { useVault } from '../../store/vault'
 import { usePlayer } from '../../store/player'
-import { isFileFavouriteKind, openFavourite, useFavourites } from '../../lib/favourites'
-import { showPage } from '../../views/PagesView'
+import { openFavourite, useFavourites } from '../../lib/favourites'
 import { KindIcon } from '../../lib/library'
 import { useSheet } from '../../lib/sheet'
 import { cn } from '../../lib/cn'
@@ -25,8 +24,8 @@ function NavTile({ icon, label, active, onClick }: { icon: ReactNode; label: str
       type="button"
       onClick={onClick}
       className={cn(
-        'flex min-h-11 min-w-0 items-center gap-2.5 border px-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0',
-        active ? 'border-accent bg-accent/15 text-accent' : 'border-line/35 text-dim hover:border-line hover:text-white'
+        'flex min-h-11 min-w-0 items-center gap-2.5 border px-3 text-left text-[11px] font-semibold caps-10 transition-colors [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0',
+        active ? 'border-accent bg-accent/15 text-accent' : 'border-line/35 text-dim hover:border-line hover:text-ink'
       )}
     >
       {icon}
@@ -109,12 +108,12 @@ export function NavMenu() {
               <button
                 key={`${p.kind}/${p.id ?? ''}`}
                 type="button"
-                onClick={() => go(() => (isFileFavouriteKind(p.kind) && p.id ? showPage(p.id) : openFavourite(p)))}
-                className="flex min-h-11 items-center gap-2.5 border border-transparent px-2.5 text-left font-sans text-[13px] text-white/90 hover:border-line/40 hover:bg-accent/10"
+                onClick={() => go(() => openFavourite(p))}
+                className="flex min-h-11 items-center gap-2.5 border border-transparent px-2.5 text-left font-body text-[13px] text-ink/90 hover:border-line/40 hover:bg-accent/10"
               >
                 <KindIcon name={p.icon} className="h-4 w-4 shrink-0 text-accent" />
                 <span className="min-w-0 flex-1 truncate">{showName(p.label)}</span>
-                {!p.id && <span className="shrink-0 font-mono text-[9.5px] uppercase tracking-wider text-faint">Kind</span>}
+                {!p.id && <span className="shrink-0 font-label text-[9.5px] caps-5 text-faint">Kind</span>}
               </button>
             ))}
           </div>

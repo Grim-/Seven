@@ -62,10 +62,10 @@ export function ModelPicker({ agentModelId }: { agentModelId: string | null }) {
                 className={cn('flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent/10', m.id === loadedId && 'bg-ok/5')}
               >
                 <Star className={cn('h-3.5 w-3.5 shrink-0', m.favourite ? 'text-accent' : 'text-transparent')} fill={m.favourite ? 'currentColor' : 'none'} />
-                <span title={m.name} className="min-w-0 flex-1 truncate text-[12.5px] text-white">{m.name}</span>
-                {m.quant && <span className="shrink-0 font-mono text-[10.5px] text-purple">{m.quant}</span>}
-                {m.remote ? <Cloud className="h-3.5 w-3.5 shrink-0 text-accent" /> : <span className="shrink-0 font-mono text-[10.5px] text-faint">{formatBytes(m.sizeBytes)}</span>}
-                {m.id === loadedId && <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-ok">Loaded</span>}
+                <span title={m.name} className="min-w-0 flex-1 truncate text-[12.5px] text-ink">{m.name}</span>
+                {m.quant && <span className="shrink-0 font-ui text-[10.5px] text-tint-purple">{m.quant}</span>}
+                {m.remote ? <Cloud className="h-3.5 w-3.5 shrink-0 text-accent" /> : <span className="shrink-0 font-ui text-[10.5px] text-faint">{formatBytes(m.sizeBytes)}</span>}
+                {m.id === loadedId && <span className="shrink-0 font-label text-[10px] caps-5 text-ok">Loaded</span>}
               </button>
             ))}
           </div>
@@ -76,7 +76,7 @@ export function ModelPicker({ agentModelId }: { agentModelId: string | null }) {
                   close()
                   unload().catch(failed('Unload failed'))
                 }}
-                className="flex flex-1 items-center gap-2 px-3 py-2 text-[12px] text-dim hover:text-white"
+                className="flex flex-1 items-center gap-2 px-3 py-2 text-[12px] text-dim hover:text-ink"
               >
                 <Power className="h-3.5 w-3.5" /> Unload
               </button>
@@ -86,7 +86,7 @@ export function ModelPicker({ agentModelId }: { agentModelId: string | null }) {
                 close()
                 setView('models')
               }}
-              className="flex flex-1 items-center gap-2 px-3 py-2 text-[12px] text-dim hover:text-white"
+              className="flex flex-1 items-center gap-2 px-3 py-2 text-[12px] text-dim hover:text-ink"
             >
               <Settings2 className="h-3.5 w-3.5" /> Manage models
             </button>

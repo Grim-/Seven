@@ -1,5 +1,5 @@
 import { dayKey } from './timeline'
-import { referencePattern } from './text'
+import { referencePattern, relinkText } from './text'
 import { linkTagOf, searchRelationships, type RelationshipEntry } from './relationships'
 
 export const STORY_PHASES = ['session', 'recent', 'backstory'] as const
@@ -76,11 +76,12 @@ export interface StoryRef {
 }
 
 export interface StoryRecallHit {
-  kind: 'memory' | 'log' | 'relationship' | 'thread'
+  kind: 'memory' | 'log' | 'relationship' | 'thread' | 'knowledge'
   id: string
   label: string
   summary: string
   detail: string
+  outcome?: string
   where: string
   who: string[]
   tags: string[]
@@ -362,9 +363,9 @@ export function storyText(story: Story, roleplay = false): string {
       ? `Pinned backstory:\n${pinnedBackstory.map((s) => sessionSummaryLine(s, story.sessions.indexOf(s) + 1)).join('\n')}`
       : '',
     activeThreads.length
-      ? `Active story threads:\n${activeThreads.slice(0, roleplay ? 6 : 10).map(threadLine).join('\n')}${closedThreadCount ? `\n(${closedThreadCount} waiting/resolved thread(s) searchable via story_recall)` : ''}`
+      ? `Active story threads:\n${activeThreads.slice(0, roleplay ? 6 : 10).map(threadLine).join('\n')}${closedThreadCount ? `\n(${closedThreadCount} waiting/resolved thread(s) searchable via character_search_knowledge)` : ''}`
       : closedThreadCount
-        ? `Story threads: ${closedThreadCount} resolved/archived (searchable via story_recall).`
+        ? `Story threads: ${closedThreadCount} resolved/archived (searchable via character_search_knowledge).`
         : '',
     pinnedChronicle.length
       ? `Pinned key scenes:\n${pinnedChronicle.map((s) => sessionSummaryLine(s, story.sessions.indexOf(s) + 1)).join('\n')}`
@@ -373,7 +374,7 @@ export function storyText(story: Story, roleplay = false): string {
       ? `Latest story log:\n${recentShown.map((s) => sessionSummaryLine(s, story.sessions.indexOf(s) + 1)).join('\n')}`
       : '',
     earlierChronicleCount || backstory.length > pinnedBackstory.length
-      ? `Archived story: ${earlierChronicleCount} earlier scene(s), ${backstory.length - pinnedBackstory.length} backstory chapter(s). Relevant snippets surface automatically; call story_recall to search or read full notes by id.`
+      ? `Archived story: ${earlierChronicleCount} earlier scene(s), ${backstory.length - pinnedBackstory.length} backstory entry(ies). Relevant snippets surface automatically; call character_search_knowledge to search or read full notes by id.`
       : ''
   ]
   return parts.filter(Boolean).join('\n\n')
@@ -388,7 +389,7 @@ export function mindMemoriesText(memories: StoryMemory[]): string {
       ? `Pinned personal memories:\n${pinned.map((m) => formatStorySnippet(memoryToHit(m, 1))).join('\n')}`
       : '',
     unpinnedCount
-      ? `Stored character memories: ${unpinnedCount} unpinned memory(ies). Relevant snippets surface automatically when triggered; call story_recall to search or read full detail by id.`
+      ? `Stored character memories: ${unpinnedCount} unpinned memory(ies). Relevant snippets surface automatically when triggered; call character_search_knowledge to search or read full detail by id.`
       : ''
   ]
   return parts.filter(Boolean).join('\n\n')
@@ -429,6 +430,21 @@ export function storyRefs(story: Story): StoryRef[] {
     scan([s.title, s.summary ?? '', s.outcome ?? '', s.where ?? '', ...(s.who ?? []), s.notes].join('\n'), i + 1)
   })
   return [...found.values()]
+}
+
+export function relinkStory(story: Story, kind: string, ref: string, to: string): Story {
+  const fix = <T extends string | undefined>(v: T): T => (v === undefined ? v : relinkText(v, kind, ref, to)) as T
+  const fixAll = (list: string[] | undefined) => list?.map((v) => relinkText(v, kind, ref, to)).filter((v) => v.trim())
+  return {
+    ...story,
+    where: fix(story.where),
+    doing: fix(story.doing),
+    goal: fix(story.goal),
+    mood: fix(story.mood),
+    backstorySummary: fix(story.backstorySummary),
+    threads: story.threads.map((t) => ({ ...t, text: fix(t.text), detail: fix(t.detail), where: fix(t.where), who: fixAll(t.who) })),
+    sessions: story.sessions.map((s) => ({ ...s, title: fix(s.title), summary: fix(s.summary), outcome: fix(s.outcome), where: fix(s.where), notes: fix(s.notes), who: fixAll(s.who) }))
+  }
 }
 
 function normalizeText(raw: string): string {
@@ -498,6 +514,7 @@ function sessionToHit(s: StorySession, index: number, score: number): StoryRecal
     label: phase,
     summary,
     detail: s.notes.trim(),
+    ...(s.outcome?.trim() ? { outcome: s.outcome.trim() } : {}),
     where: s.where ?? '',
     who: s.who ?? [],
     tags: s.tags ?? [],
@@ -544,9 +561,36 @@ function threadToHit(t: StoryThread, index: number, score: number): StoryRecallH
   }
 }
 
-export function storyHitById(story: Story, id: string, memories: StoryMemory[] = [], relationships: RelationshipEntry[] = []): StoryRecallHit | null {
+export interface KnownItem {
+  ref: string
+  name: string
+  text: string
+  tags: string[]
+  scope: string
+  pinned?: boolean
+}
+
+function knowledgeToHit(k: KnownItem, score: number): StoryRecallHit {
+  return {
+    kind: 'knowledge',
+    id: k.ref,
+    label: `knowledge · ${k.scope}`,
+    summary: `${k.name} — ${trimSnippet(k.text, 180)}`,
+    detail: k.text.trim(),
+    where: '',
+    who: [],
+    tags: k.tags,
+    when: '',
+    pinned: k.pinned === true,
+    score
+  }
+}
+
+export function storyHitById(story: Story, id: string, memories: StoryMemory[] = [], relationships: RelationshipEntry[] = [], known: KnownItem[] = []): StoryRecallHit | null {
   const needle = id.trim()
   if (!needle) return null
+  const k = known.find((x) => x.ref === needle || `@knowledge:${x.ref}` === needle)
+  if (k) return knowledgeToHit(k, 100)
   const rel = relationships.find((r) => r.id === needle)
   if (rel) return relationshipToHit(rel, 100)
   const mem = memories.find((m) => m.id === needle)
@@ -574,7 +618,7 @@ export function formatStorySnippet(hit: StoryRecallHit, sheetTitle?: string): st
 export function searchStoryItems(
   story: Story,
   query: string,
-  opts?: { category?: string; where?: string; includePinned?: boolean; memories?: StoryMemory[]; relationships?: RelationshipEntry[] }
+  opts?: { category?: string; where?: string; includePinned?: boolean; memories?: StoryMemory[]; relationships?: RelationshipEntry[]; known?: KnownItem[] }
 ): StoryRecallHit[] {
   const terms = queryTerms(query)
   const whereFilter = opts?.where ? normalizeText(opts.where).trim() : ''
@@ -634,6 +678,19 @@ export function searchStoryItems(
   if (!catFilter || catFilter === 'all' || catFilter === 'relationship') {
     for (const { entry, score } of searchRelationships(opts?.relationships ?? [], query, { includePinned, where: opts?.where ?? null })) {
       hits.push(relationshipToHit(entry, score))
+    }
+  }
+
+  if (!catFilter || catFilter === 'all' || catFilter === 'knowledge') {
+    for (const k of opts?.known ?? []) {
+      if (!includePinned && k.pinned) continue
+      if (whereFilter) continue
+      if (!terms.length) {
+        hits.push(knowledgeToHit(k, 1))
+        continue
+      }
+      const score = scoreField(terms, k.tags.join(' '), 6, 3) + scoreField(terms, k.name, 5, 2) + scoreField(terms, k.text, 2, 1)
+      if (score > 0) hits.push(knowledgeToHit(k, score))
     }
   }
 

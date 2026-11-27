@@ -1,12 +1,15 @@
 import { noteFailure } from '../util/report'
 import { GameEntity, isEntityVisible } from '@shared/game/core'
 import { catalogFrom } from '@shared/game/defs'
-import { placesIn, type PlaceVisitor } from '@shared/maps'
+import { placesIn, type PlaceVisitor, type Standing, type WorldMapUse } from '@shared/maps'
+import { smallestAt } from '@shared/shapes'
 import { PLACE_TYPE_KEY } from '@shared/world'
+import { npcActorId, npcToSheet } from '@shared/worldNpcs'
 import { gameDefs } from '../../modules/game/store'
 import { getSheet, sheetIds, sheetLine } from '../library/sheets'
 import type { CharacterSheet } from '@shared/types'
 import { agentAccess } from '../agents/access'
+import { npcs } from './npcs'
 import { worlds } from './store'
 import { saveInPlay } from './playLayer'
 
@@ -56,6 +59,26 @@ export function whoIsHere(world: string): Record<string, PlaceVisitor[]> {
   const save = saveInPlay(world, false)
   const seen = new Set<string>()
 
+  // Build spatial lookup of every token currently standing on any map in this world.
+  // Spatial truth: if a token is on a map, it is ONLY at a place if its coordinates lie inside that place's zone.
+  const uses = worlds.mapUses(world)
+  const standingOnMap = new Map<string, { use: WorldMapUse; standing: Standing }>()
+  for (const use of uses) {
+    const mergedStand: Record<string, Standing> = { ...use.stand, ...(save?.stand[use.map] ?? {}) }
+    for (const [tokenKey, st] of Object.entries(mergedStand)) {
+      standingOnMap.set(tokenKey, { use, standing: st })
+    }
+  }
+
+  const resolvedPlacesFor = (actorId: string, where: string): string[] => {
+    const live = standingOnMap.get(actorId)
+    if (live) {
+      const inside = smallestAt(live.use.shapes, live.standing.at)
+      return inside ? [inside] : []
+    }
+    return placesIn(where, world, places)
+  }
+
   const pushSheet = (id: string, requireUnbound: boolean) => {
     if (seen.has(id)) return
     let s: CharacterSheet
@@ -67,10 +90,21 @@ export function whoIsHere(world: string): Record<string, PlaceVisitor[]> {
     }
     if (requireUnbound && s.save) return
     seen.add(id)
-    for (const key of placesIn(s.story.where, world, places)) out[key] = [...(out[key] ?? []), visitorOf(s, agents)]
+    for (const key of resolvedPlacesFor(id, s.story.where)) out[key] = [...(out[key] ?? []), visitorOf(s, agents)]
   }
 
   for (const id of Object.keys(save?.characters ?? {})) pushSheet(id, false)
+  const rules = worlds.meta(world).rules
+  for (const npc of npcs.list(world, 'play')) {
+    if (npc.archetype) continue
+    const actorId = npcActorId(world, npc.id)
+    if (seen.has(actorId)) continue
+    seen.add(actorId)
+    const sheet = npcToSheet(npc, world, rules)
+    for (const key of resolvedPlacesFor(actorId, sheet.story.where)) {
+      out[key] = [...(out[key] ?? []), visitorOf(sheet, agents)]
+    }
+  }
   for (const { id } of sheetIds()) pushSheet(id, true)
   return out
 }

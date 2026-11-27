@@ -148,7 +148,7 @@ function Editor({ start, select }: { start: RoutineDraft; select: (s: DataSelect
         </Field>
 
         <div className="flex flex-col gap-3 border-t border-line/40 pt-3">
-          <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-accent-soft">When</div>
+          <div className="font-label text-[10.5px] font-semibold caps-16 text-accent-soft">When</div>
           <div className="grid grid-cols-2 gap-x-5 gap-y-3">
             <Field label="Runs">
               <Select
@@ -201,7 +201,7 @@ function Editor({ start, select }: { start: RoutineDraft; select: (s: DataSelect
         </div>
 
         <div className="flex flex-col gap-3 border-t border-line/40 pt-3">
-          <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-accent-soft">Where the result goes</div>
+          <div className="font-label text-[10.5px] font-semibold caps-16 text-accent-soft">Where the result goes</div>
           <div className="grid grid-cols-2 gap-x-5 gap-y-3">
             <Field label="Chat">
               <Select
@@ -231,7 +231,7 @@ export function RoutineScreen({ id, select }: KindScreenProps) {
   const agents = useAgents((s) => s.list)
   if (id === NEW_ROUTINE) return <Editor key="new" start={blank(agents[0]?.id ?? '')} select={select} />
   if (id) {
-    if (routines === null) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+    if (routines === null) return <div className="font-ui text-[11px] text-dim">Loading…</div>
     const r = routines.find((x) => x.id === id)
     if (r) return <Editor key={r.id} start={draftOf(r)} select={select} />
   }
@@ -250,8 +250,8 @@ export function RoutineScreen({ id, select }: KindScreenProps) {
         <EmptyState title="No routines yet">A routine is work an agent does on its own: on a schedule, or when something happens.</EmptyState>
       ) : (
         routines.map((r) => (
-          <button key={r.id} onClick={() => select({ kind: 'routine', id: r.id })} onContextMenu={(e) => entryMenuAt(e, 'routine', r.id, r.name)} className="flex flex-col border-l-2 border-l-transparent px-2.5 py-1.5 text-left hover:bg-white/[0.03]">
-            <span className={cn('text-[13px]', r.enabled ? 'text-white/90' : 'text-dim')}>{r.name}</span>
+          <button key={r.id} onClick={() => select({ kind: 'routine', id: r.id })} onContextMenu={(e) => entryMenuAt(e, 'routine', r.id, r.name)} className="flex flex-col border-l-2 border-l-transparent px-2.5 py-1.5 text-left hover:bg-ink/[0.03]">
+            <span className={cn('text-[13px]', r.enabled ? 'text-ink/90' : 'text-dim')}>{r.name}</span>
             <span className={cn('text-[11px]', r.lastError ? 'text-alert/80' : 'text-dim')}>{routineStatus(r)}</span>
           </button>
         ))

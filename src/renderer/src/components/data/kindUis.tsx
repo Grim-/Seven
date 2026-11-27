@@ -11,7 +11,7 @@ import { entryWidget } from '../../registries/widgets'
 import { FolderChat } from './FolderChat'
 import { WorldChat, WorldWidget } from '../worlds/WorldChat'
 import { SkillChat, SkillStage, SkillWidget } from '../skills/SkillChat'
-import { ThemeChat, ThemeStage, ThemeWidget } from '../themes/ThemeChat'
+import { ThemeChat, ThemeStage, ThemeThumb, ThemeWidget } from '../themes/ThemeChat'
 import '../avatars/kindUi'
 import { panelScreen } from './panelScreen'
 import { RepoChat, RepoStage, RepoWidget } from './RepoChat'
@@ -55,8 +55,6 @@ import { WorldsPanel } from '../worlds/Worlds'
 import { MapScreen } from '../maps/MapScreen'
 import { MapImporter } from '../maps/MapImporter'
 import { MapChat, MapStage, MapThumb, MapWidget } from '../maps/MapSurfaces'
-import { deletePlaceItem } from '../maps/placeActions'
-import { PlaceChat, PlaceStage, PlaceWidget } from '../maps/PlaceSurfaces'
 import { SkillsPanel } from '../skills/Skills'
 import { AgentAvatar } from '../agents/look'
 import { PageHost, ToolPage, askNewFolder, askNewPage, askRenamePage, usePageTypes } from './PageView'
@@ -76,11 +74,12 @@ import { Markdown } from '../chat/Markdown'
 import { onLibraryChange, openChat } from '../../lib/library'
 import { saveAsset } from '../../lib/exporting'
 import { addToQueue, playNow } from '../../store/player'
-import { SETUP_GROUP, registerKindUi, type KindMenuContext, type KindScreenProps, type KindUi } from '../../registries/kinds'
+import { SETUP_GROUP, registerKindUi, type EntrySurfaceProps, type KindMenuContext, type KindScreenProps, type KindUi } from '../../registries/kinds'
 import { registerStoryteller } from '../storyteller/register'
 import { registerCards } from '../cards/register'
 import './sheet/mind/facet'
 import './sheet/relations/facet'
+import './sheet/knowledge/facet'
 import './sheet/dnd/status'
 import '../play/roleplayCard'
 import { registerDecisions } from '../decisions/register'
@@ -88,14 +87,14 @@ import { AssetMedia } from '../pictures/AssetMedia'
 import { SlideshowScreen, askNewSlideshow } from '../slideshow/SlideshowScreen'
 import { SlideshowPart, SlideshowThumb } from '../slideshow/SlideshowPlayer'
 import { BoardView } from '../board/BoardView'
-import { FactionScreen } from '../factions/FactionScreen'
 import { MapObjectScreen } from '../mapObjects/MapObjectScreen'
 import { TriggerActionScreen } from '../triggerActions/TriggerActionScreen'
-import { WorldEventScreen } from '../worldEvents/WorldEventScreen'
 import { LootTableScreen } from '../lootTables/LootTableScreen'
 import { AlmanacScreen, askNewAlmanac } from '../almanac/AlmanacScreen'
 import { failed } from '../../lib/notify'
 import { sheetFacets } from './sheet/facets'
+import { MIND_SLATE } from './sheet/MindSlate'
+import { moduleOn } from '../../lib/moduleOn'
 
 
 
@@ -122,8 +121,8 @@ export function GeneratedPage({ id, onEntry }: { id: string; onEntry?: (kind: st
     return onLibraryChange(load)
   }, [id])
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border border-line/60 bg-black/70 p-4">
-      {text === null ? <div className="font-mono text-[11px] text-dim">Building…</div> : <Markdown text={text} onEntry={onEntry} />}
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border border-line/60 tone-panel-70 p-4">
+      {text === null ? <div className="font-ui text-[11px] text-dim">Building…</div> : <Markdown text={text} onEntry={onEntry} />}
     </div>
   )
 }
@@ -256,16 +255,16 @@ function AssetScreen({ id, select }: KindScreenProps) {
       actions={
         <>
           {viewables.length > 1 && (
-            <div className="flex items-center gap-1 font-mono text-[11px] border border-line/50 bg-black/40 px-1 py-0.5 mr-1">
+            <div className="flex items-center gap-1 font-ui text-[11px] border border-line/50 tone-panel-40 px-1 py-0.5 mr-1">
               <button
                 type="button"
                 title="Previous file (Left Arrow)"
                 disabled={!prevAsset}
                 onClick={() => onNavigate(prevAsset)}
-                className="flex items-center gap-0.5 px-1.5 py-0.5 text-dim hover:text-white disabled:opacity-30 disabled:hover:text-dim cursor-pointer disabled:cursor-not-allowed"
+                className="flex items-center gap-0.5 px-1.5 py-0.5 text-dim hover:text-ink disabled:opacity-30 disabled:hover:text-dim cursor-pointer disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
-                <span>PREV</span>
+                <span className="caps">Prev</span>
               </button>
               <span className="px-1.5 text-accent font-semibold tracking-wider">
                 {currentIndex + 1} / {viewables.length}
@@ -275,9 +274,9 @@ function AssetScreen({ id, select }: KindScreenProps) {
                 title="Next file (Right Arrow)"
                 disabled={!nextAsset}
                 onClick={() => onNavigate(nextAsset)}
-                className="flex items-center gap-0.5 px-1.5 py-0.5 text-dim hover:text-white disabled:opacity-30 disabled:hover:text-dim cursor-pointer disabled:cursor-not-allowed"
+                className="flex items-center gap-0.5 px-1.5 py-0.5 text-dim hover:text-ink disabled:opacity-30 disabled:hover:text-dim cursor-pointer disabled:cursor-not-allowed"
               >
-                <span>NEXT</span>
+                <span className="caps">Next</span>
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -287,9 +286,9 @@ function AssetScreen({ id, select }: KindScreenProps) {
             variant={showInspector ? 'primary' : 'ghost'}
             icon={<SlidersHorizontal className="h-3.5 w-3.5" />}
             onClick={() => setShowInspector(!showInspector)}
-            title={showInspector ? 'Hide editor and metadata tools' : 'Show editor and metadata tools'}
+            title={showInspector ? 'Hide properties panel' : 'Show properties & metadata overlay'}
           >
-            {showInspector ? 'Hide Tools' : 'Inspect'}
+            {showInspector ? 'Hide Properties' : 'Properties'}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => open(false)}>
             Open
@@ -366,6 +365,7 @@ registerKindUi('file', {
   present: { Screen: AssetScreen, Chat: FileChat, Stage: FileStage, Widget: FILE_WIDGET_UI, Thumb: FileThumb },
   railUnder: { kind: 'page', count: true },
   trail: FileTrail,
+  open: (id) => showPage(id === 'all' ? null : id),
   back: (selected) => showPage(selected.id === 'all' ? null : fileFolder(selected.id)),
   addLabel: 'Add files',
   add: (_kind, select) => () => void chooseFiles().then((added) => added[0] && select({ kind: 'file', id: added[0].id })),
@@ -410,7 +410,7 @@ function ChatScreen({ id }: KindScreenProps) {
       }
       bodyClassName="overflow-y-auto p-4"
     >
-      {text === null ? <div className="font-mono text-[11px] text-dim">Loading…</div> : <Markdown text={text} />}
+      {text === null ? <div className="font-ui text-[11px] text-dim">Loading…</div> : <Markdown text={text} />}
     </Panel>
   )
 }
@@ -418,22 +418,32 @@ function ChatScreen({ id }: KindScreenProps) {
 
 registerKindUi('workout', { present: { Screen: WorkoutEntryScreen, Chat: WorkoutChat, Stage: WorkoutChat, Widget: entryWidget(WorkoutWidget) }, home: WorkoutHome, addLabel: 'New workout', add: () => () => newWorkoutEntry('workout', 'workout', { items: [] }), importer: ({ onClose }) => <JsonImporter initial="workouts" onClose={onClose} /> })
 registerKindUi('exercise', { present: { Screen: ExerciseScreen, Chat: ExerciseChat, Stage: ExerciseChat, Widget: entryWidget(ExerciseChat) }, addLabel: 'New exercise', add: () => () => newWorkoutEntry('exercise', 'exercise', {}), importer: ({ onClose }) => <JsonImporter initial="exercises" onClose={onClose} /> })
-registerKindUi('place', { present: { Screen: panelScreen(WorldsPanel), Chat: PlaceChat, Stage: PlaceStage, Widget: entryWidget(PlaceWidget) }, whole: true, menu: (ctx) => [deletePlaceItem(ctx.id, ctx.title)] })
 registerKindUi('map', { present: { Screen: MapScreen, Chat: MapChat, Stage: MapStage, Widget: entryWidget(MapWidget), Thumb: MapThumb }, addLabel: 'New map', add: (_k, select) => () => askText('New map', 'Name', '', async (name) => { if (name.trim()) select({ kind: 'map', id: (await engine('maps.create', { name })).id }) }), importer: MapImporter, importLabel: 'Import a map made in Tiled' })
 registerKindUi('world', { present: { Screen: panelScreen(WorldsPanel), Chat: WorldChat, Stage: WorldChat, Widget: entryWidget(WorldWidget) }, whole: true })
 registerKindUi('almanac', { present: { Screen: AlmanacScreen }, addLabel: 'New almanac', add: (_k, select) => () => askNewAlmanac(select) })
-registerKindUi('faction', { present: { Screen: FactionScreen }, addLabel: 'New faction', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('map_object', { present: { Screen: MapObjectScreen }, addLabel: 'New map object', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('trigger_action', { present: { Screen: TriggerActionScreen }, addLabel: 'New trigger action', add: (kind, select) => () => select({ kind, id: '__new' }) })
-registerKindUi('world_event', { present: { Screen: WorldEventScreen }, addLabel: 'New world event', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('loot_table', { present: { Screen: LootTableScreen }, addLabel: 'New loot table', add: (kind, select) => () => select({ kind, id: '__new' }) })
 registerKindUi('skill', { present: { Screen: panelScreen(SkillsPanel), Chat: SkillChat, Stage: SkillStage, Widget: entryWidget(SkillWidget) }, whole: true })
 registerKindUi('script', { present: { Screen: panelScreen(PythonPanel), Chat: ScriptPart, Stage: ScriptPart, Widget: entryWidget(ScriptPart) }, whole: true, addLabel: 'New script', add: (_k, select) => () => select({ kind: 'script', id: '_new' }) })
-registerKindUi('theme', { railGroup: SETUP_GROUP, present: { Screen: panelScreen(ThemesPanel), Chat: ThemeChat, Stage: ThemeStage, Widget: entryWidget(ThemeWidget) }, whole: true, addLabel: 'New theme', add: (_k, select) => () => select({ kind: 'theme', id: '_new' }) })
+registerKindUi('theme', { railGroup: SETUP_GROUP, present: { Screen: panelScreen(ThemesPanel), Chat: ThemeChat, Stage: ThemeStage, Thumb: ThemeThumb, Widget: entryWidget(ThemeWidget) }, whole: true, addLabel: 'New theme', add: (_k, select) => () => select({ kind: 'theme', id: '_new' }) })
 registerKindUi('slideshow', { present: { Screen: SlideshowScreen, Chat: SlideshowPart, Stage: SlideshowPart, Widget: entryWidget(SlideshowPart), Thumb: SlideshowThumb }, addLabel: 'New slideshow', add: (_k, select) => () => askNewSlideshow(select) })
 registerKindUi('repo', { emptyText: 'No repos yet. Make one in Data.', present: { Screen: RepoScreen, Chat: RepoChat, Stage: RepoStage, Widget: entryWidget(RepoWidget) }, whole: true, addLabel: 'New repo', add: (_k, select) => () => askNewRepo(select) })
 registerKindUi('routine', { present: { Screen: RoutineScreen, Chat: RoutineChat, Stage: RoutineChat, Widget: entryWidget(RoutineWidget) }, addLabel: 'New routine', add: (_k, select) => () => select({ kind: 'routine', id: NEW_ROUTINE }) })
-registerKindUi('sheet', { moduleLists: [{ label: 'Sheet tab', list: sheetFacets }], present: { Screen: SheetScreen, Chat: SheetCard, Stage: SheetCard, Widget: entryWidget(SheetCard) }, whole: true, addLabel: 'New character', add: (_k, select) => () => askNewSheet(select) })
+registerKindUi('sheet', {
+  moduleLists: [{ label: 'Sheet tab', list: sheetFacets }],
+  present: { Screen: SheetScreen, Chat: SheetCard, Stage: SheetCard, Widget: entryWidget(SheetCard) },
+  whole: true,
+  slateParts: [
+    { part: MIND_SLATE, label: 'Mind' },
+    { part: 'knowledge', label: 'Knowledge' },
+    { part: 'relations', label: 'Relations' },
+    { part: 'story', label: 'Present state' }
+  ],
+  opensAt: (part) => sheetFacets.on(moduleOn).some((f) => f.id === part),
+  addLabel: 'New character',
+  add: (_k, select) => () => askNewSheet(select)
+})
 registerKindUi('command', { railGroup: SETUP_GROUP, present: { Screen: panelScreen(CommandsPanel), Chat: CommandChat }, whole: true, addLabel: 'New command', add: (_k, select) => () => select({ kind: 'command', id: '_new' }) })
 registerKindUi('style', { railGroup: SETUP_GROUP, present: { Screen: panelScreen(StylesPanel), Chat: StyleChat }, whole: true, addLabel: 'New style', add: (_k, select) => () => select({ kind: 'style', id: '_new' }) })
 registerKindUi('story', { present: { Screen: panelScreen(StoriesPanel), Chat: StoryChat, Stage: StoryStage, Widget: entryWidget(StoryWidget) }, whole: true, timed: true })
@@ -445,13 +455,24 @@ registerKindUi('memory', {
   present: { Screen: ({ id }) => (id ? <MindView key={id} agentId={id} /> : <KindBrowser kind="memory" title="Minds" empty="No agents yet." />), Chat: MindChat, Stage: MindChat, Widget: entryWidget(MindWidget), Thumb: AgentThumb },
   whole: true
 })
+function AgentSlateChat(props: EntrySurfaceProps) {
+  if (props.part === 'mind') return <div className="h-[min(60vh,34rem)] min-h-[20rem]"><MindView agentId={props.id} /></div>
+  return <AgentChat {...props} />
+}
+
+function AgentSlateStage(props: EntrySurfaceProps) {
+  if (props.part === 'mind') return <div className="h-[min(60vh,34rem)] min-h-[20rem]"><MindView agentId={props.id} /></div>
+  return <AgentStage {...props} />
+}
+
 registerKindUi('agent', {
   open: (id) => {
     useAgents.setState({ focus: id === 'all' ? null : id })
     useApp.getState().setView('agents')
   },
   whole: true,
-  present: { Chat: AgentChat, Stage: AgentStage, Widget: entryWidget(AgentWidget), Thumb: AgentThumb }
+  slateParts: [{ part: 'mind', label: 'Agent Mind' }],
+  present: { Chat: AgentSlateChat, Stage: AgentSlateStage, Widget: entryWidget(AgentWidget), Thumb: AgentThumb }
 })
 registerKindUi('board', {
   present: { Chat: BoardChat, Stage: BoardStage },

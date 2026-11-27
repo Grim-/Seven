@@ -40,16 +40,16 @@ export function OverdueTable({
       >
         {list.map((o) => (
           <GridRow key={o.id} onClick={() => onOpen(o.id)}>
-            <span className="truncate text-[13px] font-semibold text-white">
+            <span className="truncate text-[13px] font-semibold text-ink">
               {showName(names.get(o.id) ?? '')}
             </span>
-            <span className="text-right font-mono text-[12.5px] text-white">
+            <span className="text-right font-ui text-[12.5px] text-ink">
               {days(o.sinceLast)} ago
             </span>
-            <span className="text-right font-mono text-[12.5px] text-dim">{days(o.usual)}</span>
+            <span className="text-right font-ui text-[12.5px] text-dim">{days(o.usual)}</span>
             <span
               className={cn(
-                'text-right font-mono text-[12.5px]',
+                'text-right font-ui text-[12.5px]',
                 o.overdue > 0 ? 'text-alert' : 'text-faint'
               )}
             >

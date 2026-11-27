@@ -1,18 +1,21 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { SEVEN_THEME, skyPhase, type SkyPhase, type Theme } from '@shared/theme'
+import { skyPhase, type SkyPhase, type Theme } from '@shared/theme'
+import { DEFAULT_SKIES, SKY_PHASES } from '@shared/themeLook'
 import { on } from '../../lib/ipc'
 import { useApp } from '../../store/app'
-import { useActiveTheme } from '../../store/themes'
-import { BackdropLayer } from '../backdrop/Backdrop'
+import { useActiveTheme, useThemes } from '../../store/themes'
+import { BackdropLayer, GradientLayer } from '../backdrop/Backdrop'
+import { lightFill, stopsFill } from '../../lib/gradients'
 import { AmbientBackground } from './AmbientBackground'
 import { playSound } from './Audio'
 import { BackgroundCanvas, REACTION_EVENT, hasBackground } from '../backgrounds/BackgroundCanvas'
 import { BACKGROUND_MODULE, backgroundInfo, effectSettingsFor } from '@shared/backgrounds'
 import { useTools } from '../../store/tools'
+import { useApplyLook } from '../../lib/skins/useApplyLook'
+import { getKeybind, matchesKeybind } from '../../store/keybinds'
+import { toast } from '../../store/toasts'
 
 type Cue = { sound: string | null; flash: string | null; shake: boolean; reaction?: string | null }
-
-const PHASES: SkyPhase[] = ['dawn', 'day', 'dusk', 'night']
 
 const STARS = Array.from({ length: 28 }, (_, i) => {
   const x = (i * 37.3) % 100
@@ -21,28 +24,11 @@ const STARS = Array.from({ length: 28 }, (_, i) => {
   return `radial-gradient(${size}px ${size}px at ${x.toFixed(1)}% ${y.toFixed(1)}%, rgba(255,255,255,${i % 3 === 0 ? 0.8 : 0.45}) 50%, transparent 51%)`
 }).join(', ')
 
-const SKIES: Record<SkyPhase, { sky: string; orb: string; at: CSSProperties; moon?: boolean }> = {
-  dawn: {
-    sky: 'linear-gradient(to top, #4a2234 0%, #2a1a3a 32%, #121428 66%, transparent 100%)',
-    orb: '#ffb27a',
-    at: { left: '18%', top: '86%' }
-  },
-  day: {
-    sky: 'linear-gradient(to top, #12324d 0%, #0d2236 42%, #0a1522 76%, transparent 100%)',
-    orb: '#fff1c9',
-    at: { left: '74%', top: '14%' }
-  },
-  dusk: {
-    sky: 'linear-gradient(to top, #5a2414 0%, #3a1622 32%, #1a1026 66%, transparent 100%)',
-    orb: '#ff7a3d',
-    at: { left: '82%', top: '84%' }
-  },
-  night: {
-    sky: 'linear-gradient(to top, #0b1430 0%, #080d1f 46%, transparent 100%)',
-    orb: '#d6defa',
-    at: { left: '22%', top: '16%' },
-    moon: true
-  }
+const SKY_PLACES: Record<SkyPhase, { at: CSSProperties; moon?: boolean }> = {
+  dawn: { at: { left: '18%', top: '86%' } },
+  day: { at: { left: '74%', top: '14%' } },
+  dusk: { at: { left: '82%', top: '84%' } },
+  night: { at: { left: '22%', top: '16%' }, moon: true }
 }
 
 function orbStyle(color: string, moon: boolean): CSSProperties {
@@ -64,14 +50,13 @@ function useMinute(): Date {
   return now
 }
 
-function Sky({ phase }: { phase: SkyPhase | null }) {
+function Sky({ phase, theme }: { phase: SkyPhase | null; theme: Theme }) {
   return (
     <>
-      {PHASES.map((p) => {
-        const s = SKIES[p]
+      {SKY_PHASES.map((p) => {
+        const s = { ...SKY_PLACES[p], orb: (theme.skies?.[p] ?? DEFAULT_SKIES[p]).orb }
         return (
           <div key={p} className="absolute inset-0 transition-opacity duration-[4000ms] ease-in-out" style={{ opacity: phase === p ? 0.9 : 0 }}>
-            <div className="absolute inset-0" style={{ background: s.sky }} />
             {s.moon && <div className="absolute inset-0" style={{ backgroundImage: STARS, opacity: 0.7 }} />}
             <div className="absolute" style={{ ...s.at, ...orbStyle(s.orb, Boolean(s.moon)) }} />
           </div>
@@ -79,23 +64,6 @@ function Sky({ phase }: { phase: SkyPhase | null }) {
       })}
     </>
   )
-}
-
-function palette(theme: Theme): void {
-  const root = document.documentElement.style
-  const keys = ['--color-accent', '--color-accent-soft', '--color-teal', '--color-cyan', '--color-bg', '--color-line', '--color-line-strong']
-  root.setProperty('--chat-fade-opacity', String(theme.chatFadeOpacity ?? SEVEN_THEME.chatFadeOpacity))
-  if (theme.builtin) {
-    for (const k of keys) root.removeProperty(k)
-    return
-  }
-  root.setProperty('--color-accent', theme.accent)
-  root.setProperty('--color-accent-soft', theme.accentSoft)
-  root.setProperty('--color-teal', theme.secondary)
-  root.setProperty('--color-cyan', `color-mix(in srgb, ${theme.secondary} 70%, white)`)
-  root.setProperty('--color-bg', theme.base)
-  root.setProperty('--color-line', `color-mix(in srgb, ${theme.accentSoft} 35%, transparent)`)
-  root.setProperty('--color-line-strong', `color-mix(in srgb, ${theme.accentSoft} 60%, transparent)`)
 }
 
 function shakeMain(): void {
@@ -117,8 +85,21 @@ export function ThemeStage() {
   const now = useMinute()
   const [flash, setFlash] = useState<{ color: string; n: number } | null>(null)
 
-  useEffect(() => palette(theme), [theme])
-  useEffect(() => () => palette(SEVEN_THEME), [])
+  const palette = useThemes((s) => s.palette)
+  useApplyLook(theme)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!matchesKeybind('app.plainLook', e)) return
+      e.preventDefault()
+      if (useThemes.getState().switching) return
+      const next = !useThemes.getState().plain
+      useThemes.setState({ plain: next })
+      toast.info(next ? 'Showing the Seven theme' : 'Your theme is back', `${getKeybind('app.plainLook').display} switches it back`)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   useEffect(() => {
     const local = (e: Event) => {
@@ -154,19 +135,20 @@ export function ThemeStage() {
 
   return (
     <>
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <Sky phase={phase} />
+      <div key={theme.id} className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         {backdrop && <BackdropLayer key={JSON.stringify(backdrop)} backdrop={backdrop} />}
         {animated && (
           <BackgroundCanvas
             id={animated.id}
-            colors={{ accent: theme.accent, secondary: theme.secondary, base: theme.base }}
+            colors={palette}
             settings={effectSettingsFor(animated, theme.effect === animated.id ? theme.effectSettings : {})}
           />
         )}
+        <Sky phase={phase} theme={theme} />
+        {theme.gradient && <GradientLayer fill={stopsFill(theme.gradient.stops, theme.gradient.angle)} />}
         {light && (
           <div className="absolute inset-0 transition-opacity duration-[2000ms]" style={{ opacity: light.strength }}>
-            <div key={light.color} className="absolute inset-0" style={{ background: `radial-gradient(ellipse 120% 90% at 50% 100%, ${light.color} 0%, transparent 70%)`, animation: 'reveal-fade 2s ease-out both' }} />
+            <div key={JSON.stringify(light.stops)} className="absolute inset-0" style={{ background: lightFill(light.stops), animation: 'reveal-fade 2s ease-out both' }} />
           </div>
         )}
       </div>

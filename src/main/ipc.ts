@@ -94,6 +94,12 @@ export function registerIpc(ctx: IpcContext): MainDispatch {
       return target
     },
     'dialog.savePath': (win, { name }) => askSavePath(win, name),
+    'conversions.saveBackup': async (win, { ids, name }) => {
+      const target = await askSavePath(win, name, [{ name: 'Zip backup', extensions: ['zip'] }])
+      if (!target) return null
+      const res = (await ctx.engine.request('conversions.backup', { ids, target })) as { files: number; bytes: number }
+      return { path: target, ...res }
+    },
     'asset.saveAs': async (win, { id, name }) => {
       const source = ctx.vault.openableCopy((await ctx.engine.request('data.assets.path', { id })) as string)
       const target = await askSavePath(win, name)

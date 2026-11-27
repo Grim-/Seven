@@ -66,7 +66,7 @@ function engage(target: MapToken, hud: PlayHud): void {
   void useGameState.getState().startBattle(hud.player, [target.visitor.token || target.visitor.sheet])
 }
 
-const BUTTON = 'flex-1 flex items-center justify-center gap-1 border border-line/60 bg-black/90 py-1 text-[10px] font-bold text-dim transition-colors cursor-pointer'
+const BUTTON = 'flex-1 flex items-center justify-center gap-1 border border-line/60 tone-well-90 py-1 text-[10px] font-bold text-dim transition-colors cursor-pointer'
 
 function ExploreScreen({ hud }: { hud: PlayHud }) {
   const attackTarget = useGameState((s) => s.attackTarget)
@@ -89,9 +89,9 @@ function ExploreScreen({ hud }: { hud: PlayHud }) {
               <button
                 type="button"
                 onClick={() => openEntry('sheet', sheet)}
-                className="flex items-center gap-1.5 border border-line/60 bg-black/90 px-2.5 py-1 font-mono text-[11px] font-bold text-white hover:border-accent hover:text-accent transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 border border-line/60 tone-well-90 px-2.5 py-1 font-ui text-[11px] font-bold text-ink hover:border-accent hover:text-accent transition-colors cursor-pointer"
               >
-                <span className="border border-line/60 bg-line/20 px-1 text-[9px] text-cyan">C</span>
+                <span className="border border-line/60 bg-line/20 px-1 text-[9px] text-secondary-ink">C</span>
                 <span>CHARACTER SHEET</span>
               </button>
             </div>
@@ -112,15 +112,15 @@ function ExploreScreen({ hud }: { hud: PlayHud }) {
               useDialogue.getState().closeDialogue()
             }}
             footer={
-              <div className="flex flex-col gap-1 font-mono">
+              <div className="flex flex-col gap-1 font-ui">
                 <div className="flex gap-1">
                   {target.visitor.sheet && (
-                    <button type="button" onClick={() => exploreScene.talk(target)} title="Talk with entity (T)" className={`${BUTTON} hover:border-purple hover:text-purple`}>
+                    <button type="button" onClick={() => exploreScene.talk(target)} title="Talk with entity (T)" className={`${BUTTON} hover:border-tint-purple hover:text-tint-purple`}>
                       <span className="text-[8.5px] text-faint">[T]</span>
                       <span>TALK</span>
                     </button>
                   )}
-                  <button type="button" onClick={() => hud.nav?.smartApproach(target.at, () => undefined)} title="Approach entity (A)" className={`${BUTTON} hover:border-cyan hover:text-cyan`}>
+                  <button type="button" onClick={() => hud.nav?.smartApproach(target.at, () => undefined)} title="Approach entity (A)" className={`${BUTTON} hover:border-secondary-ink hover:text-secondary-ink`}>
                     <span className="text-[8.5px] text-faint">[A]</span>
                     <span>APPROACH</span>
                   </button>
@@ -136,7 +136,7 @@ function ExploreScreen({ hud }: { hud: PlayHud }) {
                     type="button"
                     onClick={() => exploreScene.act(target, hud)}
                     title="Engage in combat (F)"
-                    className="flex-1 flex items-center justify-center gap-1 border border-alert/70 bg-alert/15 py-1 text-[10px] font-bold text-alert hover:border-alert hover:bg-alert hover:text-white transition-all cursor-pointer shadow-[0_0_8px_rgba(255,77,77,0.25)]"
+                    className="flex-1 flex items-center justify-center gap-1 border border-alert/70 bg-alert/15 py-1 text-[10px] font-bold text-alert hover:border-alert hover:bg-alert hover:text-ink transition-all cursor-pointer shadow-[0_0_8px_color-mix(in_srgb,rgb(255,77,77)_calc(25%*var(--glow)),transparent)]"
                   >
                     <span className="text-[8.5px] text-alert/70">[F]</span>
                     <span>ENGAGE</span>

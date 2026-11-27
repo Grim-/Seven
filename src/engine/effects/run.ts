@@ -3,7 +3,8 @@ import { effectTargetKey, placedKey, type EffectOutcome, type PlacedRef, type Ef
 import { Effects, type ActionEvent, type UseContext } from '@shared/game/components'
 import { createComponent, GameEntity, type Catalog, type ComponentDef, type ComponentRecord } from '@shared/game/core'
 import type { CharacterSheet } from '@shared/types'
-import { getSheet, setGame } from '../library/sheets'
+import { actorLink, npcActorId, splitNpcRef } from '@shared/worldNpcs'
+import { findSheet, getSheet, setGame } from '../library/sheets'
 import { ToolError } from '../tools/types'
 import { triggerActionsStore } from '../triggerActions/store'
 import { saveInPlay } from '../worlds/playLayer'
@@ -15,6 +16,8 @@ import { placedThing } from './placed'
 import { dropLostConcentration } from '../../modules/game/characters'
 import './acts/flag'
 import './acts/loot'
+import './acts/worldState'
+import './acts/link'
 
 interface Side {
   key: string | null
@@ -27,31 +30,26 @@ interface Side {
 
 const bare = (uid: string, name: string, cat: Catalog): GameEntity => new GameEntity(uid, { kind: 'character_template', id: '' }, name, cat)
 
-function sheetSide(id: string, cat: Catalog): Side {
-  const s = getSheet(id)
-  const entity = s.game ? GameEntity.fromRecord(s.game, cat) : bare(id, s.title, cat)
-  entity.link = `@sheet:${id}`
-  return { key: `sheet:${id}`, token: id, entity, sheet: s, hittable: !!s.game, persist: () => (s.game ? setGame(id, entity.toRecord()) : undefined) }
+function sheetSide(ref: string, world: string | null, cat: Catalog): Side {
+  const resolvedId = findSheet(ref, world) ?? ref
+  const s = getSheet(resolvedId)
+  const entity = s.game ? GameEntity.fromRecord(s.game, cat) : bare(s.id, s.title, cat)
+  entity.link = actorLink(s.id)
+  return {
+    key: `sheet:${s.id}`,
+    token: s.id,
+    entity,
+    sheet: s,
+    hittable: Boolean(s.game),
+    persist: () => (s.game ? setGame(s.id, entity.toRecord()) : undefined)
+  }
 }
 
 function creatureSide(uid: string, world: string | null, cat: Catalog): Side {
-  const save = world ? saveInPlay(world, true) : null
-  const record = save?.creatures.find((c) => c.uid === uid)
-  if (!save || !record) throw new ToolError('That creature is not in this save.')
-  const entity = GameEntity.fromRecord(record, cat)
-  return {
-    key: `creature:${uid}`,
-    token: uid,
-    entity,
-    sheet: null,
-    hittable: true,
-    persist: () => {
-      const now = world ? saveInPlay(world, true) : null
-      if (!now) return
-      const next = entity.toRecord()
-      saves.write({ ...now, creatures: now.creatures.map((c) => (c.uid === uid ? { ...c, ...next } : c)) })
-    }
-  }
+  const candidate = splitNpcRef(uid) ? uid : world ? npcActorId(world, uid) : uid
+  const resolved = findSheet(candidate, world)
+  if (!resolved) throw new ToolError('That NPC is not in this save.')
+  return sheetSide(resolved, world, cat)
 }
 
 function built(uid: string, name: string, defs: ComponentDef[], cat: Catalog): GameEntity {
@@ -86,7 +84,7 @@ function placedSide(at: PlacedRef, world: string | null, cat: Catalog): Side {
 
 function resolveSide(ref: EffectTargetRef, world: string | null, cat: Catalog): Side {
   if (ref.placed) return placedSide(ref.placed, world, cat)
-  if (ref.sheet) return sheetSide(ref.sheet, cat)
+  if (ref.sheet) return sheetSide(ref.sheet, world, cat)
   if (ref.creature) return creatureSide(ref.creature, world, cat)
   throw new ToolError('There is nothing to target.')
 }
@@ -173,6 +171,33 @@ export function runEffects(req: EffectRun): EffectOutcome {
   } finally {
     user.entity.stop()
     if (acted !== user) acted.entity.stop()
+  }
+  return { results, lines, view }
+}
+
+export function signalPlaced(world: string, at: PlacedRef, signal: string, payload: Record<string, unknown>): EffectOutcome {
+  const cat = effectCatalog()
+  if (!cat) throw new ToolError('The game module is not available.')
+  const lines: string[] = []
+  const view: EffectOutcome['view'] = []
+  const results: EffectResult[] = []
+  const side = placedSide(at, world, cat)
+  if (!side.hittable) return { results, lines, view }
+  side.entity.start()
+  try {
+    side.entity.signals.emit(signal, {
+      ...payload,
+      collect: (result: EffectResult) => results.push(result),
+      view: (event: { kind: string; data: Record<string, unknown> }) => {
+        const act = worldAct(event.kind)
+        if (!act) return void view.push({ kind: event.kind, data: event.data, target: null })
+        const line = act(event.data, { world, target: side.entity, targetKey: side.key, catalog: cat })
+        if (line) lines.push(line)
+      }
+    })
+    side.persist()
+  } finally {
+    side.entity.stop()
   }
   return { results, lines, view }
 }

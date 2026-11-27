@@ -33,13 +33,13 @@ export function ModuleGuideView({ module }: { module: ModuleInfo }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 border border-line/40 bg-black/25 px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border border-line/40 tone-panel-25 px-3 py-2">
         <div className="flex flex-wrap items-center gap-2 text-[12px]">
           <span
             className={
               live
-                ? 'border border-accent/45 bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-accent'
-                : 'border border-line/50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-faint'
+                ? 'border border-accent/45 bg-accent/10 px-1.5 py-0.5 font-label text-[10px] caps-10 text-accent'
+                : 'border border-line/50 px-1.5 py-0.5 font-label text-[10px] caps-10 text-faint'
             }
           >
             {live ? 'Live agent guide' : 'Offline preview'}
@@ -65,7 +65,7 @@ export function ModuleGuideView({ module }: { module: ModuleInfo }) {
       </div>
 
       {markdown ? (
-        <div className="border border-line/45 bg-black/30 px-4 py-3 text-[13px]">
+        <div className="border border-line/45 tone-panel-30 px-4 py-3 text-[13px]">
           <Markdown text={markdown} />
         </div>
       ) : (
@@ -83,7 +83,7 @@ function ResetAside({ dirty, onReset }: { dirty: boolean; onReset: () => void })
     <button
       type="button"
       onClick={onReset}
-      className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.08em] text-accent-soft hover:text-accent"
+      className="inline-flex items-center gap-1 font-label text-[10px] caps-8 text-accent-soft hover:text-accent"
     >
       <RotateCcw className="h-2.5 w-2.5" />
       Reset
@@ -176,7 +176,7 @@ export function ModuleCustomEditor({ module }: { module: ModuleInfo }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 border border-line/40 bg-black/25 px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border border-line/40 tone-panel-25 px-3 py-2">
         <span className="text-[12px] text-dim">
           Customize how this module presents itself to you and agents. Tool names and parameter schemas come from code and stay locked.
         </span>
@@ -214,7 +214,7 @@ export function ModuleCustomEditor({ module }: { module: ModuleInfo }) {
         aside={<ResetAside dirty={prompt !== module.defaultPrompt} onReset={() => setPrompt(module.defaultPrompt)} />}
         hint="Instructions given to agents in their system prompt whenever this module is enabled for them."
       >
-        <Textarea rows={6} value={prompt} onChange={(e) => setPrompt(e.target.value)} className="font-mono text-[12px]" />
+        <Textarea rows={6} value={prompt} onChange={(e) => setPrompt(e.target.value)} className="font-ui text-[12px]" />
       </Field>
 
       <Field
@@ -222,7 +222,7 @@ export function ModuleCustomEditor({ module }: { module: ModuleInfo }) {
         aside={<ResetAside dirty={help !== module.defaultHelp} onReset={() => setHelp(module.defaultHelp)} />}
         hint="Additional Markdown section appended under ## More in the auto-generated documentation."
       >
-        <Textarea rows={5} value={help} onChange={(e) => setHelp(e.target.value)} className="font-mono text-[12px]" />
+        <Textarea rows={5} value={help} onChange={(e) => setHelp(e.target.value)} className="font-ui text-[12px]" />
       </Field>
 
       <Field
@@ -230,12 +230,12 @@ export function ModuleCustomEditor({ module }: { module: ModuleInfo }) {
         aside={<ResetAside dirty={remind !== module.defaultRemind} onReset={() => setRemind(module.defaultRemind)} />}
         hint="Short reminder injected into active turns when the module is active."
       >
-        <Textarea rows={3} value={remind} onChange={(e) => setRemind(e.target.value)} className="font-mono text-[12px]" />
+        <Textarea rows={3} value={remind} onChange={(e) => setRemind(e.target.value)} className="font-ui text-[12px]" />
       </Field>
 
       {module.tools.length > 0 && (
         <div className="flex flex-col gap-2.5 border-t border-line/35 pt-3">
-          <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">
+          <div className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">
             Tool Descriptions
           </div>
           <div className="flex flex-col gap-2.5">
@@ -252,7 +252,7 @@ export function ModuleCustomEditor({ module }: { module: ModuleInfo }) {
                     rows={2}
                     value={val}
                     onChange={(e) => setToolDescs((prev) => ({ ...prev, [t.name]: e.target.value }))}
-                    className="font-mono text-[12px]"
+                    className="font-ui text-[12px]"
                   />
                 </Field>
               )

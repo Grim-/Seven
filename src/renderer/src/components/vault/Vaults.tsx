@@ -30,7 +30,7 @@ export function NewVaultFields({ name, onName, parent, onParent }: { name: strin
       </Field>
       <Field label="Where" hint={parent && name.trim() ? `Creates ${folderFor(parent, name, windows)}` : 'Pick where its folder goes. It can be on a memory stick.'}>
         <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-white" title={parent ?? undefined}>
+          <span className="min-w-0 flex-1 truncate font-ui text-[12px] text-ink" title={parent ?? undefined}>
             {parent ?? 'No place picked'}
           </span>
           <Button size="sm" icon={<FolderOpen />} onClick={choose}>
@@ -71,7 +71,7 @@ export function SwitchVaultModal({ vault, onClose }: { vault: { name: string; pa
     >
       <div className="flex flex-col gap-2 text-[13px]">
         <div>Seven closes and opens again with this vault.</div>
-        <div className="truncate font-mono text-[12px] text-dim" title={vault.path}>
+        <div className="truncate font-ui text-[12px] text-dim" title={vault.path}>
           {vault.path}
         </div>
         <div className="text-dim">The vault you have open now stays as it is.</div>
@@ -99,7 +99,7 @@ function Row({ vault, pinned, onList, onSwitch }: { vault: VaultEntry; pinned: b
       })
       .catch(failed('Could not take it off'))
   return (
-    <div className={cn('flex items-center gap-3 border px-3 py-2', vault.current ? 'border-accent/60 bg-accent/5' : 'border-line/50 bg-black/40')}>
+    <div className={cn('flex items-center gap-3 border px-3 py-2', vault.current ? 'border-accent/60 bg-accent/5' : 'border-line/50 tone-panel-40')}>
       <div className="min-w-0 flex-1">
         {editing !== null ? (
           <Input
@@ -115,12 +115,12 @@ function Row({ vault, pinned, onList, onSwitch }: { vault: VaultEntry; pinned: b
           />
         ) : (
           <div className="flex items-center gap-2">
-            <span className="truncate text-[13.5px] text-white">{vault.name}</span>
-            {vault.current && <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-accent">Open</span>}
-            {!vault.exists && <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-alert">Folder not found</span>}
+            <span className="truncate text-[13.5px] text-ink">{vault.name}</span>
+            {vault.current && <span className="font-label text-[10px] caps-14 text-accent">Open</span>}
+            {!vault.exists && <span className="font-label text-[10px] caps-14 text-alert">Folder not found</span>}
           </div>
         )}
-        <div className="truncate font-mono text-[11px] text-faint" title={vault.path}>
+        <div className="truncate font-ui text-[11px] text-faint" title={vault.path}>
           {vault.path}
         </div>
       </div>
@@ -193,7 +193,7 @@ export function VaultsPanel({ className }: { className?: string }) {
         </>
       }
     >
-      {pinned && <div className="px-3.5 pt-2.5 font-mono text-[11px] text-alert">The data folder is set by {data?.pinnedBy}, so switching is off.</div>}
+      {pinned && <div className="px-3.5 pt-2.5 font-ui text-[11px] text-alert">The data folder is set by {data?.pinnedBy}, so switching is off.</div>}
       <div className="flex flex-col gap-2 p-3">
         {data?.list.map((v) => (
           <Row key={v.path} vault={v} pinned={pinned} onList={setData} onSwitch={() => setSwitching(v)} />

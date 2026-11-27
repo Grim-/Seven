@@ -70,31 +70,31 @@ export function BrowseList({
           setAt(0)
         }}
         onKeyDown={keys}
-        className="h-8 border border-line/60 bg-black/40 px-2.5 text-[13px] text-white outline-none placeholder:text-faint focus:border-accent/70"
+        className="h-8 border border-line/60 tone-well-40 px-2.5 text-[13px] text-ink outline-none placeholder:text-faint focus:border-accent/70"
       />
       <div className="max-h-[60vh] min-h-0 overflow-y-auto">
         {showClear && onClear && (
           <button
             type="button"
             onClick={onClear}
-            className="mb-1 flex w-full items-center justify-between border-b border-line/50 px-2.5 py-1.5 text-left text-[12.5px] text-dim hover:bg-cyan/[0.08] hover:text-white"
+            className="mb-1 flex w-full items-center justify-between border-b border-line/50 px-2.5 py-1.5 text-left text-[12.5px] text-dim hover:bg-secondary-ink/[0.08] hover:text-ink"
           >
             <span className="truncate">{clearLabel}</span>
-            <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Clear</span>
+            <span className="shrink-0 font-label text-[10px] caps-12 text-faint">Clear</span>
           </button>
         )}
         {canUseCustom && (
           <button
             type="button"
             onClick={() => onPick(trimmed)}
-            className="mb-1 flex w-full items-center justify-between border border-dashed border-accent/50 bg-accent/10 px-2.5 py-1.5 text-left font-mono text-[12px] text-accent hover:bg-accent/20"
+            className="mb-1 flex w-full items-center justify-between border border-dashed border-accent/50 bg-accent/10 px-2.5 py-1.5 text-left font-ui text-[12px] text-accent hover:bg-accent/20"
           >
             <span>Use custom &ldquo;{trimmed}&rdquo;</span>
           </button>
         )}
         {groups.map((group) => (
           <div key={group} className="flex flex-col">
-            <span className="sticky top-0 bg-black/95 py-1 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-accent-soft">{group}</span>
+            <span className="sticky top-0 tone-panel-95 py-1 font-label text-[9.5px] font-bold caps-16 text-accent-soft">{group}</span>
             {shown
               .filter((o) => o.group === group)
               .map((o) => {
@@ -105,15 +105,15 @@ export function BrowseList({
                     type="button"
                     onClick={() => selectOption(o)}
                     className={cn(
-                      'flex flex-col px-2.5 py-1.5 text-left hover:bg-cyan/[0.08]',
+                      'flex flex-col px-2.5 py-1.5 text-left hover:bg-secondary-ink/[0.08]',
                       ordered[at]?.value === o.value && 'bg-accent/15',
-                      selected && 'border-l-2 border-l-cyan'
+                      selected && 'border-l-2 border-l-secondary-ink'
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[13px] text-white">{o.label}</span>
+                      <span className="truncate text-[13px] text-ink">{o.label}</span>
                       {selected && onClear && (
-                        <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-cyan">Unselect</span>
+                        <span className="shrink-0 font-label text-[10px] caps-12 text-secondary-ink">Unselect</span>
                       )}
                     </div>
                     {o.note && <span className="truncate text-[11.5px] text-dim">{o.note}</span>}
@@ -135,6 +135,7 @@ export function BrowsePick({
   onChange,
   allowCustom = false,
   clearable = true,
+  showGroup = false,
   className
 }: {
   value: string | null
@@ -143,6 +144,7 @@ export function BrowsePick({
   onChange: (value: string | null) => void
   allowCustom?: boolean
   clearable?: boolean
+  showGroup?: boolean
   className?: string
 }) {
   const chosen = options.find((o) => o.value === value)
@@ -154,14 +156,14 @@ export function BrowsePick({
         align="start"
         className="w-[min(30rem,92vw)] p-3"
         rootClassName="min-w-0 flex-1"
-        triggerClassName="flex h-full min-h-8 w-full min-w-0 items-center gap-2 border border-line/60 bg-black/40 px-2.5 text-left text-[13px] hover:border-accent/70"
+        triggerClassName="flex h-full min-h-8 w-full min-w-0 items-center gap-2 border border-line/60 tone-well-40 px-2.5 text-left text-[13px] hover:border-accent/70"
         trigger={
           <>
-            <span className={cn('min-w-0 flex-1 truncate', hasValue ? 'text-white' : 'text-faint')}>{displayLabel}</span>
-            {chosen ? (
-              <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-dim">{chosen.group}</span>
+            <span title={displayLabel} className={cn('min-w-0 flex-1 truncate', hasValue ? 'text-ink' : 'text-faint')}>{displayLabel}</span>
+            {showGroup && chosen ? (
+              <span className="shrink-0 font-label text-[10px] caps-12 text-dim">{chosen.group}</span>
             ) : (
-              allowCustom && value && <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-accent">Custom</span>
+              !chosen && allowCustom && value && <span className="shrink-0 font-label text-[10px] caps-12 text-accent">Custom</span>
             )}
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-dim" />
           </>
@@ -190,7 +192,7 @@ export function BrowsePick({
         )}
       </Popover>
       {hasValue && clearable && (
-        <button type="button" title="Clear" onClick={() => onChange(null)} className="ml-1 shrink-0 px-1 text-faint hover:text-white">
+        <button type="button" title="Clear" onClick={() => onChange(null)} className="ml-1 shrink-0 px-1 text-faint hover:text-ink">
           <X className="h-3.5 w-3.5" />
         </button>
       )}

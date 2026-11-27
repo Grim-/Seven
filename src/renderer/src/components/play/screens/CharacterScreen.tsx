@@ -77,17 +77,17 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
   const activeResists = resistStats.filter((r) => (stats?.value(r.id) ?? 0) !== 0)
 
   return (
-    <div className="h-full flex flex-col gap-2.5 min-h-0 text-white">
+    <div className="h-full flex flex-col gap-2.5 min-h-0 text-ink">
       {/* 1. TOP HERO SECTION: RESOURCE POOLS (HEALTH, STAMINA, MANA) & COMBAT VITALS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 shrink-0">
         {/* Left: Resource Pools (Health, Stamina, Mana) */}
-        <div className="lg:col-span-7 border border-line/60 bg-[#070b10] p-2.5 flex flex-col justify-between gap-1.5 shadow-sm">
+        <div className="lg:col-span-7 border border-line/60 bg-surface p-2.5 flex flex-col justify-between gap-1.5 shadow-sm">
           <div className="flex items-center justify-between border-b border-line/40 pb-1">
-            <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-cyan flex items-center gap-1.5">
-              <Heart className="h-3.5 w-3.5 text-red-400" />
+            <span className="font-label text-[11px] font-bold caps-5 text-tint-cyan flex items-center gap-1.5">
+              <Heart className="h-3.5 w-3.5 text-tint-red-ink" />
               Resource Pools
             </span>
-            <span className="font-mono text-[9.5px] text-faint">Active Status</span>
+            <span className="font-ui text-[9.5px] text-faint">Active Status</span>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -96,23 +96,23 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
               const isHp = r.stat.toLowerCase().includes('health') || r.stat.toLowerCase().includes('hp')
               const isMana = r.stat.toLowerCase().includes('mana')
               const barColor = isHp
-                ? 'bg-gradient-to-r from-red-600 to-rose-500'
+                ? 'bg-gradient-to-r from-tint-red to-tint-red-ink'
                 : isMana
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-500'
-                : 'bg-gradient-to-r from-emerald-600 to-teal-500'
-              const textColor = isHp ? 'text-red-400' : isMana ? 'text-purple-300' : 'text-emerald-400'
+                ? 'bg-gradient-to-r from-tint-purple to-tint-purple-ink'
+                : 'bg-gradient-to-r from-tint-green to-tint-green-ink'
+              const textColor = isHp ? 'text-tint-red-ink' : isMana ? 'text-tint-purple-ink' : 'text-tint-green-ink'
 
               return (
                 <div key={r.stat} className="flex flex-col gap-0.5">
-                  <div className="flex items-center justify-between font-mono text-[11px]">
-                    <span className={cn('font-bold uppercase tracking-wider text-[10px]', textColor)}>
+                  <div className="flex items-center justify-between font-ui text-[11px]">
+                    <span className={cn('font-bold caps-5 text-[10px]', textColor)}>
                       {r.label}
                     </span>
-                    <span className="text-white/95 font-bold text-[11.5px]">
+                    <span className="text-ink/95 font-bold text-[11.5px]">
                       {Math.round(r.current)} / {Math.round(r.max)}
                     </span>
                   </div>
-                  <div className="h-2 w-full bg-black/80 border border-line/50 overflow-hidden">
+                  <div className="h-2 w-full tone-panel-80 border border-line/50 overflow-hidden">
                     <div
                       className={cn('h-full transition-all duration-300', barColor)}
                       style={{ width: `${pct}%` }}
@@ -127,55 +127,55 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
         {/* Right: Core Combat Vitals Grid */}
         <div className="lg:col-span-5 flex flex-col justify-between gap-1.5">
           <div className="grid grid-cols-3 gap-1.5">
-            <div className="flex items-center gap-2 border border-line/60 bg-[#070b10] px-2 py-1.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-cyan/40 bg-cyan/10 text-cyan">
+            <div className="flex items-center gap-2 border border-line/60 bg-surface px-2 py-1.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-tint-cyan/40 bg-tint-cyan/10 text-tint-cyan">
                 <Shield className="h-3.5 w-3.5" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="font-mono text-[8.5px] uppercase tracking-wider text-dim">Armor</span>
-                <span className="font-mono text-[13px] font-bold text-white leading-none">{armour} AC</span>
+                <span className="font-label text-[8.5px] caps-5 text-dim">Armor</span>
+                <span className="font-ui text-[13px] font-bold text-ink leading-none">{armour} AC</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 border border-line/60 bg-[#070b10] px-2 py-1.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-yellow-500/40 bg-yellow-500/10 text-yellow-400">
+            <div className="flex items-center gap-2 border border-line/60 bg-surface px-2 py-1.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-tint-yellow/40 bg-tint-yellow/10 text-tint-yellow-ink">
                 <Zap className="h-3.5 w-3.5" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="font-mono text-[8.5px] uppercase tracking-wider text-dim">Init</span>
-                <span className="font-mono text-[13px] font-bold text-white leading-none">{signed(dexMod)}</span>
+                <span className="font-label text-[8.5px] caps-5 text-dim">Init</span>
+                <span className="font-ui text-[13px] font-bold text-ink leading-none">{signed(dexMod)}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 border border-line/60 bg-[#070b10] px-2 py-1.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-cyan/40 bg-cyan/10 text-cyan">
+            <div className="flex items-center gap-2 border border-line/60 bg-surface px-2 py-1.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-tint-cyan/40 bg-tint-cyan/10 text-tint-cyan">
                 <Footprints className="h-3.5 w-3.5" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="font-mono text-[8.5px] uppercase tracking-wider text-dim">Speed</span>
-                <span className="font-mono text-[13px] font-bold text-white leading-none">{speed} ft</span>
+                <span className="font-label text-[8.5px] caps-5 text-dim">Speed</span>
+                <span className="font-ui text-[13px] font-bold text-ink leading-none">{speed} ft</span>
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-1.5">
-            <div className="flex items-center gap-2 border border-line/60 bg-[#070b10] px-2 py-1.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-cyan/40 bg-cyan/10 text-cyan">
+            <div className="flex items-center gap-2 border border-line/60 bg-surface px-2 py-1.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-tint-cyan/40 bg-tint-cyan/10 text-tint-cyan">
                 <Weight className="h-3.5 w-3.5" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="font-mono text-[8.5px] uppercase tracking-wider text-dim">Carry Cap</span>
-                <span className="font-mono text-[13px] font-bold text-white leading-none">{carryWeight} lbs</span>
+                <span className="font-label text-[8.5px] caps-5 text-dim">Carry Cap</span>
+                <span className="font-ui text-[13px] font-bold text-ink leading-none">{carryWeight} lbs</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 border border-line/60 bg-[#070b10] px-2 py-1.5">
+            <div className="flex items-center gap-2 border border-line/60 bg-surface px-2 py-1.5">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-accent/40 bg-accent/10 text-accent">
                 <Sparkles className="h-3.5 w-3.5" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="font-mono text-[8.5px] uppercase tracking-wider text-dim">Belt Slots</span>
-                <span className="font-mono text-[13px] font-bold text-accent leading-none">{beltSlots}</span>
+                <span className="font-label text-[8.5px] caps-5 text-dim">Belt Slots</span>
+                <span className="font-ui text-[13px] font-bold text-accent leading-none">{beltSlots}</span>
               </div>
             </div>
           </div>
@@ -187,12 +187,12 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
         {/* LEFT COLUMN: CORE ATTRIBUTES & DEFENSES (7 COLS) */}
         <div className="lg:col-span-7 flex flex-col gap-2.5 min-h-0 overflow-y-auto pr-1">
           {/* Core Attributes Grid */}
-          <div className="border border-line/50 bg-[#070b10]">
-            <div className="flex items-center justify-between border-b border-line/50 bg-black/60 px-3 py-1.5">
-              <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-cyan">
+          <div className="border border-line/50 bg-surface">
+            <div className="flex items-center justify-between border-b border-line/50 tone-panel-60 px-3 py-1.5">
+              <span className="font-label text-[11px] font-bold caps-5 text-tint-cyan">
                 Attributes & Modifiers
               </span>
-              <span className="font-mono text-[10px] text-faint">Click to Roll (1d20 + Mod)</span>
+              <span className="font-ui text-[10px] text-faint">Click to Roll (1d20 + Mod)</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2.5">
@@ -207,20 +207,20 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
                     key={def.id}
                     type="button"
                     onClick={() => handleRollCheck(def.label, mod)}
-                    className="group flex flex-col gap-1 border border-line/50 bg-black/50 p-2.5 text-left transition-all hover:border-cyan hover:bg-cyan/[0.04]"
+                    className="group flex flex-col gap-1 border border-line/50 tone-well-50 p-2.5 text-left transition-all hover:border-tint-cyan hover:bg-tint-cyan/[0.04]"
                     title={`Click to roll ${def.label} test (1d20 ${bonus})`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan group-hover:text-cyan/80">
+                      <span className="font-label text-[10px] font-bold caps-5 text-tint-cyan group-hover:text-tint-cyan/80">
                         {def.label.slice(0, 3)}
                       </span>
-                      <span className="border border-cyan/40 bg-cyan/15 px-1.5 py-0.2 font-mono text-[11px] font-bold text-cyan shadow-sm">
+                      <span className="border border-tint-cyan/40 bg-tint-cyan/15 px-1.5 py-0.2 font-ui text-[11px] font-bold text-tint-cyan shadow-sm">
                         {bonus}
                       </span>
                     </div>
                     <div className="flex items-baseline justify-between mt-1">
-                      <span className="truncate text-[12px] font-medium text-white/90">{def.label}</span>
-                      <span className={cn('font-mono text-[15px] font-bold', now > base ? 'text-ok' : now < base ? 'text-alert' : 'text-white')}>
+                      <span className="truncate text-[12px] font-medium text-ink/90">{def.label}</span>
+                      <span className={cn('font-ui text-[15px] font-bold', now > base ? 'text-ok' : now < base ? 'text-alert' : 'text-ink')}>
                         {round(now)}
                       </span>
                     </div>
@@ -231,12 +231,12 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
           </div>
 
           {/* Defenses & Resistances Matrix */}
-          <div className="border border-line/50 bg-[#070b10]">
-            <div className="flex items-center justify-between border-b border-line/50 bg-black/60 px-3 py-1.5">
-              <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-cyan">
+          <div className="border border-line/50 bg-surface">
+            <div className="flex items-center justify-between border-b border-line/50 tone-panel-60 px-3 py-1.5">
+              <span className="font-label text-[11px] font-bold caps-5 text-tint-cyan">
                 Damage Resistances & Ward Matrix
               </span>
-              <span className="font-mono text-[10px] text-faint">
+              <span className="font-ui text-[10px] text-faint">
                 {activeResists.length} Active Modifiers
               </span>
             </div>
@@ -251,7 +251,7 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
                       <div
                         key={r.id}
                         className={cn(
-                          'flex items-center justify-between border px-2.5 py-1.5 font-mono text-[11px]',
+                          'flex items-center justify-between border px-2.5 py-1.5 font-ui text-[11px]',
                           isResist ? 'border-ok/60 bg-ok/15 text-ok font-bold' : 'border-alert/60 bg-alert/15 text-alert font-bold'
                         )}
                       >
@@ -264,22 +264,22 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
               ) : null}
 
               {/* Categorized Matrix Badges */}
-              <div className="grid grid-cols-3 gap-2 text-[10.5px] font-mono">
-                <div className="border border-line/30 bg-black/40 p-2 flex flex-col gap-1">
-                  <span className="text-faint uppercase font-bold text-[9px] flex items-center gap-1">
+              <div className="grid grid-cols-3 gap-2 text-[10.5px] font-ui">
+                <div className="border border-line/30 tone-panel-40 p-2 flex flex-col gap-1">
+                  <span className="text-faint caps font-bold text-[9px] flex items-center gap-1">
                     <Swords className="h-3 w-3 text-dim" /> Physical
                   </span>
                   <span className="text-dim">Slash, Pierce, Bludgeon (Standard)</span>
                 </div>
-                <div className="border border-line/30 bg-black/40 p-2 flex flex-col gap-1">
-                  <span className="text-faint uppercase font-bold text-[9px] flex items-center gap-1">
-                    <Flame className="h-3 w-3 text-amber-400/80" /> Elemental
+                <div className="border border-line/30 tone-panel-40 p-2 flex flex-col gap-1">
+                  <span className="text-faint caps font-bold text-[9px] flex items-center gap-1">
+                    <Flame className="h-3 w-3 text-tint-amber-ink/80" /> Elemental
                   </span>
                   <span className="text-dim">Fire, Cold, Lightning, Acid (Standard)</span>
                 </div>
-                <div className="border border-line/30 bg-black/40 p-2 flex flex-col gap-1">
-                  <span className="text-faint uppercase font-bold text-[9px] flex items-center gap-1">
-                    <Sparkles className="h-3 w-3 text-purple-400/80" /> Arcane
+                <div className="border border-line/30 tone-panel-40 p-2 flex flex-col gap-1">
+                  <span className="text-faint caps font-bold text-[9px] flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-tint-purple-ink/80" /> Arcane
                   </span>
                   <span className="text-dim">Force, Necrotic, Radiant, Psychic (Standard)</span>
                 </div>
@@ -289,8 +289,8 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
 
           {/* Active Buffs & Conditions */}
           {buffs.length > 0 && (
-            <div className="border border-line/50 bg-[#070b10]">
-              <div className="border-b border-line/50 bg-black/60 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-accent">
+            <div className="border border-line/50 bg-surface">
+              <div className="border-b border-line/50 tone-panel-60 px-3 py-1.5 font-label text-[11px] font-bold caps-5 text-accent">
                 Active Buffs & Conditions ({buffs.length})
               </div>
               <div className="flex flex-col gap-1.5 p-2.5">
@@ -300,16 +300,16 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
                     className="flex items-center justify-between border border-accent/30 bg-accent/[0.04] px-3 py-1.5 text-[12px]"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold text-ink">
                         {String(catalog.template(BUFF_TEMPLATES, b.id)?.label || b.id)}
                       </span>
                       {b.stacks > 1 && (
-                        <span className="border border-accent/40 bg-accent/15 px-1 font-mono text-[10px] font-bold text-accent">
+                        <span className="border border-accent/40 bg-accent/15 px-1 font-ui text-[10px] font-bold text-accent">
                           ×{b.stacks}
                         </span>
                       )}
                     </div>
-                    <span className="font-mono text-[11px] text-cyan">{gameTime(b.remaining)}</span>
+                    <span className="font-ui text-[11px] text-tint-cyan">{gameTime(b.remaining)}</span>
                   </div>
                 ))}
               </div>
@@ -318,16 +318,16 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
         </div>
 
         {/* RIGHT COLUMN: SKILLS & PROFICIENCIES (5 COLS) */}
-        <div className="lg:col-span-5 flex flex-col min-h-0 border border-line/50 bg-[#070b10]">
-          <div className="flex items-center justify-between border-b border-line/50 bg-black/60 px-3 py-1.5 shrink-0">
-            <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-cyan">
+        <div className="lg:col-span-5 flex flex-col min-h-0 border border-line/50 bg-surface">
+          <div className="flex items-center justify-between border-b border-line/50 tone-panel-60 px-3 py-1.5 shrink-0">
+            <span className="font-label text-[11px] font-bold caps-5 text-tint-cyan">
               Skills & Proficiencies
             </span>
-            <span className="font-mono text-[10px] text-faint">{filteredSkills.length} SKILLS</span>
+            <span className="font-ui text-[10px] text-faint">{filteredSkills.length} SKILLS</span>
           </div>
 
           {/* Filter Search */}
-          <div className="border-b border-line/40 bg-black/40 p-2 shrink-0">
+          <div className="border-b border-line/40 tone-panel-40 p-2 shrink-0">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-faint" />
               <input
@@ -335,7 +335,7 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
                 placeholder="Filter skills..."
                 value={filterSkill}
                 onChange={(e) => setFilterSkill(e.target.value)}
-                className="w-full border border-line bg-black/80 pl-8 pr-2.5 py-1 font-mono text-[11px] text-white placeholder-faint focus:border-cyan focus:outline-none"
+                className="w-full border border-line tone-panel-80 pl-8 pr-2.5 py-1 font-ui text-[11px] text-ink placeholder-faint focus:border-tint-cyan focus:outline-none"
               />
             </div>
           </div>
@@ -351,17 +351,17 @@ function CharacterScreen({ entity, catalog }: ScreenProps) {
                   key={c.id}
                   type="button"
                   onClick={() => handleRollCheck(c.label, bonus)}
-                  className="w-full flex items-center justify-between border border-line/30 bg-black/40 px-2.5 py-1.5 text-left transition-all hover:border-cyan hover:bg-cyan/[0.06]"
+                  className="w-full flex items-center justify-between border border-line/30 tone-well-40 px-2.5 py-1.5 text-left transition-all hover:border-tint-cyan hover:bg-tint-cyan/[0.06]"
                   title={`Click to roll ${c.label} test (1d20 ${bonusText})`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className={cn('h-2 w-2 rounded-none border', bonus > 0 ? 'bg-cyan border-cyan' : 'border-line/60 bg-transparent')} />
-                    <span className="truncate text-[12px] font-medium text-white/90">
+                    <span className={cn('h-2 w-2 rounded-none border', bonus > 0 ? 'bg-tint-cyan border-tint-cyan' : 'border-line/60 bg-transparent')} />
+                    <span className="truncate text-[12px] font-medium text-ink/90">
                       {c.label}
                     </span>
                   </div>
 
-                  <span className={cn('font-mono text-[11.5px] font-bold', bonus > 0 ? 'text-cyan' : 'text-dim')}>
+                  <span className={cn('font-ui text-[11.5px] font-bold', bonus > 0 ? 'text-tint-cyan' : 'text-dim')}>
                     {bonusText}
                   </span>
                 </button>

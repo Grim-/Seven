@@ -1,8 +1,7 @@
-import { notFound } from '@shared/errors'
+import { isNotFound, notFound } from '@shared/errors'
 import { compactId, stripRef, toId } from '@shared/ids'
 import { referencePattern, splitLink, withoutTitle } from '@shared/text'
 import { pageKindOf, type EntryPreview, type EntryViewData, type KindInfo, type KindLinkActionInfo, type LibrarySection, type ViewRef } from '@shared/types'
-import MiniSearch from 'minisearch'
 import { agentAccess } from '../../agents/access'
 import '../../avatars/kind'
 import { data } from '../../data/hub'
@@ -12,9 +11,8 @@ import { ToolError } from '../../tools/types'
 import { noteFailure } from '../../util/report'
 import { fieldText, resolveIncludes } from '../includes'
 import { ownedKinds, type OwnedKind } from '../kindRegistry'
-import { modules } from '../../modules/registry'
 import { moduleOnForAgent } from '../../modules/isOn'
-import { matchesWhere, parseQuery, scoreDoc } from '../query'
+import { matchesWhere, scoreDoc } from '../query'
 import { cleanTag, splitTags, tags as tagStore } from '../tags'
 import './activity'
 import './agents'
@@ -22,6 +20,7 @@ import './content'
 import { setKindRuntime } from './runtime'
 import { accessOf, checkPart, clip, kindFlags, USER, type FindOptions, type FindResult, type Hit, type Kind, type KindChild, type KindChildInput, type KindContext, type KindHit, type TrailStep } from './types'
 import './worlds'
+import { nearHits } from './nearIndex'
 
 function everyKind(): Kind[] {
   return ownedKinds().map((o) => o.kind)
@@ -29,8 +28,7 @@ function everyKind(): Kind[] {
 
 function resolvable(ctx: KindContext): OwnedKind[] {
   const hidden = new Set(accessOf(ctx).hidden)
-  return ownedKinds().filter(({ kind, module }) => {
-    if (module && !modules.isOn(module)) return false
+  return ownedKinds().filter(({ kind }) => {
     if (hidden.has(kind.kind)) return false
     try {
       return kind.available(ctx)
@@ -51,7 +49,7 @@ export function kinds(ctx: KindContext = USER): Kind[] {
 
 export function kindsOwnedBy(module: string | null): Kind[] {
   return ownedKinds()
-    .filter((o) => o.module === module && (!o.module || modules.isOn(o.module)))
+    .filter((o) => o.module === module)
     .map((o) => o.kind)
 }
 
@@ -103,32 +101,6 @@ function tagged(hits: KindHit[]): KindHit[] {
   })
 }
 
-function fuzzyHits(k: Kind, all: KindHit[], text: string, limit: number, ctx: KindContext): KindHit[] {
-  const { clauses, exclude } = parseQuery(text)
-  const searchTerms = clauses.flatMap((c) => c.include).join(' ').trim()
-  if (!all.length || !searchTerms) return []
-  const docs = all.map((h, i) => {
-    const fieldsText = k.fields ? k.fields(h.id, ctx).map((f) => `${f.name}: ${f.text}`).join(' ') : ''
-    return { i, title: h.title, summary: k.line(h.id, ctx), tags: (h.tags ?? []).join(' '), fields: fieldsText }
-  })
-  const index = new MiniSearch<{ i: number; title: string; summary: string; tags: string; fields: string }>({
-    idField: 'i',
-    fields: ['title', 'summary', 'tags', 'fields'],
-    searchOptions: { boost: { title: 3, tags: 2, fields: 2 }, prefix: (term) => term.length > 2, fuzzy: (term) => (term.length > 3 ? 0.2 : false), combineWith: 'OR' }
-  })
-  index.addAll(docs)
-  return index
-    .search(searchTerms)
-    .filter((r) => {
-      if (!exclude.length) return true
-      const d = docs[r.id as number]
-      const hay = `${d.title} ${d.summary} ${d.tags} ${d.fields}`.toLowerCase()
-      return !exclude.some((ex) => hay.includes(ex))
-    })
-    .slice(0, limit)
-    .map((r) => all[r.id as number])
-}
-
 function lined(k: Kind, hits: KindHit[], ctx: KindContext): Hit[] {
   return hits.map((h) => ({ ...h, summary: k.line(h.id, ctx) }))
 }
@@ -146,15 +118,14 @@ function searchKind(k: Kind, query: string, limit: number, ctx: KindContext): Ki
     }
     if (!text.trim() || out.length >= limit) return out
     const seen = new Set(out.map((h) => h.id))
-    const near = fuzzyHits(k, tagged(k.search('', 10_000, ctx)), text, limit, ctx).filter((h) => !seen.has(h.id))
+    const near = nearHits(k, tagged(k.search('', 10_000, ctx)), text, limit, ctx, (h) => !seen.has(h.id))
     return [...out, ...near].slice(0, limit)
   }
   const hasTags = (h: KindHit) => tags.every((t) => h.tags?.includes(t))
   const direct = tagged(k.search(text, 10_000, ctx)).filter(hasTags)
   if (!text.trim() || direct.length >= limit) return direct.slice(0, limit)
   const seen = new Set(direct.map((h) => h.id))
-  const pool = tagged(k.search('', 10_000, ctx)).filter((h) => !seen.has(h.id) && hasTags(h))
-  const near = fuzzyHits(k, pool, text, limit - direct.length, ctx)
+  const near = nearHits(k, tagged(k.search('', 10_000, ctx)), text, limit - direct.length, ctx, (h) => !seen.has(h.id) && hasTags(h))
   return [...direct, ...near].slice(0, limit)
 }
 
@@ -207,6 +178,14 @@ export function renameEntry(entry: string, name: string): string {
   return kind.title(id)
 }
 
+export function duplicateEntry(entry: string): { kind: string; id: string } {
+  const { kind, id } = resolveEntry(entry, null, USER)
+  const value = kind.pack && kind.unpack ? kind.pack(id) : undefined
+  if (value === undefined || !kind.unpack) throw new ToolError(`${kind.title(id)} can't be duplicated`)
+  const parent = kind.pageTypes ? (data.pages.metaFor(id)?.parent ?? null) : null
+  return { kind: kind.kind, id: kind.unpack(value, { replace: null, parent, entry: (ref) => ref }) }
+}
+
 export function setTags(entry: string, add: string[], remove: string[], ctx: KindContext = USER): { kind: Kind; id: string; tags: string[] } {
   const { kind, id } = resolveEntry(entry, null, ctx)
   return { kind, id, tags: tagStore.change(kind.kind, id, add, remove) }
@@ -231,7 +210,8 @@ export function overview(query: string, perKind: number, ctx: KindContext = USER
 }
 
 export function kindNamed(name: string, ctx: KindContext = USER): Kind | undefined {
-  return kinds(ctx).find((k) => k.kind === name)
+  const all = kinds(ctx)
+  return all.find((k) => k.kind === name) ?? all.find((k) => k.aliases?.includes(name))
 }
 
 function kindFor(name: string, ctx: KindContext): Kind | undefined {
@@ -312,7 +292,9 @@ function byName(k: Kind, ref: string, ctx: KindContext): string | null {
   if (!id || k.resolveOnly) return null
   try {
     const all = k.search('', 100_000, ctx)
-    const exact = all.find((h) => h.id === raw || h.id.toLowerCase() === rawLower || toId(h.title) === id || toId(h.id) === id)
+    const byId = all.find((h) => h.id === raw || h.id.toLowerCase() === rawLower)
+    if (byId) return byId.id
+    const exact = all.find((h) => toId(h.title) === id || toId(h.id) === id)
     if (exact) return exact.id
     const compact = compactId(raw)
     if (!compact) return null
@@ -411,7 +393,7 @@ export function insideText(kind: Kind, id: string, base: string, trail: TrailSte
   const list = childrenOf(kind, id, ctx, trail)
   if (!list.length) return ''
   const label = (k: string) => kindFor(k, ctx)?.label.toLowerCase() ?? k
-  return `\n\nInside it (read any of these by its path):\n${list.map((c) => `- ${base}/${c.segment} — ${label(c.kind)} ${c.title}`).join('\n')}`
+  return `\n\nInside it (read any of these by its path):\n${list.map((c) => `- ${c.path ? `@${kind.kind}:${c.path}` : `${base}/${c.segment}`} — ${label(c.kind)} ${c.title}`).join('\n')}`
 }
 
 export function resolveEntry(entry: string, kindName: string | null = null, ctx: KindContext = USER): { kind: Kind; id: string; trail?: TrailStep[]; path?: string } {
@@ -471,10 +453,12 @@ export function resolveEntry(entry: string, kindName: string | null = null, ctx:
   throw notFound(new ToolError(`No ${what} ${asked}.${near.length ? ` Close: ${near.map((h) => `${h.kind} ${nearId(h)}`).join(', ')}.` : ''} find searches everything.`))
 }
 
-export function referenceText(kindName: string, ref: string, part: string | null = null): { label: string; title: string; text: string } | null {
+export function referenceText(kindName: string, ref: string, part: string | null = null, ctx: KindContext = USER, want: 'auto' | 'full' | 'brief' = 'auto'): { label: string; title: string; text: string } | null {
   const k = kindFor(kindName, USER)
   if (!k) return null
   const id = k.resolve(ref, USER)
+  if (id && !part && want === 'brief') return { label: k.label, ...(k.brief ? k.brief(id, ctx) : { title: k.title(id), text: k.line(id, ctx) }) }
+  if (id && !part && want === 'auto' && k.brief) return { label: k.label, ...k.brief(id, ctx) }
   const field = id && part ? fieldText(k, id, part) : null
   if (id && field !== null) return { label: k.label, title: `${k.title(id)} · ${part}`, text: clip(resolveIncludes(field)) }
   const checked = checkPart(k, part)
@@ -544,7 +528,84 @@ export function previewEntry(entry: string, ctx: KindContext = USER): EntryPrevi
   }
 }
 
-export function rollText(text: string, ctx: KindContext = USER, depth = 0): { text: string; rolled: { token: string; value: string; error?: string }[] } {
+/** Replace each link that stands alone on its line with the text it links to, so prompts can include pages and other entries. */
+const INLINE_DEPTH = 4
+
+export function linkedBlock(link: string, title: string, body: string): string {
+  return `[${link} · ${title}]\n${body}\n[end ${link}]`
+}
+
+function linkEntry(kind: string, ref: string): string {
+  const k = kindFor(kind, USER)
+  const id = k?.resolve(ref.replace(/^"|"$/g, ''), USER)
+  return k && id ? `${k.kind}:${id}` : `${kind.toLowerCase()}:${toId(ref) || ref}`
+}
+
+export function claimLink(seen: Set<string>, kind: string, ref: string, part: string | null): boolean {
+  const entry = linkEntry(kind, ref)
+  const key = `${entry}#${part?.toLowerCase() ?? ''}`
+  if (seen.has(key) || seen.has(`${entry}#`)) return false
+  seen.add(key)
+  return true
+}
+
+function linksToHydrate(text: string, mentions: boolean): { kind: string; ref: string; part: string | null }[] {
+  const alone = new RegExp(`^${referencePattern().source}$`, 'i')
+  return text.split('\n').flatMap((line) => {
+    const m = alone.exec(line.trim())
+    if (m && !m[4] && m[5]?.toLowerCase() !== 'random') return [{ kind: m[2], ref: m[3], part: m[5] ?? null }]
+    if (!mentions) return []
+    return [...line.matchAll(referencePattern())].filter((r) => !r[4] && !r[5]).map((r) => ({ kind: r[2], ref: r[3], part: null }))
+  })
+}
+
+function topEntries(texts: string[], mentions: boolean): Set<string> {
+  return new Set(texts.flatMap((t) => linksToHydrate(t, mentions).map((l) => linkEntry(l.kind, l.ref))))
+}
+
+export function inlineLinks(text: string, depth = 0, seen: Set<string> = new Set(), mentions = true, ctx: KindContext = USER, top: Set<string> = new Set()): string {
+  if (depth >= INLINE_DEPTH) return text
+  const blockFor = (kind: string, rawRef: string, part: string | null): string | null => {
+    const ref = rawRef.replace(/^"|"$/g, '')
+    if (depth > 0 && top.has(linkEntry(kind, ref))) return null
+    if (!claimLink(seen, kind, ref, part)) return null
+    try {
+      const found = referenceText(kind, ref, part, ctx, depth === 0 ? 'full' : 'brief')
+      if (!found) return null
+      const link = `@${kind.toLowerCase()}:${rawRef}${part ? `#${part}` : ''}`
+      const body = withoutTitle(found.text, found.title)
+      return linkedBlock(link, found.title, depth === 0 ? inlineLinks(body, depth + 1, seen, mentions, ctx, top) : body)
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not include a linked entry')
+      return null
+    }
+  }
+  const alone = new RegExp(`^${referencePattern().source}$`, 'i')
+  const after: string[] = []
+  const lines = text.split('\n').map((line) => {
+    const m = alone.exec(line.trim())
+    if (m && !m[4] && m[5]?.toLowerCase() !== 'random') return blockFor(m[2], m[3], m[5] ?? null) ?? line
+    if (!mentions) return line
+    for (const r of line.matchAll(referencePattern())) {
+      if (r[4] || r[5]) continue
+      const block = blockFor(r[2], r[3], null)
+      if (block) after.push(block)
+    }
+    return line
+  })
+  return after.length ? `${lines.join('\n')}\n\n${after.join('\n\n')}` : lines.join('\n')
+}
+
+export function hydrateForAgent(text: string, ctx: KindContext = USER, mentions = true, seen: Set<string> = new Set()): string {
+  return hydrateAllForAgent([{ text, depth: 0 }], ctx, mentions, seen)[0]
+}
+
+export function hydrateAllForAgent(texts: { text: string; depth: number }[], ctx: KindContext = USER, mentions = true, seen: Set<string> = new Set()): string[] {
+  const top = topEntries(texts.filter((t) => t.depth === 0).map((t) => t.text), mentions)
+  return texts.map((t) => rollText(resolveIncludes(inlineLinks(t.text, t.depth, seen, mentions, ctx, top), ctx, true), ctx, 0, true).text)
+}
+
+export function rollText(text: string, ctx: KindContext = USER, depth = 0, cite = false): { text: string; rolled: { token: string; value: string; error?: string }[] } {
   const rolled: { token: string; value: string; error?: string }[] = []
   let replaced = false
   const out = text.replace(referencePattern(), (full, lead: string, rawKind: string, rawRef: string, rawAction?: string, rawPart?: string) => {
@@ -558,7 +619,7 @@ export function rollText(text: string, ctx: KindContext = USER, depth = 0): { te
         const value = action.run(id, ctx)
         rolled.push({ token, value })
         replaced = true
-        return `${lead}${value}`
+        return `${lead}${value}${cite ? ` (${token})` : ''}`
       } catch (err) {
         rolled.push({ token, value: token, error: err instanceof Error ? err.message : String(err) })
         return full
@@ -569,7 +630,7 @@ export function rollText(text: string, ctx: KindContext = USER, depth = 0): { te
         const value = rollEntry(`${rawKind}/${cleanRef}`, ctx)
         rolled.push({ token, value })
         replaced = true
-        return `${lead}${value}`
+        return `${lead}${value}${cite ? ` (${token})` : ''}`
       } catch (err) {
         rolled.push({ token, value: token, error: err instanceof Error ? err.message : String(err) })
         return full
@@ -578,7 +639,7 @@ export function rollText(text: string, ctx: KindContext = USER, depth = 0): { te
     return full
   })
   if (replaced && depth < 4) {
-    const next = rollText(out, ctx, depth + 1)
+    const next = rollText(out, ctx, depth + 1, cite)
     return { text: next.text, rolled: [...rolled, ...next.rolled] }
   }
   return { text: out, rolled }
@@ -649,6 +710,18 @@ export function kindOf(entry: string, ctx: KindContext = USER): { kind: Kind; id
 
 export function kindOfPageType(type: string | null | undefined): string {
   return everyKind().find((k) => k.pageTypes?.includes(type ?? ''))?.kind ?? pageKindOf(type)
+}
+
+export function entryExists(kindName: string, id: string | null, ctx: KindContext = USER): boolean {
+  const k = kindNamed(kindName, ctx)
+  if (!k) return false
+  if (!id) return true
+  try {
+    return k.resolve(id, ctx) !== null
+  } catch (err) {
+    if (isNotFound(err)) return false
+    throw err
+  }
 }
 
 export function isPageBacked(kind: string): boolean {

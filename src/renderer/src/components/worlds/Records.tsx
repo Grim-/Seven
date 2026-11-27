@@ -71,8 +71,8 @@ function LockNote({ f }: { f: WorldField }) {
   const lock = f.lock ?? 'open'
   return (
     <>
-      {f.visible === false && <span className="font-mono text-[9.5px] uppercase text-purple">hidden from agents</span>}
-      {lock !== 'open' && <span className="font-mono text-[9.5px] uppercase text-faint">{lock === 'locked' ? 'fixed' : lock === 'create_only' ? 'set once' : 'append only'}</span>}
+      {f.visible === false && <span className="font-label text-[9.5px] caps text-tint-purple">hidden from agents</span>}
+      {lock !== 'open' && <span className="font-label text-[9.5px] caps text-faint">{lock === 'locked' ? 'fixed' : lock === 'create_only' ? 'set once' : 'append only'}</span>}
     </>
   )
 }
@@ -90,10 +90,10 @@ function ScalarEditor({ f, value, onSave, onCancel }: { f: WorldField; value: un
       ) : (
         <Input value={v} type={f.kind === 'number' ? 'number' : 'text'} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commit()} />
       )}
-      <button title="Save" onClick={commit} className="p-1 text-ok hover:text-white">
+      <button title="Save" onClick={commit} className="p-1 text-ok hover:text-ink">
         <Check className="h-4 w-4" />
       </button>
-      <button title="Cancel" onClick={onCancel} className="p-1 text-dim hover:text-white">
+      <button title="Cancel" onClick={onCancel} className="p-1 text-dim hover:text-ink">
         <X className="h-4 w-4" />
       </button>
     </div>
@@ -128,9 +128,9 @@ function EntriesView({ f, entries, onSave }: { f: WorldField; entries: WorldEntr
                 </button>
               </div>
             ) : (
-              <span className="text-white/90">{withReferences(e.text)}</span>
+              <span className="text-ink/90">{withReferences(e.text)}</span>
             )}
-            <div className="font-mono text-[10px] text-faint">
+            <div className="font-ui text-[10px] text-faint">
               {e.timestamp ?? ''}
               {f.weighted ? ` · weight ${e.weight ?? 5}` : ''}
               {e.ref ? ` · → ${e.ref}` : ''}
@@ -149,7 +149,7 @@ function EntriesView({ f, entries, onSave }: { f: WorldField; entries: WorldEntr
             <button title={e.locked ? 'Unfix (agents can edit it)' : 'Fix (agents can no longer edit or remove it)'} onClick={() => set(entries.map((x, j) => (j === i ? { ...x, locked: !x.locked } : x)))} className="text-dim hover:text-accent">
               {e.locked ? <Lock className="h-3.5 w-3.5" /> : <LockOpen className="h-3.5 w-3.5" />}
             </button>
-            <button title="Edit" onClick={() => (setEditing(i), setText(e.text))} className="text-dim hover:text-white">
+            <button title="Edit" onClick={() => (setEditing(i), setText(e.text))} className="text-dim hover:text-ink">
               <Pencil className="h-3.5 w-3.5" />
             </button>
             <button title="Remove" onClick={() => set(entries.filter((_, j) => j !== i))} className="text-dim hover:text-alert">
@@ -190,14 +190,14 @@ function GaugeView({ f, value, onSave }: { f: WorldField; value: WorldMapValue; 
         return (
           <div key={target} className="group flex flex-col gap-1">
             <div className="flex items-center gap-2 text-[12.5px]">
-              <span className="text-white">{target}</span>
-              {bar && <span className="font-mono text-[11px] text-accent">{n}</span>}
+              <span className="text-ink">{target}</span>
+              {bar && <span className="font-ui text-[11px] text-accent">{n}</span>}
               <button title="Remove" onClick={() => void onSave(Object.fromEntries(Object.entries(value).filter(([k]) => k !== target)))} className="ml-auto text-dim opacity-0 hover:text-alert group-hover:opacity-100">
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
             {bar && (
-              <div className="relative h-1.5 bg-white/10">
+              <div className="relative h-1.5 bg-ink/10">
                 <div className="absolute inset-y-0 bg-accent" style={min < 0 ? { left: `${Math.min(zero, pct)}%`, width: `${Math.abs(pct - zero)}%` } : { left: 0, width: `${pct}%` }} />
               </div>
             )}
@@ -234,21 +234,21 @@ function FieldValue({ name, f, as, value, onSave }: { name: string; f: WorldFiel
     <div className="group flex items-start gap-2">
       <div className="min-w-0 flex-1">
         {as === 'quote' ? (
-          <div className="border-l-2 border-accent/60 pl-3 italic text-white/90">{text}</div>
+          <div className="border-l-2 border-accent/60 pl-3 italic text-ink/90">{text}</div>
         ) : as === 'chips' ? (
           <div className="flex flex-wrap gap-1">
             {(Array.isArray(value) ? value : value ? [value] : []).map((x) => (
-              <span key={String(x)} className="border border-line/60 px-2 py-0.5 font-mono text-[11px] text-teal">
+              <span key={String(x)} className="border border-line/60 px-2 py-0.5 font-ui text-[11px] text-secondary">
                 {String(x)}
               </span>
             ))}
             {!value || (Array.isArray(value) && !value.length) ? <span className="text-faint">—</span> : null}
           </div>
         ) : (
-          <Markdown text={text} className={cn('text-white/90', as === 'stat' ? 'text-[13px]' : 'text-[13.5px] leading-relaxed')} />
+          <Markdown text={text} className={cn('text-ink/90', as === 'stat' ? 'text-[13px]' : 'text-[13.5px] leading-relaxed')} />
         )}
       </div>
-      <button title="Edit" onClick={() => setEditing(true)} className="shrink-0 text-dim opacity-0 hover:text-white group-hover:opacity-100">
+      <button title="Edit" onClick={() => setEditing(true)} className="shrink-0 text-dim opacity-0 hover:text-ink group-hover:opacity-100">
         <Pencil className="h-3.5 w-3.5" />
       </button>
     </div>
@@ -263,14 +263,14 @@ function FieldChange({ changes, name }: { changes: WorldChanges; name: string })
 function Group({ g, e, changes, onSave, accent }: { g: LaidGroup; e: WorldEntity; changes: WorldChanges; onSave: Save; accent: string }) {
   if (g.layout === 'stats')
     return (
-      <div className="border border-line/40 bg-black/40 p-2.5">
-        <div className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: accent }}>
+      <div className="border border-line/40 tone-panel-40 p-2.5">
+        <div className="mb-1.5 font-label text-[10px] font-semibold caps-14 " style={{ color: accent }}>
           {g.label}
         </div>
         <div className="flex flex-col gap-1">
           {g.fields.map((x) => (
             <div key={x.name} className="grid grid-cols-[7rem_1fr_auto] items-start gap-2 text-[12.5px]">
-              <span className="truncate font-mono text-[10.5px] uppercase text-faint" title={x.f.describe}>
+              <span className="truncate font-label text-[10.5px] caps text-faint" title={x.f.describe}>
                 {x.name.replace(/_/g, ' ')}
                 {x.f.display?.unit ? ` (${x.f.display.unit})` : ''}
               </span>
@@ -284,12 +284,12 @@ function Group({ g, e, changes, onSave, accent }: { g: LaidGroup; e: WorldEntity
   return (
     <>
       {g.fields.map((x) => (
-        <div key={x.name} className="border border-line/40 bg-black/40 p-2.5">
+        <div key={x.name} className="border border-line/40 tone-panel-40 p-2.5">
           <div className="mb-1.5 flex items-center gap-2">
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: accent }} title={x.f.describe}>
+            <span className="font-label text-[10px] font-semibold caps-14 " style={{ color: accent }} title={x.f.describe}>
               {x.name.replace(/_/g, ' ')}
             </span>
-            {Array.isArray(e[x.name]) && (x.f.kind === 'list' || x.f.kind === 'log') && <span className="font-mono text-[10px] text-faint">{(e[x.name] as unknown[]).length}</span>}
+            {Array.isArray(e[x.name]) && (x.f.kind === 'list' || x.f.kind === 'log') && <span className="font-ui text-[10px] text-faint">{(e[x.name] as unknown[]).length}</span>}
             <span className="ml-auto flex items-center gap-2">
               <FieldChange changes={changes} name={x.name} />
               <LockNote f={x.f} />
@@ -332,14 +332,14 @@ function Detail({ worldId, schema, type, id, entity, changes, all, onDeleted }: 
           {t.display?.glyph ?? '◈'}
         </span>
         <div className="min-w-0">
-          <div className="truncate text-[18px] font-semibold text-white">{String(entity[t.label] || id)}</div>
-          <div className="font-mono text-[10.5px] text-faint">
+          <div className="truncate text-[18px] font-semibold text-ink">{String(entity[t.label] || id)}</div>
+          <div className="font-ui text-[10.5px] text-faint">
             {t.noun} · {id}
           </div>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
           {badges.map((b) => (
-            <span key={b.name} className="border px-2 py-0.5 font-mono text-[10.5px] uppercase" style={{ borderColor: accent, color: accent }} title={b.name}>
+            <span key={b.name} className="border px-2 py-0.5 font-label text-[10.5px] caps" style={{ borderColor: accent, color: accent }} title={b.name}>
               {Array.isArray(entity[b.name]) ? (entity[b.name] as unknown[]).length : String(entity[b.name] ?? '')}
             </span>
           ))}
@@ -364,9 +364,9 @@ function Detail({ worldId, schema, type, id, entity, changes, all, onDeleted }: 
               ))}
               {c === 'rail' &&
                 backrefs.map((b) => (
-                  <div key={b.name} className="border border-line/40 bg-black/40 p-2.5">
-                    <div className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">{b.name} (referenced by)</div>
-                    <div className="text-[12.5px] text-white/90">{b.hits.length ? b.hits.join(', ') : (b.empty ?? 'none')}</div>
+                  <div key={b.name} className="border border-line/40 tone-panel-40 p-2.5">
+                    <div className="mb-1 font-label text-[10px] font-semibold caps-14 text-faint">{b.name} (referenced by)</div>
+                    <div className="text-[12.5px] text-ink/90">{b.hits.length ? b.hits.join(', ') : (b.empty ?? 'none')}</div>
                   </div>
                 ))}
             </div>
@@ -413,7 +413,7 @@ export function WorldRecords({ worldId, schema, initialType, initialKey }: { wor
           <button
             key={k}
             onClick={() => (setType(k), setSelected(null))}
-            className={cn('flex items-center gap-1.5 border px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.12em]', type === k ? 'bg-white/5' : 'border-line/40 text-dim hover:text-white')}
+            className={cn('flex items-center gap-1.5 border px-2.5 py-1 font-label text-[11px] caps-12 ', type === k ? 'bg-ink/5' : 'border-line/40 text-dim hover:text-ink')}
             style={type === k ? { borderColor: accentOf(schema, k), color: accentOf(schema, k) } : undefined}
           >
             {schema.types[k].display?.glyph ?? '◈'} {schema.types[k].plural} <span className="text-faint">{Object.keys(all[k] ?? {}).length}</span>

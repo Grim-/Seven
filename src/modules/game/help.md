@@ -12,4 +12,4 @@ All of it is one shared pool: every world and character uses the same definition
 
 A starter set is put in the first time each list is opened. Deleting entries never brings it back.
 
-- **Agent tools**: `character_game_state` inspects a character's live stats, resources, classes, traits, inventory, slots, buffs, and abilities; `character_game` joins/leaves, adjusts resources/health, gives/equips/uses items, applies/removes buffs, and casts abilities; `save_game_def` creates or updates shared Game rules/templates (`game_class`, `game_trait`, `game_buff`, `game_item`, `game_stat`, etc.).
+- **Agent tools**: `character_game_state` inspects a character's live stats, resources, classes, traits, inventory, slots, buffs, and abilities; `character_game` joins/leaves, adjusts resources/health, gives/equips/uses items, applies/removes buffs, and casts abilities; `save_game_def` creates or updates shared Game rules/templates (`game_class`, `trait`, `buff`, `item`, `stat`, etc.).

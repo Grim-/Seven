@@ -4,6 +4,7 @@ import { registerDefType, type StarterDef } from './defs'
 
 interface TemplateSpec {
   type: string
+  kind: string
   label: string
   plural: string
   icon: string
@@ -15,7 +16,13 @@ const NAMED = new Set(['id', 'label'])
 const TEMPLATE_HIDDEN = new Set(['id', 'label', 'description', 'sourceClass', 'permanent'])
 
 import {
+  ABILITY_KIND,
   ABILITY_TEMPLATES,
+  BUFF_KIND,
+  CHARACTER_KIND,
+  CREATURE_KIND,
+  ITEM_KIND,
+  TRAIT_KIND,
   BUFF_TEMPLATES,
   CHARACTER_TEMPLATES,
   CLASS_TEMPLATES,
@@ -65,6 +72,7 @@ function entityTemplate(spec: TemplateSpec & { components: string }): void {
 
 componentTemplate({
   type: BUFF_TEMPLATES,
+  kind: BUFF_KIND,
   label: 'Buff',
   plural: 'Buffs',
   icon: 'sparkle',
@@ -112,6 +120,7 @@ componentTemplate({
 
 componentTemplate({
   type: TRAIT_TEMPLATES,
+  kind: TRAIT_KIND,
   label: 'Trait',
   plural: 'Traits',
   icon: 'sparkles',
@@ -185,6 +194,7 @@ componentTemplate({
 
 componentTemplate({
   type: ABILITY_TEMPLATES,
+  kind: ABILITY_KIND,
   label: 'Ability',
   plural: 'Abilities',
   icon: 'wand-sparkles',
@@ -238,6 +248,7 @@ const ATTACK = {
 
 componentTemplate({
   type: ITEM_TEMPLATES,
+  kind: ITEM_KIND,
   label: 'Item',
   plural: 'Items',
   icon: 'package',
@@ -254,6 +265,7 @@ componentTemplate({
 
 entityTemplate({
   type: CHARACTER_TEMPLATES,
+  kind: CHARACTER_KIND,
   label: 'Character template',
   plural: 'Character templates',
   icon: 'person-standing',
@@ -286,6 +298,7 @@ entityTemplate({
 
 entityTemplate({
   type: CREATURE_TEMPLATES,
+  kind: CREATURE_KIND,
   label: 'Creature',
   plural: 'Creatures',
   icon: 'skull',

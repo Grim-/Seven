@@ -19,7 +19,7 @@ export function ShellAddTile({ add }: { add: ShellAdd }) {
   return (
     <button onClick={add.onClick} className="shell-add flex min-w-0 flex-col items-center justify-center gap-1.5">
       <span className="flex aspect-[4/3] w-full items-center justify-center [&_svg]:h-[30%] [&_svg]:w-[30%]">{add.icon}</span>
-      <span className="pb-2 font-mono text-[11px] uppercase tracking-[0.1em]">{add.label}</span>
+      <span className="pb-2 font-label text-[11px] caps-10 ">{add.label}</span>
     </button>
   )
 }

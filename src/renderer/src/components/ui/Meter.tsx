@@ -3,7 +3,7 @@ import { cn } from '../../lib/cn'
 
 export type MeterTone = 'cool' | 'warm' | 'hot'
 
-export const METER_TEXT: Record<MeterTone, string> = { cool: 'text-white/85', warm: 'text-accent', hot: 'text-alert' }
+export const METER_TEXT: Record<MeterTone, string> = { cool: 'text-ink/85', warm: 'text-accent', hot: 'text-alert' }
 
 export function meterTone(value: number | null): MeterTone {
   return value !== null && value >= 0.9 ? 'hot' : value !== null && value >= 0.75 ? 'warm' : 'cool'
@@ -24,7 +24,7 @@ export function Meter({ label, value, text, note }: { label: string; value: numb
   const tone = meterTone(value)
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-baseline gap-2 font-mono text-[10.5px] uppercase tracking-[0.16em]">
+      <div className="flex items-baseline gap-2 font-label text-[10.5px] caps-16 ">
         <span className="text-faint">{label}</span>
         <span className={cn('ml-auto normal-case tabular-nums', METER_TEXT[tone])}>{text}</span>
       </div>

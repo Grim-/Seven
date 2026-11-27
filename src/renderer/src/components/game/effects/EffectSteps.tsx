@@ -17,8 +17,8 @@ export function EffectSteps({ nodes, path, compact = false }: { nodes: EffectNod
   const anchor = useRef<HTMLSpanElement>(null)
   const palette = (
     <>
-      <span ref={anchor} className="block h-0.5 bg-accent shadow-[0_0_8px_var(--color-accent)]" />
-      <FloatLayer anchor={anchor} onClose={() => scope.setAdding(null)} align="start" className="notch-sm w-[min(40rem,94vw)] border-accent/60 bg-[#0b0c10]">
+      <span ref={anchor} className="block h-0.5 bg-accent shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_calc(100%*var(--glow)),transparent)]" />
+      <FloatLayer anchor={anchor} onClose={() => scope.setAdding(null)} align="start" className="notch-sm w-[min(40rem,94vw)] border-accent/60 bg-surface">
         <EffectPalette choices={scope.choices} onClose={() => scope.setAdding(null)} onPick={(type) => addingAt !== null && scope.insert({ path, index: addingAt }, newPiece(type))} />
       </FloatLayer>
     </>
@@ -43,7 +43,7 @@ export function EffectSteps({ nodes, path, compact = false }: { nodes: EffectNod
       {!nodes.length && addingAt === null && <span className="px-1 py-1 text-[12.5px] text-faint">Nothing happens.</span>}
       {addingAt !== null && addingAt >= nodes.length && palette}
       {addingAt === null && (
-        <button type="button" onClick={() => scope.setAdding({ path, index: nodes.length })} className="mt-1.5 inline-flex items-center gap-2 self-start border border-dashed border-[#2f3340] px-2.5 py-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-dim hover:border-accent hover:text-accent">
+        <button type="button" onClick={() => scope.setAdding({ path, index: nodes.length })} className="mt-1.5 inline-flex items-center gap-2 self-start border border-dashed border-ink/15 px-2.5 py-1.5 font-label text-[10.5px] font-bold caps-12 text-dim hover:border-accent hover:text-accent">
           <Plus className="h-3 w-3" />
           {compact ? 'Add' : 'Add effect'}
         </button>

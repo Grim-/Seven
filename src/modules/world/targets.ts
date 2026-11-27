@@ -1,8 +1,9 @@
 import { placedKey } from '@shared/effects'
 import { mapObjects } from '@shared/maps'
+import { actorLink, npcActorId } from '@shared/worldNpcs'
 import { playTargetSources, type PlayTargetCandidate } from '../../engine/cards/targets'
 import { maps } from '../../engine/maps/store'
-import { saveInPlay } from '../../engine/worlds/playLayer'
+import { npcs } from '../../engine/worlds/npcs'
 import { worlds } from '../../engine/worlds/store'
 
 function worldPlaced(world: string): PlayTargetCandidate[] {
@@ -30,15 +31,20 @@ playTargetSources.add({
   order: 10,
   list: (ctx) => {
     if (!ctx.world) return []
-    const save = saveInPlay(ctx.world, false)
-    const creatures: PlayTargetCandidate[] = (save?.creatures ?? []).map((c) => ({
-      id: `creature:${c.uid}`,
-      name: c.name,
-      link: c.name,
-      ref: { creature: c.uid },
-      sheetId: null,
-      hittable: true
-    }))
-    return [...creatures, ...worldPlaced(ctx.world)]
+    const worldNpcs: PlayTargetCandidate[] = npcs
+      .list(ctx.world, 'play')
+      .filter((n) => !n.archetype)
+      .map((n) => {
+        const actorId = npcActorId(ctx.world!, n.id)
+        return {
+          id: `sheet:${actorId}`,
+          name: n.title,
+          link: actorLink(actorId),
+          ref: { sheet: actorId },
+          sheetId: actorId,
+          hittable: Boolean(n.game)
+        }
+      })
+    return [...worldNpcs, ...worldPlaced(ctx.world)]
   }
 })

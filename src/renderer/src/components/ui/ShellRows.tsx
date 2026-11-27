@@ -25,10 +25,10 @@ export function ShellRows({ shellId = 'default', items, adds, bind, scale: _scal
   const { template, setHeaderRef, startResize, resetWidths, dragging } = useColumnResize(`shell.${shellId}`, DEFAULT_COLS)
 
   return (
-    <div className="flex w-full min-w-0 flex-col overflow-x-auto font-mono text-[12px]">
+    <div className="flex w-full min-w-0 flex-col overflow-x-auto font-ui text-[12px]">
       <div className="min-w-full w-max">
         <div
-          className="grid h-7 w-full items-center border-b border-line/40 px-2 text-[10px] uppercase tracking-[0.16em] text-faint"
+          className="grid h-7 w-full items-center border-b border-line/40 px-2 text-[10px] caps-16 text-faint"
           style={{ gridTemplateColumns: template }}
         >
           {HEADERS.map((col, idx) => {
@@ -46,7 +46,7 @@ export function ShellRows({ shellId = 'default', items, adds, bind, scale: _scal
                     type="button"
                     onClick={() => onColumnSort?.(col.sortKey!)}
                     className={cn(
-                      'flex min-w-0 items-center gap-1 truncate uppercase transition-colors hover:text-white',
+                      'flex min-w-0 items-center gap-1 truncate caps transition-colors hover:text-ink',
                       col.right && 'ml-auto',
                       activeDir ? 'text-accent' : 'text-faint'
                     )}
@@ -104,7 +104,7 @@ export function ShellRows({ shellId = 'default', items, adds, bind, scale: _scal
                     {item.icon}
                   </ShellIcon>
                 )}
-                <span className={`truncate uppercase tracking-[0.05em] text-white ${b.picked ? 'shell-cursor' : ''}`} title={item.title}>
+                <span className={`truncate caps-5 text-ink ${b.picked ? 'shell-cursor' : ''}`} title={item.title}>
                   {item.title}
                 </span>
               </span>
@@ -132,7 +132,7 @@ export function ShellRows({ shellId = 'default', items, adds, bind, scale: _scal
       {adds.length > 0 && (
         <div className="flex gap-2 pt-2">
           {adds.map((a) => (
-            <button key={a.label} onClick={a.onClick} className="shell-add flex items-center gap-1.5 px-2.5 py-1 text-[11px] uppercase tracking-[0.1em]">
+            <button key={a.label} onClick={a.onClick} className="shell-add flex items-center gap-1.5 px-2.5 py-1 text-[11px] caps-10 ">
               <span className="flex h-4 w-4 items-center justify-center">{a.icon}</span>
               {a.label}
             </button>

@@ -20,7 +20,7 @@ export function PartyHud({
   if (!playing.length) return null
 
   return (
-    <div className="pointer-events-auto flex w-64 flex-col border border-line/60 bg-black/90">
+    <div className="pointer-events-auto flex w-64 flex-col border border-line/60 tone-panel-90">
       {playing.map((t) => (
         <GamePortrait
           key={t.visitor.sheet}

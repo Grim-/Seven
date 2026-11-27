@@ -21,7 +21,7 @@ import { NoteCards, filledNotes } from './NoteCards'
 
 
 function Loading({ page }: { page: Page | null | undefined }) {
-  if (page === undefined) return <div className="p-3 font-mono text-[11px] text-dim">Loading…</div>
+  if (page === undefined) return <div className="p-3 font-ui text-[11px] text-dim">Loading…</div>
   return <EmptyState title="Deleted">This entry no longer exists.</EmptyState>
 }
 
@@ -117,12 +117,12 @@ export function ExerciseScreen({ id }: KindScreenProps) {
           <div className="flex min-w-[240px] flex-1 flex-col gap-2.5">
             <ExerciseGuide ex={ex} />
             {!ex.how.length && !ex.dos.length && !ex.donts.length && !ex.easier && <div className="text-[12.5px] text-faint">Nothing written yet. Edit it, or ask an agent to fill it in.</div>}
-            <div className="font-mono text-[11px] text-dim">{last ? <>Last ({last.date}): <span className="text-white">{valuesText(last.values)}</span></> : <span className="text-faint">Not logged yet</span>}</div>
+            <div className="font-ui text-[11px] text-dim">{last ? <>Last ({last.date}): <span className="text-ink">{valuesText(last.values)}</span></> : <span className="text-faint">Not logged yet</span>}</div>
             {usedIn.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-dim">
                 In
                 {usedIn.map((w) => (
-                  <button key={w.id} onClick={() => openEntry('workout', w.id)} onContextMenu={(e) => entryMenuAt(e, 'workout', w.id, w.title)} className="border border-line/50 px-1.5 py-0.5 text-white/85 hover:border-accent">
+                  <button key={w.id} onClick={() => openEntry('workout', w.id)} onContextMenu={(e) => entryMenuAt(e, 'workout', w.id, w.title)} className="border border-line/50 px-1.5 py-0.5 text-ink/85 hover:border-accent">
                     {w.title}
                   </button>
                 ))}
@@ -152,7 +152,7 @@ function NumberBox({ value, title, onValue }: { value: number; title: string; on
         const n = Math.round(Number(e.target.value))
         if (e.target.value.trim() && Number.isFinite(n) && n >= 0) onValue(n)
       }}
-      className="h-7 w-16 font-mono text-[12px]"
+      className="h-7 w-16 font-ui text-[12px]"
     />
   )
 }
@@ -180,7 +180,7 @@ export function WorkoutEntryScreen({ id }: KindScreenProps) {
       </EntryHeader>
       {editing ? (
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.12em] text-faint">
+          <div className="flex items-center gap-2 font-label text-[10.5px] caps-12 text-faint">
             <span className="flex-1">Exercise</span>
             <span className="w-16">Sets</span>
             <span className="w-16">Min</span>
@@ -189,7 +189,7 @@ export function WorkoutEntryScreen({ id }: KindScreenProps) {
           </div>
           {items.map((item, i) => (
             <div key={`${item.exercise}${i}`} className="flex items-center gap-2 border-b border-line/20 py-1">
-              <button onClick={() => openEntry('exercise', item.exercise)} onContextMenu={(e) => entryMenuAt(e, 'exercise', item.exercise, titleOf(exercises, item.exercise), [{ label: 'Remove from this workout', onSelect: () => put(items.filter((_, j) => j !== i)) }])} className="min-w-0 flex-1 truncate text-left text-[13.5px] text-white hover:text-accent">
+              <button onClick={() => openEntry('exercise', item.exercise)} onContextMenu={(e) => entryMenuAt(e, 'exercise', item.exercise, titleOf(exercises, item.exercise), [{ label: 'Remove from this workout', onSelect: () => put(items.filter((_, j) => j !== i)) }])} className="min-w-0 flex-1 truncate text-left text-[13.5px] text-ink hover:text-accent">
                 {titleOf(exercises, item.exercise)}
               </button>
               <NumberBox value={item.sets} title="Sets" onValue={(sets) => change(i, { sets })} />
@@ -209,7 +209,7 @@ export function WorkoutEntryScreen({ id }: KindScreenProps) {
       ) : null}
       {overview && (
         <div className="flex flex-col gap-2">
-          <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">History</span>
+          <span className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">History</span>
           <HistoryView overview={overview} workout={page.id} />
         </div>
       )}

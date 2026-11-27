@@ -15,9 +15,9 @@ export function ResourceBars({ resources, compact = false, className }: { resour
     <div className={cn('flex flex-col', compact ? 'gap-0.5' : 'gap-1', className)}>
       {resources.map((r) => (
         <div key={r.stat} className="flex items-center gap-1.5" title={`${r.label} ${Math.round(r.current)} / ${Math.round(r.max)}`}>
-          {!compact && <span className="w-14 shrink-0 truncate font-mono text-[10px] uppercase tracking-[0.08em] text-faint">{r.label}</span>}
+          {!compact && <span className="w-14 shrink-0 truncate font-label text-[10px] caps-8 text-faint">{r.label}</span>}
           <GameBar value={r.current} max={r.max} colour={r.colour} size={compact ? 'xs' : 'sm'} className="flex-1" />
-          {!compact && <span className="w-14 shrink-0 text-right font-mono text-[10.5px] text-dim">{`${Math.round(r.current)}/${Math.round(r.max)}`}</span>}
+          {!compact && <span className="w-14 shrink-0 text-right font-ui text-[10.5px] text-dim">{`${Math.round(r.current)}/${Math.round(r.max)}`}</span>}
         </div>
       ))}
     </div>

@@ -104,6 +104,11 @@ export function pageRef(pages: PageMeta[], p: PageMeta): string {
   return pagePath(pages, p.id)
 }
 
+export function entryRef(kind: string, id: string): string {
+  const pages = useData.getState().pages
+  return `${kind}/${pages.some((p) => p.id === id) ? pagePath(pages, id) : id}`
+}
+
 export function entryLink(kind: string, id: string): string {
   const pages = useData.getState().pages
   return linkFor(kind, pages.some((p) => p.id === id) ? pagePath(pages, id) : id)

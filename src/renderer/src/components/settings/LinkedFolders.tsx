@@ -54,9 +54,9 @@ function Detail({ folder }: { folder: LinkedFolder }) {
   const toggleAgent = (id: string) => setDraft({ ...draft, agents: draft.agents.includes(id) ? draft.agents.filter((a) => a !== id) : [...draft.agents, id] })
 
   return (
-    <div className="border-l-2 border-l-accent/60 bg-black/30">
+    <div className="border-l-2 border-l-accent/60 tone-panel-30">
       <SettingRow label="Name" hint={`Agents use it as @${draft.name || 'name'}/path. Letters, numbers, - and _.`}>
-        <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-') })} className="w-56 font-mono" />
+        <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-') })} className="w-56 font-ui" />
       </SettingRow>
       <SettingRow label="Access" hint="Writes still follow each agent's permission mode and approvals.">
         <Select
@@ -81,7 +81,7 @@ function Detail({ folder }: { folder: LinkedFolder }) {
       </SettingRow>
       <SettingRow wide label="Off limits" hint="One pattern per line, relative to the folder: Private/**, *.pdf, .obsidian/**. Agents can't list, read, search or change anything that matches.">
         <div className="flex w-full flex-col gap-2">
-          <Textarea value={excludeText} onChange={(e) => setExcludeText(e.target.value)} rows={5} className="font-mono text-[12px]" placeholder={'.obsidian/**\nPrivate/**'} />
+          <Textarea value={excludeText} onChange={(e) => setExcludeText(e.target.value)} rows={5} className="font-ui text-[12px]" placeholder={'.obsidian/**\nPrivate/**'} />
           <div>
             <Button size="sm" variant="secondary" icon={<FolderPlus />} onClick={() => void addExclusion()}>
               Add a subfolder…
@@ -97,7 +97,7 @@ function Detail({ folder }: { folder: LinkedFolder }) {
               <button
                 key={a.id}
                 onClick={() => toggleAgent(a.id)}
-                className={cn('flex items-center gap-2 border px-2 py-1 text-[12.5px]', on ? 'border-accent bg-accent/10 text-white' : 'border-line/60 text-dim hover:text-white')}
+                className={cn('flex items-center gap-2 border px-2 py-1 text-[12.5px]', on ? 'border-accent bg-accent/10 text-ink' : 'border-line/60 text-dim hover:text-ink')}
               >
                 <AgentAvatar agent={a} size={18} />
                 {a.name}

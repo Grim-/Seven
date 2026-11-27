@@ -84,17 +84,17 @@ export function ExercisesScreen({
           {list.map((e) => {
             return (
               <GridRow key={e.id} onClick={() => onPick(e.id)} selected={current === e.id}>
-                <span className="truncate text-[13px] font-semibold text-white">
+                <span className="truncate text-[13px] font-semibold text-ink">
                   {showName(e.name)}
                 </span>
-                <span className="truncate font-mono text-[12px] text-dim">
+                <span className="truncate font-ui text-[12px] text-dim">
                   {e.t.last ? `${shortDate(e.t.last)} · ${agoText(e.t.last, today)}` : 'never'}
                 </span>
-                <span className="truncate text-right font-mono text-[13px] font-semibold text-accent">
+                <span className="truncate text-right font-ui text-[13px] font-semibold text-accent">
                   {e.t.inPeriod.toLocaleString()}
                   <UnitLabel unit={e.unit} />
                 </span>
-                <span className="text-right font-mono text-[13px] text-white">
+                <span className="text-right font-ui text-[13px] text-ink">
                   {e.t.total.toLocaleString()}
                 </span>
               </GridRow>

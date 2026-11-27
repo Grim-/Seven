@@ -55,19 +55,20 @@ function EquipmentPanel({ comp, entity, changed }: PanelProps<Equipment>) {
       title="Equipment"
       aside={`${comp.comps.length} equipped`}
       action={
-        <span className="flex items-center gap-1 font-mono text-[11px] font-bold text-cyan">
+        <span className="flex items-center gap-1 font-ui text-[11px] font-bold text-tint-cyan">
           <Shield className="h-3.5 w-3.5" />
           {armour} AC
         </span>
       }
-      bodyClassName="gap-2.5 p-3"
+      bodyClassName="gap-2 p-2.5"
     >
-      <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+      <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
         {gearSlots.map(({ id: slot, label, icon }) => {
           const worn = comp.inSlot(slot)
           return (
             <ItemSlot
               key={slot}
+              compact
               from={slotFrom(slot)}
               label={label}
               icon={icon ? <KindIcon name={icon} /> : undefined}
@@ -84,14 +85,15 @@ function EquipmentPanel({ comp, entity, changed }: PanelProps<Equipment>) {
       </div>
 
       {beltSlots.length > 0 && (
-        <div className="flex flex-col gap-1 border-t border-line/30 pt-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Utility Belt</span>
-          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
+        <div className="flex flex-col gap-1 border-t border-line/30 pt-1.5">
+          <span className="font-label text-[10px] caps-12 text-faint">Utility Belt</span>
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
             {beltSlots.map(({ id: slot, label, icon }) => {
               const worn = comp.inSlot(slot)
               return (
                 <ItemSlot
                   key={slot}
+                  compact
                   from={slotFrom(slot)}
                   label={label}
                   icon={icon ? <KindIcon name={icon} /> : undefined}
@@ -110,11 +112,11 @@ function EquipmentPanel({ comp, entity, changed }: PanelProps<Equipment>) {
       )}
 
       {activeSlot && (
-        <div className="flex flex-wrap items-center gap-2 border border-line/40 bg-black/50 px-2.5 py-2">
-          <span className="font-mono text-[10.5px] uppercase text-cyan">{comp.label(activeSlot)}:</span>
+        <div className="flex flex-wrap items-center gap-2 border border-line/40 tone-panel-50 px-2.5 py-2">
+          <span className="font-label text-[10.5px] caps text-tint-cyan">{comp.label(activeSlot)}:</span>
           {activeWorn ? (
             <>
-              <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-white">{itemName(activeWorn)}</span>
+              <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">{itemName(activeWorn)}</span>
               <Button size="sm" variant="ghost" icon={<X />} onClick={() => act(comp.unequip(activeSlot))}>
                 Take off
               </Button>

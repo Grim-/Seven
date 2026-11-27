@@ -22,7 +22,7 @@ function PartFace({ part, onRemove }: { part: Drawn; onRemove: () => void }) {
   return (
     <div className="shell-enter group relative min-w-0">
       <DrawnFace value={part.value} from={part.from} />
-      <button type="button" title="Take out" onClick={onRemove} className="notch-sm absolute right-1.5 top-1.5 z-10 border border-line bg-black/85 p-1 text-dim opacity-0 transition-opacity hover:border-alert hover:text-alert group-hover:opacity-100">
+      <button type="button" title="Take out" onClick={onRemove} className="notch-sm absolute right-1.5 top-1.5 z-10 border border-line tone-well-85 p-1 text-dim opacity-0 transition-opacity hover:border-alert hover:text-alert group-hover:opacity-100">
         <X className="h-3.5 w-3.5" />
       </button>
     </div>
@@ -35,8 +35,8 @@ function RecentScene({ scene, onUse, onForget }: { scene: SavedScene; onUse: () 
     <div className="group flex items-center gap-2.5 border-b border-l-2 border-b-line/30 border-l-transparent px-2 py-2 transition-colors hover:border-l-accent hover:bg-accent/5">
       {agent && <AgentAvatar agent={agent} size={28} />}
       <button type="button" onClick={onUse} title="Use this again" className="min-w-0 flex-1 text-left">
-        <div className="truncate text-[12.5px] text-white">{scene.line.trim() || scene.parts.map((p) => p.from || p.value).join(', ') || 'Empty scene'}</div>
-        <div className="font-mono text-[10px] text-faint">{[agent?.name, `${scene.parts.length} part${scene.parts.length === 1 ? '' : 's'}`, formatRelative(scene.at)].filter(Boolean).join(' · ')}</div>
+        <div className="truncate text-[12.5px] text-ink">{scene.line.trim() || scene.parts.map((p) => p.from || p.value).join(', ') || 'Empty scene'}</div>
+        <div className="font-ui text-[10px] text-faint">{[agent?.name, `${scene.parts.length} part${scene.parts.length === 1 ? '' : 's'}`, formatRelative(scene.at)].filter(Boolean).join(' · ')}</div>
       </button>
       <button type="button" title="Forget this scene" onClick={onForget} className="p-0.5 text-faint opacity-0 hover:text-alert group-hover:opacity-100">
         <X className="h-3.5 w-3.5" />
@@ -88,7 +88,7 @@ export function SceneBuilder({ conv, agentId, running, onClose }: { conv: Conver
       bodyClassName="min-h-0 flex-1 overflow-y-auto"
       footer={
         <>
-          <span className="mr-auto self-center font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
+          <span className="mr-auto self-center font-label text-[10.5px] caps-14 text-faint">
             {running ? 'Wait for the reply to finish' : message ? `Sends ${[line.trim() ? 'your line' : '', parts.length ? `${parts.length} part${parts.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ')}` : 'Add something to send'}
           </span>
           <Button variant="ghost" onClick={onClose}>
@@ -150,7 +150,7 @@ export function SceneBuilder({ conv, agentId, running, onClose }: { conv: Conver
               }}
               onDragLeave={() => setOver(false)}
               onDrop={drop}
-              className={cn('notch min-h-[170px] border border-dashed p-3 transition-colors', over ? 'border-accent bg-accent/[0.07]' : 'border-line/60 bg-black/30')}
+              className={cn('notch min-h-[170px] border border-dashed p-3 transition-colors', over ? 'border-accent bg-accent/[0.07]' : 'border-line/60 tone-panel-30')}
             >
               {parts.length ? (
                 <FaceGrid scale={0.8}>
@@ -161,17 +161,17 @@ export function SceneBuilder({ conv, agentId, running, onClose }: { conv: Conver
               ) : (
                 <div className="flex h-full min-h-[146px] flex-col items-center justify-center gap-2 text-center">
                   <Drama className="h-8 w-8 text-accent/40" />
-                  <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-dim">Nothing set yet</span>
+                  <span className="font-label text-[11px] caps-16 text-dim">Nothing set yet</span>
                   <span className="max-w-sm text-[12.5px] text-faint">Add a scene card, a scenario page or characters, draw from a repo or deck, or drop pages and files here.</span>
                 </div>
               )}
             </div>
           </StepSection>
           <StepSection step={++step} label={isNew ? 'Opening line' : 'What happens'} note="optional">
-            <LinkTextarea rows={4} value={line} onValue={setLine} placeholder={isNew ? 'How it begins…' : 'The scene changes…'} className="notch-sm min-h-24 resize-y border border-line bg-black/60 px-3 py-2.5 text-[14px] leading-relaxed text-white inset-field glow-focus placeholder:text-dim/60" />
+            <LinkTextarea rows={4} value={line} onValue={setLine} placeholder={isNew ? 'How it begins…' : 'The scene changes…'} className="notch-sm min-h-24 resize-y border border-line tone-well-60 px-3 py-2.5 text-[14px] leading-relaxed text-ink inset-field glow-focus placeholder:text-dim/60" />
           </StepSection>
         </div>
-        <aside className="flex min-w-0 flex-col gap-2 border-line/50 bg-black/30 p-5 lg:border-l">
+        <aside className="flex min-w-0 flex-col gap-2 border-line/50 tone-panel-30 p-5 lg:border-l">
           <Eyebrow>Recent scenes</Eyebrow>
           {!recent.length && <span className="text-[12.5px] text-faint">Scenes you send show here so you can use them again.</span>}
           <div className="flex flex-col">

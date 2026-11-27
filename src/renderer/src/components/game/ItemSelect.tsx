@@ -43,7 +43,7 @@ export function ItemSelect({
 
   if (isTypingCustom) {
     return (
-      <div className={cn('flex items-center gap-1.5 font-mono w-full', className)}>
+      <div className={cn('flex items-center gap-1.5 font-ui w-full', className)}>
         <Input
           autoFocus
           value={customText}
@@ -89,7 +89,7 @@ export function ItemSelect({
   ]
 
   return (
-    <div className={cn('flex items-center gap-1.5 font-mono w-full', className)}>
+    <div className={cn('flex items-center gap-1.5 font-ui w-full', className)}>
       <Select
         value={currentValue}
         options={options}

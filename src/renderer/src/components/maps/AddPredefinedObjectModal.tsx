@@ -78,7 +78,7 @@ export function AddPredefinedObjectModal({ world = '', at, onClose, onPlaced }: 
 
   return (
     <Modal open={true} title={`Place Map Object at (${at.x}, ${at.y})`} onClose={onClose} wide>
-      <div className="flex flex-col gap-4 font-mono select-none">
+      <div className="flex flex-col gap-4 font-ui select-none">
         {/* CATEGORY BAR */}
         <div className="flex items-center justify-between border-b border-line pb-2.5">
           <div className="flex items-center gap-1.5 overflow-x-auto">
@@ -88,10 +88,10 @@ export function AddPredefinedObjectModal({ world = '', at, onClose, onPlaced }: 
                 type="button"
                 onClick={() => setCategory(cat)}
                 className={cn(
-                  'border px-2.5 py-1 text-[11px] font-bold uppercase transition-colors',
+                  'border px-2.5 py-1 text-[11px] font-bold caps transition-colors',
                   category === cat
-                    ? 'border-cyan bg-cyan/15 text-white'
-                    : 'border-line/40 bg-black/40 text-dim hover:text-white'
+                    ? 'border-secondary-ink bg-secondary-ink/15 text-ink'
+                    : 'border-line/40 tone-well-40 text-dim hover:text-ink'
                 )}
               >
                 {cat}
@@ -112,7 +112,7 @@ export function AddPredefinedObjectModal({ world = '', at, onClose, onPlaced }: 
         {/* TWO-COLUMN LAYOUT: TEMPLATE GALLERY & OBJECT CONFIG */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 min-h-[420px]">
           {/* GALLERY LIST */}
-          <div className="flex flex-col gap-2 border border-line bg-black/40 p-2.5 lg:col-span-5 max-h-[440px] overflow-y-auto divide-y divide-line/30">
+          <div className="flex flex-col gap-2 border border-line tone-panel-40 p-2.5 lg:col-span-5 max-h-[440px] overflow-y-auto divide-y divide-line/30">
             {filtered.map((tmpl) => {
               const isSelected = selectedTemplate.id === tmpl.id
               return (
@@ -123,11 +123,11 @@ export function AddPredefinedObjectModal({ world = '', at, onClose, onPlaced }: 
                   className={cn(
                     'flex items-center gap-3 p-2 text-left transition-colors',
                     isSelected
-                      ? 'border-l-2 border-l-cyan bg-cyan/10 text-white'
-                      : 'text-dim hover:bg-panel hover:text-white'
+                      ? 'border-l-2 border-l-secondary-ink bg-secondary-ink/10 text-ink'
+                      : 'text-dim hover:bg-ink/5 hover:text-ink'
                   )}
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center border border-line/60 bg-black/80 p-1">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center border border-line/60 tone-well-80 p-1">
                     {tmpl.image.startsWith('data:') || tmpl.image.includes('/') || tmpl.image.startsWith('http') ? (
                       <img src={tmpl.image} alt={tmpl.name} className="max-h-full max-w-full object-contain [image-rendering:pixelated]" />
                     ) : (
@@ -136,8 +136,8 @@ export function AddPredefinedObjectModal({ world = '', at, onClose, onPlaced }: 
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex items-center justify-between">
-                      <span className="truncate text-[12px] font-bold text-white">{tmpl.name}</span>
-                      <span className="text-[9px] uppercase font-bold text-cyan border border-cyan/40 px-1">
+                      <span className="truncate text-[12px] font-bold text-ink">{tmpl.name}</span>
+                      <span className="text-[9px] caps font-bold text-secondary-ink border border-secondary-ink/40 px-1">
                         {tmpl.collision}
                       </span>
                     </div>
@@ -152,11 +152,11 @@ export function AddPredefinedObjectModal({ world = '', at, onClose, onPlaced }: 
           </div>
 
           {/* OBJECT INSTANCE INSPECTOR & ACTIONS CONFIG */}
-          <div className="flex flex-col justify-between border border-line bg-black/60 p-4 lg:col-span-7">
+          <div className="flex flex-col justify-between border border-line tone-panel-60 p-4 lg:col-span-7">
             <div className="flex flex-col gap-3">
               {/* HEADER WITH PREVIEW */}
-              <div className="flex items-center gap-3 border border-line/60 bg-panel p-2.5">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center border border-line bg-black/90 p-1.5">
+              <div className="flex items-center gap-3 border border-line/60 tone-surface-60 p-2.5">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center border border-line tone-panel-90 p-1.5">
                   {selectedTemplate.image.startsWith('data:') || selectedTemplate.image.includes('/') || selectedTemplate.image.startsWith('http') ? (
                     <img src={selectedTemplate.image} alt={name} className="max-h-full max-w-full object-contain [image-rendering:pixelated]" />
                   ) : (
@@ -169,7 +169,7 @@ export function AddPredefinedObjectModal({ world = '', at, onClose, onPlaced }: 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Object Name"
-                    className="border border-line bg-black/60 px-2 py-1 text-[13px] font-bold text-white focus:border-cyan focus:outline-none"
+                    className="border border-line tone-panel-60 px-2 py-1 text-[13px] font-bold text-ink focus:border-secondary-ink focus:outline-none"
                   />
                   <div className="flex items-center gap-2 text-[10px] text-dim">
                     <span>Size: {selectedTemplate.size.w}×{selectedTemplate.size.h}px</span>
@@ -181,8 +181,8 @@ export function AddPredefinedObjectModal({ world = '', at, onClose, onPlaced }: 
 
               {/* COLLISION SELECTOR */}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold uppercase text-dim flex items-center gap-1">
-                  <Shield className="h-3 w-3 text-cyan" /> Collision &amp; Passability:
+                <label className="text-[10px] font-bold caps text-dim flex items-center gap-1">
+                  <Shield className="h-3 w-3 text-secondary-ink" /> Collision &amp; Passability:
                 </label>
                 <Segmented
                   value={collision}
@@ -207,7 +207,7 @@ export function AddPredefinedObjectModal({ world = '', at, onClose, onPlaced }: 
               {/* CONDITION GATING */}
               <div className="grid grid-cols-2 gap-2 border-t border-line/40 pt-2">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold uppercase text-dim">Visible If Flag Set:</label>
+                  <label className="text-[10px] font-bold caps text-dim">Visible If Flag Set:</label>
                   <FlagSelect
                     world={world}
                     value={needsFlag}
@@ -216,7 +216,7 @@ export function AddPredefinedObjectModal({ world = '', at, onClose, onPlaced }: 
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold uppercase text-dim">Hidden If Flag Set:</label>
+                  <label className="text-[10px] font-bold caps text-dim">Hidden If Flag Set:</label>
                   <FlagSelect
                     world={world}
                     value={hiddenIfFlag}

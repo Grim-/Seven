@@ -15,11 +15,11 @@ export function ActList({ acts, selected, onSelect, onChange, onAdd }: { acts: A
           key={i}
           {...reorder.props(i)}
           onClick={() => onSelect(i)}
-          className={cn('group flex cursor-pointer items-center gap-1.5 border-l-2 py-2 pl-1.5 pr-1', i === selected ? 'border-l-accent bg-accent/10' : 'border-l-transparent hover:bg-white/[0.03]', reorder.isOver(i) && 'border-t-2 border-t-accent')}
+          className={cn('group flex cursor-pointer items-center gap-1.5 border-l-2 py-2 pl-1.5 pr-1', i === selected ? 'border-l-accent bg-accent/10' : 'border-l-transparent hover:bg-ink/[0.03]', reorder.isOver(i) && 'border-t-2 border-t-accent')}
         >
           <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-faint opacity-0 group-hover:opacity-100" />
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center border border-line/60 font-mono text-[11px] text-accent-soft">{i + 1}</span>
-          <span className="min-w-0 flex-1 truncate text-[13px] text-white">{a.name || 'Untitled act'}</span>
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center border border-line/60 font-ui text-[11px] text-accent-soft">{i + 1}</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{a.name || 'Untitled act'}</span>
           <button
             title="Remove this act"
             onClick={(e) => {

@@ -20,13 +20,14 @@ import { GeneratedPage } from '../components/data/kindUis'
 import { PageExplorer } from '../components/data/PageExplorer'
 import { cn } from '../lib/cn'
 import { failed } from '../lib/notify'
-import { FavouriteButton, isFileFavouriteKind, useFavourites } from '../lib/favourites'
+import type { TrayPin } from '@shared/types'
+import { FavouriteButton, isFileFavouriteKind, useFavourites, whenFavouriteExists } from '../lib/favourites'
 import { recordOpenedFile, useRecentFiles } from '../lib/recentData'
 import { entryMenuAt, exportMenuAt, kindMenuAt } from './data/entryMenu'
 import { CopyLinkButton } from '../components/data/CopyLinkButton'
 import { pickWith } from '../lib/picking'
 import { dragEntries, droppedEntries, isEntryDrag } from '../lib/entryDrag'
-import { bulkItems, moveEntries, moveItems, tagItems } from '../components/data/bulkMenu'
+import { askMoveUnder, bulkItems, moveEntries, tagItems } from '../components/data/bulkMenu'
 import { showInData } from '../lib/library'
 import { transitionView } from '../lib/viewTransition'
 import { useListPrefs } from '../lib/listPrefs'
@@ -80,7 +81,7 @@ const useTree = create<TreeState>((set) => ({
   specials: [],
   selected: null,
   open: {},
-  shut: {},
+  shut: { [FAVOURITES]: true, [RECENT]: true },
   tab: ALL,
   picked: [],
   anchor: null,
@@ -107,11 +108,12 @@ const useTree = create<TreeState>((set) => ({
 const TREE_PLACE = 'pages.tree'
 
 function restoreTree(places: Record<string, unknown>): void {
-  const saved = places[TREE_PLACE] as { selected?: unknown; open?: unknown; tab?: unknown } | undefined
+  const saved = places[TREE_PLACE] as { selected?: unknown; open?: unknown; shut?: unknown; tab?: unknown } | undefined
   if (!saved) return
   useTree.setState({
     ...(typeof saved.selected === 'string' || saved.selected === null ? { selected: saved.selected } : {}),
     ...(saved.open && typeof saved.open === 'object' ? { open: saved.open as Record<string, true> } : {}),
+    ...(saved.shut && typeof saved.shut === 'object' ? { shut: saved.shut as Record<string, true> } : {}),
     ...(typeof saved.tab === 'string' ? { tab: saved.tab } : {})
   })
 }
@@ -119,7 +121,9 @@ function restoreTree(places: Record<string, unknown>): void {
 if (usePlaces.getState().loaded) restoreTree(usePlaces.getState().places)
 usePlaces.subscribe((s, prev) => s.loaded && !prev.loaded && restoreTree(s.places))
 useTree.subscribe((s, prev) => {
-  if (s.selected !== prev.selected || s.open !== prev.open || s.tab !== prev.tab) usePlaces.getState().save(TREE_PLACE, { selected: s.selected, open: s.open, tab: s.tab })
+  if (s.selected !== prev.selected || s.open !== prev.open || s.shut !== prev.shut || s.tab !== prev.tab) {
+    usePlaces.getState().save(TREE_PLACE, { selected: s.selected, open: s.open, shut: s.shut, tab: s.tab })
+  }
 })
 
 function useTagMap(): Record<string, string[]> {
@@ -143,11 +147,11 @@ function useTagMap(): Record<string, string[]> {
 function SectionHead({ icon, label, count, open, first, onToggle }: { icon: React.ReactNode; label: string; count: number; open: boolean; first: boolean; onToggle: () => void }) {
   return (
     <div className={first ? undefined : 'mt-1.5 border-t border-line/30 pt-1.5'}>
-      <button onClick={onToggle} className="flex w-full items-center gap-1.5 py-1 pl-1 pr-2 text-left text-[13px] text-white/80 hover:bg-white/[0.03]">
+      <button onClick={onToggle} className="flex w-full items-center gap-1.5 py-1 pl-1 pr-2 text-left text-[13px] text-ink/80 hover:bg-ink/[0.03]">
         <span className="flex h-4 w-4 shrink-0 items-center justify-center text-dim">{open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</span>
         {icon}
         <span className="flex-1 truncate">{label}</span>
-        <span className="shrink-0 font-mono text-[10px] text-faint">{count}</span>
+        <span className="shrink-0 font-ui text-[10px] text-faint">{count}</span>
       </button>
     </div>
   )
@@ -313,8 +317,16 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
 
   const visible = useMemo(() => {
     if (!q && !hasAnyPill) return null
-    if (hasTypeFilter && activePageTypes.length === 0) return new Set<string>()
     const keep = new Set<string>()
+    const expand = new Set<string>()
+    let matches = 0
+    // Always keep folders visible as drop targets even when filtering by type, tag, or search text.
+    for (const p of pages) {
+      if (p.type !== 'folder') continue
+      keep.add(p.id)
+      for (const a of ancestorsOf(p.id, byId)) keep.add(a.id)
+    }
+    if (hasTypeFilter && activePageTypes.length === 0) return { keep, expand, matches }
     const near = new Set<string>()
     if (q.length > 2) {
       const index = new MiniSearch<{ id: string; title: string }>({ fields: ['title'], searchOptions: { prefix: (t) => t.length > 2, fuzzy: (t) => (t.length > 3 ? 0.2 : false), combineWith: 'AND' } })
@@ -329,10 +341,14 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
         if (!activeTags.every((t) => pTags.includes(t))) continue
       }
       if (q && !p.title.toLowerCase().includes(q) && !near.has(p.id)) continue
+      matches++
       keep.add(p.id)
-      for (const a of ancestorsOf(p.id, byId)) keep.add(a.id)
+      for (const a of ancestorsOf(p.id, byId)) {
+        keep.add(a.id)
+        expand.add(a.id)
+      }
     }
-    return keep
+    return { keep, expand, matches }
   }, [q, hasAnyPill, hasTypeFilter, hasTagFilter, activePageTypes, activeTags, pages, byId, tagMap])
 
   const made = (parent: string | null) => (id: string) => {
@@ -364,14 +380,13 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
   }
 
   const pickedPages = picked.map((id) => byId.get(id)).filter((p): p is PageMeta => Boolean(p))
-  const reopen = (parent: string | null) => parent && toggle(parent, true)
   const bulkTags = (e: React.MouseEvent) => openMenu(e, `${pickedPages.length} pages`, tagItems(picked))
-  const bulkMove = (e: React.MouseEvent) => openMenu(e, 'Move under', moveItems(picked, reopen))
+  const bulkMove = () => askMoveUnder(picked)
   const bulkTop = () => void moveEntries(pickedPages.filter((p) => p.parent).map((p) => p.id), null)
 
   const menu = (e: React.MouseEvent, p: PageMeta) => {
     if (pickedSet.has(p.id) && picked.length > 1) {
-      openMenu(e, `${picked.length} pages`, bulkItems(picked, { onMoved: reopen, onClear: () => setPicked([]) }))
+      openMenu(e, `${picked.length} pages`, bulkItems(picked, { onClear: () => setPicked([]) }))
       return
     }
     const extra: MenuItem[] = [
@@ -393,13 +408,12 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
     setDragging([])
     setOver(null)
     if (!ids.length) return
-    if (parent) toggle(parent, true)
     void moveEntries(ids, parent)
   }
 
   const pageLine = (p: PageMeta, depth: number): React.ReactNode => {
     const kids = tree.get(p.id) ?? []
-    const expanded = Boolean(visible) || Boolean(open[p.id])
+    const expanded = Boolean(visible?.expand.has(p.id)) || Boolean(open[p.id])
     const kind = pageKindOf(p.type)
     return (
         <div
@@ -426,14 +440,14 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
           style={{ paddingLeft: 4 + depth * INDENT }}
           data-on={pickedSet.has(p.id) || over === p.id || selected === p.id}
           data-drag={dragging.includes(p.id)}
-          className={cn('shell-row group flex cursor-pointer items-center gap-1.5 py-1 pr-2 text-[13px]', pickedSet.has(p.id) || selected === p.id ? 'text-white' : 'text-white/80')}
+          className={cn('shell-row group flex cursor-pointer items-center gap-1.5 py-1 pr-2 text-[13px]', pickedSet.has(p.id) || selected === p.id ? 'text-ink' : 'text-ink/80')}
         >
           <button
             onClick={(e) => {
               e.stopPropagation()
               if (kids.length) toggle(p.id)
             }}
-            className={cn('flex h-4 w-4 shrink-0 items-center justify-center text-dim hover:text-white', !kids.length && 'invisible')}
+            className={cn('flex h-4 w-4 shrink-0 items-center justify-center text-dim hover:text-ink', !kids.length && 'invisible')}
           >
             {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           </button>
@@ -443,7 +457,7 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
             <KindIcon name={icons[kind] ?? 'file-text'} className={cn('h-3.5 w-3.5 shrink-0', selected === p.id ? 'text-accent' : 'text-dim')} />
           )}
           <span className={cn('min-w-0 flex-1 truncate', pickedSet.has(p.id) && 'shell-cursor')}>{showName(p.title)}</span>
-          {kids.length > 0 && !expanded && <span className="shrink-0 font-mono text-[10px] text-faint">{kids.length}</span>}
+          {kids.length > 0 && !expanded && <span className="shrink-0 font-ui text-[10px] text-faint">{kids.length}</span>}
         </div>
     )
   }
@@ -459,7 +473,7 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
         const asset = assetsById.get(id)
         const kind = page ? pageKindOf(page.type) : asset ? 'file' : p.kind
         const label = page?.title ?? asset?.name ?? p.label
-        return { kind, id, label, icon: kind === 'folder' ? 'folder' : kind === 'file' ? 'file' : (icons[kind] ?? p.icon) }
+        return { kind, id, label, icon: kind === 'folder' ? 'folder' : kind === 'file' ? 'file' : (icons[kind] ?? p.icon), pin: p }
       })
     return q ? items.filter((i) => showName(i.label).toLowerCase().includes(q)) : items
   }, [rawFavourites, byId, assetsById, icons, q])
@@ -478,17 +492,19 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
   }, [rawRecents, byId, assetsById, icons, q])
 
   const lines: Line[] = []
-  const quickRow = (item: { kind: string; id: string; label: string; icon: string }, prefix: string): Line => ({
+  const openQuick = (item: { id: string; pin?: TrayPin }) => (item.pin ? whenFavouriteExists(item.pin, () => select(item.id)) : select(item.id))
+
+  const quickRow = (item: { kind: string; id: string; label: string; icon: string; pin?: TrayPin }, prefix: string): Line => ({
     key: `${prefix}:${item.kind}:${item.id}`,
     node: () => (
       <button
         type="button"
-        onClick={() => select(item.id)}
-        onContextMenu={(e) => entryMenuAt(e, item.kind, item.id, item.label, [{ label: 'Open', icon: <FolderOpen />, onSelect: () => select(item.id) }])}
+        onClick={() => openQuick(item)}
+        onContextMenu={(e) => entryMenuAt(e, item.kind, item.id, item.label, [{ label: 'Open', icon: <FolderOpen />, onSelect: () => openQuick(item) }])}
         style={{ paddingLeft: 4 + INDENT }}
         className={cn(
           'flex w-full items-center gap-1.5 border-l-2 py-1 pr-2 text-left text-[13px]',
-          selected === item.id ? 'border-l-accent bg-accent/[0.08] text-white' : 'border-l-transparent text-white/80 hover:bg-white/[0.03]'
+          selected === item.id ? 'border-l-accent bg-accent/[0.08] text-ink' : 'border-l-transparent text-ink/80 hover:bg-ink/[0.03]'
         )}
       >
         {item.kind === 'folder' ? (
@@ -503,9 +519,9 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
     )
   })
   const addPage = (p: PageMeta, depth: number, prefix: string) => {
-    if (visible && !visible.has(p.id)) return
+    if (visible && !visible.keep.has(p.id)) return
     lines.push({ key: `${prefix}/${p.id}`, node: () => pageLine(p, depth) })
-    if (Boolean(visible) || open[p.id]) for (const k of tree.get(p.id) ?? []) addPage(k, depth + 1, `${prefix}/${p.id}`)
+    if (visible?.expand.has(p.id) || open[p.id]) for (const k of tree.get(p.id) ?? []) addPage(k, depth + 1, `${prefix}/${p.id}`)
   }
   const addSection = (key: string, icon: React.ReactNode, label: string, count: number, isOpen: boolean, onToggle: () => void) => {
     const first = lines.length === 0
@@ -515,20 +531,20 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
 
   const roots = tree.get(ROOT) ?? []
   if (tab === ALL) {
-    if (favItems.length > 0 && addSection(FAVOURITES, <Star className="h-3.5 w-3.5 shrink-0 text-accent" />, 'Favourites', favItems.length, Boolean(q) || !shut[FAVOURITES], () => toggleShut(FAVOURITES))) {
+    if (favItems.length > 0 && addSection(FAVOURITES, <Star className="h-3.5 w-3.5 shrink-0 text-accent" />, 'Favourites', favItems.length, !shut[FAVOURITES], () => toggleShut(FAVOURITES))) {
       for (const item of favItems) lines.push(quickRow(item, 'fav'))
     }
-    if (recentItems.length > 0 && addSection(RECENT, <History className="h-3.5 w-3.5 shrink-0 text-dim" />, 'Recent', recentItems.length, Boolean(q) || !shut[RECENT], () => toggleShut(RECENT))) {
+    if (recentItems.length > 0 && addSection(RECENT, <History className="h-3.5 w-3.5 shrink-0 text-dim" />, 'Recent', recentItems.length, !shut[RECENT], () => toggleShut(RECENT))) {
       for (const item of recentItems) lines.push(quickRow(item, 'recent'))
     }
     const showFilesHead = favItems.length > 0 || recentItems.length > 0 || matchedAssets.length > 0
-    if (matchedAssets.length > 0 && addSection('__assets', <File className="h-3.5 w-3.5 shrink-0 text-cyan" />, `Media / Files (${activeAssetTypes.join(', ')})`, matchedAssets.length, true, () => undefined)) {
+    if (matchedAssets.length > 0 && addSection('__assets', <File className="h-3.5 w-3.5 shrink-0 text-secondary-ink" />, `Media / Files (${activeAssetTypes.join(', ')})`, matchedAssets.length, true, () => undefined)) {
       for (const a of matchedAssets) {
         lines.push(quickRow({ kind: 'file', id: a.id, label: a.name, icon: 'file' }, 'asset'))
       }
     }
-    if ((!hasTypeFilter || activePageTypes.length > 0) && (!showFilesHead || addSection(FILES_ROOT, <FolderOpen className="h-3.5 w-3.5 shrink-0 text-dim" />, 'Files', roots.length, Boolean(q) || hasAnyPill || !shut[FILES_ROOT], () => toggleShut(FILES_ROOT)))) {
-      for (const p of roots) addPage(p, 0, '')
+    if ((!hasTypeFilter || activePageTypes.length > 0) && (!showFilesHead || addSection(FILES_ROOT, <FolderOpen className="h-3.5 w-3.5 shrink-0 text-dim" />, 'Files', roots.length, !shut[FILES_ROOT], () => toggleShut(FILES_ROOT)))) {
+      for (const p of roots) addPage(p, showFilesHead ? 1 : 0, '')
     }
   }
   if (tab === BY_TAG) {
@@ -546,7 +562,7 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
             title={sp.summary}
             onClick={() => select(sp.id)}
             style={{ paddingLeft: 4 + INDENT }}
-            className={cn('flex w-full items-center gap-1.5 border-l-2 py-1 pr-2 text-left text-[13px]', selected === sp.id ? 'border-l-accent bg-accent/[0.08] text-white' : 'border-l-transparent text-white/70 hover:bg-white/[0.03]')}
+            className={cn('flex w-full items-center gap-1.5 border-l-2 py-1 pr-2 text-left text-[13px]', selected === sp.id ? 'border-l-accent bg-accent/[0.08] text-ink' : 'border-l-transparent text-ink/70 hover:bg-ink/[0.03]')}
           >
             <span className="h-4 w-4 shrink-0" />
             <KindIcon name="file-text" className={cn('h-3.5 w-3.5 shrink-0', selected === sp.id ? 'text-accent' : 'text-faint')} />
@@ -590,8 +606,8 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
             placeholder="Filter by name, type:image, or #tag"
           />
           {picked.length > 0 && (
-            <div className="mt-1.5 flex items-center gap-1 border border-teal/40 bg-teal/[0.06] px-1.5 py-1">
-              <span className="flex-1 font-mono text-[10.5px] text-teal">{picked.length} picked</span>
+            <div className="mt-1.5 flex items-center gap-1 border border-secondary/40 bg-secondary/[0.06] px-1.5 py-1">
+              <span className="flex-1 font-ui text-[10.5px] text-secondary">{picked.length} picked</span>
               <button title="Tags" onClick={bulkTags} className="flex h-6 w-6 items-center justify-center text-dim hover:text-accent">
                 <Hash className="h-3.5 w-3.5" />
               </button>
@@ -601,7 +617,7 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
               <button title="Move to top level" onClick={bulkTop} className="flex h-6 w-6 items-center justify-center text-dim hover:text-accent">
                 <ArrowUpToLine className="h-3.5 w-3.5" />
               </button>
-              <button title="Clear selection" onClick={() => setPicked([])} className="flex h-6 w-6 items-center justify-center text-dim hover:text-white">
+              <button title="Clear selection" onClick={() => setPicked([])} className="flex h-6 w-6 items-center justify-center text-dim hover:text-ink">
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -621,9 +637,9 @@ export function PagesBrowser({ section, select: selectData, onBack }: { section:
           <VirtualList count={lines.length} scroller={scroller} estimate={26} overscan={16} keyOf={(i) => lines[i].key}>
             {(i) => lines[i].node()}
           </VirtualList>
-          {visible && visible.size === 0 && <div className="px-3 py-1.5 text-[12px] text-faint">Nothing matches "{filter.trim()}".</div>}
+          {visible && visible.matches === 0 && <div className="px-3 py-1.5 text-[12px] text-faint">Nothing matches "{filter.trim()}".</div>}
           {(over === ROOT || dragging.some((id) => (byId.get(id)?.parent ?? null) !== null)) && (
-            <div className={cn('mx-2 mt-2 border border-dashed px-2 py-2 text-center font-mono text-[10.5px] uppercase tracking-[0.14em]', over === ROOT ? 'border-accent/60 text-accent' : 'border-line/50 text-faint')}>
+            <div className={cn('mx-2 mt-2 border border-dashed px-2 py-2 text-center font-label text-[10.5px] caps-14 ', over === ROOT ? 'border-accent/60 text-accent' : 'border-line/50 text-faint')}>
               Drop here for the top level
             </div>
           )}

@@ -152,7 +152,7 @@ function resolvePose(
 
 const PRESET_GRID_LINES = {
   backgroundImage:
-    'linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)',
+    'linear-gradient(to right, color-mix(in srgb, var(--color-ink) 6%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--color-ink) 5%, transparent) 1px, transparent 1px)',
   backgroundSize: 'calc(100% / 12) 100%, 100% calc(100% / 5)'
 } as const
 
@@ -184,29 +184,29 @@ function SizePresetGrid({
             className={cn(
               'group flex flex-col gap-1 border p-1.5 text-left transition-colors cursor-pointer',
               active
-                ? 'border-accent bg-accent/15 text-white'
-                : 'border-line/55 bg-bg-0/65 text-dim hover:border-accent/70 hover:bg-accent/10 hover:text-white'
+                ? 'border-accent bg-accent/15 text-ink'
+                : 'border-line/55 tone-bg-65 text-dim hover:border-accent/70 hover:bg-accent/10 hover:text-ink'
             )}
           >
             <div
               style={PRESET_GRID_LINES}
-              className="relative h-9 w-full overflow-hidden border border-line/45 bg-[#04090e]/90"
+              className="relative h-9 w-full overflow-hidden border border-line/45 tone-surface-90"
             >
               <div
                 style={{ width: `${wPct}%`, height: `${hPct}%` }}
                 className={cn(
                   'border-r border-b transition-colors',
                   active
-                    ? 'border-accent bg-accent/45 shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_40%,transparent)]'
+                    ? 'border-accent bg-accent/45 shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_calc(40%*var(--glow)),transparent)]'
                     : 'border-accent/75 bg-accent/25 group-hover:border-accent group-hover:bg-accent/35'
                 )}
               />
             </div>
-            <div className="flex items-baseline justify-between gap-1 font-mono leading-none">
-              <span className={cn('text-[10.5px] font-bold', active ? 'text-accent' : 'text-white')}>
+            <div className="flex items-baseline justify-between gap-1 font-ui leading-none">
+              <span className={cn('text-[10.5px] font-bold', active ? 'text-accent' : 'text-ink')}>
                 {preset.w}×{preset.h}
               </span>
-              <span className="truncate text-[8.5px] uppercase tracking-wider text-dim">{preset.label}</span>
+              <span className="truncate text-[8.5px] caps-5 text-dim">{preset.label}</span>
             </div>
           </button>
         )
@@ -713,7 +713,7 @@ function WidgetSlate({
             type="button"
             onClick={onSettings}
             title="Settings"
-            className="p-1 text-dim transition-colors hover:text-white cursor-pointer"
+            className="p-1 text-dim transition-colors hover:text-ink cursor-pointer"
           >
             <Settings2 className="h-3.5 w-3.5" />
           </button>
@@ -850,9 +850,9 @@ function SurfaceSwitcherModal({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
-      className="pointer-events-auto fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/88 backdrop-blur-md select-none"
+      className="pointer-events-auto fixed inset-0 z-[200] flex flex-col items-center justify-center bg-scrim/88 backdrop-blur-[calc(var(--panel-blur)*1.5)] select-none"
     >
-      <div className="pointer-events-none absolute top-5 flex items-center gap-3 border border-line/60 bg-black/85 px-3.5 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.16em] text-dim">
+      <div className="pointer-events-none absolute top-5 flex items-center gap-3 border border-line/60 tone-panel-85 px-3.5 py-1.5 font-label text-[10.5px] caps-16 text-dim">
         <span className="font-bold text-accent">{dashboard.name}</span>
         <span>·</span>
         <span>SurfaceTop Overview</span>
@@ -899,7 +899,7 @@ function SurfaceSwitcherModal({
               className={cn(
                 'shell-slate group absolute flex flex-col justify-between p-2.5 text-left transition-all cursor-pointer',
                 isCurrent
-                  ? 'border-accent border-l-2 border-l-accent bg-accent/15 shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_25%,transparent)]'
+                  ? 'border-accent border-l-2 border-l-accent bg-accent/15 shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_calc(25%*var(--glow)),transparent)]'
                   : 'hover:border-accent/70'
               )}
             >
@@ -907,42 +907,42 @@ function SurfaceSwitcherModal({
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span
                     className={cn(
-                      'flex h-5 w-5 shrink-0 items-center justify-center border font-mono text-[11px] font-bold',
+                      'flex h-5 w-5 shrink-0 items-center justify-center border font-ui text-[11px] font-bold',
                       isCurrent
-                        ? 'border-accent bg-accent text-black'
-                        : 'border-line bg-black/60 text-accent-soft'
+                        ? 'border-accent bg-accent text-on-accent'
+                        : 'border-line tone-panel-60 text-accent-soft'
                     )}
                   >
                     {slot.index}
                   </span>
-                  <span className="truncate font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-white">
+                  <span className="truncate font-label text-[10.5px] font-bold caps-12 text-ink">
                     {slot.label}
                   </span>
                 </div>
-                <span className="shrink-0 font-mono text-[9.5px] text-faint">{items.length}</span>
+                <span className="shrink-0 font-ui text-[9.5px] text-faint">{items.length}</span>
               </div>
 
               <div className="relative my-1 flex min-h-0 flex-1 flex-wrap content-start gap-1 overflow-hidden">
                 {items.length === 0 ? (
-                  <span className="m-auto font-mono text-[10px] uppercase tracking-wider text-faint">
+                  <span className="m-auto font-label text-[10px] caps-5 text-faint">
                     Empty surface
                   </span>
                 ) : (
                   items.slice(0, 6).map((w) => (
                     <span
                       key={w.id}
-                      className="max-w-full truncate border border-line/60 border-l-2 border-l-accent bg-black/75 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/85"
+                      className="max-w-full truncate border border-line/60 border-l-2 border-l-accent tone-panel-75 px-1.5 py-0.5 font-label text-[9px] caps-5 text-ink/85"
                     >
                       {showName(w.title)}
                     </span>
                   ))
                 )}
                 {items.length > 6 && (
-                  <span className="px-1 font-mono text-[9px] text-dim">+{items.length - 6} more</span>
+                  <span className="px-1 font-ui text-[9px] text-dim">+{items.length - 6} more</span>
                 )}
               </div>
 
-              <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-faint">
+              <div className="flex items-center justify-between font-label text-[9px] caps-14 text-faint">
                 <span>{isCurrent ? 'Active' : 'Click to switch'}</span>
                 {slot.id !== '0' && (
                   <span
@@ -976,10 +976,10 @@ function SurfaceSwitcherModal({
                 onClose()
               }}
               title="Add new SurfaceTop here"
-              className="shell-add absolute flex flex-col items-center justify-center gap-1.5 bg-black/45 transition-all hover:bg-accent/10 cursor-pointer"
+              className="shell-add absolute flex flex-col items-center justify-center gap-1.5 tone-well-45 transition-all hover:bg-accent/10 cursor-pointer"
             >
               <Plus className="h-6 w-6" />
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]">
+              <span className="font-label text-[10px] font-semibold caps-16 ">
                 New SurfaceTop
               </span>
             </button>
@@ -1157,7 +1157,7 @@ export function BoardTabletop({
         isGrid ? 'overflow-y-auto p-3' : 'overflow-hidden'
       )}
     >
-      <DropOverlay show={fileDrop.over} label="Drop to put on this SurfaceTop" className="inset-0 bg-black/70" />
+      <DropOverlay show={fileDrop.over} label="Drop to put on this SurfaceTop" className="inset-0 tone-panel-70" />
 
       <div
         key={`${activeSlot.id}:${layoutMode}`}
@@ -1253,21 +1253,21 @@ export function BoardTabletop({
           }}
           className="pointer-events-auto absolute inset-0 z-45 cursor-crosshair bg-accent/[0.03]"
         >
-          <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 border border-accent/70 bg-black/90 px-3.5 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent shadow-[0_8px_24px_rgba(0,0,0,0.85)]">
+          <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 border border-accent/70 tone-panel-90 px-3.5 py-1.5 font-label text-[10.5px] caps-14 text-accent shadow-[0_8px_24px_color-mix(in_srgb,var(--color-shade)_85%,transparent)]">
             Click anywhere on {activeSlot.index}: {activeSlot.label} to place{' '}
-            <span className="font-bold text-white">{pendingPlacement.label}</span>
+            <span className="font-bold text-ink">{pendingPlacement.label}</span>
             <span className="ml-2 text-dim">(Esc or Right-click to cancel)</span>
           </div>
           {cursorPt && (
             <div
               style={{ left: cursorPt.x, top: cursorPt.y, width: 320 }}
-              className="pointer-events-none absolute border border-dashed border-accent border-l-2 border-l-accent bg-[#060b10]/85 px-3 py-2 shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_28%,transparent)] backdrop-blur-md"
+              className="pointer-events-none absolute border border-dashed border-accent border-l-2 border-l-accent tone-surface-85 px-3 py-2 shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_calc(28%*var(--glow)),transparent)] backdrop-blur-[calc(var(--panel-blur)*1.5)]"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-mono text-[11px] font-bold uppercase tracking-[0.08em] text-white">
+                <span className="truncate font-label text-[11px] font-bold caps-8 text-ink">
                   {pendingPlacement.label}
                 </span>
-                <span className="border border-accent/50 bg-accent/15 px-1.5 py-px font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-accent">
+                <span className="border border-accent/50 bg-accent/15 px-1.5 py-px font-label text-[9px] font-semibold caps-12 text-accent">
                   CLICK TO PLACE
                 </span>
               </div>

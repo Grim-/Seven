@@ -70,7 +70,7 @@ function QuestionCard({ ui }: { ui: UiRequestState }) {
 
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="text-[14px] leading-snug text-white">{props.question}</div>
+      <div className="text-[14px] leading-snug text-ink">{props.question}</div>
       <div className="flex flex-col gap-1.5">
         {props.options.map((option, i) => (
           <button
@@ -79,18 +79,18 @@ function QuestionCard({ ui }: { ui: UiRequestState }) {
             onClick={() => toggle(option)}
             className={cn(
               'flex items-center gap-2.5 border px-3 py-2 text-left text-[13.5px] transition-colors',
-              chosen(option) ? 'border-accent bg-accent/15 text-white' : 'border-line/60 bg-black/50 text-white/90',
+              chosen(option) ? 'border-accent bg-accent/15 text-ink' : 'border-line/60 tone-panel-50 text-ink/90',
               open && !sending && 'hover:border-accent hover:bg-accent/10'
             )}
           >
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center border border-line font-mono text-[10.5px] text-accent">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center border border-line font-ui text-[10.5px] text-accent">
               {chosen(option) ? <Check className="h-3.5 w-3.5" /> : i + 1}
             </span>
             {option}
           </button>
         ))}
       </div>
-      {answered?.other && <div className="border-l-2 border-l-accent pl-2.5 text-[13px] text-white/90">"{answered.other}"</div>}
+      {answered?.other && <div className="border-l-2 border-l-accent pl-2.5 text-[13px] text-ink/90">"{answered.other}"</div>}
       {open && (
         <div className="flex gap-2">
           {props.allowOther && (
@@ -115,7 +115,7 @@ function QuestionCard({ ui }: { ui: UiRequestState }) {
           )}
         </div>
       )}
-      <div className="font-mono text-[10.5px] uppercase tracking-[0.14em]">
+      <div className="font-label text-[10.5px] caps-14 ">
         <StatusLine ui={ui} />
       </div>
     </div>
@@ -127,7 +127,7 @@ function ConfirmCard({ ui }: { ui: UiRequestState }) {
   const open = ui.status === 'pending' || ui.status === 'expired'
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="text-[14px] leading-snug text-white">{props.message}</div>
+      <div className="text-[14px] leading-snug text-ink">{props.message}</div>
       {open ? (
         <div className="flex gap-2">
           <Button variant="primary" onClick={() => void answer(ui, true, `${props.message}\nMy answer: ${props.confirmLabel}`)}>
@@ -138,9 +138,9 @@ function ConfirmCard({ ui }: { ui: UiRequestState }) {
           </Button>
         </div>
       ) : (
-        <div className="font-mono text-[12px] text-white/90">{ui.answer === true ? props.confirmLabel : ui.answer === false ? props.cancelLabel : ''}</div>
+        <div className="font-ui text-[12px] text-ink/90">{ui.answer === true ? props.confirmLabel : ui.answer === false ? props.cancelLabel : ''}</div>
       )}
-      <div className="font-mono text-[10.5px] uppercase tracking-[0.14em]">
+      <div className="font-label text-[10.5px] caps-14 ">
         <StatusLine ui={ui} />
       </div>
     </div>
@@ -181,7 +181,7 @@ function ApprovalCard({ ui }: { ui: UiRequestState }) {
 
   if (answered && answered.decision !== 'deny') {
     return (
-      <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.14em]">
+      <div className="flex items-center gap-2 font-label text-[10.5px] caps-14 ">
         <ShieldAlert className="h-3.5 w-3.5 text-ok" />
         {outcome}
       </div>
@@ -192,12 +192,12 @@ function ApprovalCard({ ui }: { ui: UiRequestState }) {
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center gap-2">
         <ShieldAlert className="h-4 w-4 text-accent" />
-        <span className="font-mono text-[12.5px] font-bold uppercase tracking-[0.08em] text-white">{props.title}</span>
+        <span className="font-label text-[12.5px] font-bold caps-8 text-ink">{props.title}</span>
       </div>
       <div className="text-[12.5px] text-dim">{props.reason}</div>
       {props.command && <TerminalOutput command={props.command} shell={props.shell ?? undefined} output="" />}
       {props.patch && <PatchView patch={props.patch} maxHeight="max-h-80" />}
-      {props.details && <pre className="max-h-60 overflow-auto border border-line/40 bg-black/50 px-2.5 py-2 font-mono text-[11.5px] text-white/85">{props.details}</pre>}
+      {props.details && <pre className="max-h-60 overflow-auto border border-line/40 tone-panel-50 px-2.5 py-2 font-ui text-[11.5px] text-ink/85">{props.details}</pre>}
       {pending && (
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
@@ -223,7 +223,7 @@ function ApprovalCard({ ui }: { ui: UiRequestState }) {
           />
         </div>
       )}
-      <div className="font-mono text-[10.5px] uppercase tracking-[0.14em]">{outcome}</div>
+      <div className="font-label text-[10.5px] caps-14 ">{outcome}</div>
     </div>
   )
 }
@@ -247,8 +247,8 @@ function FormCard({ ui }: { ui: UiRequestState }) {
   }
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="font-mono text-[12px] font-bold uppercase tracking-[0.08em] text-white">{props.title}</div>
-      {props.message && <div className="text-[13px] text-white/90">{props.message}</div>}
+      <div className="font-label text-[12px] font-bold caps-8 text-ink">{props.title}</div>
+      {props.message && <div className="text-[13px] text-ink/90">{props.message}</div>}
       {props.fields.map((f) => (
         <label key={f.name} className="flex flex-col gap-1">
           <span className="text-[12px] text-dim">
@@ -280,7 +280,7 @@ function FormCard({ ui }: { ui: UiRequestState }) {
           </Button>
         </div>
       ) : (
-        <div className="font-mono text-[11px] uppercase tracking-wider text-faint">{done ? (done.action === 'accept' ? 'Sent' : 'Declined') : ui.status}</div>
+        <div className="font-label text-[11px] caps-5 text-faint">{done ? (done.action === 'accept' ? 'Sent' : 'Declined') : ui.status}</div>
       )}
     </div>
   )

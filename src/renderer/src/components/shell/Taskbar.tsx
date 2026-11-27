@@ -18,21 +18,21 @@ import { FavouritesFlyout } from './FavouritesFlyout'
 import { NavMenu, NAV_SHEET } from './NavMenu'
 
 const ACTIVE_BAR =
-  'absolute inset-x-1.5 top-0 h-0.5 bg-accent shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_70%,transparent)]'
+  'absolute inset-x-1.5 top-0 h-0.5 bg-accent shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_calc(70%*var(--glow)),transparent)]'
 
 function tabClass(active: boolean, hasLabel: boolean): string {
   return cn(
-    'relative flex h-full items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0',
+    'relative flex h-full items-center gap-2 font-label text-[11px] font-semibold caps-16 transition-colors [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0',
     hasLabel
       ? 'px-3.5 tablet:gap-1.5 tablet:px-2.5 phone:flex-col phone:justify-center phone:gap-0.5 phone:px-2 phone:text-[9px] phone:leading-none phone:tracking-[0.04em]'
       : 'w-10 justify-center phone:w-9',
-    active ? 'bg-accent/[0.07] text-accent' : 'text-dim hover:bg-white/[0.03] hover:text-white'
+    active ? 'bg-accent/[0.07] text-accent' : 'text-dim hover:bg-ink/[0.03] hover:text-ink'
   )
 }
 
-function Tab({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label?: string; onClick: () => void }) {
+function Tab({ active, icon, label, title, onClick }: { active: boolean; icon: React.ReactNode; label?: string; title?: string; onClick: () => void }) {
   return (
-    <button title={label ? undefined : 'Settings'} onClick={onClick} className={tabClass(active, Boolean(label))}>
+    <button title={title ?? (label ? undefined : 'Settings')} onClick={onClick} className={tabClass(active, Boolean(label))}>
       {active && <span className={ACTIVE_BAR} />}
       {icon}
       {label}
@@ -79,7 +79,7 @@ function ResponsiveTaskbar() {
   const onBar = visibleTabs.some((t) => t.id === view) || (!compact && settingsTabs.some((t) => t.id === view))
 
   return (
-    <nav className="relative z-40 flex h-11 shrink-0 items-stretch border-t border-line/40 bg-bg/95 px-1.5 tablet:h-[var(--nav-h)] tablet:pb-[env(safe-area-inset-bottom)] phone:px-0">
+    <nav className="relative z-40 flex h-11 shrink-0 items-stretch border-t border-line/40 tone-bg-95 px-1.5 tablet:h-[var(--nav-h)] tablet:pb-[env(safe-area-inset-bottom)] phone:px-0">
       <div ref={slotRef} className="relative flex min-w-0 flex-1 items-stretch overflow-hidden">
         <div aria-hidden className="pointer-events-none invisible absolute left-0 top-0 flex h-full items-stretch whitespace-nowrap">
           {tabs.map((item, i) => (
@@ -104,7 +104,7 @@ function ResponsiveTaskbar() {
           <Tab key={item.id} active={view === item.id} icon={item.icon} label={item.label} onClick={() => setView(item.id)} />
         ))}
       </div>
-      <div className="flex shrink-0 items-stretch font-mono text-[10.5px] uppercase tracking-wider">
+      <div className="flex shrink-0 items-stretch font-ui text-[10.5px] caps-5 ">
         <AppSearch />
         <div className="flex items-center px-1.5 phone:px-1">
           <StatusControl />
@@ -115,7 +115,7 @@ function ResponsiveTaskbar() {
           <div className="flex h-full items-stretch phone:hidden">
             <LockButton compact />
             {settingsTabs.map((item) => (
-              <Tab key={item.id} active={view === item.id} icon={item.icon} onClick={() => setView(item.id)} />
+              <Tab key={item.id} active={view === item.id} icon={item.icon} title={item.label} onClick={() => setView(item.id)} />
             ))}
           </div>
         </div>
@@ -133,7 +133,7 @@ function DesktopTaskbar() {
   const settingsTabs = useViewsIn('settings')
 
   return (
-    <nav className="relative z-40 flex h-11 shrink-0 items-stretch border-t border-line/40 bg-bg/95 px-1.5">
+    <nav className="relative z-40 flex h-11 shrink-0 items-stretch border-t border-line/40 tone-bg-95 px-1.5">
       {tabs.map((item) => (
         <div key={item.id} className="group relative flex">
           <Tab active={view === item.id} icon={item.icon} label={item.label} onClick={() => setView(item.id)} />
@@ -141,7 +141,7 @@ function DesktopTaskbar() {
         </div>
       ))}
       <AppSearch />
-      <div className="ml-auto flex items-center gap-2.5 pr-2 font-mono text-[10.5px] uppercase tracking-wider">
+      <div className="ml-auto flex items-center gap-2.5 pr-2 font-ui text-[10.5px] caps-5 ">
         <div className="flex h-7 items-center gap-2 border border-line/30 px-1.5">
           <MiniPlayer />
           <SoundControl />

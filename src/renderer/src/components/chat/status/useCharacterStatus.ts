@@ -4,7 +4,11 @@ import { useModuleList } from '../../../registries/useModuleList'
 import { statusSources, type CharacterStatus } from './characterStatus'
 
 export function useCharacterStatus(sheet: string | null): CharacterStatus | null {
-  const data = useLive(() => (sheet ? engine('sheets.get', { id: sheet }) : Promise.resolve(null)), 'page.changed', [sheet])
+  const data = useLive(
+    () => (sheet ? engine('sheets.get', { id: sheet }) : Promise.resolve(null)),
+    ['page.changed', 'npcs.changed', 'saves.changed'],
+    [sheet]
+  )
   const sources = useModuleList(statusSources)
   if (!sheet || !data || !sources) return null
   const reads = sources.map((s) => s.read(data))

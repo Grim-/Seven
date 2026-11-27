@@ -81,6 +81,7 @@ const stem = (name: string) => name.replace(/\.[a-z0-9]+$/, '')
 
 export class AssetStore {
   private defaultParent: () => string | null = () => null
+  private placer: (source: AssetMeta['source']) => string | null = () => this.defaultParent()
 
   constructor(
     private dir: string,
@@ -89,6 +90,10 @@ export class AssetStore {
 
   setDefaultParent(fn: () => string | null): void {
     this.defaultParent = fn
+  }
+
+  setPlacer(fn: (source: AssetMeta['source']) => string | null): void {
+    this.placer = fn
   }
 
   private folder(id: string): string {
@@ -176,7 +181,7 @@ export class AssetStore {
   private add(file: string, size: number, fingerprint: string, origin: AssetMeta['source'], ctx: WriteContext, write: (target: string) => void): AssetMeta {
     const id = newId('a').toLowerCase()
     const { mime, kind } = classify(file)
-    const parent = this.defaultParent()
+    const parent = this.placer(origin)
     const meta: AssetMeta = { id, name: file, file, mime, kind, size, source: origin, fingerprint, ...(parent ? { parent } : {}), ...(secure.enabled ? { stored: 'blob' } : {}), createdAt: Date.now() }
     const target = this.filePath(meta)
     ctx.checkpoint?.(target, null)

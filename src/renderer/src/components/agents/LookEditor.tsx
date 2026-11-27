@@ -58,21 +58,21 @@ export function LookEditor({ draft, onChange }: { draft: AgentDraft; onChange: (
         <LookBackground look={look} />
         <div className="relative flex items-center gap-2 border-b border-line px-2.5 py-2">
           <AgentAvatar agent={preview} size={28} />
-          <span className="truncate text-[12px] font-semibold uppercase tracking-[0.06em] text-white">{draft.name || 'Agent'}</span>
+          <span className="truncate text-[12px] font-semibold caps-6 text-ink">{draft.name || 'Agent'}</span>
         </div>
         <div className="relative flex flex-1 flex-col gap-2 p-2.5">
-          <span className="flex items-center gap-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.18em] text-teal">
+          <span className="flex items-center gap-1.5 font-label text-[9.5px] font-semibold caps-18 text-secondary">
             <AgentAvatar agent={preview} size={16} />
             {draft.name || 'Agent'}
           </span>
-          <span className="border-l-2 border-l-line pl-2 text-[12px] text-white">Hello. This is how I look.</span>
+          <span className="border-l-2 border-l-line pl-2 text-[12px] text-ink">Hello. This is how I look.</span>
           {look.avatar && (
             <div className="flex items-end gap-2">
               <AgentAvatar agent={preview} size={96} pose={poseOf(pose)} />
               <Select value={pose} options={POSE_OPTIONS} onChange={setPose} className="h-7 text-[11px]" />
             </div>
           )}
-          <span className="mt-auto self-start border border-accent px-2 py-0.5 font-mono text-[10px] uppercase text-accent">Send</span>
+          <span className="mt-auto self-start border border-accent px-2 py-0.5 font-label text-[10px] caps text-accent">Send</span>
         </div>
       </div>
     </div>

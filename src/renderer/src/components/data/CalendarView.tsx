@@ -49,7 +49,7 @@ export function CalendarBody({ page, records, options, compact, onOpen }: BodyPr
   return (
     <div className="flex h-full min-h-0 flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.12em] text-white">
+        <span className="font-label text-[12px] font-semibold caps-12 text-ink">
           {first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
         </span>
         <div className="ml-auto flex items-center gap-1">
@@ -64,7 +64,7 @@ export function CalendarBody({ page, records, options, compact, onOpen }: BodyPr
           </Button>
         </div>
       </div>
-      <div className="grid grid-cols-7 gap-px font-mono text-[10px] uppercase tracking-wider text-faint">
+      <div className="grid grid-cols-7 gap-px font-label text-[10px] caps-5 text-faint">
         {DAYS.map((d) => (
           <div key={d} className="px-1">
             {d}
@@ -78,23 +78,23 @@ export function CalendarBody({ page, records, options, compact, onOpen }: BodyPr
           const k = inMonth ? key(month.y, month.m, day) : ''
           const items = inMonth ? (byDay.get(k) ?? []) : []
           return (
-            <div key={i} className={cn('flex min-h-14 flex-col gap-0.5 bg-bg p-1', !inMonth && 'bg-black/60')}>
+            <div key={i} className={cn('flex min-h-14 flex-col gap-0.5 bg-bg p-1', !inMonth && 'tone-panel-60')}>
               {inMonth && (
-                <span className={cn('font-mono text-[10.5px]', k === todayKey ? 'font-bold text-accent' : 'text-dim')}>{day}</span>
+                <span className={cn('font-ui text-[10.5px]', k === todayKey ? 'font-bold text-accent' : 'text-dim')}>{day}</span>
               )}
               {items.slice(0, max).map((r) => (
                 <button
                   key={r.id}
                   onClick={() => onOpen(r)}
                   className={cn(
-                    'truncate border-l-2 bg-accent/10 px-1 text-left text-[11px] text-white hover:bg-accent/20',
+                    'truncate border-l-2 bg-accent/10 px-1 text-left text-[11px] text-ink hover:bg-accent/20',
                     check && r.values[check.name] === true ? 'border-ok/70 line-through opacity-60' : 'border-accent'
                   )}
                 >
                   {String(r.values[primary.name] ?? r.id)}
                 </button>
               ))}
-              {items.length > max && <span className="font-mono text-[10px] text-faint">+{items.length - max} more</span>}
+              {items.length > max && <span className="font-ui text-[10px] text-faint">+{items.length - max} more</span>}
             </div>
           )
         })}

@@ -69,7 +69,8 @@ interface Props {
 
 export function PlayStage({ world, save, triggers, onTrigger, map, shapes, places, here, place, tokens, mine, selected, onPlace, onBlankMenu, tokenHandlers, objects, onTime, onClock, onWalked, onBattleMove, onNavigation, onTarget, onCamera, aiming = false, aimRange = 0, activeActorId = null, battle = null, className }: Props) {
   const catalog = useGameCatalog()
-  const factions: StoredFaction[] = useLive(() => engine('factions.list'), 'factions.changed') ?? []
+  const factions: StoredFaction[] =
+    useLive(() => engine('factions.list', { world, layer: 'play' }), ['factions.changed', 'saves.changed'], [world]) ?? []
   const names = useMemo(() => Object.fromEntries(Object.keys(shapes).map((k) => [k, placeName(places, k)])), [shapes, places])
   const timeDef = catalog ? (catalog.time(save?.clockId ?? '') ?? catalog.times()[0] ?? null) : null
   const hostileFactions = useMemo(() => {

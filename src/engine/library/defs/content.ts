@@ -18,7 +18,7 @@ import { filePacking, folderPacking, freeName, pagePacking, type EntryRef } from
 import { PAGE_WIDGET } from '../pageWidget'
 import { flattenText, scoreDoc, type SearchField } from '../query'
 import { findRepo, getRepo, repoIds, repoMarkdown, REPO_TYPES, rollRepo, drawRepo } from '../repos'
-import { findSheet, getSheet, SHEET_TYPE, sheetIds, sheetLine, sheetMarkdown } from '../sheets'
+import { findSheet, getSheet, setSheetRelationships, SHEET_TYPE, sheetIds, sheetLine, sheetMarkdown } from '../sheets'
 import { takeOut } from '../../worlds/party'
 import { worlds } from '../../worlds/store'
 import { findSlideshow, getSlideshow, slideshowIds, slideshowText } from '../slideshows'
@@ -34,6 +34,7 @@ export const pageKind: Kind = {
   kind: 'page',
   ...pagePacking(),
   pageTypes: [''],
+  home: null,
   isGenerated: (id) => id.startsWith(GENERATED),
   resolveOnly: true,
   missing: (ref) => data.pages.missing(ref, 'page'),
@@ -126,6 +127,7 @@ export const folderKind: Kind = {
   kind: 'folder',
   ...folderPacking,
   pageTypes: [FOLDER_TYPE],
+  home: null,
   root: ROOT_FOLDER,
   resolveOnly: true,
   missing: (ref) => data.pages.missing(ref, 'folder'),
@@ -437,7 +439,11 @@ export const sheetKind: Kind = {
   group: 'Yours',
   kind: 'sheet',
   image: (id) => getSheet(id).image,
-  ...pagePacking(sheetRefs),
+  relations: {
+    list: (id) => getSheet(id).relationships ?? [],
+    save: (id, list) => void setSheetRelationships(id, list)
+  },
+  ...pagePacking(sheetRefs()),
   pageTypes: [SHEET_TYPE],
   label: 'Character',
   plural: 'Characters',
@@ -447,7 +453,7 @@ export const sheetKind: Kind = {
   description: 'characters, yours or for agents to play: named fields of text, and D&D stats with a story log; an agent can wear one as its character',
   parts: ['sheet'],
   defaultPart: () => 'sheet',
-  actions: ['sheet_write', 'update_stats', 'update_proficiencies', 'add_story_log', 'set_story_where'],
+  actions: ['sheet_write', 'update_stats', 'update_proficiencies', 'character_learn_event', 'character_set_state'],
   available: () => true,
   title: (id) => getSheet(id).title,
   search(query, limit) {

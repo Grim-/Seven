@@ -2,7 +2,7 @@ import { entryLink, registerComponent } from '../../core'
 import type { ActionEvent } from '../Action'
 import { registerLegacyTriggerAction } from '../../triggerActions'
 import { WorldPiece } from './WorldPiece'
-import { CREATURE_TEMPLATES, GAME_BESTIARY } from '../../templateKinds'
+import { CREATURE_KIND, CREATURE_TEMPLATES, GAME_BESTIARY } from '../../templateKinds'
 
 export class StartCombat extends WorldPiece {
   static readonly type: string = 'world.startCombat'
@@ -17,7 +17,7 @@ export class StartCombat extends WorldPiece {
   handle(event: ActionEvent): void {
     const p = this.params
     this.send(event, 'start_combat', { source: GAME_BESTIARY, creature: p.creature })
-    this.report(event, {}, `A fight starts with ${entryLink(CREATURE_TEMPLATES, String(p.creature))}.`)
+    this.report(event, {}, `A fight starts with ${entryLink(CREATURE_KIND, String(p.creature))}.`)
     this.next(event)
   }
 }

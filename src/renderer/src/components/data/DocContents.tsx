@@ -19,8 +19,8 @@ export function DocContents({ text, doc }: { text: string; doc: RefObject<HTMLEl
   if (headings.length < 2) return null
   const go = (i: number) => doc.current?.querySelectorAll('h1, h2, h3')[i]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   return (
-    <nav className="sticky top-0 w-44 shrink-0 self-start border-l border-line/50 pl-3 font-mono text-[11px]">
-      <div className="mb-2 text-[9.5px] font-bold uppercase tracking-[0.16em] text-faint">Contents</div>
+    <nav className="sticky top-0 w-44 shrink-0 self-start border-l border-line/50 pl-3 font-ui text-[11px]">
+      <div className="mb-2 text-[9.5px] font-bold caps-16 text-faint">Contents</div>
       {headings.map((h, i) => (
         <button
           key={i}

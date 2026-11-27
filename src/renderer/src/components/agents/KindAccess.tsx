@@ -48,13 +48,13 @@ function Cell({ on, onClick, title }: { on: boolean; onClick: () => void; title:
 export function KindAccess() {
   const kinds = useKindInfo()
   const agents = useAgents((s) => s.list)
-  if (!kinds) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (!kinds) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   const shared = kinds.filter((k) => k.agents)
   const own = kinds.filter((k) => !k.agents)
   const sees = (a: AgentProfile, kind: string) => !(a.library?.hidden ?? []).includes(kind)
   if (!agents.length) return <EmptyState title="No agents yet" />
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto border border-line/60 bg-black/70 p-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto border border-line/60 tone-panel-70 p-4">
       <div className="text-[12.5px] text-dim">Which kinds of entry each agent can find, read and link. Click a cell to change one, a kind's name for every agent, or an agent for every kind.</div>
       <table className="border-collapse">
         <thead>
@@ -64,7 +64,7 @@ export function KindAccess() {
               const all = shared.every((k) => sees(a, k.kind))
               return (
                 <th key={a.id} className="px-2 pb-2 align-bottom">
-                  <button title={all ? `Hide every kind from ${a.name}` : `Let ${a.name} see every kind`} onClick={() => setVisible(a, shared.map((k) => k.kind), !all)} className="flex flex-col items-center gap-1 text-[11.5px] text-white/85 hover:text-accent">
+                  <button title={all ? `Hide every kind from ${a.name}` : `Let ${a.name} see every kind`} onClick={() => setVisible(a, shared.map((k) => k.kind), !all)} className="flex flex-col items-center gap-1 text-[11.5px] text-ink/85 hover:text-accent">
                     <AgentAvatar agent={a} size={26} />
                     <span className="max-w-24 truncate">{a.name}</span>
                   </button>
@@ -79,10 +79,10 @@ export function KindAccess() {
             return (
               <tr key={k.kind} className="border-t border-line/20">
                 <td className="py-1.5 pr-4">
-                  <button title={all ? `Hide ${k.plural.toLowerCase()} from every agent` : `Let every agent see ${k.plural.toLowerCase()}`} onClick={() => agents.forEach((a) => setVisible(a, [k.kind], !all))} className="flex items-center gap-2 text-left text-[13px] text-white/90 hover:text-accent">
-                    <KindIcon name={k.icon} className="h-3.5 w-3.5 shrink-0 text-teal/80" />
+                  <button title={all ? `Hide ${k.plural.toLowerCase()} from every agent` : `Let every agent see ${k.plural.toLowerCase()}`} onClick={() => agents.forEach((a) => setVisible(a, [k.kind], !all))} className="flex items-center gap-2 text-left text-[13px] text-ink/90 hover:text-accent">
+                    <KindIcon name={k.icon} className="h-3.5 w-3.5 shrink-0 text-secondary/80" />
                     {k.plural}
-                    {k.source && <span className="border border-line/60 px-1 font-mono text-[9px] uppercase text-faint">add-on</span>}
+                    {k.source && <span className="border border-line/60 px-1 font-label text-[9px] caps text-faint">add-on</span>}
                   </button>
                 </td>
                 {agents.map((a) => (

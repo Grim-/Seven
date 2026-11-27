@@ -17,7 +17,7 @@ export function SetBoxes({ values, hints = [], onChange }: { values: string[]; h
           placeholder={hints[i] !== undefined ? String(hints[i]) : '—'}
           title={`Set ${i + 1}`}
           onChange={(e) => set(i, e.target.value)}
-          className="h-8 w-14 border border-line/50 bg-black/60 px-1.5 text-center font-mono text-[13px] text-white outline-none placeholder:text-faint/60 focus:border-accent/70"
+          className="h-8 w-14 border border-line/50 tone-well-60 px-1.5 text-center font-ui text-[13px] text-ink outline-none placeholder:text-faint/60 focus:border-accent/70"
         />
       ))}
       <button title="Add a set" onClick={() => onChange([...Array.from({ length: count }, (_, j) => values[j] ?? ''), ''])} className="flex h-8 items-center gap-1 border border-dashed border-line/50 px-2 text-[11.5px] text-faint hover:border-accent/60 hover:text-accent">

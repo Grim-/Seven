@@ -8,7 +8,7 @@ import type { Card } from '../cards/model'
 function Part({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-[0.4em]">
-      <b className="font-mono text-[0.88em] uppercase tracking-[0.06em] text-white/95">{label}</b>
+      <b className="font-label text-[0.88em] caps-6 text-ink/95">{label}</b>
       {children}
     </div>
   )

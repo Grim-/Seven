@@ -74,7 +74,7 @@ export function HubSearch({ onOpen }: { onOpen: (model: HubModel) => void }) {
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {isPacks ? (
         <>
-          <div className="flex flex-wrap items-center gap-2 border border-line bg-panel px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2 border border-line tone-surface-60 px-3 py-2">
             <SearchBox value={text} onChange={setText} placeholder={meta.placeholder} className="w-72" />
             <Segmented value={pickedFamily} options={FAMILIES} onChange={(v) => setPickedFamily(v)} />
           </div>

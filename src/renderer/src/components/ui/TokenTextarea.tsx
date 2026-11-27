@@ -70,11 +70,11 @@ export const TokenTextarea = forwardRef<HTMLTextAreaElement | null, TokenTextare
           setQuery(null)
           onBlur?.(e)
         }}
-        className={cn('w-full resize-y border border-line bg-black/60 px-2.5 py-2 text-[13.5px] leading-relaxed text-white outline-none placeholder:text-dim/60 focus:border-accent/60', className)}
+        className={cn('w-full resize-y border border-line tone-well-60 px-2.5 py-2 text-[13.5px] leading-relaxed text-ink outline-none placeholder:text-dim/60 focus:border-accent/60', className)}
         {...rest}
       />
       {query && matches.length > 0 && (
-        <div className="absolute left-2 right-2 top-full z-30 -mt-1 border border-accent/60 bg-black/95 py-0.5 shadow-lg">
+        <div className="absolute left-2 right-2 top-full z-30 -mt-1 border border-accent/60 tone-panel-95 py-0.5 shadow-lg">
           {matches.map((m, i) => (
             <button
               key={m.value}
@@ -82,9 +82,9 @@ export const TokenTextarea = forwardRef<HTMLTextAreaElement | null, TokenTextare
                 e.preventDefault()
                 insert(m.value)
               }}
-              className={cn('flex w-full items-baseline gap-2 px-2.5 py-1 text-left', i === pick ? 'bg-accent/15' : 'hover:bg-white/[0.04]')}
+              className={cn('flex w-full items-baseline gap-2 px-2.5 py-1 text-left', i === pick ? 'bg-accent/15' : 'hover:bg-ink/[0.04]')}
             >
-              <span className="font-mono text-[12px] text-white">
+              <span className="font-ui text-[12px] text-ink">
                 {open}
                 {m.value}
                 {close}

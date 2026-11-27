@@ -1,4 +1,5 @@
 import './index.css'
+import './theme/looks/register'
 import './transport/electron'
 import './transport/remote'
 import { startTransport } from './lib/transport'

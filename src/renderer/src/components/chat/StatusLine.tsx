@@ -33,7 +33,7 @@ export function StatusLine({ messageId }: { messageId: string }) {
   if (!shown) return null
   const seconds = phase ? Math.floor((now - phase.since) / 1000) : 0
   return (
-    <div className="mt-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-teal/80">
+    <div className="mt-2 flex items-center gap-2 font-label text-[11px] caps-14 text-secondary/80">
       {shown.icon}
       <span className="truncate normal-case tracking-normal">{shown.text}</span>
       {seconds >= 2 && <span className="text-faint">{seconds}s</span>}

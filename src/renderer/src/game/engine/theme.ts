@@ -1,8 +1,15 @@
+import { rgba } from '../../lib/cssColors'
+import type { Roles } from '../../lib/skins/roles'
+import { currentRoles } from '../../lib/skins/useRoleColours'
+
 export interface GameTheme {
   bg: string
   card: string
+  surface: string
+  well: string
   line: string
   accent: string
+  secondary: string
   cyan: string
   purple: string
   alert: string
@@ -12,44 +19,31 @@ export interface GameTheme {
   font: string
 }
 
-const COLORS: Record<Exclude<keyof GameTheme, 'font'>, [string, string]> = {
-  bg: ['--color-bg', '#090a0d'],
-  card: ['--color-card', '#11141c'],
-  line: ['--color-line', 'rgba(245, 158, 11, 0.35)'],
-  accent: ['--color-accent', '#ffc919'],
-  cyan: ['--color-cyan', 'rgb(102, 252, 241)'],
-  purple: ['--color-purple', '#a855f7'],
-  alert: ['--color-alert', '#ef4444'],
-  ok: ['--color-ok', '#34d399'],
-  text: ['--color-text', '#ffffff'],
-  dim: ['--color-dim', '#a1a1aa']
-}
-
 export function themeColour(theme: GameTheme, name: string | null, fallback: string): string {
   if (!name || name === 'font' || !(name in theme)) return fallback
   return theme[name as keyof GameTheme]
 }
 
-function resolved(probe: HTMLElement, g: CanvasRenderingContext2D, name: string, fallback: string): string {
-  probe.style.color = `var(${name}, ${fallback})`
-  g.clearRect(0, 0, 1, 1)
-  g.fillStyle = fallback
-  g.fillStyle = getComputedStyle(probe).color
-  g.fillRect(0, 0, 1, 1)
-  const [r, gr, b, a] = g.getImageData(0, 0, 1, 1).data
-  return `rgba(${r}, ${gr}, ${b}, ${Math.round((a / 255) * 1000) / 1000})`
+export function gameTheme({ colours: c, fonts }: Roles): GameTheme {
+  const solid = (hex: string) => rgba(hex, 1)
+  return {
+    bg: solid(c.bg),
+    card: solid(c.card),
+    surface: solid(c.surface),
+    well: solid(c.well),
+    line: solid(c.line),
+    accent: solid(c.accent),
+    secondary: solid(c.secondary),
+    cyan: solid(c.cyan),
+    purple: solid(c.purple),
+    alert: solid(c.alert),
+    ok: solid(c.ok),
+    text: solid(c.ink),
+    dim: solid(c.dim),
+    font: fonts.sans
+  }
 }
 
 export function readTheme(): GameTheme {
-  const font = getComputedStyle(document.documentElement).getPropertyValue('--font-sans').trim() || 'Segoe UI, sans-serif'
-  const probe = document.createElement('span')
-  probe.style.display = 'none'
-  document.body.appendChild(probe)
-  const g = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
-  try {
-    const colors = Object.fromEntries(Object.entries(COLORS).map(([key, [name, fallback]]) => [key, g ? resolved(probe, g, name, fallback) : fallback]))
-    return { ...(colors as Omit<GameTheme, 'font'>), font }
-  } finally {
-    probe.remove()
-  }
+  return gameTheme(currentRoles())
 }

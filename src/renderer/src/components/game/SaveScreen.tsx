@@ -40,7 +40,7 @@ function Loaded({ save, select }: { save: GameSave; select: KindScreenProps['sel
       <div className="mx-auto flex w-full max-w-[900px] flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <InlineTitle value={save.name} onSave={(name) => void engine('saves.rename', { id: save.id, name }).catch(failed('Could not rename the save'))} />
-          <span className="border border-line/50 px-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-dim">Save</span>
+          <span className="border border-line/50 px-1.5 font-label text-[10px] caps-12 text-dim">Save</span>
           <span className="flex-1" />
           <Button size="sm" variant="primary" icon={<Play />} disabled={!world} onClick={play}>
             Play
@@ -54,9 +54,9 @@ function Loaded({ save, select }: { save: GameSave; select: KindScreenProps['sel
           <Eyebrow>Characters</Eyebrow>
           {people.length ? (
             people.map((v) => (
-              <div key={v.sheet} className="flex items-center gap-2.5 border border-line/40 bg-white/[0.015] p-2">
+              <div key={v.sheet} className="flex items-center gap-2.5 border border-line/40 bg-ink/[0.015] p-2">
                 <SheetPortrait image={v.image} className="h-9 w-9" />
-                <span className="min-w-0 flex-1 truncate text-[13px] text-white">{showName(v.name)}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{showName(v.name)}</span>
                 <Button size="sm" variant="ghost" icon={<DoorOpen />} onClick={() => takeOut(v)}>
                   Take out
                 </Button>
@@ -85,7 +85,7 @@ function SaveCard({ id, short }: { id: string; short: boolean }) {
   if (!save) return <Loading />
   const rows: [string, string][] = [['World', world ?? save.world], ['Characters', people.map((v) => showName(v.name)).join(', ') || 'none']]
   return (
-    <EntryCard title={save.name} tag="Save" aside={<span className="font-mono text-[11px] text-faint">{save.id}</span>}>
+    <EntryCard title={save.name} tag="Save" aside={<span className="font-ui text-[11px] text-faint">{save.id}</span>}>
       <Facts rows={short ? rows.slice(0, 1) : rows} />
     </EntryCard>
   )

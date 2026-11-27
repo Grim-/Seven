@@ -44,10 +44,10 @@ function ChatPadPanel({ start, conv, running }: { start: PadDraft; conv: Convers
       'Could not save it'
     )
   return (
-    <div className="flex shrink-0 flex-col border-t border-line/60 bg-black/50">
+    <div className="flex shrink-0 flex-col border-t border-line/60 tone-panel-50">
       <div {...size.handle} title="Drag to resize" className="drag-bar" />
       <div className="flex flex-wrap items-center gap-2 px-3 py-1.5">
-        <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent">{draft.page ? showName(draft.title) : 'New paper'}</span>
+        <span className="font-label text-[10.5px] font-semibold caps-14 text-accent">{draft.page ? showName(draft.title) : 'New paper'}</span>
         <span className="flex-1" />
         {draft.page && (
           <Button size="sm" variant="ghost" icon={<Save />} disabled={busy} onClick={() => save(null)}>

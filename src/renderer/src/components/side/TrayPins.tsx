@@ -95,13 +95,13 @@ function EntryList({ kind, onPick }: { kind: string; onPick: (id: string) => voi
       .then(setList)
       .catch(noteFailure('library', 'Could not list them', () => setList([])))
   }, [kind])
-  if (list === null) return <div className="p-3 font-mono text-[11px] text-dim">Loading…</div>
+  if (list === null) return <div className="p-3 font-ui text-[11px] text-dim">Loading…</div>
   if (!list.length) return <div className="p-3 text-[12.5px] text-faint">Nothing here yet.</div>
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
       {list.map((h) => (
-        <button key={h.id} onClick={() => onPick(h.id)} className="flex flex-col border-l-2 border-l-transparent px-2 py-1.5 text-left hover:border-l-accent hover:bg-white/[0.03]">
-          <span className="truncate text-[13px] text-white">{h.title}</span>
+        <button key={h.id} onClick={() => onPick(h.id)} className="flex flex-col border-l-2 border-l-transparent px-2 py-1.5 text-left hover:border-l-accent hover:bg-ink/[0.03]">
+          <span className="truncate text-[13px] text-ink">{h.title}</span>
           {hitDetail(h) && <span className="truncate text-[11.5px] text-dim">{hitDetail(h)}</span>}
         </button>
       ))}
@@ -124,7 +124,7 @@ export function PinnedView({ pin }: { pin: TrayPin }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {sel && (
-        <button onClick={() => setSel(null)} className={cn('flex shrink-0 items-center gap-1 border-b border-line/40 px-2.5 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft hover:text-white')}>
+        <button onClick={() => setSel(null)} className={cn('flex shrink-0 items-center gap-1 border-b border-line/40 px-2.5 py-1 font-label text-[10.5px] font-semibold caps-14 text-accent-soft hover:text-ink')}>
           <ChevronLeft className="h-3.5 w-3.5" /> Back to {pin.label}
         </button>
       )}

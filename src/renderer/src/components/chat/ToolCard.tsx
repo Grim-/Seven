@@ -17,6 +17,7 @@ import { copyText } from '../../lib/notify'
 import { useConversation } from '../../lib/conversation'
 import { useThreadLook } from './threadLook'
 import { Trace, partTone } from './Trace'
+import { skinSurface } from '../skins/skinSurface'
 
 function seconds(part: ToolPart): string | undefined {
   return part.durationMs === undefined ? undefined : `${(part.durationMs / 1000).toFixed(1)}s`
@@ -40,17 +41,17 @@ function sentEntries(args: Record<string, unknown>): [string, string][] {
 function Sent({ entries }: { entries: [string, string][] }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-soft">Sent</div>
+      <div className="font-label text-[10px] font-semibold caps-16 text-accent-soft">Sent</div>
       {entries.map(([key, text]) =>
         text.includes('\n') || text.length > 90 ? (
           <div key={key} className="flex flex-col gap-0.5">
             <span className="font-mono text-[11px] text-faint">{key}</span>
-            <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words border-l-2 border-line/50 pl-2 font-mono text-[12px] text-white/85">{text}</pre>
+            <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words border-l-2 border-line/50 pl-2 font-mono text-[12px] text-ink/85">{text}</pre>
           </div>
         ) : (
           <div key={key} className="flex gap-2 font-mono text-[12px]">
             <span className="shrink-0 text-faint">{key}</span>
-            <span className="min-w-0 whitespace-pre-wrap break-words text-white/85">{text}</span>
+            <span className="min-w-0 whitespace-pre-wrap break-words text-ink/85">{text}</span>
           </div>
         )
       )}
@@ -60,7 +61,7 @@ function Sent({ entries }: { entries: [string, string][] }) {
 
 function StatusIcon({ part }: { part: ToolPart }) {
   if (part.ui?.status === 'pending') return <MessageCircleQuestion className="h-4 w-4 animate-pulse text-accent" />
-  if (part.status === 'running') return <LoaderCircle className="h-4 w-4 animate-spin text-cyan" />
+  if (part.status === 'running') return <LoaderCircle className="h-4 w-4 animate-spin text-secondary-ink" />
   if (part.status === 'error') return <CircleAlert className="h-4 w-4 text-alert" />
   if (part.status === 'blocked') return <ShieldX className="h-4 w-4 text-alert" />
   if (part.status === 'cancelled') return <CircleSlash className="h-4 w-4 text-faint" />
@@ -93,28 +94,28 @@ function ReasonCard({ part }: { part: ToolPart }) {
   }
   if (!expanded && look.foldTools) return <Trace tone="mind" label="reasoning" text={summary(part)} aside={seconds(part)} open={false} onToggle={() => setOpen(true)} />
   return (
-    <div className="my-2 border border-purple/50 bg-black/50">
-      <button onClick={() => setOpen(!expanded)} className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-white/[0.03]">
-        <Brain className="h-4 w-4 shrink-0 text-purple" />
-        <span className="font-mono text-[12px] font-semibold text-purple">reasoning</span>
-        {t.style && <span className="shrink-0 border border-purple/50 px-1 font-mono text-[10px] uppercase tracking-wider text-purple">{t.style}</span>}
-        {part.edited && <span title="You changed what the agent got back" className="shrink-0 border border-accent/60 px-1 font-mono text-[10px] uppercase tracking-wider text-accent">edited</span>}
-        <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-dim">{summary(part)}</span>
-        {part.durationMs !== undefined && <span className="shrink-0 font-mono text-[10.5px] text-faint">{seconds(part)}</span>}
+    <div className="my-2 border border-tint-purple/50 tone-panel-50">
+      <button onClick={() => setOpen(!expanded)} className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-ink/[0.03]">
+        <Brain className="h-4 w-4 shrink-0 text-tint-purple" />
+        <span className="font-ui text-[12px] font-semibold text-tint-purple">reasoning</span>
+        {t.style && <span className="shrink-0 border border-tint-purple/50 px-1 font-label text-[10px] caps-5 text-tint-purple">{t.style}</span>}
+        {part.edited && <span title="You changed what the agent got back" className="shrink-0 border border-accent/60 px-1 font-label text-[10px] caps-5 text-accent">edited</span>}
+        <span className="min-w-0 flex-1 truncate font-ui text-[12px] text-dim">{summary(part)}</span>
+        {part.durationMs !== undefined && <span className="shrink-0 font-data text-[10.5px] text-faint">{seconds(part)}</span>}
         <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-dim transition-transform', expanded && 'rotate-90')} />
       </button>
-      <div className="flex flex-col gap-2 border-t border-purple/30 px-2.5 py-2 text-[12.5px]">
+      <div className="flex flex-col gap-2 border-t border-tint-purple/30 px-2.5 py-2 text-[12.5px]">
         {expanded && t.question && (
           <div className="flex flex-col gap-0.5">
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">Asked</span>
+            <span className="font-label text-[10px] caps-14 text-faint">Asked</span>
             <div className="whitespace-pre-wrap text-accent-soft">{t.question}</div>
           </div>
         )}
-        {expanded && t.reasoning && <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words border-l-2 border-l-purple/60 pl-2.5 font-mono text-[12px] leading-relaxed text-white/80">{t.reasoning}</pre>}
+        {expanded && t.reasoning && <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words border-l-2 border-l-tint-purple/60 pl-2.5 font-ui text-[12px] leading-relaxed text-ink/80">{t.reasoning}</pre>}
         {draft === null ? (
           <div className="flex items-start gap-2">
-            <div className="min-w-0 flex-1 text-white">
-              <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent">Conclusion </span>
+            <div className="min-w-0 flex-1 text-ink">
+              <span className="font-label text-[10.5px] caps-14 text-accent">Conclusion </span>
               {conclusion}
             </div>
             <button
@@ -136,7 +137,7 @@ function ReasonCard({ part }: { part: ToolPart }) {
               <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>
                 Cancel
               </Button>
-              <span className="font-mono text-[10.5px] text-faint">The agent sees your version from your next message.</span>
+              <span className="font-ui text-[10.5px] text-faint">The agent sees your version from your next message.</span>
             </div>
           </div>
         )}
@@ -172,7 +173,7 @@ export function ToolCard(props: ToolCallMessagePartProps) {
   const streaming = part.status === 'running' && live !== undefined
   if (part.ui && (part.ui.kind !== 'approval' || part.ui.status === 'pending')) {
     return (
-      <div className="notch-sm my-3 border border-line border-l-2 border-l-accent bg-black/60 p-3.5">
+      <div {...skinSurface('approval')} className="notch-sm my-3 border border-line border-l-2 border-l-accent tone-panel-60 p-3.5">
         <UiRequestCard ui={part.ui} />
       </div>
     )
@@ -186,7 +187,7 @@ export function ToolCard(props: ToolCallMessagePartProps) {
 
   return (
     <div
-      className={cn('my-2 border bg-black/50', part.status === 'error' || part.status === 'blocked' ? 'border-alert/50' : 'border-line/50')}
+      className={cn('my-2 border tone-panel-50', part.status === 'error' || part.status === 'blocked' ? 'border-alert/50' : 'border-line/50')}
       onContextMenu={(e) =>
         openMenu(e, part.name, [
           { label: 'Copy result', icon: <Copy />, disabled: !(part.result ?? part.error), onSelect: () => void copyText(part.result ?? part.error ?? '') },
@@ -198,18 +199,18 @@ export function ToolCard(props: ToolCallMessagePartProps) {
       <button
         disabled={!expandable}
         onClick={() => setOpen(!expanded)}
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-white/[0.03] disabled:cursor-default"
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-ink/[0.03] disabled:cursor-default"
       >
         <StatusIcon part={part} />
         <span className="font-mono text-[12px] font-semibold text-accent">{part.name}</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-dim">{summary(part)}</span>
-        {repeat > 1 && <span className="shrink-0 border border-accent/50 px-1 font-mono text-[10px] uppercase tracking-wider text-accent">same call ×{repeat}</span>}
+        <span className="min-w-0 flex-1 truncate font-ui text-[12px] text-dim">{summary(part)}</span>
+        {repeat > 1 && <span className="shrink-0 border border-accent/50 px-1 font-label text-[10px] caps-5 text-accent">same call ×{repeat}</span>}
         {part.trimmed !== undefined && (
-          <span title="Removed from the model's context to save space. The model can read it again with read_kind." className="shrink-0 border border-line/60 px-1 font-mono text-[9.5px] uppercase tracking-wider text-faint">
+          <span title="Removed from the model's context to save space. The model can read it again with read_kind." className="shrink-0 border border-line/60 px-1 font-label text-[9.5px] caps-5 text-faint">
             trimmed
           </span>
         )}
-        {part.durationMs !== undefined && <span className="shrink-0 font-mono text-[10.5px] text-faint">{seconds(part)}</span>}
+        {part.durationMs !== undefined && <span className="shrink-0 font-data text-[10.5px] text-faint">{seconds(part)}</span>}
         {expandable && <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-dim transition-transform', expanded && 'rotate-90')} />}
       </button>
       {expanded && (
@@ -219,14 +220,14 @@ export function ToolCard(props: ToolCallMessagePartProps) {
           {streaming ? (
             <TerminalOutput command={String(part.args.command ?? '')} output={live} />
           ) : part.error ? (
-            <div className="font-mono text-[12px] text-alert">{part.error}</div>
+            <div className="font-ui text-[12px] text-alert">{part.error}</div>
           ) : part.view ? (
             <ViewRenderer view={part.view} />
           ) : part.result ? (
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[12px] text-white/90">{part.result}</pre>
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[12px] text-ink/90">{part.result}</pre>
           ) : null}
           {part.cut && (
-            <div className="font-mono text-[10.5px] text-faint">The model saw a shortened copy of this output; it can read the rest with read_kind.</div>
+            <div className="font-ui text-[10.5px] text-faint">The model saw a shortened copy of this output; it can read the rest with read_kind.</div>
           )}
         </div>
       )}

@@ -9,8 +9,10 @@ import {
   type StoryThreadKind,
   type StoryThreadStatus
 } from '@shared/story'
-import { Button, ChipInput, InlineEdit, RowAction, Segmented, StatusBadge, askConfirm } from '../../../ui'
+import { Button, ChipInput, RowAction, Segmented, StatusBadge, askConfirm } from '../../../ui'
 import { cn } from '../../../../lib/cn'
+import { LinkTextarea } from '../../LinkTextarea'
+import { LinkInlineEdit } from '../../LinkInlineEdit'
 
 const KIND_LABEL: Record<StoryThreadKind, string> = {
   arc: 'Arc',
@@ -41,11 +43,13 @@ export function threadStatus(t: StoryThread): StoryThreadStatus {
 export function StoryThreads({
   story,
   onChange,
-  query = ''
+  query = '',
+  title = 'Story Threads & Arcs'
 }: {
   story: Story
   onChange: (story: Story) => void
   query?: string
+  title?: string
 }) {
   const [filter, setFilter] = useState<'open' | 'resolved' | 'all'>('open')
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -95,12 +99,12 @@ export function StoryThreads({
   }).length
 
   return (
-    <section className="flex flex-col gap-2.5 border border-line/45 bg-black/40 p-3.5">
+    <section className="flex flex-col gap-2.5 border border-line/45 tone-panel-40 p-3.5">
       <div className="flex flex-wrap items-center gap-2 border-b border-line/35 pb-2">
-        <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-accent">
-          Story Threads &amp; Arcs
+        <span className="font-label text-[11px] font-bold caps-16 text-accent">
+          {title}
         </span>
-        <span className="font-mono text-[11px] text-dim">{activeCount} open</span>
+        <span className="font-ui text-[11px] text-dim">{activeCount} open</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Segmented
             value={filter}
@@ -118,7 +122,7 @@ export function StoryThreads({
       </div>
 
       {adding && (
-        <div className="flex flex-col gap-2 border border-accent/45 bg-black/60 p-3">
+        <div className="flex flex-col gap-2 border border-accent/45 tone-panel-60 p-3">
           <div className="flex flex-wrap items-center gap-1.5">
             {STORY_THREAD_KINDS.map((k) => (
               <button
@@ -126,7 +130,7 @@ export function StoryThreads({
                 type="button"
                 onClick={() => setDraftKind(k)}
                 className={cn(
-                  'border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider',
+                  'border px-2 py-0.5 font-label text-[10px] caps-5 ',
                   draftKind === k ? 'border-accent bg-accent/15 text-accent' : 'border-line/40 text-faint hover:text-dim'
                 )}
               >
@@ -139,15 +143,14 @@ export function StoryThreads({
             onChange={(e) => setDraftTitle(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && create()}
             placeholder="Thread or personal arc (e.g. Uncover who burned the crystal foundry)"
-            className="h-8 border border-line/60 bg-black/70 px-2.5 text-[13px] text-white outline-none focus:border-accent"
+            className="h-8 border border-line/60 tone-well-70 px-2.5 text-[13px] text-ink outline-none focus:border-accent"
             autoFocus
           />
-          <textarea
+          <LinkTextarea rolls={false}
             value={draftDetail}
-            onChange={(e) => setDraftDetail(e.target.value)}
+            onValue={(v) => setDraftDetail(v)}
             rows={2}
             placeholder="Context, stakes, or next beat (optional)"
-            className="border border-line/50 bg-black/70 px-2.5 py-1.5 text-[12.5px] text-white/90 outline-none focus:border-accent"
           />
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>
@@ -161,7 +164,7 @@ export function StoryThreads({
       )}
 
       {rows.length === 0 ? (
-        <div className="py-1 font-mono text-[11.5px] text-faint">
+        <div className="py-1 font-ui text-[11.5px] text-faint">
           {q ? 'No threads match that filter.' : filter === 'open' ? 'No active story threads yet — track quests, mysteries, promises, or personal arcs here.' : 'No threads here yet.'}
         </div>
       ) : (
@@ -174,7 +177,7 @@ export function StoryThreads({
               <div
                 key={key}
                 className={cn(
-                  'flex flex-col border bg-black/50 transition-colors',
+                  'flex flex-col border tone-panel-50 transition-colors',
                   t.done ? 'border-line/30 opacity-70' : 'border-line/45 hover:border-line/70'
                 )}
               >
@@ -187,20 +190,20 @@ export function StoryThreads({
                   >
                     <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge>
                   </button>
-                  <span className="border border-line/50 px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-cyan">
+                  <span className="border border-line/50 px-1.5 py-0.5 font-label text-[9.5px] caps-5 text-secondary-ink">
                     {KIND_LABEL[kind]}
                   </span>
                   <div className="min-w-[10rem] flex-1">
-                    <InlineEdit
+                    <LinkInlineEdit
                       value={t.text}
                       required
                       onSave={(text) => updateAt(i, { text })}
-                      className={cn('text-[13px] font-medium', t.done ? 'text-faint line-through' : 'text-white')}
+                      className={cn('text-[13px] font-medium', t.done ? 'text-faint line-through' : 'text-ink')}
                     />
                   </div>
-                  {t.where && <span className="font-mono text-[11px] text-cyan/80">@ {t.where}</span>}
+                  {t.where && <span className="font-ui text-[11px] text-secondary-ink/80">@ {t.where}</span>}
                   {t.who && t.who.length > 0 && (
-                    <span className="font-mono text-[11px] text-dim">{t.who.join(', ')}</span>
+                    <span className="font-ui text-[11px] text-dim">{t.who.join(', ')}</span>
                   )}
                   <div className="flex items-center gap-0.5">
                     <RowAction
@@ -231,7 +234,7 @@ export function StoryThreads({
                 )}
 
                 {isOpen && (
-                  <div className="flex flex-col gap-2.5 border-t border-line/35 bg-black/40 p-3">
+                  <div className="flex flex-col gap-2.5 border-t border-line/35 tone-panel-40 p-3">
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center gap-1">
                         {STORY_THREAD_KINDS.map((k) => (
@@ -240,8 +243,8 @@ export function StoryThreads({
                             type="button"
                             onClick={() => updateAt(i, { kind: k })}
                             className={cn(
-                              'border px-1.5 py-0.5 font-mono text-[10px] uppercase',
-                              kind === k ? 'border-cyan bg-cyan/15 text-cyan' : 'border-line/40 text-faint hover:text-dim'
+                              'border px-1.5 py-0.5 font-label text-[10px] caps',
+                              kind === k ? 'border-secondary-ink bg-secondary-ink/15 text-secondary-ink' : 'border-line/40 text-faint hover:text-dim'
                             )}
                           >
                             {KIND_LABEL[k]}
@@ -255,7 +258,7 @@ export function StoryThreads({
                             type="button"
                             onClick={() => updateAt(i, { status: st })}
                             className={cn(
-                              'border px-1.5 py-0.5 font-mono text-[10px] uppercase',
+                              'border px-1.5 py-0.5 font-label text-[10px] caps',
                               status === st ? 'border-accent bg-accent/15 text-accent' : 'border-line/40 text-faint hover:text-dim'
                             )}
                           >
@@ -266,27 +269,27 @@ export function StoryThreads({
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-dim">Context, stakes &amp; next beat</span>
-                      <InlineEdit
+                      <span className="font-label text-[10px] caps-5 text-dim">Context, stakes &amp; next beat</span>
+                      <LinkInlineEdit
                         value={t.detail ?? ''}
                         placeholder="Why this thread matters, clues found so far, or next step..."
                         onSave={(detail) => updateAt(i, { detail: detail.trim() || undefined })}
-                        className="border border-line/40 bg-black/50 px-2 py-1 text-[12.5px] text-white/90"
+                        className="border border-line/40 tone-panel-50 px-2 py-1 text-[12.5px] text-ink/90"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div className="flex flex-col gap-1">
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-dim">Where (@place:... or freeform)</span>
-                        <InlineEdit
+                        <span className="font-label text-[10px] caps-5 text-dim">Where (@place:... or freeform)</span>
+                        <LinkInlineEdit
                           value={t.where ?? ''}
                           placeholder="Associated location"
                           onSave={(where) => updateAt(i, { where: where.trim() || undefined })}
-                          className="border border-line/40 bg-black/50 px-2 py-1 font-mono text-[12px] text-white/90"
+                          className="border border-line/40 tone-panel-50 px-2 py-1 font-ui text-[12px] text-ink/90"
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-dim">Who is involved</span>
+                        <span className="font-label text-[10px] caps-5 text-dim">Who is involved</span>
                         <ChipInput
                           value={t.who ?? []}
                           onChange={(who) => updateAt(i, { who: who.length ? who : undefined })}

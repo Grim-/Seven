@@ -7,6 +7,7 @@ import {
   type ViewRef
 } from '@shared/types'
 import type { AssetMeta } from '@shared/types'
+import type { RelationshipEntry } from '@shared/relationships'
 import type { ExportPreset } from '@shared/exporting'
 import type { KindPortabilityMeta } from '@shared/portability'
 import type { WidgetSource } from '@shared/types'
@@ -52,6 +53,7 @@ export interface KindChildInput {
   kind: string
   id: string
   title: string
+  path?: string
 }
 
 export interface KindChild extends KindChildInput {
@@ -110,6 +112,7 @@ export interface Kind {
   line(id: string, ctx: KindContext): string
   card(id: string, ctx: KindContext): string
   full(id: string, options: ReadOptions, ctx: KindContext): string
+  brief?(id: string, ctx: KindContext): { title: string; text: string }
   handTo?: KindHandTo
   fields?(id: string, ctx: KindContext): KindField[]
   title(id: string): string
@@ -133,6 +136,7 @@ export interface Kind {
   image?(id: string): string | null
   exportAtRoot?: boolean
   pageTypes?: string[]
+  home?: string | null
   lasting?: boolean
   inKindList?: boolean
   actionsStayWhenHidden?: boolean
@@ -140,8 +144,15 @@ export interface Kind {
   pack?(id: string, options?: Record<string, unknown>): unknown
   uses?(id: string, options?: Record<string, unknown>): EntryRef[]
   unpack?(value: unknown, how: Unpack): string
+  placesOwnFiles?: boolean
   children?(id: string, ctx: KindContext, trail: TrailStep[]): KindChildInput[]
+  relations?: KindRelations
   pathOf?(id: string, ctx: KindContext): string | null
+}
+
+export interface KindRelations {
+  list(id: string): RelationshipEntry[]
+  save(id: string, list: RelationshipEntry[]): void
 }
 
 export const MAX_TEXT = 12000

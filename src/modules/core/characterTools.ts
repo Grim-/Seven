@@ -2,29 +2,37 @@ import { DND_COINS, DND_CONDITIONS, DND_SKILLS, DND_STATS, blankDnd, cleanDnd, t
 import { toId } from '@shared/ids'
 import {
   STORY_ENTRY_KINDS,
-  STORY_MEMORY_CATEGORIES,
-  STORY_PHASES,
   STORY_THREAD_KINDS,
   STORY_THREAD_STATUSES,
-  formatStorySnippet,
   newMemory,
   newSession,
   newThread,
   searchStoryItems,
   storyHitById,
   type StoryEntryKind,
-  type StoryMemoryCategory,
-  type StoryPhase,
+  type StoryRecallHit,
   type StoryThreadKind,
   type StoryThreadStatus
 } from '@shared/story'
-import { findSheet, getSheet, setDnd, setMind, setSheetRelationships, setStory } from '../../engine/library/sheets'
-import { ToolError, optBool, optInt, optStr, str, type ToolDef } from '../../engine/tools/types'
-import { applyRelationshipRemove, applyRelationshipUpsert, extractRelationshipPatch, formatRelationshipChange, formatRelationshipDetail, removeRelationshipSchema, setRelationshipSchema } from '../../engine/relationships'
+import { findSheet, getSheet, setDnd, setStory } from '../../engine/library/sheets'
+import { campaignOf, editHold, holdIn, holdsOf, saveHold, sheetIn } from '../../engine/library/holds'
+import { grantKnowledge, knowledge, knownBy, worldsOfSheet } from '../../engine/worlds/knowledge'
+import { bindingOrNull } from '../../engine/worlds/ops'
+import { sessionAccess } from '../../engine/sessions/access'
+import { sessionWorld } from '../../engine/worlds/chatWorld'
+import { knowledgeRef, splitKnowledgeRef } from '@shared/worldKnowledge'
+import { ToolError, optBool, optInt, optStr, str, type ToolContext, type ToolDef } from '../../engine/tools/types'
+import { categoryMeta, searchRelationships, type RelationshipEntry } from '@shared/relationships'
+import { applyRelationshipUpsert, extractRelationshipPatch, formatRelationshipChange, setRelationshipSchema } from '../../engine/relationships'
 
-function sheetOf(raw: string) {
-  const id = findSheet(raw)
-  if (!id) throw new ToolError(`No sheet ${raw}. find with kind sheet lists characters.`)
+function activeWorldOf(ctx?: ToolContext): string | null {
+  if (!ctx) return null
+  return bindingOrNull(ctx.agentId)?.worldId ?? sessionWorld(ctx.sessionId, ctx.agentId)
+}
+
+function sheetOf(raw: string, ctx?: ToolContext) {
+  const id = findSheet(raw, activeWorldOf(ctx))
+  if (!id) throw new ToolError(`No character or world NPC "${raw}". find with kind sheet or world lists them.`)
   return getSheet(id)
 }
 
@@ -39,7 +47,7 @@ const updateStats: ToolDef = {
   params: {
     type: 'object',
     properties: {
-      sheet: { type: 'string', description: 'The character, e.g. Valerius' },
+      sheet: { type: 'string', description: 'The character or world NPC, e.g. Valerius or @world:elysium/npc/marta' },
       race: TEXT('e.g. Air genasi'),
       class: TEXT('e.g. Rogue'),
       level: INT('1 to 20'),
@@ -57,8 +65,8 @@ const updateStats: ToolDef = {
       alignment: TEXT('e.g. Chaotic good')
     }
   },
-  async execute(params) {
-    const s = sheetOf(str(params, 'sheet'))
+  async execute(params, ctx) {
+    const s = sheetOf(str(params, 'sheet'), ctx)
     const current = s.dnd ?? blankDnd()
     const given = (key: string) => params[key] !== undefined && params[key] !== null && params[key] !== ''
     const pick = <T,>(key: string, fallback: T): unknown => (given(key) ? params[key] : fallback)
@@ -99,154 +107,318 @@ function mergeTags(existing?: string[], added?: string[]): string[] | undefined 
   return merged.length ? merged : undefined
 }
 
-const addStoryLog: ToolDef = {
-  name: 'add_story_log',
+function formatTags(tags: string[], comma = false): string {
+  const clean = tags.map((t) => `#${t.replace(/^#/, '').trim()}`).filter((t) => t.length > 1)
+  return clean.join(comma ? ', ' : ' ')
+}
+
+const KNOWLEDGE_FORMATTERS = new Map<StoryRecallHit['kind'], (hit: StoryRecallHit) => string>([
+  [
+    'knowledge',
+    (hit) => {
+      const lines = ['[World Knowledge]', `Context: ${hit.detail || hit.summary}`]
+      if (hit.tags.length) lines.push(formatTags(hit.tags))
+      return lines.join('\n')
+    }
+  ],
+  [
+    'log',
+    (hit) => {
+      const lines = [hit.label.includes('backstory') ? '[Backstory]' : '[Event]']
+      const title = hit.label.split(' · ')[1]
+      if (title && !title.startsWith('Entry ')) lines.push(title)
+      lines.push(`Context: ${hit.detail || hit.summary}`)
+      if (hit.outcome) lines.push(`Outcome: ${hit.outcome}`)
+      if (hit.tags.length) lines.push(formatTags(hit.tags))
+      return lines.join('\n')
+    }
+  ]
+])
+
+function formatKnowledgeHit(hit: StoryRecallHit): string {
+  const custom = KNOWLEDGE_FORMATTERS.get(hit.kind)
+  if (custom) return custom(hit)
+  const tagPrefix = hit.tags.length ? `${formatTags(hit.tags, true)} - ` : ''
+  const header = hit.label === 'backstory' ? '[Backstory]' : '[Memory]'
+  const body = `${tagPrefix}${hit.summary}`
+  return hit.detail ? `${header}\n${body}\n${hit.detail}` : `${header}\n${body}`
+}
+
+function formatRelationHit(sheetTitle: string, r: RelationshipEntry): string {
+  const lines = [
+    `[Relation: ${categoryMeta(r.category).label}]`,
+    `${sheetTitle} -> ${r.target} (relation type : ${r.role || r.stance})`
+  ]
+  if (r.ref) lines.push(`relevant link ${r.ref}`)
+  if (r.notes) lines.push(`notes: ${r.notes}`)
+  return lines.join('\n')
+}
+
+const characterSearchKnowledge: ToolDef = {
+  name: 'character_search_knowledge',
   group: 'core',
   needsWorkspace: false,
-  description: "Record, update, or remove structured historical story notes on a character sheet with phase ('session', 'recent', 'backstory'), entry kind ('scene', 'interaction', 'milestone', 'downtime'), location ('where'), people present ('who'), tags, outcome, and a short summary snippet.",
+  lookup: true,
+  description: "Search a character sheet's own knowledge: memories, world knowledge, events, and backstory (NOT Agent Mind, and NOT relations — use character_recall_relation for relations). Pass keywords as an array or string, or pass id to read one entry in full.",
   params: {
     type: 'object',
     properties: {
-      sheet: { type: 'string', description: 'The character' },
-      id: TEXT('Existing story log id (s...) to update or remove instead of creating/appending'),
-      remove: { type: ['boolean', 'null'], description: 'When true with id, remove that story log entry' },
-      text: TEXT('Full event notes in markdown (required when creating/appending)'),
-      summary: TEXT('Concise 1-line snippet summarizing the event for recall (recommended)'),
-      outcome: TEXT('Optional consequence or outcome line'),
-      title: TEXT('Optional title for this story log entry'),
-      phase: { type: ['string', 'null'], enum: [...STORY_PHASES, null], description: "When this belongs: 'session' (default), 'recent', or 'backstory'" },
-      kind: { type: ['string', 'null'], enum: [...STORY_ENTRY_KINDS, null], description: "Entry kind: 'scene' (default), 'interaction', 'milestone', or 'downtime'" },
-      where: TEXT('Place link (@place:...) or freeform location where it happened'),
-      who: { type: ['array', 'null'], items: { type: 'string' }, description: 'Characters or NPCs present' },
-      tags: { type: ['array', 'null'], items: { type: 'string' }, description: 'Topic/keyword tags for recall' },
-      pin: { type: ['boolean', 'null'], description: 'Keep this entry pinned in default story prompt context' },
-      new_session: { type: ['boolean', 'null'], description: 'True to create a separate log entry instead of appending to the latest entry' }
-    }
+      sheet: { type: 'string', description: 'The character or world NPC name or link' },
+      keywords: {
+        oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }, { type: 'null' }],
+        description: "Trigger words/topics to search for, e.g. ['magic', 'world']"
+      },
+      id: TEXT('Optional entry id (mem_…, s…, or world/entry) to read in full')
+    },
+    required: ['sheet']
   },
-  async execute(params) {
-    const s = sheetOf(str(params, 'sheet'))
-    const existingId = optStr(params, 'id')?.trim()
-    const body = optStr(params, 'text')?.trim() ?? ''
-    const summary = optStr(params, 'summary')?.trim()
-    const outcome = optStr(params, 'outcome')?.trim()
-    const title = optStr(params, 'title')?.trim()
-    const rawPhase = optStr(params, 'phase')?.trim()
-    const phase: StoryPhase | undefined = rawPhase && (STORY_PHASES as readonly string[]).includes(rawPhase) ? (rawPhase as StoryPhase) : undefined
-    const rawKind = optStr(params, 'kind')?.trim()
-    const kind: StoryEntryKind | undefined = rawKind && (STORY_ENTRY_KINDS as readonly string[]).includes(rawKind) ? (rawKind as StoryEntryKind) : undefined
-    const where = optStr(params, 'where')?.trim()
-    const who = strList(params.who)
-    const tags = strList(params.tags)
-    const pin = optBool(params, 'pin')
-
-    if (existingId) {
-      const idx = s.story.sessions.findIndex((x) => x.id === existingId)
-      if (idx < 0) throw new ToolError(`No story log "${existingId}" on ${s.title}. Use story_recall to find ids.`)
-      if (optBool(params, 'remove') === true) {
-        const sessions = s.story.sessions.filter((x) => x.id !== existingId)
-        setStory(s.id, { ...s.story, sessions })
-        return `Removed story log ${existingId} from ${s.title}'s story.`
-      }
-      const prev = s.story.sessions[idx]
-      const updated = {
-        ...prev,
-        ...(title !== undefined ? { title } : {}),
-        ...(phase ? { phase } : {}),
-        ...(kind ? { kind } : {}),
-        ...(summary !== undefined ? { summary } : {}),
-        ...(outcome !== undefined ? { outcome } : {}),
-        ...(where !== undefined ? { where } : {}),
-        ...(pin !== null ? { pinned: pin } : {}),
-        ...(body ? { notes: body } : {}),
-        who: who.length ? mergeTags(prev.who, who) : prev.who,
-        tags: tags.length ? mergeTags(prev.tags, tags) : prev.tags
-      }
-      const sessions = [...s.story.sessions.slice(0, idx), updated, ...s.story.sessions.slice(idx + 1)]
-      setStory(s.id, { ...s.story, sessions })
-      return `Updated story log ${updated.id} on ${s.title}'s story.`
+  async execute(params, ctx) {
+    const s = sheetIn(sheetOf(str(params, 'sheet'), ctx).id, campaignOf(ctx.sessionId))
+    const memories = s.mind?.memories ?? []
+    const known = knownBy(s, worldsOfSheet(s.id))
+    const id = optStr(params, 'id')?.trim()
+    if (id) {
+      const hit = storyHitById(s.story, id, memories, [], known)
+      if (!hit) return `No memory, event, backstory, or world knowledge with id "${id}" found on ${s.title}.`
+      return `${s.title} recalls\n\n${formatKnowledgeHit(hit)}`
     }
 
-    if (!body) throw new ToolError('Give text to add.')
-    const targetPhase: StoryPhase = phase ?? 'session'
-    const createNew = optBool(params, 'new_session') === true || !s.story.sessions.length || targetPhase !== 'session' || Boolean(title && s.story.sessions[s.story.sessions.length - 1]?.title && s.story.sessions[s.story.sessions.length - 1].title !== title)
-
-    if (createNew) {
-      const entry = newSession(undefined, {
-        title: title ?? '',
-        notes: body,
-        phase: targetPhase,
-        ...(kind ? { kind } : {}),
-        ...(summary ? { summary } : {}),
-        ...(outcome ? { outcome } : {}),
-        ...(where ? { where } : {}),
-        ...(who.length ? { who } : {}),
-        ...(tags.length ? { tags } : {}),
-        ...(pin === true ? { pinned: true } : {})
-      })
-      const sessions = [...s.story.sessions, entry]
-      setStory(s.id, { ...s.story, sessions })
-      return `Recorded ${targetPhase} log ${entry.id} (${sessions.length}) on ${s.title}'s story.`
+    const rawKw = params.keywords
+    const query = Array.isArray(rawKw) ? strList(rawKw).join(' ') : typeof rawKw === 'string' ? rawKw.trim() : ''
+    const hits = searchStoryItems(s.story, query, { includePinned: true, memories, known })
+      .filter((h) => h.kind !== 'relationship')
+      .slice(0, 12)
+    if (!hits.length) {
+      return `${s.title} recalls nothing matching${query ? ` "${query}"` : ''}.`
     }
-
-    const last = s.story.sessions[s.story.sessions.length - 1]
-    const updated = {
-      ...last,
-      ...(title ? { title } : {}),
-      ...(kind ? { kind } : {}),
-      ...(summary ? { summary } : {}),
-      ...(outcome ? { outcome } : {}),
-      ...(where ? { where } : {}),
-      ...(pin !== null ? { pinned: pin } : {}),
-      who: mergeTags(last.who, who),
-      tags: mergeTags(last.tags, tags),
-      notes: last.notes.trim() ? `${last.notes.trim()}\n\n${body}` : body
-    }
-    setStory(s.id, { ...s.story, sessions: [...s.story.sessions.slice(0, -1), updated] })
-    return `Added to story log ${updated.id} (${s.story.sessions.length}) of ${s.title}'s story.`
+    return `${s.title} recalls\n\n${hits.map(formatKnowledgeHit).join('\n\n')}`
   }
 }
 
-const setStoryWhere: ToolDef = {
-  name: 'set_story_where',
+const characterRecallRelation: ToolDef = {
+  name: 'character_recall_relation',
   group: 'core',
   needsWorkspace: false,
-  description: "Update a character's present state (where they are, what they are doing right now, focus/goal, state/stakes, core backstory summary) and/or open story threads.",
+  lookup: true,
+  description: "Recall a character's relationships across ALL categories (person, place, thing, faction, concept, event) by keywords, names, @ links, or relation ids.",
   params: {
     type: 'object',
     properties: {
-      sheet: { type: 'string', description: 'The character' },
+      sheet: { type: 'string', description: 'The character or world NPC name or link' },
+      keywords_or_ids: {
+        oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }, { type: 'null' }],
+        description: "Keywords, names, @sheet:/@world:/@place:/@faction: links, or relation ids (rel_…)"
+      }
+    },
+    required: ['sheet']
+  },
+  async execute(params, ctx) {
+    const s = sheetIn(sheetOf(str(params, 'sheet'), ctx).id, campaignOf(ctx.sessionId))
+    const relationships = s.relationships ?? []
+    if (!relationships.length) return `${s.title} has no recorded relationships.`
+    const raw = params.keywords_or_ids
+    const terms = Array.isArray(raw) ? strList(raw) : typeof raw === 'string' && raw.trim() ? [raw.trim()] : []
+    let matched: RelationshipEntry[]
+    if (!terms.length) {
+      matched = [...relationships].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || b.updatedAt - a.updatedAt).slice(0, 12)
+    } else {
+      const byId = new Map<string, RelationshipEntry>()
+      for (const term of terms) {
+        const direct = relationships.find((r) => r.id === term || r.ref?.toLowerCase() === term.toLowerCase())
+        if (direct) byId.set(direct.id, direct)
+      }
+      const query = terms.join(' ')
+      for (const { entry } of searchRelationships(relationships, query, { includePinned: true })) {
+        if (!byId.has(entry.id)) byId.set(entry.id, entry)
+      }
+      matched = [...byId.values()].slice(0, 12)
+    }
+    if (!matched.length) return `${s.title} knows of no matching relations.`
+    return `${s.title} knows of..\n\n${matched.map((r) => formatRelationHit(s.title, r)).join('\n\n')}`
+  }
+}
+
+const characterLearnMemory: ToolDef = {
+  name: 'character_learn_memory',
+  group: 'core',
+  needsWorkspace: false,
+  description: 'Save a new personal memory for a character sheet (memories are additive; agents never forget or delete).',
+  params: {
+    type: 'object',
+    properties: {
+      sheet: { type: 'string', description: 'The character or world NPC' },
+      summary: { type: 'string', description: 'Concise 1-sentence memory' },
+      tags: { type: ['array', 'null'], items: { type: 'string' }, description: 'Topic/trigger keywords' },
+      where: TEXT('Where it happened (@place:... or location)'),
+      who: { type: ['array', 'null'], items: { type: 'string' }, description: 'People/characters involved' },
+      detail: TEXT('Optional fuller recollection')
+    },
+    required: ['sheet', 'summary']
+  },
+  async execute(params, ctx) {
+    const s = sheetOf(str(params, 'sheet'), ctx)
+    const summary = str(params, 'summary').trim()
+    if (!summary) throw new ToolError('Give summary for the character memory.')
+    const campaign = campaignOf(ctx.sessionId)
+    const entry = newMemory({
+      category: 'memory',
+      summary,
+      detail: optStr(params, 'detail')?.trim(),
+      where: optStr(params, 'where')?.trim(),
+      who: strList(params.who),
+      tags: strList(params.tags),
+      pinned: false
+    })
+    editHold(s.id, campaign, (h) => ({ ...h, memories: [...h.memories, entry] }))
+    return `${s.title} learned memory (${entry.id}): "${entry.summary}".`
+  }
+}
+
+const characterLearnEvent: ToolDef = {
+  name: 'character_learn_event',
+  group: 'core',
+  needsWorkspace: false,
+  description: 'Record a witnessed or experienced event on a character sheet (events are additive; agents never delete).',
+  params: {
+    type: 'object',
+    properties: {
+      sheet: { type: 'string', description: 'The character or world NPC' },
+      title: { type: 'string', description: 'Short event title' },
+      context: { type: 'string', description: 'What happened' },
+      outcome: TEXT('Consequence or outcome of the event'),
+      where: TEXT('Where it happened (@place:... or location)'),
+      who: { type: ['array', 'null'], items: { type: 'string' }, description: 'People/characters involved' },
+      tags: { type: ['array', 'null'], items: { type: 'string' }, description: 'Topic/trigger keywords' },
+      kind: { type: ['string', 'null'], enum: [...STORY_ENTRY_KINDS, null], description: "Entry kind: 'scene' (default), 'interaction', 'milestone', or 'downtime'" }
+    },
+    required: ['sheet', 'title', 'context']
+  },
+  async execute(params, ctx) {
+    const s = sheetOf(str(params, 'sheet'), ctx)
+    const title = str(params, 'title').trim()
+    const context = str(params, 'context').trim()
+    if (!context) throw new ToolError('Give context for the event.')
+    const campaign = campaignOf(ctx.sessionId)
+    const rawKind = optStr(params, 'kind')?.trim()
+    const kind: StoryEntryKind = rawKind && (STORY_ENTRY_KINDS as readonly string[]).includes(rawKind) ? (rawKind as StoryEntryKind) : 'scene'
+    const outcome = optStr(params, 'outcome')?.trim()
+    const where = optStr(params, 'where')?.trim()
+    const who = strList(params.who)
+    const tags = strList(params.tags)
+    const entry = newSession(undefined, {
+      title,
+      summary: context,
+      notes: context,
+      phase: 'session',
+      kind,
+      ...(outcome ? { outcome } : {}),
+      ...(where ? { where } : {}),
+      ...(who.length ? { who } : {}),
+      ...(tags.length ? { tags } : {})
+    })
+    editHold(s.id, campaign, (h) => ({ ...h, sessions: [...h.sessions, entry] }))
+    return `${s.title} recorded event ${entry.id}: "${title}".`
+  }
+}
+
+const characterLearnBackstory: ToolDef = {
+  name: 'character_learn_backstory',
+  group: 'core',
+  needsWorkspace: false,
+  description: 'Add a piece of backstory knowledge to a character sheet (additive; agents never delete).',
+  params: {
+    type: 'object',
+    properties: {
+      sheet: { type: 'string', description: 'The character or world NPC' },
+      text: { type: 'string', description: 'The backstory fact or recollection' },
+      tags: { type: ['array', 'null'], items: { type: 'string' }, description: 'Topic/trigger keywords' }
+    },
+    required: ['sheet', 'text']
+  },
+  async execute(params, ctx) {
+    const s = sheetOf(str(params, 'sheet'), ctx)
+    const text = str(params, 'text').trim()
+    if (!text) throw new ToolError('Give text for the backstory entry.')
+    const entry = newMemory({
+      category: 'backstory',
+      summary: text,
+      tags: strList(params.tags),
+      pinned: false
+    })
+    editHold(s.id, campaignOf(ctx.sessionId), (h) => ({ ...h, memories: [...h.memories, entry] }))
+    return `${s.title} added backstory (${entry.id}).`
+  }
+}
+
+const characterLearnWorldKnowledge: ToolDef = {
+  name: 'character_learn_world_knowledge',
+  group: 'core',
+  needsWorkspace: false,
+  description: 'Mark an existing piece of local world knowledge (@knowledge:world/entry or name in active world) as learned by a character.',
+  params: {
+    type: 'object',
+    properties: {
+      sheet: { type: 'string', description: 'The character or world NPC' },
+      knowledge: { type: 'string', description: 'The knowledge: @knowledge:world/entry or its name in this world' },
+      source: TEXT('Who or what they learned it from, if any')
+    },
+    required: ['sheet', 'knowledge']
+  },
+  async execute(params, ctx) {
+    const s = sheetOf(str(params, 'sheet'), ctx)
+    const raw = str(params, 'knowledge')
+    const parts = splitKnowledgeRef(raw)
+    const world = parts?.world ?? activeWorldOf(ctx)
+    if (!world) throw new ToolError('Pass knowledge as @knowledge:world/entry; this chat is not in a world.')
+    const entry = knowledge.find(world, parts?.id ?? raw)
+    if (!entry) throw new ToolError(`No knowledge ${raw} in ${world}.`)
+    if (entry.scope === 'global') return `${entry.name} is global: everyone in ${world} already knows it.`
+    const ref = knowledgeRef(world, entry.id)
+    const campaign = campaignOf(ctx.sessionId)
+    if (!grantKnowledge(s.id, campaign, ref, { source: optStr(params, 'source'), where: sessionAccess.get(ctx.sessionId)?.scene?.where ?? '' })) {
+      return `${s.title} already knows ${entry.name}.`
+    }
+    return `${s.title} learned @world:${world}/knowledge/${entry.id}${campaign ? ' in this campaign' : ''}.`
+  }
+}
+
+const characterSetState: ToolDef = {
+  name: 'character_set_state',
+  group: 'core',
+  needsWorkspace: false,
+  description: "Update a character's present state ('Where am I right now and who I am': where, doing, goal, mood) and open threads.",
+  params: {
+    type: 'object',
+    properties: {
+      sheet: { type: 'string', description: 'The character or world NPC' },
       where: TEXT('Where they are now, e.g. @place:lantern-market or Rooftops above the Lantern Market'),
       doing: TEXT('What they are doing right this moment / immediate active scene'),
       goal: TEXT('Their current immediate focus or objective'),
       mood: TEXT('Current situational posture, condition, or stakes'),
-      backstory_summary: TEXT('Concise pinned 2-4 line contextual backstory essence'),
       add_thread: TEXT('Optional new open thread/arc title to track or update'),
       thread_kind: { type: ['string', 'null'], enum: [...STORY_THREAD_KINDS, null], description: "Thread type: 'arc', 'goal', 'mystery', 'bond', or 'threat'" },
       thread_status: { type: ['string', 'null'], enum: [...STORY_THREAD_STATUSES, null], description: "Thread status: 'active', 'waiting', 'resolved', or 'dropped'" },
       thread_detail: TEXT('Optional context notes or next beat for add_thread'),
       thread_who: { type: ['array', 'null'], items: { type: 'string' }, description: 'People/factions involved in the thread' },
       thread_where: TEXT('Where the thread takes place'),
-      resolve_thread: TEXT('Optional text matching an existing thread to mark resolved'),
-      remove_thread: TEXT('Optional text matching an existing thread to delete it')
-    }
+      resolve_thread: TEXT('Optional text matching an existing thread to mark resolved')
+    },
+    required: ['sheet']
   },
-  async execute(params) {
-    const s = sheetOf(str(params, 'sheet'))
+  async execute(params, ctx) {
+    const s = sheetOf(str(params, 'sheet'), ctx)
     const where = optStr(params, 'where')
     const doing = optStr(params, 'doing')
     const goal = optStr(params, 'goal')
     const mood = optStr(params, 'mood')
-    const backstorySummary = optStr(params, 'backstory_summary')
     const addThread = optStr(params, 'add_thread')?.trim()
     const resolveThread = optStr(params, 'resolve_thread')?.trim().toLowerCase()
-    const removeThread = optStr(params, 'remove_thread')?.trim().toLowerCase()
-    if (where === null && doing === null && goal === null && mood === null && backstorySummary === null && !addThread && !resolveThread && !removeThread) {
-      throw new ToolError('Provide a present field (where, doing, goal, mood), backstory_summary, add_thread, resolve_thread, or remove_thread.')
+    if (where === null && doing === null && goal === null && mood === null && !addThread && !resolveThread) {
+      throw new ToolError('Provide a present field (where, doing, goal, mood), add_thread, or resolve_thread.')
     }
-    let threads = s.story.threads
-    if (removeThread) {
-      threads = threads.filter((t) => !t.text.toLowerCase().includes(removeThread) && t.id !== removeThread)
-    }
+    const campaign = campaignOf(ctx.sessionId)
+    const target = holdIn(s.id, campaign)
+    let threads = target.threads
     if (resolveThread) {
       threads = threads.map((t) => (t.text.toLowerCase().includes(resolveThread) ? { ...t, done: true, status: 'resolved' as StoryThreadStatus } : t))
     }
@@ -290,177 +462,39 @@ const setStoryWhere: ToolDef = {
       }
     }
     const nextStory = {
-      ...s.story,
+      ...getSheet(s.id).story,
       where: where !== null ? where.trim() : s.story.where,
       ...(doing !== null ? { doing: doing.trim() || undefined } : {}),
       ...(goal !== null ? { goal: goal.trim() || undefined } : {}),
-      ...(mood !== null ? { mood: mood.trim() || undefined } : {}),
-      ...(backstorySummary !== null ? { backstorySummary: backstorySummary.trim() || undefined } : {}),
-      threads
+      ...(mood !== null ? { mood: mood.trim() || undefined } : {})
     }
     setStory(s.id, nextStory)
+    if (threads !== target.threads) saveHold(s.id, campaign, { ...target, threads })
     return `${s.title} present state updated (where: ${nextStory.where || 'not set'}${nextStory.doing ? `, doing: ${nextStory.doing}` : ''}, open threads: ${threads.filter((t) => !t.done).length}).`
   }
 }
 
-const addCharacterMemory: ToolDef = {
-  name: 'add_character_memory',
-  group: 'core',
-  needsWorkspace: false,
-  description: 'Save, update, or remove an episodic memory/event on a character sheet (use set_character_relationship for the living bond/stance table). Keeps a short snippet separate from full details (fetched via story_recall).',
-  params: {
-    type: 'object',
-    properties: {
-      sheet: { type: 'string', description: 'The character' },
-      id: TEXT('Existing memory id to update or remove instead of adding a new entry'),
-      remove: { type: ['boolean', 'null'], description: 'When true with id, remove that memory entry' },
-      summary: TEXT('Concise 1-sentence snippet surfaced when relevant (required when creating)'),
-      detail: TEXT('Optional fuller recollection/details kept out of the default prompt until recalled by id'),
-      category: { type: ['string', 'null'], enum: [...STORY_MEMORY_CATEGORIES, null], description: "One of: 'memory' (default), 'backstory', 'recent', 'relationship', 'secret'" },
-      where: TEXT('Where it happened (@place:... or freeform location)'),
-      who: { type: ['array', 'null'], items: { type: 'string' }, description: 'People/characters involved' },
-      tags: { type: ['array', 'null'], items: { type: 'string' }, description: 'Topic/trigger keywords (e.g. ["goblin", "ambush", "tavern"])' },
-      when: TEXT('Timeframe or date (e.g. "Last winter", "Session 3")'),
-      pin: { type: ['boolean', 'null'], description: 'True to keep this snippet pinned in the default character prompt' }
-    }
-  },
-  async execute(params) {
-    const s = sheetOf(str(params, 'sheet'))
-    const existingId = optStr(params, 'id')?.trim()
-    const summaryInput = optStr(params, 'summary')?.trim()
-    const rawCat = optStr(params, 'category')?.trim()
-    const category: StoryMemoryCategory | undefined = rawCat && (STORY_MEMORY_CATEGORIES as readonly string[]).includes(rawCat) ? (rawCat as StoryMemoryCategory) : undefined
-    const detail = optStr(params, 'detail')?.trim()
-    const where = optStr(params, 'where')?.trim()
-    const when = optStr(params, 'when')?.trim()
-    const who = strList(params.who)
-    const tags = strList(params.tags)
-    const pin = optBool(params, 'pin')
-
-    const existingMemories = s.mind?.memories ?? []
-
-    if (existingId) {
-      const idx = existingMemories.findIndex((m) => m.id === existingId)
-      if (idx < 0) throw new ToolError(`No memory ${existingId} in ${s.title}'s mind. Use story_recall to find memory ids.`)
-      if (optBool(params, 'remove') === true) {
-        const memories = existingMemories.filter((m) => m.id !== existingId)
-        setMind(s.id, { ...(s.mind ?? {}), memories })
-        return `Removed memory ${existingId} from ${s.title}'s mind.`
-      }
-      const prev = existingMemories[idx]
-      const updated = newMemory({
-        ...prev,
-        ...(summaryInput ? { summary: summaryInput } : {}),
-        ...(category ? { category } : {}),
-        ...(detail !== undefined ? { detail } : {}),
-        ...(where !== undefined ? { where } : {}),
-        ...(when !== undefined ? { when } : {}),
-        who: who.length ? mergeTags(prev.who, who) : prev.who,
-        tags: tags.length ? mergeTags(prev.tags, tags) : prev.tags,
-        pinned: pin === null ? prev.pinned : pin,
-        createdAt: prev.createdAt
-      })
-      const memories = [...existingMemories.slice(0, idx), updated, ...existingMemories.slice(idx + 1)]
-      setMind(s.id, { ...(s.mind ?? {}), memories })
-      return `Updated memory ${updated.id} in ${s.title}'s mind: "${updated.summary}".`
-    }
-
-    if (!summaryInput) throw new ToolError('Give summary for the character memory.')
-    const entry = newMemory({
-      category: category ?? 'memory',
-      summary: summaryInput,
-      detail,
-      where,
-      when,
-      who,
-      tags,
-      pinned: pin === true
-    })
-    setMind(s.id, { ...(s.mind ?? {}), memories: [...existingMemories, entry] })
-    return `Saved ${entry.category} memory ${entry.id} in ${s.title}'s mind: "${entry.summary}".`
-  }
-}
-
-const storyRecall: ToolDef = {
-  name: 'story_recall',
-  group: 'core',
-  needsWorkspace: false,
-  description: "Search a character's mind memories, story logs, and relationship table as short snippets, or pass an entry id (mem_…, s…, or rel_…) to inspect full details.",
-  params: {
-    type: 'object',
-    properties: {
-      sheet: { type: 'string', description: 'The character' },
-      id: TEXT('Memory id (mem_...), story log id (s...), or relationship id (rel_...) to read in full'),
-      query: TEXT('Keywords, person, place, thing, or concept to search for (e.g. "goblin", "tavern", "Kestrel")'),
-      category: TEXT("Optional filter: 'memory', 'backstory', 'recent', 'relationship', 'secret', 'session', or 'all'"),
-      where: TEXT('Optional place/location filter'),
-      limit: { type: ['integer', 'null'], description: 'Max snippets to return (default 8, max 20)' }
-    }
-  },
-  async execute(params) {
-    const s = sheetOf(str(params, 'sheet'))
-    const memories = s.mind?.memories ?? []
-    const relationships = s.relationships ?? []
-    const id = optStr(params, 'id')?.trim()
-    if (id) {
-      const rel = relationships.find((r) => r.id === id)
-      if (rel) return formatRelationshipDetail(s.title, rel)
-      const hit = storyHitById(s.story, id, memories, relationships)
-      if (!hit) return `No mind memory, story log, or relationship with id "${id}" found on ${s.title}.`
-      const lines = [
-        `[${s.title} · ${hit.kind} · ${hit.label}] ${hit.id}`,
-        `Summary: ${hit.summary}`,
-        hit.when ? `When: ${hit.when}` : '',
-        hit.where ? `Where: ${hit.where}` : '',
-        hit.who.length ? `Who: ${hit.who.join(', ')}` : '',
-        hit.tags.length ? `Tags: ${hit.tags.join(', ')}` : '',
-        hit.detail ? `\n${hit.detail}` : ''
-      ].filter(Boolean)
-      return lines.join('\n')
-    }
-
-    const query = optStr(params, 'query') ?? ''
-    const category = optStr(params, 'category') ?? undefined
-    const where = optStr(params, 'where') ?? undefined
-    const limit = Math.max(1, Math.min(20, optInt(params, 'limit') ?? 8))
-    const hits = searchStoryItems(s.story, query, { category, where, includePinned: true, memories, relationships }).slice(0, limit)
-    if (!hits.length) {
-      return `No matching memories, story logs, or relationships found on ${s.title}${query ? ` for "${query}"` : ''}.`
-    }
-    const lines = hits.map((h) => formatStorySnippet(h))
-    return `${s.title} — ${hits.length} matching snippet(s) (pass id to story_recall for full detail):\n${lines.join('\n')}`
-  }
-}
-
-const setCharacterRelationship: ToolDef = {
-  name: 'set_character_relationship',
+const characterSetRelation: ToolDef = {
+  name: 'character_set_relation',
   group: 'core',
   needsWorkspace: false,
   activity: (params) => `updating character relationship${typeof params.target === 'string' && params.target.trim() ? `: ${params.target.trim()}` : ''}`,
   description: 'Add or update a structured relationship on a character sheet (person, place, thing, faction, concept, or event). Updates an existing match for target or id in place; null keeps existing fields.',
-  params: setRelationshipSchema({ sheet: { type: 'string', description: 'The character, e.g. Valerius' } }),
+  params: setRelationshipSchema({ sheet: { type: 'string', description: 'The character or world NPC, e.g. Valerius or @world:elysium/npc/marta' } }),
   async execute(params, ctx) {
-    const s = sheetOf(str(params, 'sheet'))
+    const s = sheetOf(str(params, 'sheet'), ctx)
+    const campaign = campaignOf(ctx.sessionId)
     const patch = extractRelationshipPatch(params, { agentId: ctx.agentId })
-    const { list, entry, created } = applyRelationshipUpsert(s.relationships ?? [], patch)
-    setSheetRelationships(s.id, list)
-    return formatRelationshipChange(created ? 'Added' : 'Updated', `${s.title}'s`, entry)
-  }
-}
-
-const removeCharacterRelationship: ToolDef = {
-  name: 'remove_character_relationship',
-  group: 'core',
-  needsWorkspace: false,
-  activity: () => 'removing character relationship',
-  description: 'Remove a relationship entry from a character sheet by id (rel_…) or target name.',
-  params: removeRelationshipSchema({ sheet: { type: 'string', description: 'The character, e.g. Valerius' } }),
-  async execute(params) {
-    const s = sheetOf(str(params, 'sheet'))
-    const targetOrId = str(params, 'target_or_id').trim()
-    const { list, removed } = applyRelationshipRemove(s.relationships ?? [], targetOrId, optStr(params, 'category'))
-    setSheetRelationships(s.id, list)
-    return `Removed ${s.title}'s relationship with ${removed.target} (${removed.id}).`
+    const held = holdsOf(s.id, campaign)
+    for (const at of held) {
+      const tried = applyRelationshipUpsert(at.hold.relationships, patch)
+      if (tried.created) continue
+      saveHold(s.id, at.campaign, { ...at.hold, relationships: tried.list })
+      return formatRelationshipChange('Updated', `${s.title}'s`, tried.entry)
+    }
+    const { list, entry } = applyRelationshipUpsert(held[0].hold.relationships, patch)
+    saveHold(s.id, held[0].campaign, { ...held[0].hold, relationships: list })
+    return formatRelationshipChange('Added', `${s.title}'s`, entry)
   }
 }
 
@@ -476,7 +510,7 @@ const updateProficiencies: ToolDef = {
   params: {
     type: 'object',
     properties: {
-      sheet: { type: 'string', description: 'The character, e.g. Valerius' },
+      sheet: { type: 'string', description: 'The character or world NPC, e.g. Valerius' },
       proficient: NAMES(`Skills they become proficient in, e.g. ["Stealth", "Acrobatics"]. Skills: ${DND_SKILLS.map((s) => s.name).join(', ')}`),
       expert: NAMES('Skills they get expertise in (double proficiency)'),
       untrained: NAMES('Skills they lose proficiency in'),
@@ -487,8 +521,8 @@ const updateProficiencies: ToolDef = {
       languages: { type: ['string', 'null'], description: 'e.g. Common, Primordial' }
     }
   },
-  async execute(params) {
-    const s = sheetOf(str(params, 'sheet'))
+  async execute(params, ctx) {
+    const s = sheetOf(str(params, 'sheet'), ctx)
     const current = s.dnd ?? blankDnd()
     const list = (key: string) => (Array.isArray(params[key]) ? (params[key] as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '') : [])
     const skillId = (name: string) => {
@@ -539,7 +573,7 @@ const updateDnd: ToolDef = {
   params: {
     type: 'object',
     properties: {
-      sheet: { type: 'string', description: 'The character, e.g. Valerius' },
+      sheet: { type: 'string', description: 'The character or world NPC, e.g. Valerius' },
       temp_hp: INT('Temporary hit points'),
       inspiration: { type: ['boolean', 'null'], description: 'Heroic inspiration' },
       exhaustion: INT('Exhaustion level 0 to 6'),
@@ -581,8 +615,8 @@ const updateDnd: ToolDef = {
       remove_spells: NAMES('Spell names to remove')
     }
   },
-  async execute(params) {
-    const s = sheetOf(str(params, 'sheet'))
+  async execute(params, ctx) {
+    const s = sheetOf(str(params, 'sheet'), ctx)
     const cur = s.dnd ?? blankDnd()
     const tempHp = optInt(params, 'temp_hp')
     const inspiration = optBool(params, 'inspiration')
@@ -716,4 +750,16 @@ const updateDnd: ToolDef = {
   }
 }
 
-export const CHARACTER_TOOLS: ToolDef[] = [updateStats, updateProficiencies, updateDnd, addStoryLog, setStoryWhere, addCharacterMemory, storyRecall, setCharacterRelationship, removeCharacterRelationship]
+export const CHARACTER_TOOLS: ToolDef[] = [
+  updateStats,
+  updateProficiencies,
+  updateDnd,
+  characterSearchKnowledge,
+  characterRecallRelation,
+  characterLearnMemory,
+  characterLearnEvent,
+  characterLearnBackstory,
+  characterLearnWorldKnowledge,
+  characterSetState,
+  characterSetRelation
+].map((t) => ({ ...t, needsCharacter: true }))

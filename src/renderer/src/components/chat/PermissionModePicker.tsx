@@ -27,7 +27,7 @@ export function PermissionModePicker({ compact = false, labelled = false }: { co
       value={mode}
       options={PERMISSION_MODES.map((m) => ({ value: m.id, label: m.label }))}
       onChange={(v) => setMode(activeId, v as PermissionMode).catch(failed('Could not change mode'))}
-      className={cn(labelled ? 'h-8 text-[12px]' : 'h-7 font-mono text-[11px] uppercase tracking-wider', mode === 'trusted' && 'border-alert/70 text-alert')}
+      className={cn(labelled ? 'h-8 text-[12px]' : 'h-7 font-label text-[11px] caps-5 ', mode === 'trusted' && 'border-alert/70 text-alert')}
     />
   )
   if (labelled)

@@ -13,7 +13,7 @@ import { failed } from '../../../lib/notify'
 
 function ToolButton({ active, title, onClick, children }: { active: boolean; title: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button title={title} onMouseDown={(e) => e.preventDefault()} onClick={onClick} className={cn('flex h-7 items-center gap-1 px-1.5 font-mono text-[10.5px] uppercase tracking-wider', active ? 'text-accent' : 'text-dim hover:text-accent')}>
+    <button title={title} onMouseDown={(e) => e.preventDefault()} onClick={onClick} className={cn('flex h-7 items-center gap-1 px-1.5 font-label text-[10.5px] caps-5 ', active ? 'text-accent' : 'text-dim hover:text-accent')}>
       {children}
     </button>
   )
@@ -62,16 +62,16 @@ export function FieldCard({
       className={cn(
         'group/field flex min-w-0 flex-col border transition-all focus-within:border-accent/70',
         highlighted
-          ? 'border-accent bg-accent/[0.08] shadow-[0_0_18px_color-mix(in_srgb,var(--color-accent)_25%,transparent)]'
-          : 'border-line/50 bg-black/45 hover:border-line',
+          ? 'border-accent bg-accent/[0.08] shadow-[0_0_18px_color-mix(in_srgb,var(--color-accent)_calc(25%*var(--glow)),transparent)]'
+          : 'border-line/50 tone-well-45 hover:border-line',
         dragOver && 'border-l-4 border-l-accent'
       )}
     >
       <header className="relative flex items-center gap-1 border-b border-line/30 px-2 py-1.5">
         <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-faint opacity-0 group-hover/field:opacity-100" />
-        <InlineTitle value={name} onSave={onRename} className="min-w-0 flex-1 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-accent-soft" />
+        <InlineTitle value={name} onSave={onRename} className="min-w-0 flex-1 font-label text-[11px] font-bold caps-16 text-accent-soft" />
         {highlighted && (
-          <span className="flex shrink-0 items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-mono text-[8.5px] font-bold uppercase tracking-[0.14em] text-accent animate-pulse">
+          <span className="flex shrink-0 items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-label text-[8.5px] font-bold caps-14 text-accent animate-pulse">
             <Sparkles className="h-2.5 w-2.5" />
             UPDATED
           </span>
@@ -116,7 +116,7 @@ export function FieldCard({
           />
         </div>
       ) : value.trim() ? (
-        <div role="button" tabIndex={0} onClick={() => setEditing(true)} onKeyDown={(e) => e.key === 'Enter' && setEditing(true)} className="cursor-text px-3.5 py-2.5 text-[13.5px] leading-relaxed text-white/90 hover:bg-white/[0.02]">
+        <div role="button" tabIndex={0} onClick={() => setEditing(true)} onKeyDown={(e) => e.key === 'Enter' && setEditing(true)} className="cursor-text px-3.5 py-2.5 text-[13.5px] leading-relaxed text-ink/90 hover:bg-ink/[0.02]">
           <Markdown text={value} />
         </div>
       ) : (

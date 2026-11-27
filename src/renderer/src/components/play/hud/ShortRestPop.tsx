@@ -9,7 +9,7 @@ export interface RestMember {
   hitDice: { total: string; used: number } | null
 }
 
-const HUD_BUTTON = 'flex h-7 min-w-8 items-center justify-center border border-transparent px-1 text-dim hover:bg-white/5 hover:text-white'
+const HUD_BUTTON = 'flex h-7 min-w-8 items-center justify-center border border-transparent px-1 text-dim hover:bg-ink/5 hover:text-ink'
 const count = (total: string): number => Number(/^\s*(\d+)/.exec(total)?.[1] ?? 0)
 
 export function ShortRestPop({ controls, party, label }: { controls: ClockControls | null; party: RestMember[]; label: string }) {
@@ -22,12 +22,12 @@ export function ShortRestPop({ controls, party, label }: { controls: ClockContro
           {party.map((m) => {
             const left = m.hitDice ? count(m.hitDice.total) - m.hitDice.used : 0
             return (
-              <div key={m.sheet} className="flex items-center gap-2 font-mono text-[11px]">
-                <span className="min-w-0 flex-1 truncate text-white">{m.name}</span>
+              <div key={m.sheet} className="flex items-center gap-2 font-ui text-[11px]">
+                <span className="min-w-0 flex-1 truncate text-ink">{m.name}</span>
                 {m.hitDice && (
                   <>
                     <span className="text-dim">{m.hitDice.total.replace(/^\s*\d+/, '')}</span>
-                    <span className="text-cyan">{left}</span>
+                    <span className="text-tint-cyan">{left}</span>
                     <CountStepper small value={spend[m.sheet] ?? 0} min={0} max={left} onChange={(n) => setSpend({ ...spend, [m.sheet]: n })} />
                   </>
                 )}
@@ -41,7 +41,7 @@ export function ShortRestPop({ controls, party, label }: { controls: ClockContro
               setSpend({})
               close()
             }}
-            className="notch-sm flex h-7 items-center justify-center gap-1.5 border border-accent bg-gradient-to-b from-accent/20 to-accent/5 font-mono text-[11px] font-semibold uppercase tracking-wider text-accent hover:text-white"
+            className="notch-sm flex h-7 items-center justify-center gap-1.5 border border-accent bg-gradient-to-b from-accent/20 to-accent/5 font-label text-[11px] font-semibold caps-5 text-accent hover:text-ink"
           >
             <Flame className="h-3.5 w-3.5" />
             Rest

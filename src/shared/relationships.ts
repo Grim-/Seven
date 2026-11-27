@@ -377,25 +377,24 @@ export function relationshipRagText(entry: RelationshipEntry): string {
     .join(' | ')
 }
 
+const SHORT_RELATIONS = 12
+
 export function formatRelationshipsMarkdown(list: RelationshipEntry[], opts?: { pinnedOnly?: boolean; recallTool?: string }): string {
   if (!list.length) return ''
-  const pinned = list.filter((x) => x.pinned)
-  const shown = opts?.pinnedOnly ? pinned : list
-  const unpinnedCount = opts?.pinnedOnly ? list.length - pinned.length : 0
-  if (!shown.length && unpinnedCount > 0) {
-    return opts?.recallTool
-      ? `*(${unpinnedCount} relationship${unpinnedCount === 1 ? '' : 's'} indexed — use \`${opts.recallTool}\` to inspect)*`
-      : ''
-  }
+  const shown = opts?.pinnedOnly ? list.filter((x) => x.pinned) : list
+  const rest = opts?.pinnedOnly ? list.filter((x) => !x.pinned).sort((a, b) => b.updatedAt - a.updatedAt) : []
+  const aff = (entry: RelationshipEntry) => (typeof entry.affinity === 'number' ? ` ${entry.affinity >= 0 ? `+${entry.affinity}` : entry.affinity}` : '')
+  const link = (entry: RelationshipEntry) => (entry.ref ? ` (${linkTagOf(entry.ref)})` : '')
   const lines = shown.map((entry) => {
-    const aff = typeof entry.affinity === 'number' ? ` ${entry.affinity >= 0 ? `+${entry.affinity}` : entry.affinity}` : ''
-    const link = entry.ref ? ` (${linkTagOf(entry.ref)})` : ''
     const role = entry.role ? `${entry.role}; ` : ''
     const note = entry.notes ? entry.notes : ''
-    return `- **${entry.target}**${link} [${entry.category} · ${entry.stance}${aff}]: ${role}${note}`.replace(/: $/, '')
+    return `- **${entry.target}**${link(entry)} [${entry.category} · ${entry.stance}${aff(entry)}]: ${role}${note}`.replace(/: $/, '')
   })
-  if (unpinnedCount > 0 && opts?.recallTool) {
-    lines.push(`*(+${unpinnedCount} more searchable via \`${opts.recallTool}\`)*`)
-  }
+  const brief = rest.slice(0, SHORT_RELATIONS).map((entry) => `- ${entry.target}${link(entry)} [${entry.category} · ${entry.stance}${aff(entry)}]${entry.role ? `: ${entry.role}` : ''}`)
+  const more = rest.length - brief.length
+  const notes = opts?.recallTool ? `notes via \`${opts.recallTool}\`` : ''
+  const footer = [more > 0 ? `+${more} more` : '', notes].filter(Boolean).join('; ')
+  lines.push(...brief)
+  if (brief.length && footer) lines.push(`*(${footer})*`)
   return lines.join('\n')
 }

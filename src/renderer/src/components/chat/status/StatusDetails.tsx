@@ -9,7 +9,7 @@ export function StatusDetails({ status }: { status: CharacterStatus }) {
       {status.health && (
         <div className="flex items-center gap-2">
           <HealthBar health={status.health} className="flex-1" />
-          <span className="font-mono text-[11px] text-white">{healthText(status)}</span>
+          <span className="font-ui text-[11px] text-ink">{healthText(status)}</span>
         </div>
       )}
       {status.effects.length > 0 && (

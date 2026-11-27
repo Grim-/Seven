@@ -22,7 +22,7 @@ export function BackgroundCanvas({ id, colors, settings }: { id: string; colors:
     return () => window.removeEventListener(REACTION_EVENT, react)
   }, [live])
 
-  const colorKey = `${colors.accent}${colors.secondary}${colors.base}`
+  const colorKey = `${colors.accent}${colors.secondary}${colors.base}${colors.ink}${colors.surface}`
   useEffect(() => live.current?.setColors(latest.current.colors), [colorKey, live])
   const settingsKey = JSON.stringify(settings)
   useEffect(() => live.current?.setSettings(latest.current.settings), [settingsKey, live])

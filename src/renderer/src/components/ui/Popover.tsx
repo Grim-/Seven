@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import type { NearAlign, NearSide } from '../../lib/fitNear'
 import { FloatLayer } from './FloatLayer'
+import { Pressable } from './Pressable'
 
 export function Popover({
   trigger,
@@ -29,21 +30,24 @@ export function Popover({
   const close = () => setOpen(false)
   return (
     <div ref={root} className={cn('relative', rootClassName)}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
+      <Pressable
+        onClick={() => {
+          if (disabled) return
+          setOpen(!open)
+        }}
         onContextMenu={(e) => {
           if (disabled) return
           e.preventDefault()
           e.stopPropagation()
           setOpen(true)
         }}
-        disabled={disabled}
+        aria-disabled={disabled}
+        tabIndex={disabled ? -1 : 0}
         title={title}
         className={cn('flex items-center text-left', triggerClassName)}
       >
         {trigger}
-      </button>
+      </Pressable>
       {open && (
         <FloatLayer anchor={root} onClose={close} side={side} align={align} className={className}>
           {typeof children === 'function' ? children(close) : children}

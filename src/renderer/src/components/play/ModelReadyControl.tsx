@@ -37,9 +37,9 @@ export function ModelReadyControl({ agent = null, compact = false, className }: 
 
   if (ready) {
     return (
-      <div className={cn('flex items-center gap-1.5 font-mono text-[10px] text-ok', className)}>
+      <div className={cn('flex items-center gap-1.5 font-ui text-[10px] text-ok', className)}>
         <Cpu className="h-3 w-3 shrink-0" />
-        <span className="truncate uppercase tracking-wider">
+        <span className="truncate caps-5 ">
           READY{activeLabel ? ` · ${activeLabel}` : ''}
         </span>
       </div>
@@ -47,7 +47,7 @@ export function ModelReadyControl({ agent = null, compact = false, className }: 
   }
 
   return (
-    <div className={cn('flex flex-wrap items-center gap-1.5 font-mono text-[10px]', className)}>
+    <div className={cn('flex flex-wrap items-center gap-1.5 font-ui text-[10px]', className)}>
       {runnable.length > 0 ? (
         <>
           <select
@@ -56,7 +56,7 @@ export function ModelReadyControl({ agent = null, compact = false, className }: 
             disabled={loading}
             aria-label="Choose local model to load"
             className={cn(
-              'min-w-0 flex-1 border border-line/70 bg-black/90 px-1.5 font-mono text-[10px] text-white outline-none focus:border-accent',
+              'min-w-0 flex-1 border border-line/70 tone-panel-90 px-1.5 font-ui text-[10px] text-ink outline-none focus:border-accent',
               compact ? 'h-6' : 'h-7'
             )}
           >

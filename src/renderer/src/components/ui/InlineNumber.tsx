@@ -8,7 +8,7 @@ export function InlineNumber({ value, onSave, min = -Infinity, max = Infinity, t
       numeric
       required
       title={title}
-      className={cn('font-mono', className)}
+      className={cn('font-data', className)}
       onSave={(text) => {
         const n = Math.round(Number(text))
         if (Number.isFinite(n)) onSave(Math.min(max, Math.max(min, n)))

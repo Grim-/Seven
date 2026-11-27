@@ -26,7 +26,7 @@ function ZoomEditor({ range, zoom, onChange }: { range: ZoomRange; zoom: number;
   const round = (n: number) => Math.round(n * 100) / 100
   const end = (key: keyof ZoomRange, label: string) => (
     <div className="flex items-center gap-1.5">
-      <span className="w-14 font-mono text-[10px] uppercase tracking-[0.1em] text-faint">{label}</span>
+      <span className="w-14 font-label text-[10px] caps-10 text-faint">{label}</span>
       <NumberField value={range[key] ?? undefined} min={0.01} step={0.05} placeholder="any" allowEmpty onChange={(v) => onChange({ ...range, [key]: v ?? null })} className="h-7 w-20 text-[12px]" />
       <Button size="sm" variant="ghost" onClick={() => onChange({ ...range, [key]: round(zoom) })}>
         Use {round(zoom)}×
@@ -34,7 +34,7 @@ function ZoomEditor({ range, zoom, onChange }: { range: ZoomRange; zoom: number;
     </div>
   )
   return (
-    <div className="flex flex-col gap-1 border-y border-purple/30 bg-purple/[0.04] px-2.5 py-2">
+    <div className="flex flex-col gap-1 border-y border-tint-purple/30 bg-tint-purple/[0.04] px-2.5 py-2">
       <span className="text-[11.5px] text-dim">Shows only between these zooms. Empty means no limit.</span>
       {end('min', 'From')}
       {end('max', 'Up to')}
@@ -69,18 +69,18 @@ function LayerRows({ list, all, onChange, depth, zoom, zooming, onZooming, selec
               {...reorder.props(i)}
               onContextMenu={(e) => openMenu(e, l.name, items(l))}
               onClick={() => 'image' in l && onSelect(l.id)}
-              className={cn('group grid grid-cols-[12px_20px_minmax(0,1fr)_auto_56px_24px] items-center gap-1.5 py-1 pr-1 text-[12.5px]', reorder.isOver(i) && 'bg-accent/10', selected === l.id && 'bg-cyan/10')}
+              className={cn('group grid grid-cols-[12px_20px_minmax(0,1fr)_auto_56px_24px] items-center gap-1.5 py-1 pr-1 text-[12.5px]', reorder.isOver(i) && 'bg-accent/10', selected === l.id && 'bg-secondary-ink/10')}
               style={{ paddingLeft: 8 + depth * 14 }}
             >
               <GripVertical className="h-3 w-3 cursor-grab text-faint" />
-              <button type="button" title={l.visible ? 'Hide' : 'Show'} onClick={() => change(l.id, { visible: !l.visible })} className={l.visible ? 'text-cyan' : 'text-faint'}>
+              <button type="button" title={l.visible ? 'Hide' : 'Show'} onClick={() => change(l.id, { visible: !l.visible })} className={l.visible ? 'text-secondary-ink' : 'text-faint'}>
                 {l.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
               </button>
               <span className="flex min-w-0 items-baseline gap-1.5">
                 <InlineEdit value={l.name} onSave={(name) => change(l.id, { name })} className="min-w-0 truncate" />
-                <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.1em] text-faint">{layerTypeOf(l)?.tag}</span>
+                <span className="shrink-0 font-label text-[9px] caps-10 text-faint">{layerTypeOf(l)?.tag}</span>
               </span>
-              <button type="button" title="Shows at zoom" onClick={() => onZooming(zooming === l.id ? null : l.id)} className={cn('whitespace-nowrap border px-1 font-mono text-[9.5px]', range ? 'border-purple/45 text-purple' : 'border-transparent text-faint opacity-0 group-hover:opacity-100')}>
+              <button type="button" title="Shows at zoom" onClick={() => onZooming(zooming === l.id ? null : l.id)} className={cn('whitespace-nowrap border px-1 font-ui text-[9.5px]', range ? 'border-tint-purple/45 text-tint-purple' : 'border-transparent text-faint opacity-0 group-hover:opacity-100')}>
                 {range ?? 'any zoom'}
               </button>
               <span title={`Opacity ${Math.round(l.opacity * 100)}%`}>

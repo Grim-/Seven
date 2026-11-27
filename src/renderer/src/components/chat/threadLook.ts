@@ -15,22 +15,22 @@ export interface ThreadLook {
   divider: boolean
 }
 
-const SLATE_USER = 'notch-sm relative border border-line bg-gradient-to-b from-accent/[0.12] to-accent/[0.04] whitespace-pre-wrap text-white after:absolute after:bottom-0 after:right-0 after:h-1.5 after:w-1.5 after:bg-accent'
+const SLATE_USER = 'notch-sm relative border border-line bg-gradient-to-b from-accent/[0.12] to-accent/[0.04] whitespace-pre-wrap text-ink after:absolute after:bottom-0 after:right-0 after:h-1.5 after:w-1.5 after:bg-accent'
 const SLATE_AGENT =
-  'relative border-l border-l-line pl-3.5 text-white before:absolute before:left-[-1px] before:top-0 before:h-4 before:w-px before:bg-accent before:shadow-[0_0_6px_var(--color-accent)]'
-const TAG = 'font-mono text-[9.5px] font-semibold uppercase tracking-[0.2em]'
-const BAR_FIELD = 'notch-sm border border-line bg-black/60 backdrop-blur-md px-3 py-2.5 text-white inset-field glow-focus placeholder:text-dim/60'
+  'relative border-l border-l-line pl-3.5 text-ink before:absolute before:left-[-1px] before:top-0 before:h-4 before:w-px before:bg-accent before:shadow-[0_0_6px_color-mix(in_srgb,var(--color-accent)_calc(100%*var(--glow)),transparent)]'
+const TAG = 'font-label text-[9.5px] font-semibold caps-20 '
+const BAR_FIELD = 'notch-sm border border-line tone-well-60 backdrop-blur-[calc(var(--panel-blur)*1.5)] px-3 py-2.5 text-ink inset-field glow-focus placeholder:text-dim/60'
 
 export const THREAD_LOOKS = {
   panel: {
     viewport: 'px-6 py-5',
     column: 'mx-auto max-w-4xl',
     gap: 'pb-6',
-    user: { width: 'max-w-[78%]', label: 'font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-soft', box: 'notch-sm border border-line bg-accent/[0.06] px-3.5 py-2.5 text-[14.5px] leading-relaxed whitespace-pre-wrap text-white' },
-    agent: { width: 'max-w-[86%]', label: 'font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-teal', body: 'border-l-2 border-l-line pl-3.5 text-white', avatar: 20, bigAvatars: true },
+    user: { width: 'max-w-[78%]', label: 'font-label text-[10px] font-semibold caps-18 text-accent-soft', box: 'notch-sm border border-line bg-accent/[0.06] px-3.5 py-2.5 text-[14.5px] leading-relaxed whitespace-pre-wrap text-ink' },
+    agent: { width: 'max-w-[86%]', label: 'font-label text-[10px] font-semibold caps-18 text-secondary', body: 'border-l-2 border-l-line pl-3.5 text-ink', avatar: 20, bigAvatars: true },
     times: false,
     foldTools: false,
-    composer: { root: 'border-t border-line/60 bg-black/75 backdrop-blur-md p-3', field: 'border border-line bg-black/60 px-3 py-2.5 text-white inset-field glow-focus placeholder:text-dim/60', avatar: 72, round: false },
+    composer: { root: 'border-t border-line/60 tone-panel-75 backdrop-blur-[calc(var(--panel-blur)*1.5)] p-3', field: 'border border-line tone-well-60 px-3 py-2.5 text-ink inset-field glow-focus placeholder:text-dim/60', avatar: 72, round: false },
     outputs: true,
     ownsComposer: true,
     compactBars: true,
@@ -68,11 +68,11 @@ export const THREAD_LOOKS = {
     viewport: 'px-6 py-5',
     column: 'mx-auto max-w-4xl',
     gap: 'pb-6',
-    user: { width: 'max-w-[78%]', label: 'font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-soft', box: 'notch-sm border border-line bg-black/75 backdrop-blur-md px-3.5 py-2.5 text-[14.5px] leading-relaxed whitespace-pre-wrap text-white' },
-    agent: { width: 'max-w-[86%]', label: 'font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-teal', body: 'border-l-2 border-l-line bg-black/65 backdrop-blur-md p-3.5 text-white', avatar: 20, bigAvatars: true },
+    user: { width: 'max-w-[78%]', label: 'font-label text-[10px] font-semibold caps-18 text-accent-soft', box: 'notch-sm border border-line tone-panel-75 backdrop-blur-[calc(var(--panel-blur)*1.5)] px-3.5 py-2.5 text-[14.5px] leading-relaxed whitespace-pre-wrap text-ink' },
+    agent: { width: 'max-w-[86%]', label: 'font-label text-[10px] font-semibold caps-18 text-secondary', body: 'border-l-2 border-l-line tone-panel-65 backdrop-blur-[calc(var(--panel-blur)*1.5)] p-3.5 text-ink', avatar: 20, bigAvatars: true },
     times: false,
     foldTools: true,
-    composer: { root: 'border-t border-line/60 bg-black/80 backdrop-blur-md p-3', field: 'border border-line bg-black/60 px-3 py-2.5 text-white inset-field glow-focus placeholder:text-dim/60', avatar: 72, round: false },
+    composer: { root: 'border-t border-line/60 tone-panel-80 backdrop-blur-[calc(var(--panel-blur)*1.5)] p-3', field: 'border border-line tone-well-60 px-3 py-2.5 text-ink inset-field glow-focus placeholder:text-dim/60', avatar: 72, round: false },
     outputs: false,
     ownsComposer: true,
     compactBars: true,

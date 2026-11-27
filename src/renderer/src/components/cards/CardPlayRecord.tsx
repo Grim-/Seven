@@ -19,8 +19,8 @@ export function CardPlayRecord({ data }: ChatElementProps) {
     <div ref={vfxRef} className="card-play-record">
       <div className="w-20 shrink-0 phone:w-14">{id ? <LiveCard id={id} /> : <CardBack className="w-full" />}</div>
       <div className="flex min-w-0 flex-col items-start gap-1.5">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent-soft">Played {showName(name)}</span>
-        {said && <Markdown text={said} className="text-[13.5px] italic text-white" />}
+        <span className="font-label text-[10px] font-bold caps-16 text-accent-soft">Played {showName(name)}</span>
+        {said && <Markdown text={said} className="text-[13.5px] italic text-ink" />}
         {outcome && <PlayStamp outcome={outcome} className="play-stamp-inline" />}
         {!!outcome?.effects?.length && <EffectLinesList lines={outcome.effects} />}
       </div>

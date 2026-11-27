@@ -12,6 +12,10 @@ import type { ModelRegistry } from '../model/registry'
 import { executeImageRequest, type ResolvedImageParams } from './client'
 import { imageHistory } from './history'
 import { buildSdServerArgs, ImageServer } from './server'
+import { registerPlaceTarget } from '../data/placeTargets'
+
+registerPlaceTarget({ target: 'generate_image', label: 'Generated pictures', home: 'Pictures/Generated', asks: false })
+registerPlaceTarget({ target: 'edit_image', label: 'Edited pictures', home: 'Pictures/Generated', asks: false })
 
 export interface ImageRunOptions {
   signal?: AbortSignal
@@ -146,6 +150,10 @@ export class ImageHost extends EventEmitter {
       const chatName = this.models.list().find((m) => m.id === chatId)?.name ?? 'a local chat model'
       return new Error(`${msg}\n\nNote: "${chatName}" is currently loaded in llama-server and using GPU VRAM. Unload it or enable CPU offload options in the image model settings if needed.`)
     }
+    if (this.server && (lower.includes('fetch failed') || lower.includes('connection failed') || lower.includes('econnreset') || lower.includes('econnrefused'))) {
+      const tail = this.server.lastLines().trim()
+      if (tail) return new Error(`${msg}\n\nsd-server log:\n${tail}`)
+    }
     return err instanceof Error ? err : new Error(msg)
   }
 
@@ -153,7 +161,10 @@ export class ImageHost extends EventEmitter {
     return this.enqueue(() => this.loadInner(id, { alreadyYielded: false, resident: true }))
   }
 
-  private async loadInner(id: string, opts: { alreadyYielded: boolean; resident: boolean }): Promise<ImageHostState> {
+  private async loadInner(
+    id: string,
+    opts: { alreadyYielded: boolean; resident: boolean; runtimeLoraDir?: string | null }
+  ): Promise<ImageHostState> {
     const entry = this.models.get(id)
     if (entry.remote) throw new Error(`${entry.name} is a remote model and runs directly via its API without starting sd-server.`)
     if (this.models.infoFor(id)?.kind !== 'image') throw new Error(`${entry.name} is not an image diffusion model.`)
@@ -164,7 +175,7 @@ export class ImageHost extends EventEmitter {
       throw new Error('sd-server is not installed or selected yet. Download or point to sd-server.exe under Models › Servers › sd-server first.')
     }
     const pipeline = this.models.resolveImagePipeline(id)
-    const args = buildSdServerArgs(pipeline, sdServerBuild()?.flags ?? null)
+    const args = buildSdServerArgs(pipeline, sdServerBuild()?.flags ?? null, opts.runtimeLoraDir ?? null)
     const key = [id, version, ...args].join('\u0000')
     if (this.server && this.loadedKey === key) {
       if (opts.resident && this.state.residency !== 'resident') this.setState({ residency: 'resident' })
@@ -282,10 +293,14 @@ export class ImageHost extends EventEmitter {
       }
       return entry.id
     }
+    const defaultId = this.models.getDefaultImageModel()
+    if (defaultId && this.models.has(defaultId)) return defaultId
     if (this.state.modelId && this.models.has(this.state.modelId)) return this.state.modelId
     const imageModels = this.models.list().filter((m) => isImageModel(m))
     if (imageModels.length === 1) return imageModels[0].id
-    if (imageModels.length > 1) throw new Error('Multiple image models are configured. Specify which image model to use.')
+    const favImage = imageModels.find((m) => m.favourite)
+    if (favImage) return favImage.id
+    if (imageModels.length > 1) throw new Error('Multiple image models are configured. Set a Default image model in the Image tab or specify which model to use.')
     throw new Error('No image model is available yet. Add a diffusion checkpoint in Models or configure a remote image model first.')
   }
 
@@ -320,6 +335,8 @@ export class ImageHost extends EventEmitter {
         const cfg = entry.remote ? null : this.models.getImageConfig(modelId)
         const hydratedPrompt = hydratePromptLinks(prompt)
         const hydratedNegative = req.negativePrompt?.trim() ? hydratePromptLinks(req.negativePrompt.trim()) : undefined
+        const resolvedLoras = entry.remote ? [] : this.models.resolveLoraFiles(req.loras)
+        const runtimeLoraDir = resolvedLoras[0]?.dir ?? null
         const params: ResolvedImageParams = {
           prompt: hydratedPrompt,
           negativePrompt: hydratedNegative,
@@ -329,6 +346,7 @@ export class ImageHost extends EventEmitter {
           cfgScale: req.cfgScale ?? cfg?.cfgScale ?? 7,
           seed: req.seed,
           sampler: req.sampler?.trim() || cfg?.sampler || undefined,
+          loras: resolvedLoras.length ? resolvedLoras.map((l) => ({ stem: l.stem, weight: l.weight })) : undefined,
           sourceAssetId: req.sourceAssetId,
           maskAssetId: req.maskAssetId
         }
@@ -348,7 +366,7 @@ export class ImageHost extends EventEmitter {
               restoreChat = yielded
             }
           }
-          await this.loadInner(modelId, { alreadyYielded: true, resident: stayLoaded && !restoreChat })
+          await this.loadInner(modelId, { alreadyYielded: true, resident: stayLoaded && !restoreChat, runtimeLoraDir })
           const server = this.server
           if (!server) throw new Error('sd-server stopped before starting image generation.')
           this.setState({ status: 'generating', progress: { stage: 'queued', detail: '', completed: null, total: null, elapsedMs: 0 }, error: null })

@@ -25,7 +25,7 @@ export function Segmented<T extends string>({
           title={o.hint}
           onClick={() => o.value !== value && onChange(o.value)}
           onContextMenu={onMenu ? (e) => onMenu(e, o.value) : undefined}
-          className={cn('flex-1 px-3 py-1.5 text-[12px] transition-colors', wrap && 'flex-none', o.value === value ? 'bg-accent/15 text-white shadow-[inset_0_-2px_0_rgb(255,201,25)]' : 'text-dim hover:bg-white/[0.04] hover:text-white')}
+          className={cn('flex-1 px-3 py-1.5 text-[12px] transition-colors', wrap && 'flex-none', o.value === value ? 'bg-accent/15 text-ink shadow-[inset_0_-2px_0_var(--color-accent)]' : 'text-dim hover:bg-ink/[0.04] hover:text-ink')}
         >
           {o.label}
           {marked.includes(o.value) && <span className="ml-1 text-accent">•</span>}

@@ -22,6 +22,7 @@ function useOverride(): string | null {
 export function ThemeList({ className }: { className?: string }) {
   const list = useThemes((s) => s.list)
   const current = useApp((s) => s.settings?.defaultTheme ?? DEFAULT_THEME_ID)
+  const switching = useThemes((s) => s.switching)
   const override = useOverride()
   return (
     <div className={cn('flex min-h-0 flex-col gap-1', className)}>
@@ -30,16 +31,17 @@ export function ThemeList({ className }: { className?: string }) {
           <button
             key={t.id}
             onClick={() => applyTheme(t.id)}
+            disabled={switching}
             title={t.description || t.name}
-            className={cn('flex w-full items-center gap-2.5 px-2 py-1.5 text-left normal-case tracking-normal', t.id === current ? 'bg-accent/10 text-white' : 'text-white/80 hover:bg-white/[0.04]')}
+            className={cn('flex w-full items-center gap-2.5 px-2 py-1.5 text-left normal-case tracking-normal disabled:cursor-wait disabled:opacity-60', t.id === current ? 'bg-accent/10 text-ink' : 'text-ink/80 hover:bg-ink/[0.04]')}
           >
             <Swatches theme={t} />
-            <span className="min-w-0 flex-1 truncate font-sans text-[12.5px]">{t.name}</span>
+            <span className="min-w-0 flex-1 truncate font-body text-[12.5px]">{t.name}</span>
             {t.id === current && <Check className="h-3.5 w-3.5 shrink-0 text-accent" />}
           </button>
         ))}
       </div>
-      {override && <div className="px-2 font-sans text-[11px] normal-case tracking-normal text-faint">{override}</div>}
+      {override && <div className="px-2 font-body text-[11px] normal-case tracking-normal text-faint">{override}</div>}
     </div>
   )
 }
@@ -70,7 +72,7 @@ export function ThemeButton() {
         <Palette className="h-3.5 w-3.5" />
       </button>
       {open && (
-        <div className="absolute right-0 bottom-full z-50 mb-2 flex max-h-80 w-64 flex-col border border-line bg-bg/95 p-1 shadow-[0_0_24px_rgba(0,0,0,0.6)]">
+        <div className="absolute right-0 bottom-full z-50 mb-2 flex max-h-80 w-64 flex-col border border-line tone-bg-95 p-1 shadow-[0_0_24px_color-mix(in_srgb,var(--color-shade)_60%,transparent)]">
           <ThemeList className="max-h-80" />
         </div>
       )}

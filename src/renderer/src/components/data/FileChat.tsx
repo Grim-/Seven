@@ -5,7 +5,7 @@ import type { EntrySurfaceProps } from '../../registries/kinds'
 
 function useFile(id: string) {
   const asset = useAsset(id)
-  if (asset === undefined) return { asset: null, empty: <div className="font-mono text-[11px] text-dim">Loading…</div> }
+  if (asset === undefined) return { asset: null, empty: <div className="font-ui text-[11px] text-dim">Loading…</div> }
   if (!asset) return { asset: null, empty: <EmptyState title="Removed">This file is no longer in Seven's files.</EmptyState> }
   return { asset, empty: null }
 }

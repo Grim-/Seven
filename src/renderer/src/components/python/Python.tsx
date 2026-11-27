@@ -34,10 +34,10 @@ export function usePythonScripts(): PythonScript[] | null {
 function RunOutput({ run }: { run: PythonRun }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="font-mono text-[10.5px] text-faint">
+      <div className="font-ui text-[10.5px] text-faint">
         {new Date(run.at).toLocaleString()} · {run.exit === null ? 'stopped' : `exit ${run.exit}`}
       </div>
-      <pre className={cn('max-h-80 overflow-auto whitespace-pre-wrap border bg-black/60 p-3 font-mono text-[12px] leading-relaxed', run.exit === 0 ? 'border-line/40 text-white/90' : 'border-red-500/40 text-red-200')}>
+      <pre className={cn('max-h-80 overflow-auto whitespace-pre-wrap border tone-panel-60 p-3 font-ui text-[12px] leading-relaxed', run.exit === 0 ? 'border-line/40 text-ink/90' : 'border-tint-red/40 text-tint-red-ink')}>
         {run.output || '(no output)'}
       </pre>
       {run.files.length > 0 && <LiveAssets assetIds={run.files} />}
@@ -51,7 +51,7 @@ export function ScriptPart({ id, part }: { id: string; part: string }) {
   const script = list.find((s) => s.id === id)
   if (!script) return <EmptyState title="Removed">This script no longer exists.</EmptyState>
   if (part === 'output') return script.runs[0] ? <RunOutput run={script.runs[0]} /> : <EmptyState title="Not run yet">This script hasn't been run.</EmptyState>
-  return <pre className="max-h-[420px] overflow-auto border border-line/40 bg-black/60 p-3 font-mono text-[12px] leading-relaxed text-white/90">{script.code}</pre>
+  return <pre className="max-h-[420px] overflow-auto border border-line/40 tone-panel-60 p-3 font-ui text-[12px] leading-relaxed text-ink/90">{script.code}</pre>
 }
 
 interface Draft {
@@ -117,10 +117,10 @@ export function PythonPanel({ initial = null }: { initial?: string | null }) {
     >
       <div className="flex w-60 shrink-0 flex-col gap-0.5 overflow-y-auto">
         {list && !list.length && selected !== NEW && <div className="text-[12px] text-faint">No scripts yet. Agents save them with python_save, or make one here.</div>}
-        {selected === NEW && <div className="border-l-2 border-l-accent bg-accent/10 px-2 py-1.5 text-[13px] text-white">{draft?.name || 'New script'}</div>}
+        {selected === NEW && <div className="border-l-2 border-l-accent bg-accent/10 px-2 py-1.5 text-[13px] text-ink">{draft?.name || 'New script'}</div>}
         {list?.map((s) => (
           <ListRow key={s.id} active={selected === s.id} onClick={() => setSelected(s.id)} onMenu={rowMenu('script', s.id, s.name, () => setSelected(s.id))} title={s.name} subtitle={s.description || `${s.code.split('\n').length} lines`} wrap>
-            <span className="block font-mono text-[10px] text-faint">{s.runs[0] ? `ran ${formatRelative(s.runs[0].at)}` : 'not run yet'}</span>
+            <span className="block font-ui text-[10px] text-faint">{s.runs[0] ? `ran ${formatRelative(s.runs[0].at)}` : 'not run yet'}</span>
           </ListRow>
         ))}
       </div>
@@ -156,17 +156,17 @@ export function PythonPanel({ initial = null }: { initial?: string | null }) {
                 }
               }}
               spellCheck={false}
-              className="min-h-[260px] flex-1 resize-y border border-line/60 bg-black/60 p-3 font-mono text-[12.5px] leading-relaxed text-white"
+              className="min-h-[260px] flex-1 resize-y border border-line/60 tone-panel-60 p-3 font-ui text-[12.5px] leading-relaxed text-ink"
             />
             {script && script.runs.length > 0 && (
               <div className="flex flex-col gap-2 border-t border-line/40 pt-2">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-soft">Runs</span>
+                  <span className="font-label text-[10.5px] caps-14 text-accent-soft">Runs</span>
                   {script.runs.map((r, i) => (
                     <button
                       key={r.at}
                       onClick={() => setShownRun(i)}
-                      className={cn('border px-2 py-0.5 font-mono text-[10.5px]', i === shownRun ? 'border-accent bg-accent/10 text-white' : 'border-line/40 text-dim hover:text-white', r.exit !== 0 && 'text-red-300')}
+                      className={cn('border px-2 py-0.5 font-ui text-[10.5px]', i === shownRun ? 'border-accent bg-accent/10 text-ink' : 'border-line/40 text-dim hover:text-ink', r.exit !== 0 && 'text-tint-red-ink')}
                     >
                       {formatRelative(r.at)}
                     </button>

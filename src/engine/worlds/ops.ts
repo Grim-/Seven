@@ -99,8 +99,8 @@ function renderValue(worldIdv: string, name: string, f: WorldField, v: unknown, 
 }
 
 export function requireBinding(binding: WorldBinding | null | undefined): WorldBinding {
-  if (!binding) throw new WorldError("You aren't linked to a record in a world, so the world tools can't work yet. Tell the user they can link you to one in your agent settings.")
-  if (!worlds.exists(binding.worldId)) throw new WorldError(`Your world "${binding.worldId}" no longer exists. Tell the user they can link you to another world in your agent settings.`)
+  if (!binding) throw new WorldError("You aren't in a world, so the world tools can't work yet. Tell the user they can add your character to a world.")
+  if (!worlds.exists(binding.worldId)) throw new WorldError(`Your world "${binding.worldId}" no longer exists. Tell the user they can add your character to another world.`)
   return binding
 }
 
@@ -295,7 +295,7 @@ export function editEntries(worldIdv: string, typeKey: string, id: string, field
 }
 
 export function worldGuide(b: WorldBinding | null | undefined, builder: boolean): string {
-  if (!b) return "## World\nYou aren't linked to a record in a world yet, so the world tools won't work until the user links you in your agent settings."
+  if (!b) return "## World\nYou aren't in a world yet, so the world tools won't work until the user adds your character to a world."
   if (!worlds.exists(b.worldId)) return `## World\nYour world "${b.worldId}" no longer exists.`
   const schema = worlds.schema(b.worldId)
   const meta = worlds.meta(b.worldId)

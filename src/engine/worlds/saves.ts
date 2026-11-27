@@ -43,6 +43,11 @@ class SaveStore extends EventEmitter {
     return save
   }
 
+  evict(id?: string): void {
+    if (id) this.cache.delete(id)
+    else this.cache.clear()
+  }
+
   write(save: GameSave): GameSave {
     const next = { ...save, updatedAt: Date.now() }
     fs.mkdirSync(ROOT, { recursive: true })

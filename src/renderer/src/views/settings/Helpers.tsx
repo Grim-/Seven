@@ -40,7 +40,7 @@ function HelperOverviewRow({
       <button
         type="button"
         onClick={onSelect}
-        className={selected ? 'border border-accent bg-accent/15 px-2.5 py-1 font-mono text-[11px] text-accent' : 'border border-line px-2.5 py-1 font-mono text-[11px] text-dim hover:border-line-hover hover:text-white'}
+        className={selected ? 'border border-accent bg-accent/15 px-2.5 py-1 font-ui text-[11px] text-accent' : 'border border-line px-2.5 py-1 font-ui text-[11px] text-dim hover:border-line-hover hover:text-ink'}
       >
         {selected ? 'Selected' : 'Manage'}
       </button>

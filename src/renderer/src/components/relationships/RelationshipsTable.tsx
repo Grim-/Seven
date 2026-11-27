@@ -1,19 +1,13 @@
 import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
-import { ExternalLink, Link2, Pencil, Pin, Plus, Trash2 } from 'lucide-react'
-import {
-  linkTagOf,
-  parseLinkRef,
-  stanceMeta,
-  type RelationCategory,
-  type RelationStance,
-  type RelationshipEntry
-} from '@shared/relationships'
+import { ExternalLink, Network, Pencil, Pin, Plus, Trash2 } from 'lucide-react'
+import { linkTagOf, parseLinkRef, type RelationCategory, type RelationshipEntry } from '@shared/relationships'
 import { Button, EmptyState, Eyebrow, Fold, GridRow, GridTable, SearchBox, askConfirm, openMenu, type GridColumn, type MenuEvent, type MenuItem } from '../ui'
 import { cn } from '../../lib/cn'
-import { copyText } from '../../lib/notify'
-import { openEntry } from '../../lib/library'
+import { openEntry, openEntryAt, opensAt } from '../../lib/library'
 import { RelationshipEditor } from './RelationshipEditor'
-import { CATEGORY_UIS, STANCE_UIS, categoryUi, stanceUi } from './styles'
+import { CategoryChips } from './CategoryChips'
+import { RELATIONS, relationItems, stanceItems } from './relationItems'
+import { STANCE_UIS, categoryUi, stanceUi } from './styles'
 
 export interface InheritedRelationships {
   id: string
@@ -31,7 +25,7 @@ function SortableColumns(compact: boolean, sort: 'name' | 'stance' | 'recent', d
     return [
       { label: 'Target', width: 'minmax(0,1.4fr)', sorted: sort === 'name' ? dir : null, onSort: () => onSort('name') },
       { label: 'Stance', width: 'minmax(0,1fr)', sorted: sort === 'stance' ? dir : null, onSort: () => onSort('stance') },
-      { label: '', width: '3.25rem', right: true }
+      { label: '', width: '4.5rem', right: true }
     ]
   }
   return [
@@ -39,7 +33,7 @@ function SortableColumns(compact: boolean, sort: 'name' | 'stance' | 'recent', d
     { label: 'Bond / Role', width: 'minmax(7rem,0.9fr)' },
     { label: 'Stance', width: 'minmax(7.5rem,0.8fr)', sorted: sort === 'stance' ? dir : null, onSort: () => onSort('stance') },
     { label: 'Notes', width: 'minmax(10rem,1.8fr)' },
-    { label: '', width: '5rem', right: true }
+    { label: '', width: '6.25rem', right: true }
   ]
 }
 
@@ -49,7 +43,8 @@ export function RelationshipsTable({
   compact = false,
   readOnly = false,
   emptyHint = 'No relationships yet. Track characters, places, items, factions, or concepts.',
-  inherited
+  inherited,
+  extra
 }: {
   items: RelationshipEntry[]
   onChange?: (next: RelationshipEntry[]) => void
@@ -57,6 +52,7 @@ export function RelationshipsTable({
   readOnly?: boolean
   emptyHint?: string
   inherited?: InheritedRelationships[]
+  extra?: (entry: RelationshipEntry) => MenuItem[]
 }) {
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<RelationCategory | 'all'>('all')
@@ -75,11 +71,6 @@ export function RelationshipsTable({
   }
 
   const stanceOrder = useMemo(() => new Map(STANCE_UIS.map((s, i) => [s.id, i])), [])
-  const categoryCounts = useMemo(() => {
-    const counts = new Map<RelationCategory, number>()
-    for (const item of items) counts.set(item.category, (counts.get(item.category) ?? 0) + 1)
-    return counts
-  }, [items])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -115,38 +106,12 @@ export function RelationshipsTable({
     })
   }
 
-  const setStance = (entry: RelationshipEntry, stance: RelationStance) => {
-    updateItem({
-      ...entry,
-      stance,
-      ...(typeof entry.affinity === 'number' ? { affinity: stanceMeta(stance).defaultAffinity } : {}),
-      updatedAt: Date.now()
-    })
-  }
-
-  const rowMenuItems = (entry: RelationshipEntry): MenuItem[] => {
-    const parsed = entry.ref ? parseLinkRef(entry.ref) : null
-    const stanceItems: MenuItem[] = STANCE_UIS.map((s) => ({
-      label: `${s.id === entry.stance ? '✓ ' : ''}${s.label}`,
-      onSelect: () => setStance(entry, s.id)
-    }))
-    return [
-      ...(parsed ? [{ label: `Open ${entry.target}`, icon: <ExternalLink />, onSelect: () => openEntry(parsed.kind, parsed.id) }] : []),
-      ...(entry.ref ? [{ label: 'Copy @link', icon: <Link2 />, onSelect: () => copyText(linkTagOf(entry.ref!), 'Link copied') }] : []),
-      ...(!readOnly && onChange
-        ? [
-            { label: 'Edit', icon: <Pencil />, onSelect: () => setEditing(entry) },
-            { label: 'Set stance', children: stanceItems },
-            {
-              label: entry.pinned ? 'Unpin from prompt' : 'Pin to prompt',
-              icon: <Pin />,
-              onSelect: () => updateItem({ ...entry, pinned: entry.pinned ? undefined : true, updatedAt: Date.now() })
-            },
-            { label: 'Remove', icon: <Trash2 />, danger: true, onSelect: () => removeItem(entry) }
-          ]
-        : [])
-    ]
-  }
+  const rowMenuItems = (entry: RelationshipEntry): MenuItem[] =>
+    relationItems(
+      entry,
+      !readOnly && onChange ? { update: updateItem, remove: () => removeItem(entry), editItem: { label: 'Edit', icon: <Pencil />, onSelect: () => setEditing(entry) } } : null,
+      extra?.(entry) ?? []
+    )
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const tag = (e.target as HTMLElement | null)?.tagName
@@ -183,41 +148,7 @@ export function RelationshipsTable({
         )}
       </div>
 
-      {items.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => setCategoryFilter('all')}
-            className={cn(
-              'border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider transition-colors',
-              categoryFilter === 'all' ? 'border-accent bg-accent/15 text-accent' : 'border-line/50 text-dim hover:border-line hover:text-white'
-            )}
-          >
-            All ({items.length})
-          </button>
-          {CATEGORY_UIS.map(({ id, plural, Icon, chipClass }) => {
-            const count = categoryCounts.get(id) ?? 0
-            if (compact && count === 0) return null
-            const on = categoryFilter === id
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setCategoryFilter(id)}
-                className={cn(
-                  'flex items-center gap-1 border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider transition-colors',
-                  on ? chipClass : 'border-line/40 text-dim hover:border-line hover:text-white',
-                  count === 0 && !on && 'opacity-50'
-                )}
-              >
-                <Icon className="h-3 w-3" />
-                {plural}
-                {count > 0 && <span className="opacity-75">{count}</span>}
-              </button>
-            )
-          })}
-        </div>
-      )}
+      {items.length > 0 && <CategoryChips items={items} value={categoryFilter} onChange={setCategoryFilter} hideEmpty={compact} />}
 
       {items.length === 0 ? (
         <EmptyState
@@ -233,7 +164,7 @@ export function RelationshipsTable({
           {emptyHint}
         </EmptyState>
       ) : (
-        <div className="border border-line/40 bg-black/30">
+        <div className="border border-line/40 tone-panel-30">
           <GridTable columns={columns} empty={filtered.length === 0 && 'No relationships match that filter.'}>
             {filtered.map((entry) => {
               const cat = categoryUi(entry.category)
@@ -270,19 +201,19 @@ export function RelationshipsTable({
                               openEntry(parsed.kind, parsed.id)
                             }}
                             title={`Open ${linkTagOf(entry.ref!)}`}
-                            className="truncate text-left text-[13px] font-medium text-teal hover:underline"
+                            className="truncate text-left text-[13px] font-medium text-secondary hover:underline"
                           >
                             {entry.target}
                           </button>
                         ) : (
-                          <span className="truncate text-[13px] font-medium text-white/95">{entry.target}</span>
+                          <span className="truncate text-[13px] font-medium text-ink/95">{entry.target}</span>
                         )}
                         {entry.pinned && (
                           <span title="Pinned to default prompt" className="inline-flex shrink-0 text-accent">
                             <Pin className="h-3 w-3" />
                           </span>
                         )}
-                        {entry.secret && <span className="border border-purple/40 bg-purple/10 px-1 font-mono text-[9px] uppercase text-purple">secret</span>}
+                        {entry.secret && <span className="border border-tint-purple/40 bg-tint-purple/10 px-1 font-label text-[9px] caps text-tint-purple">secret</span>}
                       </div>
                       {compact && (entry.role || entry.notes) && (
                         <div className="truncate text-[11px] text-dim">{[entry.role, entry.notes].filter(Boolean).join(' — ')}</div>
@@ -296,7 +227,7 @@ export function RelationshipsTable({
                       onDoubleClick={() => {
                         if (!readOnly && onChange) setEditing(entry)
                       }}
-                      className="min-w-0 truncate font-mono text-[11.5px] text-dim"
+                      className="min-w-0 truncate font-ui text-[11.5px] text-dim"
                     >
                       {entry.role || '—'}
                     </div>
@@ -308,27 +239,20 @@ export function RelationshipsTable({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          openMenu(
-                            menuEventFrom(e),
-                            `${entry.target} · stance`,
-                            STANCE_UIS.map((s) => ({
-                              label: `${s.id === entry.stance ? '✓ ' : ''}${s.label}`,
-                              onSelect: () => setStance(entry, s.id)
-                            }))
-                          )
+                          openMenu(menuEventFrom(e), `${entry.target} · stance`, stanceItems(entry, updateItem))
                         }}
                         title="Click to change stance"
-                        className={cn('border px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider hover:brightness-125', st.badgeClass)}
+                        className={cn('border px-1.5 py-0.5 font-label text-[10px] font-semibold caps-5 hover:brightness-125', st.badgeClass)}
                       >
                         {st.label}
                       </button>
                     ) : (
-                      <span className={cn('border px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider', st.badgeClass)}>
+                      <span className={cn('border px-1.5 py-0.5 font-label text-[10px] font-semibold caps-5 ', st.badgeClass)}>
                         {st.label}
                       </span>
                     )}
                     {typeof entry.affinity === 'number' && (
-                      <span className="font-mono text-[10.5px] tabular-nums text-faint">
+                      <span className="font-data text-[10.5px] tabular-nums text-faint">
                         {entry.affinity >= 0 ? `+${entry.affinity}` : entry.affinity}
                       </span>
                     )}
@@ -348,6 +272,21 @@ export function RelationshipsTable({
                   )}
 
                   <div className="flex items-center justify-end gap-0.5">
+                    {(extra?.(entry) ?? []).map((item) => (
+                      <button key={item.label} type="button" onClick={() => item.onSelect?.()} title={item.label} className="p-1 text-dim hover:text-ink [&>svg]:h-3.5 [&>svg]:w-3.5">
+                        {item.icon}
+                      </button>
+                    ))}
+                    {parsed && opensAt(parsed.kind, RELATIONS) && (
+                      <button
+                        type="button"
+                        onClick={() => openEntryAt(parsed.kind, parsed.id, RELATIONS)}
+                        title={`Open ${entry.target}'s relations`}
+                        className="p-1 text-dim hover:text-ink"
+                      >
+                        <Network className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                     {!readOnly && onChange && (
                       <>
                         {!compact && (
@@ -355,7 +294,7 @@ export function RelationshipsTable({
                             type="button"
                             onClick={() => updateItem({ ...entry, pinned: entry.pinned ? undefined : true, updatedAt: Date.now() })}
                             title={entry.pinned ? 'Unpin from prompt' : 'Pin to prompt'}
-                            className={cn('p-1 hover:text-white', entry.pinned ? 'text-accent' : 'text-faint')}
+                            className={cn('p-1 hover:text-ink', entry.pinned ? 'text-accent' : 'text-faint')}
                           >
                             <Pin className="h-3.5 w-3.5" />
                           </button>
@@ -364,7 +303,7 @@ export function RelationshipsTable({
                           type="button"
                           onClick={() => setEditing(entry)}
                           title="Edit relationship"
-                          className="p-1 text-dim hover:text-white"
+                          className="p-1 text-dim hover:text-ink"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
@@ -392,7 +331,7 @@ export function RelationshipsTable({
             {inherited
               .filter((g) => g.items.length > 0)
               .map((group) => (
-                <div key={group.id} className="flex flex-col gap-1.5 border border-line/35 bg-black/25 p-2.5">
+                <div key={group.id} className="flex flex-col gap-1.5 border border-line/35 tone-panel-25 p-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <Eyebrow>{group.title}</Eyebrow>
                     {group.onOpen && (

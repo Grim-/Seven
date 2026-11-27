@@ -11,7 +11,7 @@ export function Card({ selected, interactive = true, className, children, ...res
   return (
     <div
       data-selected={selected ? 'true' : 'false'}
-      className={cn('card-deks font-mono', interactive && 'cursor-pointer', className)}
+      className={cn('card-deks font-ui', interactive && 'cursor-pointer', className)}
       {...rest}
     >
       {children}

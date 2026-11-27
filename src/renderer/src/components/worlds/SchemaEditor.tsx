@@ -148,7 +148,7 @@ function FieldForm({ schema, typeKey, name, f, onChange, onRename }: { schema: W
           </Field>
           <div />
           <div className="col-span-2 flex flex-col gap-1.5">
-            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-soft">Values kept per entry</div>
+            <div className="font-label text-[10.5px] caps-14 text-accent-soft">Values kept per entry</div>
             {subs.map(([k, s]) => (
               <div key={k} className="grid grid-cols-[8rem_6rem_1fr_1fr_1fr_auto] items-center gap-1.5">
                 <Input defaultValue={k} onBlur={(e) => e.target.value.trim() && setSub(k, s, e.target.value.trim())} />
@@ -270,7 +270,7 @@ export function SchemaEditor({ worldId }: { worldId: string }) {
           Add type
         </Button>
         <div className="mt-auto flex flex-col gap-1.5 border-t border-line/40 pt-2">
-          <div className="max-h-48 overflow-y-auto font-mono text-[10.5px]">
+          <div className="max-h-48 overflow-y-auto font-ui text-[10.5px]">
             {check.errors.map((e) => (
               <div key={e} className="text-alert">✕ {e}</div>
             ))}
@@ -289,13 +289,13 @@ export function SchemaEditor({ worldId }: { worldId: string }) {
             <div className="flex gap-3">
               <div className="flex w-52 shrink-0 flex-col gap-0.5">
                 {Object.entries(t.fields).map(([n, f]) => (
-                  <div key={n} className={cn('group flex items-center gap-1 px-2 py-1', n === fieldName ? 'bg-white/5 text-white' : 'text-dim hover:text-white')}>
+                  <div key={n} className={cn('group flex items-center gap-1 px-2 py-1', n === fieldName ? 'bg-ink/5 text-ink' : 'text-dim hover:text-ink')}>
                     <button onClick={() => setFieldName(n)} className="min-w-0 flex-1 truncate text-left text-[12.5px]">
-                      {n} <span className="font-mono text-[10px] text-faint">{f.kind}{f.lock && f.lock !== 'open' ? ' · ' + f.lock.replace('_', ' ') : ''}{f.visible === false ? ' · hidden' : ''}</span>
+                      {n} <span className="font-ui text-[10px] text-faint">{f.kind}{f.lock && f.lock !== 'open' ? ' · ' + f.lock.replace('_', ' ') : ''}{f.visible === false ? ' · hidden' : ''}</span>
                     </button>
                     <span className="flex opacity-0 group-hover:opacity-100">
-                      <button onClick={() => update((s) => void (s.types[typeKey].fields = moveKey(s.types[typeKey].fields, n, -1)))} className="text-dim hover:text-white"><ArrowUp className="h-3 w-3" /></button>
-                      <button onClick={() => update((s) => void (s.types[typeKey].fields = moveKey(s.types[typeKey].fields, n, 1)))} className="text-dim hover:text-white"><ArrowDown className="h-3 w-3" /></button>
+                      <button onClick={() => update((s) => void (s.types[typeKey].fields = moveKey(s.types[typeKey].fields, n, -1)))} className="text-dim hover:text-ink"><ArrowUp className="h-3 w-3" /></button>
+                      <button onClick={() => update((s) => void (s.types[typeKey].fields = moveKey(s.types[typeKey].fields, n, 1)))} className="text-dim hover:text-ink"><ArrowDown className="h-3 w-3" /></button>
                       <button onClick={() => (update((s) => void delete s.types[typeKey].fields[n]), n === fieldName && setFieldName(''))} className="text-dim hover:text-alert"><Trash2 className="h-3 w-3" /></button>
                     </span>
                   </div>
@@ -352,7 +352,7 @@ export function SchemaEditor({ worldId }: { worldId: string }) {
                   <Input value={t.display?.glyph ?? ''} maxLength={2} onChange={(e) => setType({ display: { ...t.display, glyph: e.target.value } })} />
                 </Field>
               </div>
-              <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-soft">Groups</div>
+              <div className="font-label text-[10.5px] caps-14 text-accent-soft">Groups</div>
               {groups.map((g, i) => {
                 const setGroup = (patch: Partial<typeof g>) => setType({ display: { ...t.display, groups: groups.map((x, j) => (j === i ? { ...x, ...patch } : x)) } })
                 return (

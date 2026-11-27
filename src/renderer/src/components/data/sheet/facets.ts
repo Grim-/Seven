@@ -9,6 +9,7 @@ export interface FacetProps {
   draft: SheetDraft
   change: (next: SheetDraft) => void
   open: (facet: string) => void
+  campaign: string | null
 }
 
 export interface SheetFacet extends ModuleEntry {

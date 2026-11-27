@@ -19,13 +19,13 @@ export function OptionRollFields({ roll, targets = [], onChange }: { roll: Optio
       {roll.type === 'chance' && (
         <>
           <NumberField value={roll.chance} min={0} max={100} onChange={(v) => onChange({ ...roll, chance: v ?? 0 })} className="w-20" />
-          <span className="font-mono text-[11px] text-dim">%</span>
+          <span className="font-ui text-[11px] text-dim">%</span>
         </>
       )}
       {roll.type === 'check' && (
         <>
           <SkillSelect targets={targets} value={roll.against} onChange={(against) => onChange({ ...roll, against })} className="w-52" />
-          <span className="font-mono text-[11px] text-dim">DC</span>
+          <span className="font-ui text-[11px] text-dim">DC</span>
           <NumberField value={roll.dc} onChange={(v) => onChange({ ...roll, dc: v ?? 0 })} className="w-16" />
         </>
       )}

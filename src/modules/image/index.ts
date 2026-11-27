@@ -9,7 +9,7 @@ import type { JsonObjectSchema, JsonSchema } from '../../engine/tools/schema'
 import { ToolError, optInt, optStr, str, type ToolDef } from '../../engine/tools/types'
 import { secure } from '../../engine/util/secure'
 
-function availableModels(): { id: string; name: string }[] {
+function availableModels(): { id: string; name: string; remoteModel?: string }[] {
   if (secure.enabled && !secure.unlocked) return []
   const rt = getImageRuntime()
   if (!rt) return []
@@ -17,7 +17,7 @@ function availableModels(): { id: string; name: string }[] {
     return rt.models
       .list()
       .filter((m) => isImageModel(m))
-      .map((m) => ({ id: m.id, name: m.name }))
+      .map((m) => ({ id: m.id, name: m.name, ...(m.remote?.model ? { remoteModel: m.remote.model } : {}) }))
   } catch (err) {
     if (isVaultLocked(err)) return []
     throw err
@@ -25,6 +25,8 @@ function availableModels(): { id: string; name: string }[] {
 }
 
 function modelParamSchema(models: { id: string; name: string }[]): JsonSchema {
+  const defaultId = getImageRuntime()?.models.getDefaultImageModel() ?? null
+  const defaultName = defaultId ? models.find((m) => m.id === defaultId)?.name : null
   if (models.length === 0) {
     return {
       type: 'string',
@@ -35,22 +37,30 @@ function modelParamSchema(models: { id: string; name: string }[]): JsonSchema {
   return {
     type: 'string',
     enum: names,
-    description: 'Which configured image model to use (optional when only one image model exists)'
+    description: defaultName
+      ? `Optional. Omit to use the default image model (${defaultName}) unless the user explicitly asks for a different model.`
+      : 'Optional. Omit to use the default or active image model unless told to use a specific one.'
   }
 }
 
 function resolveModelId(requested: string | null): string | undefined {
   const models = availableModels()
   if (models.length === 0) {
-    throw new ToolError('No image model is configured. Add a diffusion checkpoint (.safetensors / .ckpt / .gguf) or remote image model in Models first.')
+    throw new ToolError(
+      'No image model is configured. In Models, add a local diffusion checkpoint (.safetensors / .ckpt / .gguf) or connect a remote image model (e.g. OpenAI gpt-image-1, Google gemini-2.5-flash-image, or an OpenRouter image model) with "Use for" set to Image generation.'
+    )
   }
   if (!requested) {
+    const defaultId = getImageRuntime()?.models.getDefaultImageModel()
+    if (defaultId && models.some((m) => m.id === defaultId)) return defaultId
     if (models.length === 1) return models[0].id
     return undefined
   }
   const q = requested.trim()
   const lower = q.toLowerCase()
-  const exact = models.find((m) => m.id === q || m.name.toLowerCase() === lower)
+  const exact = models.find(
+    (m) => m.id === q || m.name.toLowerCase() === lower || m.remoteModel?.toLowerCase() === lower
+  )
   if (exact) return exact.id
   throw new ToolError(`There is no image model called "${q}". Available image models: ${models.map((m) => m.name).join(', ')}.`)
 }

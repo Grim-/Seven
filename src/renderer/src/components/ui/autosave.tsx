@@ -97,11 +97,11 @@ export function useDraft<T>(source: T, save: (value: T) => Promise<unknown>, opt
 }
 
 export function SaveState({ status, error, blocked }: { status: SaveStatus; error?: string | null; blocked?: string | null }) {
-  if (blocked) return <span title={blocked} className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-alert">Not saved until fixed</span>
+  if (blocked) return <span title={blocked} className="font-label text-[10.5px] caps-14 text-alert">Not saved until fixed</span>
   if (status === 'idle') return null
   const text = status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : 'Not saved'
   return (
-    <span title={status === 'error' && error ? error : undefined} className={cn('flex min-w-0 items-baseline gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em]', status === 'error' ? 'text-alert' : status === 'saved' ? 'text-ok' : 'text-dim')}>
+    <span title={status === 'error' && error ? error : undefined} className={cn('flex min-w-0 items-baseline gap-1.5 font-label text-[10.5px] caps-14 ', status === 'error' ? 'text-alert' : status === 'saved' ? 'text-ok' : 'text-dim')}>
       <span className="shrink-0">{text}</span>
       {status === 'error' && error && <span className="max-w-72 truncate normal-case tracking-normal text-[11.5px]">{error}</span>}
     </span>

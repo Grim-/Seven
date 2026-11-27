@@ -25,6 +25,8 @@ export interface FrozenInstructions {
   tools: string[]
   workspace: string | null
   builtAt: number
+  template?: string
+  setup?: string
   memory?: string
   acceptedMemory?: string
 }

@@ -9,7 +9,6 @@ import {
   ListRow,
   Modal,
   RowAction,
-  SegmentBar,
   StatusBadge,
   Toggle,
   TraitChips,
@@ -17,7 +16,7 @@ import {
   type ShellTrait
 } from '../../../ui'
 import { BrowsePick, type BrowseOption } from '../../../ui/BrowsePick'
-import { GamePanel } from '../../../../game/ui'
+import { GameBar, GamePanel } from '../../../../game/ui'
 import { cn } from '../../../../lib/cn'
 import { useGameDefs } from '../../useGameDefs'
 import { EffectTokenButton } from '../../effects/EffectTokenButton'
@@ -49,7 +48,7 @@ function ClassesPanel({ comp, changed }: PanelProps<Classes>) {
     <GamePanel
       title="Classes & Specializations"
       aside={comp.held.length ? `${comp.held.length} held` : 'classless'}
-      bodyClassName="gap-2.5 p-3"
+      bodyClassName="gap-2 p-2.5"
     >
       {comp.pendingUnlocks.length > 0 && (
         <div className="flex flex-col border border-accent/50 bg-accent/[0.06]">
@@ -95,7 +94,7 @@ function ClassesPanel({ comp, changed }: PanelProps<Classes>) {
       {error && <AlertBox>{error}</AlertBox>}
 
       {comp.held.length === 0 ? (
-        <span className="font-mono text-[11.5px] text-faint">No classes yet — works classless, or add one or more below.</span>
+        <span className="font-ui text-[11.5px] text-faint">No classes yet — works classless, or add one or more below.</span>
       ) : (
         <div className="flex flex-col gap-1.5">
           {comp.held.map((cls: CharacterClass) => {
@@ -103,7 +102,6 @@ function ClassesPanel({ comp, changed }: PanelProps<Classes>) {
             const restrictions = cls.restrictionReasons()
             const restricted = restrictions.length > 0
             const needed = cls.xpNeeded()
-            const ratio = Math.min(1, Math.max(0, cls.xp / Math.max(1, needed)))
             const amount = xpAdd[cls.id] ?? 50
             const tags: ShellTrait[] = [
               ...(def?.parentClass ? [{ key: 'parent', label: def.parentClass, tone: 'busy' as const }] : []),
@@ -114,21 +112,21 @@ function ClassesPanel({ comp, changed }: PanelProps<Classes>) {
               <div
                 key={cls.uid}
                 className={cn(
-                  'flex flex-col gap-1.5 border bg-black/55 px-2.5 py-2',
-                  restricted ? 'border-warn/50 shadow-[inset_2px_0_0_var(--color-warn)]' : 'border-line/50 shadow-[inset_2px_0_0_var(--color-accent)]'
+                  'flex flex-col gap-1 border tone-panel-40 px-2.5 py-1.5',
+                  restricted ? 'border-warn/50' : 'border-line/45'
                 )}
               >
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                  <div className="flex min-w-[9rem] flex-1 items-center gap-2">
-                    <span className="truncate font-semibold text-white" title={def?.description || cls.title}>
+                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                    <span className="text-[13px] font-semibold text-ink" title={def?.description || cls.title}>
                       {cls.title}
                     </span>
                     <StatusBadge tone={restricted ? 'warn' : 'ok'}>{restricted ? 'Restricted' : 'Active'}</StatusBadge>
                     {tags.length > 0 && <TraitChips traits={tags} />}
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[10px] uppercase text-faint">Lv</span>
+                  <div className="flex shrink-0 items-center gap-1 [--tone:var(--color-accent)]">
+                    <span className="font-label text-[10px] caps text-faint">Lv</span>
                     <CountStepper
                       small
                       value={cls.level}
@@ -140,16 +138,6 @@ function ClassesPanel({ comp, changed }: PanelProps<Classes>) {
                         changed()
                       }}
                     />
-                  </div>
-
-                  <div className="flex min-w-[10rem] flex-[1_1_10rem] items-center gap-2">
-                    <SegmentBar value={ratio} segments={14} thin className="flex-1" />
-                    <span className="shrink-0 font-mono text-[11px] tabular-nums text-dim">
-                      {cls.xp}/{needed}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1 [--tone:var(--color-accent)]">
                     <EffectTokenButton
                       name="xp"
                       spec={{ kind: 'number', default: 50, min: 1, description: `XP to grant directly to ${cls.title}.` }}
@@ -190,8 +178,15 @@ function ClassesPanel({ comp, changed }: PanelProps<Classes>) {
                   </div>
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <GameBar value={cls.xp} max={needed} colour={restricted ? 'warn' : null} size="xs" className="flex-1" />
+                  <span className="shrink-0 font-data text-[10.5px] tabular-nums text-dim">
+                    {cls.xp} / {needed} XP
+                  </span>
+                </div>
+
                 {restricted && (
-                  <div className="border-t border-warn/30 pt-1 font-mono text-[11px] text-warn">
+                  <div className="border-t border-warn/30 pt-1 font-ui text-[11px] text-warn">
                     Restricted: {restrictions.join('; ')}
                   </div>
                 )}

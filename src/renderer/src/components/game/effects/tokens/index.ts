@@ -11,6 +11,7 @@ import './ListToken'
 import './SignalToken'
 import './TagToken'
 import './StoryFlagToken'
+import './WorldTokens'
 
 export { effectToken, registerEffectToken, type EffectToken, type TokenEditProps, type TokenProps } from './registry'
 export { PARAM_TOKEN } from './ParamToken'

@@ -4,6 +4,8 @@ import { EventEmitter } from 'node:events'
 import { cleanBackdrop, cleanVoice, type AudioPrefs, type DropPrefs, type VoicePrefs, type ChatListPrefs, type Settings, type SidePanelPrefs, type TrayPin } from '@shared/types'
 import { cleanProblemPrefs } from '@shared/problems'
 import { cleanPortabilityPrefs } from '@shared/portability'
+import { cleanStartColors } from '@shared/startColors'
+import { cleanWidgetLook } from '@shared/widgetLook'
 import { dataDir } from './paths'
 
 
@@ -32,7 +34,9 @@ const DEFAULTS: Settings = {
   startWithWindows: false,
   droppedPictures: { ask: true, folder: '' },
   problems: cleanProblemPrefs(null),
-  portability: cleanPortabilityPrefs(null)
+  portability: cleanPortabilityPrefs(null),
+  startColors: null,
+  widgetLook: null
 }
 
 const REMOTE_SETTINGS: Record<keyof Settings, boolean> = {
@@ -58,7 +62,9 @@ const REMOTE_SETTINGS: Record<keyof Settings, boolean> = {
   startWithWindows: false,
   droppedPictures: false,
   problems: false,
-  portability: true
+  portability: true,
+  startColors: false,
+  widgetLook: false
 }
 
 export function remoteSettingsOut(value: Settings): Settings {
@@ -164,7 +170,9 @@ function sanitize(input: Partial<Settings>): Settings {
     startWithWindows: typeof input.startWithWindows === 'boolean' ? input.startWithWindows : DEFAULTS.startWithWindows,
     droppedPictures: droppedPictures(input.droppedPictures),
     problems: cleanProblemPrefs(input.problems),
-    portability: cleanPortabilityPrefs(input.portability)
+    portability: cleanPortabilityPrefs(input.portability),
+    startColors: cleanStartColors(input.startColors),
+    widgetLook: cleanWidgetLook(input.widgetLook)
   }
 }
 

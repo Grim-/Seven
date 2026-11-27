@@ -20,16 +20,16 @@ export function ItemReward({ sheet, item, count, gold, onTaken }: { sheet: strin
       onTaken?.()
     }, 'Could not take it')
   return (
-    <div className="flex items-center gap-3 border border-line/50 bg-black/40 p-3 text-[13.5px]">
+    <div className="flex items-center gap-3 border border-line/50 tone-panel-40 p-3 text-[13.5px]">
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {item && (
           <span>
-            <span className="font-mono text-accent">{count} ×</span> {name}
+            <span className="font-ui text-accent">{count} ×</span> {name}
           </span>
         )}
         {gold > 0 && (
           <span>
-            <span className="font-mono text-accent">{gold}</span> gold
+            <span className="font-ui text-accent">{gold}</span> gold
           </span>
         )}
         {!item && !gold && <span className="text-faint">Nothing here.</span>}

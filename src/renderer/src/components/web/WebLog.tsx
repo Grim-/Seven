@@ -12,7 +12,7 @@ import { copyText } from '../../lib/notify'
 
 const OUTCOME: Record<WebLogEntry['outcome'], { label: string; className: string }> = {
   allowed: { label: 'You allowed', className: 'text-ok' },
-  auto: { label: 'Allowed site', className: 'text-teal' },
+  auto: { label: 'Allowed site', className: 'text-secondary' },
   denied: { label: 'You declined', className: 'text-faint' },
   blocked: { label: 'Blocked', className: 'text-alert' },
   failed: { label: 'Failed', className: 'text-alert' }
@@ -42,7 +42,7 @@ export function WebLog() {
       bodyClassName="flex flex-col overflow-y-auto p-3"
     >
       <p className="mb-2 text-[12.5px] text-dim">Every search and page the Web module asked for, newest first, with what happened. Kept in the vault.</p>
-      {error && <div className="font-mono text-[11px] text-alert">{error}</div>}
+      {error && <div className="font-ui text-[11px] text-alert">{error}</div>}
       {list && !list.length && <EmptyState title="Nothing yet">Searches and pages show here once an agent with the Web module uses them.</EmptyState>}
       {list?.map((e, i) => {
         const agent = agents.find((a) => a.id === e.agentId)
@@ -60,12 +60,12 @@ export function WebLog() {
           >
             <AgentAvatar agent={agent} size={20} />
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.1em]">
-                <span className="text-teal/80">{new Date(e.at).toLocaleString('en-GB')}</span>
+              <div className="flex flex-wrap items-center gap-2 font-label text-[10.5px] caps-10 ">
+                <span className="text-secondary/80">{new Date(e.at).toLocaleString('en-GB')}</span>
                 <span className="text-accent">{e.kind === 'search' ? 'Search' : 'Page'}</span>
                 <span className={cn(o.className)}>{o.label}</span>
               </div>
-              <div className="break-all text-[13px] text-white/90">{e.target}</div>
+              <div className="break-all text-[13px] text-ink/90">{e.target}</div>
               {e.note && <div className="break-all text-[11.5px] text-faint">{e.note}</div>}
             </div>
           </div>

@@ -38,7 +38,7 @@ export function CompactCombatLog({
       subtitle={!expanded ? subtitle : undefined}
       expanded={expanded}
       onToggleExpand={() => setExpanded((v) => !v)}
-      className={cn('pointer-events-auto font-mono', expanded ? 'w-[420px]' : 'w-[340px]', className)}
+      className={cn('pointer-events-auto font-ui', expanded ? 'w-[420px]' : 'w-[340px]', className)}
     >
       <div
         ref={scrollRef}
@@ -68,30 +68,30 @@ export function CompactCombatLog({
                       : isHeal
                         ? 'border-ok bg-ok/5'
                         : isParley
-                          ? 'border-purple bg-purple/5'
+                          ? 'border-tint-purple bg-tint-purple/5'
                           : isAttack
-                            ? 'border-cyan bg-cyan/5'
+                            ? 'border-tint-cyan bg-tint-cyan/5'
                             : 'border-line/40'
                 )}
               >
-                <span className="shrink-0 font-mono text-[9px] text-faint">[R{entry.round}]</span>
+                <span className="shrink-0 font-ui text-[9px] text-faint">[R{entry.round}]</span>
                 <strong
                   className={cn(
                     'shrink-0 font-semibold',
                     isTurn
                       ? 'text-accent'
                       : isAttack
-                        ? 'text-cyan'
+                        ? 'text-tint-cyan'
                         : isDamage
                           ? 'text-alert'
                           : isParley
-                            ? 'text-purple'
-                            : 'text-white'
+                            ? 'text-tint-purple'
+                            : 'text-ink'
                   )}
                 >
                   {entry.actorName}:
                 </strong>
-                <span className="text-white/80">{entry.text}</span>
+                <span className="text-ink/80">{entry.text}</span>
               </div>
             )
           })

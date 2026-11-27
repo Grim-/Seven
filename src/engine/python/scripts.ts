@@ -10,6 +10,9 @@ import { findNewMedia } from '../tools/outputs'
 import { data } from '../data/hub'
 import { killTree } from '../tools/shell'
 import { modules } from '../modules/registry'
+import { registerPlaceTarget } from '../data/placeTargets'
+
+registerPlaceTarget({ target: 'run_python', label: 'Python output', home: 'Files/Python', asks: false })
 
 const MAX_OUTPUT = 60_000
 const KEEP_RUNS = 10

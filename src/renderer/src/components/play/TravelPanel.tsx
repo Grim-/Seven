@@ -34,14 +34,14 @@ export function TravelPanel({ world: target, map, place, sheet: who, onDone }: {
   return (
     <div className="flex flex-col gap-3">
       <span className="text-[13px] text-dim">
-        {sheet?.title ?? 'They'} leave{sheet ? 's' : ''} this save, taking their state, and join a save of <b className="text-white">{world.name}</b>.
+        {sheet?.title ?? 'They'} leave{sheet ? 's' : ''} this save, taking their state, and join a save of <b className="text-ink">{world.name}</b>.
       </span>
       <div className="flex flex-col gap-1.5">
         {(list?.saves ?? []).map((s) => (
           <button key={s.id} type="button" disabled={busy} onClick={() => go(s.id)} className="flex items-center gap-2 border border-line/50 px-3 py-2 text-left hover:border-accent/60">
             <DoorOpen className="h-4 w-4 text-accent" />
-            <span className="flex-1 text-[13px] text-white">{s.name}</span>
-            <span className="font-mono text-[11px] text-dim">{s.characters.length} in it</span>
+            <span className="flex-1 text-[13px] text-ink">{s.name}</span>
+            <span className="font-ui text-[11px] text-dim">{s.characters.length} in it</span>
           </button>
         ))}
       </div>

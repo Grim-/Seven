@@ -9,10 +9,10 @@ import { actionItems, decisionItems, type PlayHolder } from './playHolder'
 function Row({ tag, title, chip, items, purple }: { tag: string; title: string; chip: string; items: MenuItem[]; purple?: boolean }) {
   const [first] = items
   return (
-    <div onContextMenu={(e) => openMenu(e, title, items)} className="flex items-center gap-2 border border-line/40 bg-white/[0.015] px-2 py-1.5">
-      <span className={cn('shrink-0 border px-1 font-mono text-[9.5px] font-bold', purple ? 'border-purple/50 text-purple' : 'border-accent/60 text-accent')}>{tag}</span>
-      <span className="min-w-0 flex-1 text-[12.5px] text-white/90">{title}</span>
-      <span className="shrink-0 border border-line/50 px-1.5 font-mono text-[10px] text-dim">{chip}</span>
+    <div onContextMenu={(e) => openMenu(e, title, items)} className="flex items-center gap-2 border border-line/40 bg-ink/[0.015] px-2 py-1.5">
+      <span className={cn('shrink-0 border px-1 font-ui text-[9.5px] font-bold', purple ? 'border-tint-purple/50 text-tint-purple' : 'border-accent/60 text-accent')}>{tag}</span>
+      <span className="min-w-0 flex-1 text-[12.5px] text-ink/90">{title}</span>
+      <span className="shrink-0 border border-line/50 px-1.5 font-ui text-[10px] text-dim">{chip}</span>
       <Button size="sm" variant={purple ? 'secondary' : 'primary'} icon={first.icon} onClick={first.onSelect}>
         {first.label}
       </Button>

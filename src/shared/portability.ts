@@ -8,6 +8,7 @@ export interface PortabilityPrefs {
   warnJsonMb: number
   warnCardMb: number
   maxUnpackMb: number
+  maxPictureSide: number
   includeDependenciesByDefault: boolean
 }
 
@@ -15,6 +16,7 @@ export const DEFAULT_PORTABILITY_PREFS: PortabilityPrefs = {
   warnJsonMb: 10,
   warnCardMb: 5,
   maxUnpackMb: 250,
+  maxPictureSide: 8192,
   includeDependenciesByDefault: true
 }
 
@@ -26,6 +28,7 @@ export function cleanPortabilityPrefs(raw: unknown): PortabilityPrefs {
     warnJsonMb: num(v.warnJsonMb, DEFAULT_PORTABILITY_PREFS.warnJsonMb, 1, 500),
     warnCardMb: num(v.warnCardMb, DEFAULT_PORTABILITY_PREFS.warnCardMb, 1, 500),
     maxUnpackMb: num(v.maxUnpackMb, DEFAULT_PORTABILITY_PREFS.maxUnpackMb, 10, 4096),
+    maxPictureSide: Math.round(num(v.maxPictureSide, DEFAULT_PORTABILITY_PREFS.maxPictureSide, 256, 32768)),
     includeDependenciesByDefault:
       typeof v.includeDependenciesByDefault === 'boolean'
         ? v.includeDependenciesByDefault
@@ -126,6 +129,7 @@ export interface PortableExportRequest {
   pictureId?: string | null
   framedBase64?: string | null
   framedByKey?: Record<string, string> | null
+  prefixKind?: boolean
 }
 
 export interface PortableExportResult {
@@ -167,6 +171,7 @@ export interface PortablePeekResult {
   items: PortablePeekItem[]
   text: string | null
   fileCount: number
+  missingFiles?: string[]
   error?: string | null
 }
 
@@ -183,6 +188,9 @@ export interface PortableImportRequest {
   defaultMode?: PortableConflictResolution
   keepPicture?: boolean
   keepPictureOnly?: boolean
+  pictureFolder?: string | null
+  folder?: string | null
+  tags?: string[]
 }
 
 export interface PortableImportEntryResult {
@@ -197,6 +205,7 @@ export interface PortableImportResult {
   skipped: { title: string; reason: string }[]
   text: string | null
   pictureAssetId: string | null
+  folder: { kind: string; id: string } | null
 }
 
 export function sanitizeFileName(name: string, fallback = 'export'): string {

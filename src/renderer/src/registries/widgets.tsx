@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
 import type { Dashboard, Widget, WidgetProviderInfo, WidgetSource } from '@shared/types'
+import { surfaceDefaults } from './surfaceDefaults'
 import { EmptyState } from '../components/ui'
 import type { EntrySurfaceProps } from './kinds'
 
@@ -28,7 +29,6 @@ export interface WidgetUi {
 }
 
 const uis = new Map<string, WidgetUi>()
-let defaultEntryWidgetUi: WidgetUi | null = null
 
 function Unknown({ widget }: WidgetBodyProps) {
   return <EmptyState title="Can't show this">Seven has nothing that shows a {widget.source.kind} widget.</EmptyState>
@@ -37,7 +37,7 @@ function Unknown({ widget }: WidgetBodyProps) {
 const UNKNOWN: WidgetUi = { Body: Unknown }
 
 export function setDefaultEntryWidgetUi(ui: WidgetUi): void {
-  defaultEntryWidgetUi = ui
+  surfaceDefaults.widget = ui
 }
 
 export function registerWidgetUi(kind: string, ui: WidgetUi): void {
@@ -51,7 +51,7 @@ export function widgetUiOf(kind: string): WidgetUi | undefined {
 export function widgetUi(source: WidgetSource): WidgetUi {
   const found = uis.get(source.kind)
   if (found) return found
-  if (defaultEntryWidgetUi && typeof source.id === 'string') return defaultEntryWidgetUi
+  if (surfaceDefaults.widget && typeof source.id === 'string') return surfaceDefaults.widget
   return UNKNOWN
 }
 

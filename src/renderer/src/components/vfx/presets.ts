@@ -6,7 +6,7 @@ function sampleCurve(steps: number, fn: (p: number) => Keyframe): Keyframe[] {
   return out
 }
 
-const glowShadow = (color: string, px: number, pct: number) => `0 0 ${px.toFixed(1)}px color-mix(in srgb, ${color} ${Math.round(pct)}%, transparent)`
+const glowShadow = (color: string, px: number, pct: number) => `0 0 ${px.toFixed(1)}px color-mix(in srgb, ${color} calc(${Math.round(pct)}% * var(--glow, 1)), transparent)`
 
 registerVfxPreset({
   id: 'hit',

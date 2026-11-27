@@ -59,13 +59,13 @@ export function ToolsetEditor({ toolset, onSaved, onDeleted }: { toolset: Toolse
       {pickable.map((m) => {
         const all = m.tools.every((t) => tools.includes(t.name))
         return (
-          <div key={m.id} className="border border-line/40 bg-black/40 p-2.5">
+          <div key={m.id} className="border border-line/40 tone-panel-40 p-2.5">
             <div className="mb-1.5 flex items-center gap-2">
-              <span className="text-[13px] text-white">{m.name}</span>
-              {m.state !== 'on' && <span className="font-mono text-[10px] uppercase text-accent">{m.state}</span>}
+              <span className="text-[13px] text-ink">{m.name}</span>
+              {m.state !== 'on' && <span className="font-label text-[10px] caps text-accent">{m.state}</span>}
               <button
                 onClick={() => setTools(all ? tools.filter((t) => !m.tools.some((x) => x.name === t)) : [...new Set([...tools, ...m.tools.map((x) => x.name)])])}
-                className="ml-auto font-mono text-[10px] uppercase tracking-[0.14em] text-dim hover:text-white"
+                className="ml-auto font-label text-[10px] caps-14 text-dim hover:text-ink"
               >
                 {all ? 'None' : 'All'}
               </button>
@@ -75,7 +75,7 @@ export function ToolsetEditor({ toolset, onSaved, onDeleted }: { toolset: Toolse
                 <div key={t.name} className="flex items-start gap-2" title={t.description}>
                   <Toggle checked={tools.includes(t.name)} onChange={(v) => toggle(t.name, v)} />
                   <span className="min-w-0">
-                    <span className="block font-mono text-[12px] text-white">{t.name}</span>
+                    <span className="block font-ui text-[12px] text-ink">{t.name}</span>
                     <span className="block truncate text-[11px] text-faint">{t.description}</span>
                   </span>
                 </div>

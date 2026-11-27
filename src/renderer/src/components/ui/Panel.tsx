@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '../../lib/cn'
+import { skinSurface } from '../skins/skinSurface'
 
 interface PanelProps {
   lead?: ReactNode
@@ -22,7 +23,7 @@ export function Panel({ lead, tail, title, meta, actions, collapsible, defaultOp
   const [open, setOpen] = useState(defaultOpen)
   const hasHeader = lead || tail || title || actions || meta
   return (
-    <section style={style} className={cn('panel-box relative flex min-h-0 flex-col overflow-hidden hover:border-l-accent', className)}>
+    <section style={style} {...skinSurface('panel')} className={cn('panel-box relative flex min-h-0 flex-col overflow-hidden hover:border-l-accent', className)}>
       {loading && <span className="seven-pulse" />}
       {hasHeader && (
         <header
@@ -31,8 +32,8 @@ export function Panel({ lead, tail, title, meta, actions, collapsible, defaultOp
         >
           {lead}
           <div className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-2.5 tablet:flex-wrap tablet:gap-2 tablet:px-2 tablet:py-1.5">
-            {title && <h2 className="text-[14px] font-semibold uppercase tracking-[0.06em] text-white tablet:min-w-0">{title}</h2>}
-            {meta && <span className="font-mono text-[12px] text-dim">{meta}</span>}
+            {title && <h2 className="type-title text-ink tablet:min-w-0">{title}</h2>}
+            {meta && <span className="font-ui text-[12px] text-dim">{meta}</span>}
             <div className="ml-auto flex items-center gap-2 tablet:flex-wrap tablet:justify-end" onClick={(e) => e.stopPropagation()}>
               {actions}
             </div>

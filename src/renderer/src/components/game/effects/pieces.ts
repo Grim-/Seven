@@ -33,6 +33,7 @@ export function hostLanes(host: string): EffectLane[] | null {
 
 export function pieceChoices(host: string): PieceChoice[] {
   return componentFits(host).flatMap((f) => {
+    if (f.fits !== true) return []
     const Class = asPiece(f.Class)
     return Class ? [{ Class, fits: f.fits }] : []
   })

@@ -7,7 +7,7 @@ export function ActEditor({ act, index, onChange }: { act: Act; index: number; o
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
       <div className="flex items-center gap-3">
-        <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-faint">Act {index + 1}</span>
+        <span className="font-label text-[11px] caps-16 text-faint">Act {index + 1}</span>
         <Input value={act.name} onChange={(e) => set({ name: e.target.value })} placeholder="Name this act, e.g. The Descent" className="h-9 flex-1 text-[16px] font-semibold" />
       </div>
       <Section title="What happens" hint="The beat the storyteller steers towards in this act.">

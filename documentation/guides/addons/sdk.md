@@ -72,5 +72,16 @@ To add an MCP server: Tools → **Import mcp.json**, or a folder whose `module.j
 { "id": "my-server", "name": "My server", "type": "mcp", "transport": "stdio", "command": "npx", "args": ["-y", "some-mcp-server"], "env": {} }
 ```
 
+## Styling views
+Part views and HTML widgets get Seven's look as CSS variables, filled from the user's skin and theme:
+- Colours: `--bg`, `--card`, `--panel`, `--surface`, `--well`, `--ink`, `--dim`, `--faint`, `--line`, `--line-strong`, `--accent`, `--accent-soft`, `--on-accent`, `--secondary`, `--secondary-ink`, `--alert`, `--ok`, `--warn`, `--tint-cyan`, `--tint-teal`, `--tint-purple`.
+- Fonts: `--font-body`, `--font-heading`, `--font-ui`, `--font-label`, `--font-data`, `--font-mono`, `--font-sans`.
+- Labels: `--label-case`, `--label-tracking`, `--label-variant`.
+- Older names still work: `--text`, `--cyan`, `--mono`, `--sans`.
+
+Classes: `s-panel`, `s-title`, `s-label`, `s-dim`, `s-faint`, `s-mono`, `s-row`, `s-grid` (`--min` sets the column width), `s-btn` (`primary`, `danger`), `s-tabs` / `s-tab` (`on`), `s-input`, `s-textarea`, `s-select`, `s-chip`, `s-stat` (`<b>` value, `<span>` label), `s-note`.
+
+A view built on these follows the user's skin with no change on its side. A view with its own colours and fonts keeps its own look. An open view picks up a skin change the next time it loads. Skin font files are not passed into views; the font's family stack is used.
+
 ## Kinds
 Most of an add-on's reach comes from its kinds: entries that can be searched, read, linked, exported, shown as parts and placed on boards. See `../kinds/overview.md` for everything a kind can implement.

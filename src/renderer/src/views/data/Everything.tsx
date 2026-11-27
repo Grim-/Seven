@@ -12,14 +12,14 @@ import { openIn } from './KindList'
 function HitRow({ section, hit, at, onOpen, onMenu }: { section: LibrarySection; hit: LibraryHit; at?: number; onOpen: () => void; onMenu: (e: React.MouseEvent) => void }) {
   const when = at ?? hit.at
   return (
-    <button onClick={onOpen} onContextMenu={onMenu} className="flex items-center gap-3 border-b border-line/20 px-2 py-2 text-left hover:bg-white/[0.03]">
+    <button onClick={onOpen} onContextMenu={onMenu} className="flex items-center gap-3 border-b border-line/20 px-2 py-2 text-left hover:bg-ink/[0.03]">
       <KindIcon name={section.icon} className="h-4 w-4 shrink-0 text-accent-soft" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13.5px] text-white">{showName(hit.title)}</span>
+        <span className="block truncate text-[13.5px] text-ink">{showName(hit.title)}</span>
         {hitDetail(hit) && <span className="block truncate text-[11.5px] text-dim">{hitDetail(hit)}</span>}
       </span>
-      <span className="shrink-0 font-mono text-[10.5px] uppercase tracking-[0.12em] text-faint">{section.label}</span>
-      {when !== undefined && <span className="w-16 shrink-0 text-right font-mono text-[10.5px] text-faint">{formatRelative(when)}</span>}
+      <span className="shrink-0 font-label text-[10.5px] caps-12 text-faint">{section.label}</span>
+      {when !== undefined && <span className="w-16 shrink-0 text-right font-ui text-[10.5px] text-faint">{formatRelative(when)}</span>}
     </button>
   )
 }
@@ -69,7 +69,7 @@ export function Everything({
         {!found.length && <div className="text-[13px] text-faint">Nothing matches "{query}".</div>}
         {found.map((section) => (
           <section key={section.kind} className="flex flex-col">
-            <button onClick={() => select({ kind: section.kind, id: 'all' })} onContextMenu={(e) => kindMenuAt(e, section, select)} className="mb-1 self-start font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-accent-soft hover:text-white">
+            <button onClick={() => select({ kind: section.kind, id: 'all' })} onContextMenu={(e) => kindMenuAt(e, section, select)} className="mb-1 self-start font-label text-[11px] font-bold caps-16 text-accent-soft hover:text-ink">
               {section.plural}
             </button>
             {section.entries.map((hit) => (
@@ -93,7 +93,7 @@ export function Everything({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-accent-soft">
+        <h2 className="font-label text-[11px] font-bold caps-16 text-accent-soft">
           {mode === 'recent' ? 'Recently opened' : 'Recently changed'}
         </h2>
         {onModeChange && (

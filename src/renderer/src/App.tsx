@@ -20,19 +20,23 @@ import { ExportHost } from './components/export/ExportModal'
 import { PlayHost } from './components/play/PlayHost'
 import { PicturePickerHost } from './components/data/PicturePicker'
 import { GenerateImageHost } from './components/pictures/GenerateImageModal'
+import { ImageModelSetupModalHost } from './components/models/ImageModelConfigPanel'
 import { CarryHost } from './components/carry/CarryModals'
 import { PortabilityHost } from './components/portability/PortabilityHost'
 import { DropPicturesHost } from './components/files/DropPictures'
+import { SaveLocationHost } from './components/files/SaveLocationModal'
+import { DataConversionHost } from './components/conversions/DataConversionModal'
 import { StageOverlay } from './registries/presentations'
 import { WelcomeModalHost } from './components/shell/WelcomeModal'
 import { useCinema, useCinemaKey } from './lib/cinema'
+import { skinSurface } from './components/skins/skinSurface'
 
 function StartupScreen() {
   const startup = useApp((s) => s.startup)
   const engineStatus = useApp((s) => s.engine)
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-6">
-      <DecodeText className="font-mono text-[18px] font-bold uppercase tracking-[0.34em] text-accent" text="Seven" />
+      <DecodeText className="font-label text-[18px] font-bold caps-34 text-accent" text="Seven" />
       <LoadingScreen
         className="w-full flex-none p-0"
         title="Seven"
@@ -66,7 +70,7 @@ export function App() {
   const fileDrop = useFileDrop((_, e, dropped) => void dropFiles(dropped, e.shiftKey))
   return (
     <MotionConfig reducedMotion="user">
-    <div className="fixed inset-0 flex flex-col bg-bg text-text">
+    <div {...skinSurface('app')} className="fixed inset-0 flex flex-col bg-bg text-ink">
       <ThemeStage />
       <AudioHost />
       {!cinema && <TitleBar />}
@@ -90,9 +94,12 @@ export function App() {
       <PlayHost />
       <PicturePickerHost />
       <GenerateImageHost />
+      <ImageModelSetupModalHost />
       <CarryHost />
       <PortabilityHost />
       <DropPicturesHost />
+      <SaveLocationHost />
+      <DataConversionHost />
       <TooltipHost />
       <StageOverlay />
       <WelcomeModalHost />

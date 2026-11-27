@@ -8,6 +8,16 @@ export const WORLD_DISPLAY_AS: WorldDisplayAs[] = ['stat', 'prose', 'quote', 'ba
 export const WORLD_LAYOUTS = ['flow', 'stats'] as const
 export const WORLD_COLUMNS = ['main', 'left', 'rail'] as const
 
+export const WORLD_LINK_KIND = 'world'
+
+export const worldLink = (worldId: string, type: 'place' | 'event' | 'faction' | 'knowledge' | string, id: string): string =>
+  `@${WORLD_LINK_KIND}:${worldId}/${type}/${id}`
+
+export function worldPart(ref: string): { world: string; segment: string; id: string } | null {
+  const [world, segment, ...rest] = ref.replace(/^"|"$/g, '').split('/')
+  return world && segment && rest.length ? { world, segment, id: rest.join('/') } : null
+}
+
 export interface WorldMapSub {
   kind: 'text' | 'number'
   default?: string | number
@@ -133,6 +143,7 @@ export interface WorldMeta {
   tags: string[]
   flags?: Record<string, string | number | boolean>
   launch?: WorldLaunch
+  knowledgeCues?: boolean
   updatedAt: number
 }
 
@@ -317,16 +328,35 @@ export function normalEntity(t: WorldType, raw: unknown, includeHidden = true): 
   return out
 }
 
+export const REGION_TYPE_KEY = 'region'
 export const PLACE_TYPE_KEY = 'place'
+
+export const REGION_TYPE: WorldType = {
+  noun: 'region',
+  plural: 'regions',
+  label: 'Name',
+  describe: 'A region or area on a map that groups places together.',
+  fields: {
+    Name: { kind: 'text', lock: 'create_only', describe: "The region or area's name." },
+    Parent: { kind: 'ref', to: REGION_TYPE_KEY, describe: 'Optional larger region this area sits inside.' },
+    Summary: { kind: 'text', describe: 'Brief overview of this region or area.', display: { as: 'prose' } }
+  },
+  backrefs: {
+    Places: { from: PLACE_TYPE_KEY, via: 'Region', empty: 'none' },
+    Subregions: { from: REGION_TYPE_KEY, via: 'Parent', empty: 'none' }
+  },
+  display: { glyph: '◈', icon: 'layers' }
+}
 
 export const PLACE_TYPE: WorldType = {
   noun: 'place',
   plural: 'places',
   label: 'Name',
-  describe: 'A place in the world. A place can be inside another place, and can be drawn on maps.',
+  describe: 'A place in the world. Places are nested inside regions/areas, drawn as zones on maps, and define where characters spawn.',
   fields: {
     Name: { kind: 'text', lock: 'create_only', describe: "The place's name." },
-    Inside: { kind: 'ref', to: PLACE_TYPE_KEY, describe: 'The place it is inside, if any.' },
+    Region: { kind: 'ref', to: REGION_TYPE_KEY, describe: 'The region or area this place belongs to.' },
+    Inside: { kind: 'ref', to: PLACE_TYPE_KEY, describe: 'Optional parent place it is inside (e.g. a room inside a building).' },
     Looks: { kind: 'text', describe: 'What this place looks like visually at a glance (lighting, layout, materials, atmosphere).', display: { as: 'prose' } },
     Exits: { kind: 'list', entryRef: { to: PLACE_TYPE_KEY, resolve: true }, describe: 'Direct ways out of this place (one per line, e.g. "iron door (locked)") linked to the destination place. Only immediate exits are shown to preserve anti-clairvoyancy.' },
     Files: { kind: 'text', describe: 'Links to what belongs here, e.g. @page:the_den @sheet:mara.', display: { as: 'prose' } },
@@ -336,6 +366,13 @@ export const PLACE_TYPE: WorldType = {
   },
   backrefs: { Places_inside: { from: PLACE_TYPE_KEY, via: 'Inside', empty: 'none' } },
   display: { glyph: '⌖', icon: 'map-pin' }
+}
+
+export function withRegions(schema: WorldSchema): WorldSchema {
+  const own = schema.types[REGION_TYPE_KEY]
+  if (own && Object.keys(REGION_TYPE.fields).every((f) => f in own.fields)) return schema
+  const type: WorldType = own ? { ...own, fields: { ...REGION_TYPE.fields, ...own.fields }, backrefs: { ...REGION_TYPE.backrefs, ...own.backrefs } } : REGION_TYPE
+  return { ...schema, types: { ...schema.types, [REGION_TYPE_KEY]: type } }
 }
 
 export function withPlaces(schema: WorldSchema): WorldSchema {

@@ -4,7 +4,8 @@ import { engine } from '../../lib/ipc'
 import { formatRelative } from '../../lib/format'
 import { KindIcon, onLibraryChange, openEntry } from '../../lib/library'
 import { ThemeGlance } from '../themes/ThemeControl'
-import { BackgroundControlGlance, DiceGlance } from './RoleplayGlances'
+import { BackgroundControlGlance, DiceGlance, WorldClockGlance } from './RoleplayGlances'
+import { CharacterStateGlance, ImageHistoryGlance, ModelCacheGlance, WorldEventsGlance } from './MindAndCacheGlances'
 import { WorkoutState, lastDone, openWorkout, useWorkout } from '../workout/Workout'
 import { useTools } from '../../store/tools'
 import { modelName, useModels } from '../../store/models'
@@ -22,7 +23,7 @@ import { MissingWidget, registerWidgetUi, type WidgetBodyProps, type WidgetEdito
 import { noteFailure } from '../../store/problems'
 
 function Label({ children }: { children: ReactNode }) {
-  return <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-accent-soft">{children}</div>
+  return <div className="font-label text-[10px] font-semibold caps-22 text-accent-soft">{children}</div>
 }
 
 function greeting(hour: number): string {
@@ -38,11 +39,11 @@ function ClockGlance() {
   return (
     <div className="flex h-full flex-col justify-center gap-1.5 overflow-hidden">
       <Label>{greeting(now.getHours())}</Label>
-      <div className="font-mono text-[44px] font-bold leading-none tabular-nums text-white">
+      <div className="font-data text-[44px] font-bold leading-none tabular-nums text-ink">
         {pad(now.getHours())}:{pad(now.getMinutes())}
         <span className="ml-1 text-[22px] text-accent">{pad(now.getSeconds())}</span>
       </div>
-      <div className="font-mono text-[11.5px] uppercase tracking-[0.16em] text-teal/80">{now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+      <div className="font-label text-[11.5px] caps-16 text-secondary/80">{now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
     </div>
   )
 }
@@ -60,9 +61,9 @@ function when(time: number): string {
 function Row({ icon, title, meta, onClick, hot }: { icon: ReactNode; title: string; meta: string; onClick?: () => void; hot?: boolean }) {
   return (
     <button onClick={onClick} className="shell-row flex w-full items-center gap-2.5 px-2 py-1.5 text-left">
-      <span className={cn('shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5', hot ? 'text-accent' : 'text-teal/70')}>{icon}</span>
-      <span className="min-w-0 flex-1 truncate text-[13px] text-white/90">{title}</span>
-      <span className="shrink-0 font-mono text-[10.5px] text-faint">{meta}</span>
+      <span className={cn('shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5', hot ? 'text-accent' : 'text-secondary/70')}>{icon}</span>
+      <span className="min-w-0 flex-1 truncate text-[13px] text-ink/90">{title}</span>
+      <span className="shrink-0 font-ui text-[10.5px] text-faint">{meta}</span>
     </button>
   )
 }
@@ -140,12 +141,12 @@ function SystemGlance() {
   const model = host.status === 'ready' ? modelName(models, host.modelId) : host.status === 'loading' ? `loading ${Math.round(host.progress * 100)}%` : host.status === 'error' ? 'error' : 'none loaded'
   return (
     <div className="flex h-full flex-col gap-2.5 overflow-hidden">
-      <div className="flex items-center justify-between gap-2 font-mono text-[11px]">
-        <span className="truncate text-white/90">
-          <span className={cn('mr-1.5 inline-block h-1.5 w-1.5', host.status === 'ready' ? 'bg-teal' : host.status === 'loading' ? 'bg-accent' : host.status === 'error' ? 'bg-alert' : 'bg-faint')} />
+      <div className="flex items-center justify-between gap-2 font-ui text-[11px]">
+        <span className="truncate text-ink/90">
+          <span className={cn('mr-1.5 inline-block h-1.5 w-1.5', host.status === 'ready' ? 'bg-secondary' : host.status === 'loading' ? 'bg-accent' : host.status === 'error' ? 'bg-alert' : 'bg-faint')} />
           {model}
         </span>
-        {vault.configured && <span className={vault.unlocked ? 'text-teal/80' : 'text-faint'}>vault {vault.unlocked ? 'open' : 'locked'}</span>}
+        {vault.configured && <span className={vault.unlocked ? 'text-secondary/80' : 'text-faint'}>vault {vault.unlocked ? 'open' : 'locked'}</span>}
       </div>
       {stats && (
         <>
@@ -166,6 +167,11 @@ registerGlanceView('player', { View: PlayerGlance })
 registerGlanceView('theme', { View: ThemeGlance })
 registerGlanceView('background_control', { View: BackgroundControlGlance })
 registerGlanceView('dice', { View: DiceGlance })
+registerGlanceView('world_time', { View: WorldClockGlance })
+registerGlanceView('world_events', { View: WorldEventsGlance })
+registerGlanceView('model_cache', { View: ModelCacheGlance })
+registerGlanceView('image_history', { View: ImageHistoryGlance })
+registerGlanceView('character_state', { View: CharacterStateGlance })
 
 function glanceChoices(info: WidgetProviderInfo, modules: { id: string; state: string }[]): WidgetChoice[] {
   return (info.choices ?? []).filter((c) => !c.module || modules.some((m) => m.id === c.module && m.state === 'on'))

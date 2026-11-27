@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 260" fill="none">
+  <rect width="820" height="260" fill="#101319" rx="4" />
+  <rect x="12" y="12" width="796" height="236" stroke="#2a3342" stroke-width="1.2" stroke-dasharray="4 4" />
+  <!-- Nodes -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+    <rect x="36" y="48" width="160" height="72" fill="#171d27" stroke="#e5a93c" stroke-width="1.6" />
+    <text x="52" y="74" fill="#e5a93c" font-size="11" font-weight="700" letter-spacing="1.4">MODELS</text>
+    <text x="52" y="94" fill="#d9e0ea" font-size="11">Local GGUF / SD</text>
+    <text x="52" y="109" fill="#8d99ae" font-size="10">OpenAI · Gemini · OR</text>
+
+    <rect x="242" y="48" width="160" height="72" fill="#171d27" stroke="#5ccfe6" stroke-width="1.6" />
+    <text x="258" y="74" fill="#5ccfe6" font-size="11" font-weight="700" letter-spacing="1.4">AGENTS</text>
+    <text x="258" y="94" fill="#d9e0ea" font-size="11">Persona + Tools</text>
+    <text x="258" y="109" fill="#8d99ae" font-size="10">Chat · Tabletop · Cinema</text>
+
+    <rect x="448" y="48" width="160" height="72" fill="#171d27" stroke="#7fd962" stroke-width="1.6" />
+    <text x="464" y="74" fill="#7fd962" font-size="11" font-weight="700" letter-spacing="1.4">WORLDS &amp; MAPS</text>
+    <text x="464" y="94" fill="#d9e0ea" font-size="11">Blueprints → Atlases</text>
+    <text x="464" y="109" fill="#8d99ae" font-size="10">Zones · Tokens · Triggers</text>
+
+    <rect x="654" y="48" width="130" height="72" fill="#171d27" stroke="#d4bfff" stroke-width="1.6" />
+    <text x="670" y="74" fill="#d4bfff" font-size="11" font-weight="700" letter-spacing="1.4">IMAGE STUDIO</text>
+    <text x="670" y="94" fill="#d9e0ea" font-size="11">sd-server / Cloud</text>
+    <text x="670" y="109" fill="#8d99ae" font-size="10">LoRAs · img2img</text>
+
+    <!-- Bottom bar -->
+    <rect x="36" y="162" width="748" height="54" fill="#141923" stroke="#2f3a4d" stroke-width="1.2" />
+    <text x="56" y="185" fill="#e5a93c" font-size="10.5" font-weight="700" letter-spacing="1.6">SHARED LIBRARY &amp; FILES (@file, @note, @character, @world)</text>
+    <text x="56" y="203" fill="#9aa7bd" font-size="10.5">Everything links cleanly — agents read notes, generate images into Files, and move tokens across live Worlds.</text>
+
+    <!-- Arrows -->
+    <path d="M196 84 H240" stroke="#5ccfe6" stroke-width="1.5" />
+    <path d="M402 84 H446" stroke="#7fd962" stroke-width="1.5" />
+    <path d="M608 84 H652" stroke="#d4bfff" stroke-width="1.5" />
+    <path d="M322 120 V160 M528 120 V160 M719 120 V160" stroke="#3c4960" stroke-width="1.2" stroke-dasharray="3 3" />
+  </g>
+</svg>

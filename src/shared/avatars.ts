@@ -1,11 +1,13 @@
 import './avatars/glyph'
 import './avatars/lattice'
 import './avatars/picture'
+import './avatars/treatments'
 import { pictureAvatar } from './avatars/picture'
 import type { Avatar } from './avatars/registry'
 import type { AvatarRef } from './types'
 
 export * from './avatars/registry'
+export * from './avatars/treatments'
 export { PICTURE_RENDERER, pictureAvatar } from './avatars/picture'
 
 export function avatarOfRef(ref: AvatarRef | null | undefined, list: Avatar[]): Avatar | null {

@@ -1,6 +1,8 @@
 import { toId } from '../ids'
+import { worldLink } from '../world'
 import { cleanComponents } from './core/params'
 import type { ComponentDef } from './core/registry'
+import type { StoredFaction } from './factions'
 
 export type WorldEventScopeLevel = 'global' | 'map' | 'area' | 'place'
 export type WorldEventStatus = 'dormant' | 'active' | 'resolved'
@@ -29,10 +31,13 @@ export interface WorldEventParticipant {
   power: number
 }
 
+export type WorldEventScoreStat = 'power' | string
+
 export interface WorldEventScoreFactor {
   label: string
   kind: 'power' | 'flag' | 'fixed'
   factionId?: string
+  stat?: WorldEventScoreStat
   participantId?: string
   flag?: string
   expected?: string | number | boolean
@@ -43,6 +48,7 @@ export interface WorldEventOutcome {
   id: string
   label: string
   summary: string
+  known: string
   winnerFactionId?: string | null
   factors: WorldEventScoreFactor[]
   varianceDie?: number
@@ -69,16 +75,30 @@ export interface WorldEventResolution {
 
 export interface WorldEventRuntime {
   status: WorldEventStatus
+  activatedAt?: number
   resolution?: WorldEventResolution | null
 }
 
+export interface WorldEventFlagCondition {
+  flag: string
+  value: string
+}
+
+export interface WorldEventTrigger {
+  at: number | null
+  flags: WorldEventFlagCondition[]
+}
+
+/** Pure world-level authoring definition of a World Event. Runtime play state lives only in a Save. */
 export interface WorldEvent {
   id: string
   worldId: string
   title: string
   premise: string
   scope: { level: WorldEventScopeLevel; refId: string }
-  status: WorldEventStatus
+  /** When true, this event begins active as soon as a new save starts; otherwise it starts dormant until triggered. */
+  startsActive?: boolean
+  trigger: WorldEventTrigger
   rumours: WorldEventRumour[]
   participants: WorldEventParticipant[]
   outcomes: WorldEventOutcome[]
@@ -86,8 +106,41 @@ export interface WorldEvent {
   updatedAt: number
 }
 
+/** Definition merged with the active Save's runtime instance state. */
 export interface ResolvedWorldEvent extends WorldEvent {
+  status: WorldEventStatus
+  hasSave: boolean
+  activatedAt?: number
   resolution?: WorldEventResolution | null
+}
+
+export function resolveWorldEventState(
+  ev: WorldEvent,
+  runtime: WorldEventRuntime | null | undefined,
+  hasSave: boolean
+): ResolvedWorldEvent {
+  return {
+    ...ev,
+    status: runtime?.status ?? (ev.startsActive ? 'active' : 'dormant'),
+    hasSave,
+    ...(typeof runtime?.activatedAt === 'number' ? { activatedAt: runtime.activatedAt } : {}),
+    resolution: runtime?.resolution ?? null
+  }
+}
+
+export const EVENT_SEGMENT = 'event'
+
+export const eventLink = (world: string, id: string): string => `${world}/${EVENT_SEGMENT}/${id}`
+
+export const eventKey = (ref: string): string => ref.split('/').pop() ?? ref
+
+export const eventPlace = (ev: Pick<WorldEvent, 'scope'>): string => (ev.scope.level === 'place' && ev.scope.refId ? eventKey(ev.scope.refId) : '')
+
+export const placeScope = (place: string | null): WorldEvent['scope'] => (place ? { level: 'place', refId: place } : { level: 'global', refId: '' })
+
+export const eventWhere = (ev: Pick<WorldEvent, 'scope' | 'worldId'>): string => {
+  const place = eventPlace(ev)
+  return place && ev.worldId ? worldLink(ev.worldId, 'place', place) : 'everywhere'
 }
 
 const LEVELS: readonly WorldEventScopeLevel[] = ['global', 'map', 'area', 'place']
@@ -128,7 +181,12 @@ export function cleanWorldEventRuntime(raw: unknown): WorldEventRuntime | null {
           ...(str(res.transcriptSummary) ? { transcriptSummary: str(res.transcriptSummary) } : {})
         }
       : null
-  return { status: cleanStatus(v.status), ...(resolution ? { resolution } : {}) }
+  const activatedAt = typeof v.activatedAt === 'number' && Number.isFinite(v.activatedAt) ? v.activatedAt : undefined
+  return {
+    status: cleanStatus(v.status),
+    ...(activatedAt !== undefined ? { activatedAt } : {}),
+    ...(resolution ? { resolution } : {})
+  }
 }
 
 export function cleanWorldEvent(raw: unknown): WorldEvent | null {
@@ -193,6 +251,7 @@ export function cleanWorldEvent(raw: unknown): WorldEvent | null {
                     label: str(fac.label) || kind,
                     kind,
                     ...(str(fac.factionId) ? { factionId: str(fac.factionId) } : {}),
+                    ...(str(fac.stat) ? { stat: str(fac.stat) as WorldEventScoreStat } : {}),
                     ...(str(fac.participantId) ? { participantId: str(fac.participantId) } : {}),
                     ...(str(fac.flag) ? { flag: str(fac.flag) } : {}),
                     ...(fac.expected !== undefined ? { expected: fac.expected as string | number | boolean } : {}),
@@ -204,6 +263,7 @@ export function cleanWorldEvent(raw: unknown): WorldEvent | null {
             id: (str(item.id) && toId(str(item.id))) || toId(label) || `outcome_${i + 1}`,
             label,
             summary: str(item.summary),
+            known: str(item.known),
             winnerFactionId: str(item.winnerFactionId) || null,
             factors,
             ...(typeof item.varianceDie === 'number' && item.varianceDie > 0 ? { varianceDie: Math.floor(item.varianceDie) } : {}),
@@ -215,6 +275,8 @@ export function cleanWorldEvent(raw: unknown): WorldEvent | null {
     : []
 
   const tags = Array.isArray(v.tags) ? v.tags.map(str).filter(Boolean).map((t) => toId(t)) : []
+  const startsActive =
+    typeof v.startsActive === 'boolean' ? v.startsActive : v.status === 'active'
 
   return {
     id,
@@ -222,13 +284,31 @@ export function cleanWorldEvent(raw: unknown): WorldEvent | null {
     title,
     premise: str(v.premise),
     scope: { level: cleanLevel(sc.level), refId: str(sc.refId) },
-    status: cleanStatus(v.status),
+    ...(startsActive ? { startsActive: true } : {}),
+    trigger: cleanTrigger(v.trigger),
     rumours,
     participants,
     outcomes,
     tags,
     updatedAt: num(v.updatedAt, Date.now())
   }
+}
+
+function cleanTrigger(raw: unknown): WorldEventTrigger {
+  const t = obj(raw)
+  const flags = Array.isArray(t.flags)
+    ? t.flags.map((f) => ({ flag: str(obj(f).flag), value: str(obj(f).value) })).filter((f) => f.flag)
+    : []
+  return { at: typeof t.at === 'number' && Number.isFinite(t.at) ? t.at : null, flags }
+}
+
+const flagMatches = (have: unknown, want: string): boolean => (want ? String(have) === want : have !== undefined && have !== false && have !== '')
+
+export function triggerMet(ev: WorldEvent, state: { time: number | null; flags: Record<string, unknown> }): boolean {
+  const { at, flags } = ev.trigger
+  if (at === null && !flags.length) return false
+  if (at !== null && (state.time === null || state.time < at)) return false
+  return flags.every((f) => flagMatches(state.flags[f.flag], f.value))
 }
 
 export function blankWorldEvent(worldId = ''): WorldEvent {
@@ -238,7 +318,8 @@ export function blankWorldEvent(worldId = ''): WorldEvent {
     title: '',
     premise: '',
     scope: { level: 'global', refId: '' },
-    status: 'active',
+    startsActive: false,
+    trigger: { at: null, flags: [] },
     rumours: [],
     participants: [],
     outcomes: [],
@@ -252,7 +333,7 @@ export function worldEventPublicMarkdown(event: ResolvedWorldEvent): string {
   const lines = [
     `# ${event.title}`,
     `- Status: ${event.status}`,
-    `- Scope: ${event.scope.level}${event.scope.refId ? ` (${event.scope.refId})` : ''}`
+    `- Where: ${eventWhere(event)}`
   ]
   if (event.status === 'active' && event.rumours.length) {
     lines.push('\n## Rumours & News')
@@ -268,22 +349,32 @@ export function worldEventPublicMarkdown(event: ResolvedWorldEvent): string {
 
 export interface ScoreContext {
   flags: Record<string, string | number | boolean>
+  factions?: StoredFaction[]
   rng?: () => number
 }
 
-/** Deterministically scores all defined outcomes of a WorldEvent using real save flags, participant power, and optional bounded variance. */
+/** Deterministically scores all defined outcomes of a WorldEvent using real save flags, participant/faction stats, and optional bounded variance. */
 export function scoreWorldEventOutcomes(
   event: WorldEvent,
   ctx: ScoreContext
 ): { winner: WorldEventOutcome | null; breakdown: WorldEventScoreRow[] } {
   if (!event.outcomes.length) return { winner: null, breakdown: [] }
   const rand = ctx.rng ?? Math.random
+  const factionById = new Map((ctx.factions ?? []).map((f) => [f.id, f]))
   const powerByFaction = new Map<string, number>()
   const powerByParticipant = new Map<string, number>()
   for (const p of event.participants) {
     powerByParticipant.set(p.id, p.power)
     const fid = p.factionId || (p.kind === 'faction' ? p.refId : '')
     if (fid) powerByFaction.set(fid, (powerByFaction.get(fid) ?? 0) + p.power)
+  }
+
+  const readFactionStat = (factionId: string, stat: WorldEventScoreStat | undefined): number => {
+    const f = factionById.get(factionId)
+    if (stat && stat !== 'power') {
+      return f?.stats?.[stat] ?? f?.power ?? powerByFaction.get(factionId) ?? 0
+    }
+    return f?.power ?? powerByFaction.get(factionId) ?? 0
   }
 
   const breakdown: WorldEventScoreRow[] = event.outcomes.map((o) => {
@@ -294,7 +385,7 @@ export function scoreWorldEventOutcomes(
         const p = f.participantId
           ? (powerByParticipant.get(f.participantId) ?? 0)
           : f.factionId
-            ? (powerByFaction.get(f.factionId) ?? 0)
+            ? readFactionStat(f.factionId, f.stat)
             : 0
         const add = p * f.weight
         total += add
@@ -341,11 +432,12 @@ export function worldEventRumours(
   const out: { eventId: string; headline?: string; text: string }[] = []
   for (const ev of events) {
     if (ev.status !== 'active' || !ev.rumours.length) continue
+    const place = eventPlace(ev)
     for (const r of ev.rumours) {
       const reaches =
         r.reach === 'global' ||
         (r.reach === 'map' && (!ev.scope.refId || ev.scope.refId === filter.mapId)) ||
-        ((r.reach === 'area' || r.reach === 'place') && (!ev.scope.refId || placeSet.has(ev.scope.refId)))
+        ((r.reach === 'area' || r.reach === 'place') && (!place || placeSet.has(place)))
       if (reaches) out.push({ eventId: ev.id, headline: r.headline, text: r.text })
     }
   }
@@ -359,7 +451,7 @@ export function worldEventMetaMarkdown(
 ): string {
   const lines = [
     `## Meta-Narrative Event: ${event.title}`,
-    `- Scope: ${event.scope.level}${event.scope.refId ? ` (${event.scope.refId})` : ''}`,
+    `- Where: ${eventWhere(event)}`,
     ...(event.premise ? [`- Premise: ${event.premise}`] : [])
   ]
   if (extra?.factionTensions?.length) {

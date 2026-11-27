@@ -12,7 +12,7 @@ export function ItemBody({ item, worn }: { item: Item; worn?: Item[] }) {
   return (
     <span className="flex min-w-56 flex-col gap-2">
       <RowList rows={itemRows(item)} />
-      {item.count > 1 && <span className="font-mono text-[11px] text-dim">{item.count} in this stack</span>}
+      {item.count > 1 && <span className="font-ui text-[11px] text-dim">{item.count} in this stack</span>}
       {worn?.map((w) => (
         <span key={w.uid} className="flex flex-col gap-1 border-t border-line/40 pt-2">
           <Eyebrow className="text-faint">Worn now: {itemName(w)}</Eyebrow>

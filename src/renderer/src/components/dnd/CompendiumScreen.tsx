@@ -36,7 +36,7 @@ function NewEntry({ kind, select }: { kind: CompendiumKind; select: KindScreenPr
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
       <div className="flex items-center gap-3">
-        <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-dim">
+        <span className="font-label text-[11px] caps-16 text-dim">
           New {label}
         </span>
         <span className="flex-1" />
@@ -70,7 +70,7 @@ function EditEntry({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
       <div className="flex items-center gap-3">
-        <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-dim">
+        <span className="font-label text-[11px] caps-16 text-dim">
           Editing your {compendiumInfo(kind)?.label.toLowerCase()}
         </span>
         <span className="flex-1" />
@@ -116,8 +116,8 @@ export function CompendiumScreen({ kind: raw, id, select }: KindScreenProps) {
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
       <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-[18px] font-semibold text-white">{entry.name}</h2>
-          <span className="border border-line/50 px-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-dim">
+          <h2 className="text-[18px] font-semibold text-ink">{entry.name}</h2>
+          <span className="border border-line/50 px-1.5 font-label text-[10px] caps-12 text-dim">
             {own ? (srd ? 'Your copy of SRD' : 'Yours') : entry.source}
           </span>
           <span className="flex-1" />

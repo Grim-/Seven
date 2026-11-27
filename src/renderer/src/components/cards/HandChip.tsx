@@ -14,7 +14,7 @@ export function HandChip({ name, held }: { name: string; held: HeldCard[] }) {
       side="bottom"
       align="start"
       className="w-[min(34rem,92vw)] gap-2 p-3"
-      triggerClassName="h-7 gap-1.5 px-1 font-mono text-[10.5px] text-dim hover:text-white"
+      triggerClassName="h-7 gap-1.5 px-1 font-ui text-[10.5px] text-dim hover:text-ink"
       trigger={
         <>
           <span className="flex items-end phone:hidden">

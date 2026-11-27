@@ -34,11 +34,11 @@ export function DrawPanel({ onUse, onClose, className }: { onUse: (picked: Drawn
     }, 'Could not draw')
   }
   return (
-    <div data-layer className={cn('notch border border-accent bg-bg/[0.97] shadow-[0_0_30px_rgba(0,0,0,0.8),0_0_18px_color-mix(in_srgb,var(--color-accent)_12%,transparent)]', className)}>
+    <div data-layer className={cn('notch border border-accent bg-bg/[0.97] shadow-[0_0_30px_color-mix(in_srgb,var(--color-shade)_80%,transparent),0_0_18px_color-mix(in_srgb,var(--color-accent)_calc(12%*var(--glow)),transparent)]', className)}>
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-2.5 py-2">
         <Eyebrow>Draw from</Eyebrow>
         {sources === null ? (
-          <span className="font-mono text-[11px] text-dim">Looking…</span>
+          <span className="font-ui text-[11px] text-dim">Looking…</span>
         ) : options.length ? (
           <Select value={source ? `${source.kind}/${source.id}` : ''} options={options} onChange={(v) => setPlace({ ...place, source: v })} className="h-7 max-w-64 text-[12px]" />
         ) : (
@@ -54,7 +54,7 @@ export function DrawPanel({ onUse, onClose, className }: { onUse: (picked: Drawn
             Keep all
           </Button>
         )}
-        <button type="button" title="Close (Esc)" onClick={onClose} className="p-1 text-dim hover:text-white">
+        <button type="button" title="Close (Esc)" onClick={onClose} className="p-1 text-dim hover:text-ink">
           <X className="h-4 w-4" />
         </button>
       </div>

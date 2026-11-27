@@ -83,7 +83,7 @@ export function SheetScreen({ id, select }: KindScreenProps) {
       live = false
     }
   }, [id])
-  if (id && sheet === undefined) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (id && sheet === undefined) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   if (sheet) return <SheetEditor key={sheet.id} start={sheet} />
   return <SheetList select={select} />
 }

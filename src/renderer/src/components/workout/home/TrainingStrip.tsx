@@ -7,7 +7,7 @@ function Stat({ label, value, sub, gold = false }: { label: string; value: strin
   return (
     <div className="flex flex-col">
       <Eyebrow className="text-[10px]">{label}</Eyebrow>
-      <span className={gold ? 'font-mono text-[20px] font-semibold leading-tight text-accent' : 'font-mono text-[20px] font-semibold leading-tight text-white'}>{value}</span>
+      <span className={gold ? 'font-ui text-[20px] font-semibold leading-tight text-accent' : 'font-ui text-[20px] font-semibold leading-tight text-ink'}>{value}</span>
       {sub && <span className="text-[11.5px] text-faint">{sub}</span>}
     </div>
   )
@@ -19,7 +19,7 @@ export function TrainingStrip({ rows, today, nav }: { rows: WorkoutLogRow[]; tod
   const week = days.filter((d) => d >= weekStart(today) && d <= today)
   const month = days.filter((d) => d.slice(0, 7) === today.slice(0, 7) && d <= today)
   return (
-    <div className="flex flex-wrap items-center gap-x-7 gap-y-2 border border-line/50 bg-black/50 px-4 py-2.5">
+    <div className="flex flex-wrap items-center gap-x-7 gap-y-2 border border-line/50 tone-panel-50 px-4 py-2.5">
       <Stat label="Last trained" value={last ? dayLabel(last) : 'Never'} sub={last ? agoText(last, today) : undefined} gold />
       <Stat label="This week" value={`${week.length} day${week.length === 1 ? '' : 's'}`} sub={week.map(weekdayOf).join(', ') || undefined} />
       <Stat label="This month" value={`${month.length} day${month.length === 1 ? '' : 's'}`} />

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type ComponentType } from 'react'
 import { Eye, FolderOpen, MapPin, Maximize2, Minimize2, Minus, Pin, Plus, Sparkles } from 'lucide-react'
 import { agentSheets, type AgentProfile, type AvatarSize } from '@shared/types'
 import { showName } from '@shared/ids'
+import { actorEntry, npcActorId } from '@shared/worldNpcs'
 import { referencesIn, type TextReference } from '@shared/text'
 import { registerChatElement, type ChatElementProps } from '../../registries/chatElements'
 import { AgentAvatar } from '../agents/look'
@@ -15,7 +16,9 @@ import { AssetMedia } from '../pictures/AssetMedia'
 import { useEntryPreview } from '../entries/entryPreview'
 import { EntryInspect } from '../entries/EntryInspect'
 import { FloatLayer, openMenu, type MenuItem } from '../ui'
+import { engine } from '../../lib/ipc'
 import { openSevenLink } from '../../lib/links'
+import { useLive } from '../../lib/useLive'
 import { useConversation } from '../../lib/conversation'
 import { pinToChatTable } from './tabletopStore'
 
@@ -81,6 +84,7 @@ const words = (text: string) =>
 
 export function useSpeakerMatch(name: string, agent: AgentProfile | null) {
   const pages = useData((s) => s.pages)
+  const worldNpcs = useLive(() => engine('npcs.list', { layer: 'play' }), ['npcs.changed', 'saves.changed']) ?? []
   const trimmed = name.trim()
   const lower = trimmed.toLowerCase()
   const isAgent = Boolean(agent && lower && agent.name.trim().toLowerCase() === lower)
@@ -91,9 +95,17 @@ export function useSpeakerMatch(name: string, agent: AgentProfile | null) {
     const fromRoster = sheets.find((s) => {
       const sLower = s.toLowerCase()
       const sName = showName(s).toLowerCase()
-      return sLower === lower || sName === lower || sName.startsWith(lower) || lower.startsWith(sName)
+      return sLower === lower || sName === lower || sLower.startsWith(lower) || lower.startsWith(sName)
     })
     if (fromRoster) return fromRoster
+
+    const fromNpcs = worldNpcs.find((n) => {
+      if (n.archetype || !n.worldId) return false
+      const nTitle = showName(n.title).toLowerCase()
+      const nId = showName(n.id).toLowerCase()
+      return nTitle === lower || nId === lower || nTitle.startsWith(lower) || lower.startsWith(nTitle)
+    })
+    if (fromNpcs && fromNpcs.worldId) return npcActorId(fromNpcs.worldId, fromNpcs.id)
 
     const fromPages = pages.find((p) => {
       if (p.type !== 'sheet') return false
@@ -102,7 +114,7 @@ export function useSpeakerMatch(name: string, agent: AgentProfile | null) {
       return pTitle === lower || pId === lower || pTitle.startsWith(lower) || lower.startsWith(pTitle)
     })
     return fromPages ? fromPages.id : null
-  }, [isAgent, sheets, pages, lower])
+  }, [isAgent, sheets, worldNpcs, pages, lower])
 
   const page = useMemo(() => {
     if (!lower || isAgent || matchedSheet) return null
@@ -126,7 +138,7 @@ export function SpeakerStatusStrip({ sheetId }: { sheetId: string }) {
       <div className="w-20">
         <HealthBar health={status.health} />
       </div>
-      <span className="font-mono text-[10px] text-dim">
+      <span className="font-ui text-[10px] text-dim">
         {status.health.cur}/{status.health.max}
       </span>
     </div>
@@ -145,7 +157,7 @@ export function PortraitSizeStepper({ avatarSize, className }: { avatarSize: Ava
           e.stopPropagation()
           stepAvatarSize(avatarSize, -1)
         }}
-        className="flex h-5 w-5 items-center justify-center border border-line/60 bg-black/80 text-dim hover:border-accent hover:text-accent disabled:opacity-35 disabled:pointer-events-none cursor-pointer"
+        className="flex h-5 w-5 items-center justify-center border border-line/60 tone-well-80 text-dim hover:border-accent hover:text-accent disabled:opacity-35 disabled:pointer-events-none cursor-pointer"
       >
         <Minus className="h-2.5 w-2.5" />
       </button>
@@ -157,7 +169,7 @@ export function PortraitSizeStepper({ avatarSize, className }: { avatarSize: Ava
           e.stopPropagation()
           stepAvatarSize(avatarSize, 1)
         }}
-        className="flex h-5 w-5 items-center justify-center border border-line/60 bg-black/80 text-dim hover:border-accent hover:text-accent disabled:opacity-35 disabled:pointer-events-none cursor-pointer"
+        className="flex h-5 w-5 items-center justify-center border border-line/60 tone-well-80 text-dim hover:border-accent hover:text-accent disabled:opacity-35 disabled:pointer-events-none cursor-pointer"
       >
         <Plus className="h-2.5 w-2.5" />
       </button>
@@ -220,7 +232,7 @@ export function SpeakerPortrait({
           title={`Inspect ${name}`}
           onClick={onInspect}
           style={frameStyle}
-          className="overflow-hidden border border-accent/50 bg-black/60 hover:border-accent cursor-pointer"
+          className="overflow-hidden border border-accent/50 tone-well-60 hover:border-accent cursor-pointer"
         >
           <AssetMedia id={pageImage} className="h-full w-full object-cover" usedBy={`speaker:${name}`} />
         </button>
@@ -236,7 +248,7 @@ export function SpeakerPortrait({
         disabled={!pageId}
         onClick={onInspect}
         style={{ ...frameStyle, fontSize: Math.max(16, Math.round(size * 0.32)) }}
-        className="flex items-center justify-center border border-accent/50 bg-accent/10 font-mono font-bold text-accent enabled:hover:border-accent enabled:hover:bg-accent/20 enabled:cursor-pointer"
+        className="flex items-center justify-center border border-accent/50 bg-accent/10 font-ui font-bold text-accent enabled:hover:border-accent enabled:hover:bg-accent/20 enabled:cursor-pointer"
       >
         {name.slice(0, 2).toUpperCase()}
       </button>
@@ -275,13 +287,13 @@ function BeatIllustrationTile({ item }: { item: TextReference }) {
             { label: 'Open in Data', icon: <FolderOpen />, onSelect: () => openSevenLink(`seven:${preview.kind}/${encodeURIComponent(preview.id)}`) }
           ])
         }
-        className="group/pic relative flex h-28 max-w-xs overflow-hidden border border-line/70 bg-black/70 hover:border-accent transition-colors cursor-pointer"
+        className="group/pic relative flex h-28 max-w-xs overflow-hidden border border-line/70 tone-well-70 hover:border-accent transition-colors cursor-pointer"
         title={`${showName(preview.title)} · Click to inspect`}
       >
         <AssetMedia id={preview.image} className="h-full w-44 object-cover transition-transform duration-300 group-hover/pic:scale-105" usedBy={item.link} />
-        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1.5 bg-black/80 px-2 py-1 font-mono text-[9.5px]">
-          <span className="truncate font-semibold text-white">{showName(preview.title)}</span>
-          <span className="shrink-0 uppercase text-accent">{preview.label}</span>
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1.5 tone-panel-80 px-2 py-1 font-ui text-[9.5px]">
+          <span className="truncate font-semibold text-ink">{showName(preview.title)}</span>
+          <span className="shrink-0 caps text-accent">{preview.label}</span>
         </div>
       </button>
       {open && (
@@ -298,8 +310,9 @@ function SayBeatView({ beat, agent, sessionId }: BeatViewProps) {
   const avatarSize = useApp((s) => s.settings?.avatarSize ?? 'medium')
   const portraitSize = ROLEPLAY_PORTRAIT_SIZE[avatarSize] ?? ROLEPLAY_PORTRAIT_SIZE.medium
   const { isAgent, matchedSheet, page } = useSpeakerMatch(speaker, agent)
-  const inspectKind = matchedSheet ? 'sheet' : page ? 'page' : null
-  const inspectId = matchedSheet ?? page?.id ?? null
+  const matchedEntry = matchedSheet ? actorEntry(matchedSheet) : null
+  const inspectKind = matchedEntry ? matchedEntry.kind : page ? 'page' : null
+  const inspectId = matchedEntry ? matchedEntry.id : (page?.id ?? null)
   const anchor = useRef<HTMLDivElement>(null)
   const [inspecting, setInspecting] = useState(false)
 
@@ -336,14 +349,14 @@ function SayBeatView({ beat, agent, sessionId }: BeatViewProps) {
         avatarSize={avatarSize}
         onInspect={() => inspectKind && setInspecting((v) => !v)}
       />
-      <div className="notch-sm relative min-w-0 flex-1 overflow-hidden border border-line/70 bg-gradient-to-b from-[#0b0f17]/95 to-black/90 px-4 py-3 shadow-[0_6px_24px_rgba(0,0,0,0.45)]">
+      <div className="notch-sm relative min-w-0 flex-1 overflow-hidden border border-line/70 bg-gradient-to-b from-surface/95 to-scrim/90 px-4 py-3 shadow-[0_6px_24px_color-mix(in_srgb,var(--color-shade)_45%,transparent)]">
         <div className="mb-1.5 flex items-center justify-between gap-2 border-b border-line/40 pb-1">
           <div className="flex items-center gap-2">
             <button
               type="button"
               disabled={!inspectKind}
               onClick={() => inspectKind && setInspecting((v) => !v)}
-              className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-accent enabled:hover:text-white enabled:cursor-pointer"
+              className="font-label text-[11px] font-bold caps-18 text-accent enabled:hover:text-ink enabled:cursor-pointer"
             >
               {speaker}
             </button>
@@ -357,7 +370,7 @@ function SayBeatView({ beat, agent, sessionId }: BeatViewProps) {
                   type="button"
                   title={`Inspect ${speaker}`}
                   onClick={() => setInspecting((v) => !v)}
-                  className="flex h-5 w-5 items-center justify-center border border-line/50 bg-black/50 text-dim hover:border-accent hover:text-accent cursor-pointer"
+                  className="flex h-5 w-5 items-center justify-center border border-line/50 tone-well-50 text-dim hover:border-accent hover:text-accent cursor-pointer"
                 >
                   <Eye className="h-3 w-3" />
                 </button>
@@ -365,7 +378,7 @@ function SayBeatView({ beat, agent, sessionId }: BeatViewProps) {
                   type="button"
                   title={`Pin ${speaker} to chat table`}
                   onClick={() => pinToChatTable(inspectKind, inspectId, speaker)}
-                  className="flex h-5 w-5 items-center justify-center border border-line/50 bg-black/50 text-dim hover:border-accent hover:text-accent cursor-pointer"
+                  className="flex h-5 w-5 items-center justify-center border border-line/50 tone-well-50 text-dim hover:border-accent hover:text-accent cursor-pointer"
                 >
                   <Pin className="h-3 w-3" />
                 </button>
@@ -373,7 +386,7 @@ function SayBeatView({ beat, agent, sessionId }: BeatViewProps) {
             )}
           </div>
         </div>
-        <div className="text-[15px] leading-[1.7] text-white/95 [&_em]:font-mono [&_em]:text-[13px] [&_em]:not-italic [&_em]:text-cyan/85">
+        <div className="text-[15px] leading-[1.7] text-ink/95 [&_em]:font-ui [&_em]:text-[13px] [&_em]:not-italic [&_em]:text-secondary-ink/85">
           <Markdown text={beat.text} />
         </div>
         <BeatIllustrations text={beat.text} />
@@ -389,8 +402,8 @@ function SayBeatView({ beat, agent, sessionId }: BeatViewProps) {
 
 function ActBeatView({ beat }: BeatViewProps) {
   return (
-    <div className="relative flex items-start gap-2.5 border border-cyan/25 border-l-2 border-l-cyan bg-cyan/[0.04] px-3.5 py-2 text-[14px] italic leading-relaxed text-cyan/90">
-      <Sparkles className="mt-1 h-3.5 w-3.5 shrink-0 text-cyan/70" />
+    <div className="relative flex items-start gap-2.5 border border-secondary-ink/25 border-l-2 border-l-secondary-ink bg-secondary-ink/[0.04] px-3.5 py-2 text-[14px] italic leading-relaxed text-secondary-ink/90">
+      <Sparkles className="mt-1 h-3.5 w-3.5 shrink-0 text-secondary-ink/70" />
       <div className="min-w-0 flex-1">
         <Markdown text={beat.text} />
         <BeatIllustrations text={beat.text} />
@@ -401,7 +414,7 @@ function ActBeatView({ beat }: BeatViewProps) {
 
 function TellBeatView({ beat }: BeatViewProps) {
   return (
-    <div className="relative border-y border-line/40 bg-[#07090e]/80 px-4 py-3 text-[15px] leading-[1.75] text-white/90 before:absolute before:left-0 before:top-0 before:h-px before:w-12 before:bg-accent/60">
+    <div className="relative border-y border-line/40 tone-surface-80 px-4 py-3 text-[15px] leading-[1.75] text-ink/90 before:absolute before:left-0 before:top-0 before:h-px before:w-12 before:bg-accent/60">
       <Markdown text={beat.text} />
       <BeatIllustrations text={beat.text} />
     </div>
@@ -419,7 +432,7 @@ function makeSayBeat(speaker: string, initialText: string): RoleplayBeat {
 function makeActBeat(text: string): RoleplayBeat {
   return {
     speaker: null,
-    text,
+    text: text,
     View: ActBeatView
   }
 }
@@ -427,7 +440,7 @@ function makeActBeat(text: string): RoleplayBeat {
 function makeTellBeat(text: string): RoleplayBeat {
   return {
     speaker: null,
-    text,
+    text: text,
     View: TellBeatView
   }
 }
@@ -490,20 +503,20 @@ export function ScenePlaceBanner({ placeRef }: { placeRef: string }) {
             { label: 'Open in Data', icon: <FolderOpen />, onSelect: () => openSevenLink(`seven:place/${encodeURIComponent(preview.id)}`) }
           ])
         }
-        className="group/place relative flex items-center justify-between gap-3 overflow-hidden border border-cyan/40 bg-gradient-to-r from-cyan/15 via-black/85 to-black/90 px-3.5 py-2 font-mono cursor-pointer hover:border-cyan transition-colors"
+        className="group/place relative flex items-center justify-between gap-3 overflow-hidden border border-secondary-ink/40 bg-gradient-to-r from-secondary-ink/15 via-scrim/85 to-scrim/90 px-3.5 py-2 font-ui cursor-pointer hover:border-secondary-ink transition-colors"
       >
         <div className="flex min-w-0 items-center gap-2.5">
           {preview.image ? (
-            <AssetMedia id={preview.image} className="h-9 w-14 shrink-0 border border-cyan/40 object-cover" usedBy={placeRef} />
+            <AssetMedia id={preview.image} className="h-9 w-14 shrink-0 border border-secondary-ink/40 object-cover" usedBy={placeRef} />
           ) : (
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-cyan/40 bg-cyan/10 text-cyan">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-secondary-ink/40 bg-secondary-ink/10 text-secondary-ink">
               <MapPin className="h-4 w-4" />
             </span>
           )}
           <div className="flex min-w-0 flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan">SCENE LOCATION</span>
-              <span className="truncate text-[12.5px] font-bold uppercase tracking-wider text-white">{showName(preview.title)}</span>
+              <span className="text-[9px] font-bold caps-20 text-secondary-ink">Scene location</span>
+              <span className="truncate text-[12.5px] font-bold caps-5 text-ink">{showName(preview.title)}</span>
             </div>
             {preview.card && <span className="truncate text-[11px] text-dim">{preview.card.split('\n')[0]}</span>}
           </div>
@@ -516,7 +529,7 @@ export function ScenePlaceBanner({ placeRef }: { placeRef: string }) {
               e.stopPropagation()
               pinToChatTable('place', preview.id, preview.title)
             }}
-            className="flex h-6 w-6 items-center justify-center border border-line/60 bg-black/60 text-dim hover:border-accent hover:text-accent cursor-pointer"
+            className="flex h-6 w-6 items-center justify-center border border-line/60 tone-well-60 text-dim hover:border-accent hover:text-accent cursor-pointer"
           >
             <Pin className="h-3 w-3" />
           </button>
@@ -534,7 +547,10 @@ export function ScenePlaceBanner({ placeRef }: { placeRef: string }) {
 export function RoleplayText({ text, agent }: { text: string; agent: AgentProfile | null }) {
   const { sessionId } = useConversation()
   const blocks = useMemo(() => parseRoleplay(text), [text])
-  const placeLinks = useMemo(() => referencesIn(text).filter((r) => r.link.startsWith('@place:')), [text])
+  const placeLinks = useMemo(
+    () => referencesIn(text).filter((r) => r.link.startsWith('@place:') || (r.link.startsWith('@world:') && r.ref.includes('/place/'))),
+    [text]
+  )
 
   return (
     <div className="flex flex-col gap-3.5 py-1">

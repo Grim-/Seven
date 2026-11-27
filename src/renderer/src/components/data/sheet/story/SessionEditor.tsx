@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
 import { Pin } from 'lucide-react'
 import type { StorySession } from '@shared/story'
-import { ChipInput, InlineEdit, TagInput } from '../../../ui'
+import { ChipInput, TagInput } from '../../../ui'
 import { cn } from '../../../../lib/cn'
 import { MarkdownEditor } from '../../MarkdownEditor'
+import { LinkTextarea } from '../../LinkTextarea'
 import { SessionHead } from './SessionHead'
 
 export function SessionEditor({
@@ -30,7 +31,7 @@ export function SessionEditor({
               onClick={() => onChange({ pinned: !session.pinned })}
               title="Pinned entries are kept as 1-line summaries in the agent prompt; unpinned entries stay archived on story_recall"
               className={cn(
-                'flex items-center gap-1 border px-2 py-0.5 font-mono text-[10px] uppercase',
+                'flex items-center gap-1 border px-2 py-0.5 font-label text-[10px] caps',
                 session.pinned ? 'border-accent/60 bg-accent/10 text-accent' : 'border-line/40 text-faint hover:text-dim'
               )}
             >
@@ -44,41 +45,44 @@ export function SessionEditor({
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">
+          <span className="font-label text-[10px] font-bold caps-5 text-dim">
             Agent summary (1-line prompt / recall snippet)
           </span>
-          <InlineEdit
+          <LinkTextarea
+            rolls={false}
+            rows={1}
             value={session.summary ?? ''}
             placeholder="Concise summary sentence (recommended)"
-            onSave={(summary) => onChange({ summary: summary.trim() || undefined })}
-            className="border border-line/40 bg-black/40 px-2 py-1 text-[12.5px] text-white/90"
+            onValue={(summary) => onChange({ summary: summary || undefined })}
           />
         </div>
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">
+          <span className="font-label text-[10px] font-bold caps-5 text-dim">
             Outcome / consequence
           </span>
-          <InlineEdit
+          <LinkTextarea
+            rolls={false}
+            rows={1}
             value={session.outcome ?? ''}
             placeholder="What changed as a result? (optional)"
-            onSave={(outcome) => onChange({ outcome: outcome.trim() || undefined })}
-            className="border border-line/40 bg-black/40 px-2 py-1 text-[12.5px] text-white/90"
+            onValue={(outcome) => onChange({ outcome: outcome || undefined })}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">Where (@place:... or text)</span>
-          <InlineEdit
+          <span className="font-label text-[10px] font-bold caps-5 text-dim">Where (@place:... or text)</span>
+          <LinkTextarea
+            rolls={false}
+            rows={1}
             value={session.where ?? ''}
             placeholder="Location"
-            onSave={(where) => onChange({ where: where.trim() || undefined })}
-            className="border border-line/40 bg-black/40 px-2 py-1 font-mono text-[12px] text-white/90"
+            onValue={(where) => onChange({ where: where || undefined })}
           />
         </div>
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">Who was involved</span>
+          <span className="font-label text-[10px] font-bold caps-5 text-dim">Who was involved</span>
           <ChipInput
             value={session.who ?? []}
             onChange={(who) => onChange({ who: who.length ? who : undefined })}
@@ -86,7 +90,7 @@ export function SessionEditor({
           />
         </div>
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">Recall tags</span>
+          <span className="font-label text-[10px] font-bold caps-5 text-dim">Recall tags</span>
           <TagInput
             value={session.tags ?? []}
             onChange={(tags) => onChange({ tags: tags.length ? tags : undefined })}

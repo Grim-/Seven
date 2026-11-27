@@ -1,12 +1,18 @@
-import { useState } from 'react'
-import { Copy, Dices, Play, RotateCcw, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Copy, Dices, FastForward, Play, RotateCcw, Sparkles, Sunrise } from 'lucide-react'
+import { worldTimeFromSeconds } from '@shared/almanac'
+import type { GameSave } from '@shared/game/save'
+import type { WorldMeta } from '@shared/world'
 import { backgroundInfo, effectSettingsFor } from '@shared/backgrounds'
-import { Button, Input } from '../ui'
+import { Button, EmptyState, Eyebrow, Input, NumberField, Select, StatusBadge } from '../ui'
 import { SettingControls } from '../settingSpec/SettingControls'
 import { runCue } from '../shell/ThemeStage'
 import { useActiveTheme, useThemes } from '../../store/themes'
-import { engine } from '../../lib/ipc'
+import { useConversation } from '../../lib/conversation'
+import { useSessions } from '../../store/sessions'
+import { engine, on } from '../../lib/ipc'
 import { copyText, failed } from '../../lib/notify'
+import { noteFailure } from '../../store/problems'
 import { cn } from '../../lib/cn'
 
 interface DiceRollResult {
@@ -58,7 +64,7 @@ export function DiceGlance() {
             key={die}
             type="button"
             onClick={() => roll(die)}
-            className="border border-line/60 bg-black/40 px-2 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-white/85 hover:border-accent hover:text-accent"
+            className="border border-line/60 tone-well-40 px-2 py-1 font-label text-[11px] font-semibold caps-5 text-ink/85 hover:border-accent hover:text-accent"
           >
             {die}
           </button>
@@ -75,17 +81,17 @@ export function DiceGlance() {
           value={formula}
           onChange={(e) => setFormula(e.target.value)}
           placeholder="2d6+3"
-          className="h-8 min-w-0 flex-1 font-mono text-[12px]"
+          className="h-8 min-w-0 flex-1 font-ui text-[12px]"
         />
         <Button type="submit" size="sm" variant="primary" icon={<Dices />} disabled={!parsed}>
           Roll
         </Button>
       </form>
-      <div className="flex flex-col items-center justify-center border border-line/40 bg-black/45 px-2.5 py-2 text-center">
+      <div className="flex flex-col items-center justify-center border border-line/40 tone-panel-45 px-2.5 py-2 text-center">
         {latest ? (
           <>
             <div className="flex items-center gap-2">
-              <span className={cn('font-mono text-[28px] font-bold leading-none tabular-nums', isNatCrit ? 'text-teal' : isNatFumble ? 'text-alert' : 'text-accent')}>
+              <span className={cn('font-data text-[28px] font-bold leading-none tabular-nums', isNatCrit ? 'text-secondary' : isNatFumble ? 'text-alert' : 'text-accent')}>
                 {latest.total}
               </span>
               <button
@@ -97,12 +103,12 @@ export function DiceGlance() {
                 <Copy className="h-3.5 w-3.5" />
               </button>
             </div>
-            <div className="mt-1 font-mono text-[10.5px] text-dim">
+            <div className="mt-1 font-ui text-[10.5px] text-dim">
               {latest.formula} · [{latest.dice.join(', ')}]{modText}
             </div>
           </>
         ) : (
-          <div className="font-mono text-[11px] text-faint">Pick a die or type a formula</div>
+          <div className="font-ui text-[11px] text-faint">Pick a die or type a formula</div>
         )}
       </div>
       {history.length > 1 && (
@@ -112,10 +118,10 @@ export function DiceGlance() {
               key={r.id}
               type="button"
               onClick={() => roll(r.formula)}
-              className="flex items-center justify-between px-1.5 py-0.5 font-mono text-[10.5px] text-dim hover:bg-white/[0.04] hover:text-white"
+              className="flex items-center justify-between px-1.5 py-0.5 font-ui text-[10.5px] text-dim hover:bg-ink/[0.04] hover:text-ink"
             >
               <span>{r.formula}</span>
-              <span className="text-white/85">{r.total}</span>
+              <span className="text-ink/85">{r.total}</span>
             </button>
           ))}
         </div>
@@ -147,7 +153,7 @@ export function BackgroundControlGlance() {
       <div className="flex items-center justify-between gap-2 border-b border-line/35 pb-1.5">
         <div className="flex min-w-0 items-center gap-1.5">
           <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent-soft" />
-          <span className="truncate font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90">
+          <span className="truncate font-label text-[11px] font-semibold caps-14 text-ink/90">
             {info?.name ?? theme.effect}
           </span>
         </div>
@@ -156,7 +162,7 @@ export function BackgroundControlGlance() {
             type="button"
             title="Reset live preview"
             onClick={() => useThemes.setState({ preview: null })}
-            className="flex items-center gap-1 font-mono text-[10px] text-dim hover:text-accent"
+            className="flex items-center gap-1 font-ui text-[10px] text-dim hover:text-accent"
           >
             <RotateCcw className="h-3 w-3" /> Reset
           </button>
@@ -164,14 +170,14 @@ export function BackgroundControlGlance() {
       </div>
 
       {!info && (
-        <div className="font-mono text-[11px] text-faint">
+        <div className="font-ui text-[11px] text-faint">
           No animated background effect active on {theme.name}.
         </div>
       )}
 
       {info && info.reactions.length > 0 && (
         <div className="flex flex-col gap-1">
-          <div className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-accent-soft">Triggers</div>
+          <div className="font-label text-[9.5px] caps-18 text-accent-soft">Triggers</div>
           <div className="flex flex-wrap gap-1.5">
             {info.reactions.map((r) => (
               <Button
@@ -197,6 +203,189 @@ export function BackgroundControlGlance() {
             onChange={(name, value) => updateSetting(name, value as number | string)}
           />
         </div>
+      )}
+    </div>
+  )
+}
+
+const TIME_UNITS: { value: 'minutes' | 'hours' | 'days'; label: string; seconds: number }[] = [
+  { value: 'minutes', label: 'min', seconds: 60 },
+  { value: 'hours', label: 'hr', seconds: 3600 },
+  { value: 'days', label: 'day', seconds: 86400 }
+]
+
+const TIME_LEAPS: { label: string; hint: string; seconds: number }[] = [
+  { label: '+10m', hint: 'Advance 10 minutes', seconds: 10 * 60 },
+  { label: '+30m', hint: 'Advance 30 minutes', seconds: 30 * 60 },
+  { label: '+1h', hint: 'Short rest / 1 hour', seconds: 3600 },
+  { label: '+4h', hint: 'Advance 4 hours', seconds: 4 * 3600 },
+  { label: '+8h', hint: 'Long rest / 8 hours', seconds: 8 * 3600 },
+  { label: '+1d', hint: 'Advance 1 full day', seconds: 86400 }
+]
+
+const DAY_PERIODS: { beforeHour: number; label: string }[] = [
+  { beforeHour: 5, label: 'Night' },
+  { beforeHour: 7, label: 'Dawn' },
+  { beforeHour: 12, label: 'Morning' },
+  { beforeHour: 17, label: 'Afternoon' },
+  { beforeHour: 21, label: 'Evening' },
+  { beforeHour: 24, label: 'Night' }
+]
+
+function dayPeriod(hour: number): string {
+  return DAY_PERIODS.find((p) => hour < p.beforeHour)?.label ?? 'Night'
+}
+
+function secondsToDawn(hour: number, minute: number): number {
+  const curMinutes = hour * 60 + minute
+  const dawnMinutes = 6 * 60
+  const delta = curMinutes < dawnMinutes ? dawnMinutes - curMinutes : 24 * 60 - curMinutes + dawnMinutes
+  return delta * 60
+}
+
+/** Tabletop slate widget for inspecting and advancing world time in narrative leaps. */
+export function WorldClockGlance() {
+  const { sessionId } = useConversation()
+  const activeSession = useSessions((s) => (sessionId ? s.list.find((x) => x.id === sessionId) ?? null : null))
+  const sceneWorld = activeSession?.scene?.worldId ?? null
+  const sceneSave = activeSession?.scene?.saveId ?? null
+
+  const [worlds, setWorlds] = useState<WorldMeta[]>([])
+  const [pickedWorld, setPickedWorld] = useState<string>('')
+  const [save, setSave] = useState<GameSave | null>(null)
+  const [amount, setAmount] = useState(1)
+  const [unit, setUnit] = useState<'minutes' | 'hours' | 'days'>('hours')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    const loadWorlds = () => void engine('worlds.list').then(setWorlds).catch(failed('Could not load worlds'))
+    loadWorlds()
+    return on('worlds.changed', loadWorlds)
+  }, [])
+
+  const effectiveWorld = sceneWorld ?? (pickedWorld || worlds[0]?.id || '')
+
+  useEffect(() => {
+    if (!effectiveWorld && !sceneSave) {
+      setSave(null)
+      return
+    }
+    const loadSave = () => {
+      const req = sceneSave
+        ? engine('saves.get', { id: sceneSave })
+        : engine('saves.current', { world: effectiveWorld })
+      void req.then(setSave).catch((err) => {
+        noteFailure('worlds', 'Could not load world save')(err)
+        setSave(null)
+      })
+    }
+    loadSave()
+    return on('saves.changed', loadSave)
+  }, [effectiveWorld, sceneSave])
+
+  const advance = (seconds: number, source: string) => {
+    if (!save || !(seconds > 0) || busy) return
+    setBusy(true)
+    void engine('saves.advance', {
+      id: save.id,
+      seconds,
+      source,
+      sheets: Object.keys(save.characters)
+    })
+      .then(setSave)
+      .catch(failed('Could not advance world time'))
+      .finally(() => setBusy(false))
+  }
+
+  const unitMult = TIME_UNITS.find((u) => u.value === unit)?.seconds ?? 3600
+  const wt = save ? worldTimeFromSeconds(save.clock.time, 1) : null
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const worldName = save ? (worlds.find((w) => w.id === save.world)?.name ?? save.world) : ''
+
+  return (
+    <div className="flex h-full flex-col gap-2.5 overflow-y-auto">
+      {!sceneWorld && worlds.length > 0 && (
+        <div className="flex items-center justify-between gap-2">
+          <Eyebrow>World</Eyebrow>
+          <Select
+            value={effectiveWorld}
+            options={worlds.map((w) => ({ value: w.id, label: w.name }))}
+            onChange={setPickedWorld}
+            className="h-7 w-40 text-[11px]"
+          />
+        </div>
+      )}
+
+      {!save || !wt ? (
+        <EmptyState title="No active save">Start or select a save in this world to track and advance its clock.</EmptyState>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-2 border border-line/50 tone-well-35 px-3 py-2">
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-baseline gap-2">
+                <span className="font-data text-[26px] font-bold leading-none tabular-nums text-ink">
+                  {pad(wt.hour)}:{pad(wt.minute)}
+                </span>
+                <span className="font-label text-[11px] font-semibold caps-14 text-accent">Day {wt.day}</span>
+              </div>
+              <span className="truncate font-ui text-[10.5px] text-dim">
+                {worldName} · {save.name}
+              </span>
+            </div>
+            <StatusBadge tone="idle">{dayPeriod(wt.hour)}</StatusBadge>
+          </div>
+
+          <div className="flex flex-wrap gap-1">
+            {TIME_LEAPS.map((leap) => (
+              <Button
+                key={leap.label}
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                title={leap.hint}
+                onClick={() => advance(leap.seconds, `tabletop_${leap.label}`)}
+              >
+                {leap.label}
+              </Button>
+            ))}
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<Sunrise />}
+              disabled={busy}
+              title="Advance to 06:00 next dawn"
+              onClick={() => advance(secondsToDawn(wt.hour, wt.minute), 'tabletop_dawn')}
+            >
+              Dawn
+            </Button>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              advance(Math.max(1, amount) * unitMult, `tabletop_${amount}_${unit}`)
+            }}
+            className="mt-auto flex items-center gap-1.5"
+          >
+            <NumberField
+              value={amount}
+              min={1}
+              max={999}
+              step={1}
+              onChange={(v) => setAmount(v ?? 1)}
+              className="w-20"
+            />
+            <Select
+              value={unit}
+              options={TIME_UNITS.map((u) => ({ value: u.value, label: u.label }))}
+              onChange={(v) => setUnit(v as 'minutes' | 'hours' | 'days')}
+              className="h-8 w-20 text-[12px]"
+            />
+            <Button type="submit" size="sm" variant="primary" icon={<FastForward />} disabled={busy} className="flex-1">
+              {busy ? 'Advancing…' : 'Advance'}
+            </Button>
+          </form>
+        </>
       )}
     </div>
   )

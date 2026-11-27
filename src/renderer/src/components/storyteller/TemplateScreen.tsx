@@ -16,11 +16,11 @@ function Editor({ pageId, title, start }: { pageId: string; title: string; start
   const change = (patch: Partial<StoryTemplate>) => saver.set((t) => ({ ...t, ...patch }))
   const current = template.acts[act]
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto border border-line/60 bg-black/70 p-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto border border-line/60 tone-panel-70 p-4">
       <AddonTitle pageId={pageId} title={title} status={saver.status} error={saver.error} icon={<ScrollText className="h-5 w-5 shrink-0 text-accent-soft" />} />
       <TagInput value={template.tags} onChange={(tags) => change({ tags })} placeholder="Tags, e.g. horror, short" />
       <div className="text-[12px] text-dim">
-        Type <span className="font-mono text-teal">{'{'}</span> in any box to roll from one of your repos when the story starts, e.g. <span className="font-mono text-teal">{'{villain_names}'}</span>.
+        Type <span className="font-ui text-secondary">{'{'}</span> in any box to roll from one of your repos when the story starts, e.g. <span className="font-ui text-secondary">{'{villain_names}'}</span>.
       </div>
       <Section title="The world and its rules" hint="Kept in mind for the whole story.">
         <StoryText value={template.story_notes} onValue={(story_notes) => change({ story_notes })} rows={5} placeholder="A drowned city ruled by {faction}. Magic always costs a memory…" />
@@ -35,7 +35,7 @@ function Editor({ pageId, title, start }: { pageId: string; title: string; start
         />
       </Section>
       <Section title="Acts" hint="The story moves through these in order.">
-        <div className="flex min-h-[22rem] gap-4 border border-line/40 bg-black/40 p-3">
+        <div className="flex min-h-[22rem] gap-4 border border-line/40 tone-panel-40 p-3">
           <ActList
             acts={template.acts}
             selected={act}

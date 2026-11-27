@@ -15,10 +15,10 @@ export function About() {
         </Button>
       </SettingRow>
       <SettingRow label="Vault">
-        <div className="font-mono text-[12px] text-dim">{vault.configured ? (vault.unlocked ? 'Set up, unlocked' : 'Set up, locked') : 'Not set up: files are stored unencrypted'}</div>
+        <div className="font-ui text-[12px] text-dim">{vault.configured ? (vault.unlocked ? 'Set up, unlocked' : 'Set up, locked') : 'Not set up: files are stored unencrypted'}</div>
       </SettingRow>
       <SettingRow label="Version">
-        <div className="font-mono text-[12px] text-dim">
+        <div className="font-ui text-[12px] text-dim">
           {info?.version} · {info?.platform}
         </div>
       </SettingRow>

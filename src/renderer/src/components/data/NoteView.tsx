@@ -107,7 +107,7 @@ export function NoteBody({
         <AddressTools order={1}>{actions}</AddressTools>
       ) : (
         <div className={heading || editing ? 'flex items-center gap-2' : readOnly ? 'hidden' : 'absolute right-1 top-1 z-10 flex'}>
-          {heading && <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.1em] text-white">{page.title}</span>}
+          {heading && <span className="font-label text-[12px] font-semibold caps-10 text-ink">{page.title}</span>}
           {actions}
         </div>
       )}
@@ -136,7 +136,7 @@ export function NoteBody({
 
 export function LiveNote({ noteId }: { noteId: string }) {
   const page = usePage(noteId)
-  if (page === undefined) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (page === undefined) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   if (!page) return <EmptyState title="Deleted">This page no longer exists.</EmptyState>
   return <NoteBody page={page} />
 }

@@ -5,8 +5,8 @@ export function SquareIcon({ active, children }: { active?: boolean; children: R
   return (
     <span
       className={cn(
-        'notch-sm flex h-[34px] w-[34px] shrink-0 items-center justify-center border bg-black/75 text-accent transition-colors hover:border-accent hover:text-white [&>svg]:h-4 [&>svg]:w-4',
-        active ? 'border-accent shadow-[0_0_12px_color-mix(in_srgb,var(--color-accent)_30%,transparent)]' : 'border-line'
+        'notch-sm flex h-[34px] w-[34px] shrink-0 items-center justify-center border tone-well-75 text-accent transition-colors hover:border-accent hover:text-ink [&>svg]:h-4 [&>svg]:w-4',
+        active ? 'border-accent shadow-[0_0_12px_color-mix(in_srgb,var(--color-accent)_calc(30%*var(--glow)),transparent)]' : 'border-line'
       )}
     >
       {children}

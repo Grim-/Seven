@@ -15,7 +15,6 @@ import { MindView } from '../components/mind/Mind'
 import { useTools } from '../store/tools'
 import { AgentAvatar } from '../components/agents/look'
 import { LookEditor } from '../components/agents/LookEditor'
-import { WorldLink } from '../components/worlds/Worlds'
 import { ThemePicker } from '../components/themes/Themes'
 import { VoicePicker } from '../components/voice/VoicePicker'
 import { agentGroups, useToolsets } from '../store/toolsets'
@@ -51,7 +50,6 @@ function toDraft(agent: AgentProfile): AgentDraft {
     permissionMode: agent.permissionMode,
     context: { ...agent.context },
     look: { ...agent.look },
-    world: agent.world ?? null,
     toolsets: [...(agent.toolsets ?? [])],
     private: agent.private === true,
     incognito: agent.incognito === true,
@@ -98,7 +96,7 @@ function LibraryAccessEditor({ draft, onChange }: { draft: AgentDraft; onChange:
       <Field label="Kinds it can see" className="col-span-2" hint="Turned off, the agent can't find, read or show that kind, and loses its tools. Its own memory is always its own.">
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
           {list.map((k) => (
-            <label key={k.kind} className="flex items-center gap-2 text-[13px] text-white/85" title={k.description}>
+            <label key={k.kind} className="flex items-center gap-2 text-[13px] text-ink/85" title={k.description}>
               <input type="checkbox" checked={!hidden.has(k.kind)} onChange={(e) => set(k.kind, e.target.checked)} className="accent-[var(--color-accent)]" />
               {k.label}
             </label>
@@ -152,24 +150,24 @@ function PromptCostLine({ cost, modules, activeIds }: { cost: PromptCost | null;
   ]
   const totalSeg = segments.reduce((sum, s) => sum + s.tokens, 0)
   return (
-    <div className="col-span-2 flex flex-col gap-2 border border-line/40 bg-black/40 px-3 py-2 font-mono text-[11.5px] text-dim">
+    <div className="col-span-2 flex flex-col gap-2 border border-line/40 tone-panel-40 px-3 py-2 font-ui text-[11.5px] text-dim">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Prompt size</span>
+        <span className="text-[10.5px] font-semibold caps-14 text-accent-soft">Prompt size</span>
         <span>
-          Instructions <span className="text-white">{pre}{formatPromptTokens(cost.system)}</span>
+          Instructions <span className="text-ink">{pre}{formatPromptTokens(cost.system)}</span>
         </span>
         <span>
-          Tools <span className="text-white">{pre}{formatPromptTokens(cost.tools)}</span>
+          Tools <span className="text-ink">{pre}{formatPromptTokens(cost.tools)}</span>
         </span>
         <span>
-          Total <span className="text-white">{pre}{formatPromptTokens(cost.total)}</span>
+          Total <span className="text-ink">{pre}{formatPromptTokens(cost.total)}</span>
           {cost.contextSize ? ` of ${formatPromptTokens(cost.contextSize)} (${Math.round((cost.total / cost.contextSize) * 100)}%)` : ''}
         </span>
         <span className="text-faint">{cost.exact ? 'counted with the loaded model' : 'estimate; load a model for an exact count'}</span>
       </div>
       {segments.length > 0 && totalSeg > 0 && (
         <>
-          <div className="segment-mask flex h-1.5 w-full overflow-hidden bg-white/[0.06]">
+          <div className="segment-mask flex h-1.5 w-full overflow-hidden bg-ink/[0.06]">
             {segments.map((seg) => {
               const tone = sourceTone(seg.id)
               const pct = Math.max(1, (seg.tokens / totalSeg) * 100)
@@ -226,10 +224,10 @@ function EditorSection({ id, title, summary, isNew, defaultOpen = false, childre
     writeStored(SECTIONS_KEY, { ...savedSections(), [id]: next })
   }
   return (
-    <section className="border border-line/50 bg-black/30">
-      <button onClick={toggle} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-white/[0.02]">
+    <section className="border border-line/50 tone-panel-30">
+      <button onClick={toggle} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-ink/[0.02]">
         <ChevronRight className={cn('h-4 w-4 shrink-0 text-accent transition-transform', open && 'rotate-90')} />
-        <span className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-white">{title}</span>
+        <span className="font-label text-[11px] font-bold caps-18 text-ink">{title}</span>
         {!open && <span className="min-w-0 flex-1 truncate text-[12px] text-dim">{summary}</span>}
       </button>
       {open && <div className="border-t border-line/40 p-3.5">{children}</div>}
@@ -251,9 +249,9 @@ function ToolsetPicker({ draft, onChange }: { draft: AgentDraft; onChange: (d: A
                 key={t.id}
                 title={t.description || t.tools.join(', ')}
                 onClick={() => onChange({ ...draft, toolsets: on ? chosen.filter((x) => x !== t.id) : [...chosen, t.id] })}
-                className={cn('border px-2.5 py-1 text-[12.5px]', on ? 'border-accent bg-accent/10 text-accent' : 'border-line/50 text-dim hover:text-white')}
+                className={cn('border px-2.5 py-1 text-[12.5px]', on ? 'border-accent bg-accent/10 text-accent' : 'border-line/50 text-dim hover:text-ink')}
               >
-                {t.name} <span className="font-mono text-[10px] text-faint">{t.tools.length}</span>
+                {t.name} <span className="font-ui text-[10px] text-faint">{t.tools.length}</span>
               </button>
             )
           })}
@@ -382,12 +380,12 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
           <Select value={draft.modelId ?? ''} options={modelOptions} onChange={(v) => change({ ...draft, modelId: v || null })} />
         </Field>
         {selectedRemote?.remote && (
-          <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 border border-line/50 border-l-2 border-l-accent bg-black/40 px-3 py-2 text-[12px]">
+          <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 border border-line/50 border-l-2 border-l-accent tone-panel-40 px-3 py-2 text-[12px]">
             <div className="min-w-0">
-              <span className="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-accent">
+              <span className="font-label text-[10.5px] font-semibold caps-5 text-accent">
                 Remote · {presetForSpec(selectedRemote.remote.api, selectedRemote.remote.baseUrl).label}
               </span>
-              <div className="truncate font-mono text-[11px] text-dim">
+              <div className="truncate font-ui text-[11px] text-dim">
                 {remoteHostLabel(selectedRemote.remote.api, selectedRemote.remote.baseUrl)} · {selectedRemote.remote.model} · {selectedRemote.remote.hasKey ? 'Key saved' : 'No key set'}
               </div>
             </div>
@@ -404,7 +402,7 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
           </div>
         )}
         {maker && (
-          <div className="col-span-2 border border-accent/40 bg-accent/5 px-3 py-2 text-[12.5px] text-white/85">
+          <div className="col-span-2 border border-accent/40 bg-accent/5 px-3 py-2 text-[12.5px] text-ink/85">
             Made by {maker}. It only gets the tools and permissions you give it here.
           </div>
         )}
@@ -436,9 +434,12 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
             <div className="mb-3 flex flex-col gap-2">
               <Toggle
                 checked={draft.mindAuto?.recall !== false}
-                onChange={(v) => change({ ...draft, mindAuto: { recall: v } })}
+                onChange={(v) => change({ ...draft, mindAuto: { recall: v, recallCooldown: draft.mindAuto?.recallCooldown ?? 0 } })}
                 label="Auto-recall: add memories that match each message to what the model sees"
               />
+              <Field label="Recall cooldown (turns)" hint="Minimum user messages before the same character memory or place-triggered recall can re-inject. 0 recalls whenever relevant.">
+                <NumberField value={draft.mindAuto?.recallCooldown ?? 0} min={0} max={50} step={1} onChange={(v) => change({ ...draft, mindAuto: { recall: draft.mindAuto?.recall !== false, recallCooldown: v ?? 0 } })} className="w-28" />
+              </Field>
               <Field label="Check in every N turns" hint="Seven adds a check_in to the agent's context: each turned-on module's reminder, plus how long since it remembered, looked things up or reasoned, and which tools it used. 0 turns it off.">
                 <NumberField value={draft.remindEvery ?? 5} min={0} max={100} step={1} onChange={(v) => change({ ...draft, remindEvery: v ?? 0 })} className="w-28" />
               </Field>
@@ -501,7 +502,7 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
         </Field>
         <Field label="Workspace" className="col-span-2" hint="The folder this agent's file tools work in. Paths outside it are refused.">
           <div className="flex gap-2">
-            <Input readOnly value={draft.workspace ?? ''} placeholder="No workspace: file tools are off" className="font-mono text-[12.5px]" />
+            <Input readOnly value={draft.workspace ?? ''} placeholder="No workspace: file tools are off" className="font-ui text-[12.5px]" />
             <Button
               variant="badge"
               icon={<FolderOpen />}
@@ -519,10 +520,9 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
             )}
           </div>
         </Field>
-        {agentGroups(draft, toolsetList, modules).includes('world') && <WorldLink value={draft.world} agentName={draft.name} onChange={(world) => change({ ...draft, world })} />}
         <PromptCostLine cost={cost} modules={modules} activeIds={new Set(agentGroups(draft, toolsetList, modules))} />
         <div className="col-span-2 flex flex-col gap-2.5">
-          <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Tools</span>
+          <span className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">Tools</span>
           {(() => {
             const ids = CORE_MODULES.filter((id) => modules.some((m) => m.id === id) && !draft.modules.includes(id))
             const names = ids.map((id) => modules.find((m) => m.id === id)?.name ?? id)
@@ -534,19 +534,19 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
             const on = draft.modules.includes(group.id)
             const blocked = group.needsWorkspace && !draft.workspace
             return (
-              <div key={group.id} className="flex items-start gap-3 border border-line/40 bg-black/40 px-3 py-2">
+              <div key={group.id} className="flex items-start gap-3 border border-line/40 tone-panel-40 px-3 py-2">
                 <Toggle
                   checked={on}
                   onChange={(v) => change({ ...draft, modules: v ? [...draft.modules, group.id] : draft.modules.filter((g) => g !== group.id) })}
                 />
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 text-[13px] text-white">
+                  <div className="flex items-center gap-2 text-[13px] text-ink">
                     {group.name}
-                    {CORE_MODULES.includes(group.id) && <span className="border border-accent/60 bg-accent/10 px-1 font-mono text-[9.5px] uppercase text-accent">core</span>}
-                    {group.kind === 'mcp' && <span className="border border-purple/40 px-1 font-mono text-[9.5px] uppercase text-purple">MCP</span>}
-                    {group.source === 'user' && <span className="border border-line/60 px-1 font-mono text-[9.5px] uppercase text-faint">yours</span>}
-                    {group.state !== 'on' && <span className="font-mono text-[10px] uppercase tracking-wider text-accent">{group.state === 'needs-enabling' ? 'not enabled in Tools' : group.state}</span>}
-                    {cost?.modules[group.id] ? <span className="ml-auto font-mono text-[10.5px] text-faint">~{tok(cost.modules[group.id])} tokens</span> : null}
+                    {CORE_MODULES.includes(group.id) && <span className="border border-accent/60 bg-accent/10 px-1 font-label text-[9.5px] caps text-accent">core</span>}
+                    {group.kind === 'mcp' && <span className="border border-tint-purple/40 px-1 font-label text-[9.5px] caps text-tint-purple">MCP</span>}
+                    {group.source === 'user' && <span className="border border-line/60 px-1 font-label text-[9.5px] caps text-faint">yours</span>}
+                    {group.state !== 'on' && <span className="font-label text-[10px] caps-5 text-accent">{group.state === 'needs-enabling' ? 'not enabled in Tools' : group.state}</span>}
+                    {cost?.modules[group.id] ? <span className="ml-auto font-ui text-[10.5px] text-faint">~{tok(cost.modules[group.id])} tokens</span> : null}
                   </div>
                   <div className="text-[12px] text-dim">
                     {group.description}
@@ -561,7 +561,7 @@ function AgentEditor({ draft, onChange, onSaved }: { draft: AgentDraft; onChange
                             key={t.name}
                             title={`${t.description}\n\n${off ? 'Off for this agent. Click to turn on.' : 'Click to turn off for this agent.'}`}
                             onClick={() => change({ ...draft, offTools: off ? (draft.offTools ?? []).filter((n) => currentToolName(n) !== t.name) : [...(draft.offTools ?? []), t.name] })}
-                            className={cn('border px-1.5 py-0.5 font-mono text-[10.5px]', off ? 'border-line/40 text-faint line-through' : 'border-teal/40 text-teal hover:border-teal')}
+                            className={cn('border px-1.5 py-0.5 font-ui text-[10.5px]', off ? 'border-line/40 text-faint line-through' : 'border-secondary/40 text-secondary hover:border-secondary')}
                           >
                             {t.name}
                           </button>

@@ -20,6 +20,7 @@ import { engine } from '../../lib/ipc'
 import { useViewPlace } from '../../lib/viewPlace'
 import { errorText } from '../../lib/format'
 import { noteFailure } from '../../store/problems'
+import { LinkTextarea } from '../data/LinkTextarea'
 
 export interface GenerateImageOptions {
   modelId?: string
@@ -216,7 +217,7 @@ function GenerateImageModal({ request }: { request: GenerateRequest }) {
             ]}
             onChange={(v) => setTab(v as 'create' | 'history')}
           />
-          {context && <span className="truncate font-mono text-[11px] text-accent-soft">{context.title}</span>}
+          {context && <span className="truncate font-ui text-[11px] text-accent-soft">{context.title}</span>}
         </div>
 
         {tab === 'history' ? (
@@ -232,7 +233,7 @@ function GenerateImageModal({ request }: { request: GenerateRequest }) {
               const found = assets.find((a) => a.id === assetId)
               if (found) close(found)
             }}
-            onRemove={(id) => void removeHistory(id)}
+            onRemove={(id, deleteAsset) => void removeHistory(id, deleteAsset)}
             onClear={() => void clearHistory()}
           />
         ) : imageModels.length === 0 ? (
@@ -241,15 +242,15 @@ function GenerateImageModal({ request }: { request: GenerateRequest }) {
           <div className="flex flex-col gap-3">
             {error && <AlertBox>{error}</AlertBox>}
             {selectedEntry && !selectedEntry.remote && sdInstall && !sdReady && (
-              <div className="flex items-center gap-3 border border-line border-l-2 border-l-accent bg-accent/5 px-3 py-2 text-[12px] text-white">
-                <span className="flex-1"><span className="font-mono text-accent">sd-server</span> is needed to run <span className="font-mono">{selectedEntry.name}</span>.</span>
+              <div className="flex items-center gap-3 border border-line border-l-2 border-l-accent bg-accent/5 px-3 py-2 text-[12px] text-ink">
+                <span className="flex-1"><span className="font-ui text-accent">sd-server</span> is needed to run <span className="font-ui">{selectedEntry.name}</span>.</span>
                 <Button size="sm" variant="primary" icon={<Server />} onClick={() => { close(null); openHelperInstaller('sd-server') }}>
                   Install sd-server…
                 </Button>
               </div>
             )}
             {selectedEntry && !selectedEntry.remote && sdReady && chatHost.modelId && swapNotice && (
-              <div className="border border-line/50 bg-bg px-3 py-1.5 font-mono text-[11.5px] text-dim">
+              <div className="border border-line/50 bg-bg px-3 py-1.5 font-ui text-[11.5px] text-dim">
                 {swapNotice}
               </div>
             )}
@@ -291,9 +292,9 @@ function GenerateImageModal({ request }: { request: GenerateRequest }) {
               hint="Supports @kind:name links (e.g. @page:style, @sheet:name#Appearance) — hydrated before generating."
             >
               <div className="flex flex-col gap-1.5">
-                <Textarea
+                <LinkTextarea rolls={false}
                   value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
+                  onValue={(v) => setPrompt(v)}
                   rows={3}
                   placeholder="Describe the image, or reference @page:style @sheet:name#Appearance…"
                 />
@@ -347,21 +348,21 @@ function GenerateImageModal({ request }: { request: GenerateRequest }) {
                   />
                 </Field>
                 <Field label="Seed (blank = random)">
-                  <Input value={seedText} onChange={(e) => setSeedText(e.target.value)} placeholder="Random" className="font-mono" />
+                  <Input value={seedText} onChange={(e) => setSeedText(e.target.value)} placeholder="Random" className="font-ui" />
                 </Field>
               </div>
             </Fold>
 
             {busy && (
               <div className="flex items-center justify-between border border-line bg-bg px-3 py-2 text-[12px] text-dim">
-                <span className="font-mono">{progressInfo.text}</span>
+                <span className="font-ui">{progressInfo.text}</span>
                 <StatusBadge tone="busy">{host.progress?.stage || host.status}</StatusBadge>
               </div>
             )}
 
             {result && (
               <div className="flex flex-col gap-2 border border-line bg-bg p-3">
-                <div className="flex max-h-80 items-center justify-center overflow-hidden bg-black/30">
+                <div className="flex max-h-80 items-center justify-center overflow-hidden tone-panel-30">
                   <AssetMedia id={result.asset.id} className="max-h-80 w-auto object-contain" />
                 </div>
                 <FactGrid>

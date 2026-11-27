@@ -4,9 +4,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { DEFAULT_IMAGE_CONFIG, MODEL_KINDS, type ChatTemplate, type ImageCompanionRef, type ImageCompanions, type ImageModelConfig, type ModelConfig, type ModelConfigResult, type ModelEntry, type ModelInfo, type ModelKind, type RemoteApi } from '@shared/types'
+import { DEFAULT_IMAGE_CONFIG, MODEL_KINDS, type ChatTemplate, type ImageCompanionRef, type ImageCompanions, type ImageLoraSelection, type ImageModelConfig, type ModelConfig, type ModelConfigResult, type ModelEntry, type ModelInfo, type ModelKind, type RemoteApi } from '@shared/types'
 import { resolveImageArchSpec, missingRecipeSlots, type CompanionSlot } from '@shared/imageModels'
-import { REMOTE_APIS } from '@shared/remoteModels'
+import { REMOTE_APIS, isImageModel } from '@shared/remoteModels'
 import { paths } from '../util/paths'
 import { remoteKeys } from './keys'
 import type { ApiTarget } from './apiChat'
@@ -18,6 +18,7 @@ interface ModelsFile {
   models: ModelEntry[]
   configs: Record<string, ModelConfig>
   imageConfigs?: Record<string, Partial<ImageModelConfig>>
+  defaultImageModel?: string | null
   favourites?: string[]
   lastUsed?: Record<string, number>
   info?: Record<string, { size: number; info: ModelInfo | null; v?: number }>
@@ -29,7 +30,7 @@ interface ModelsFile {
 
 export type ConfigOverlay = (id: string, own: ModelConfig) => ModelConfig
 
-const INFO_VERSION = 7
+const INFO_VERSION = 9
 function readInfo(filePath: string): Promise<ModelInfo | null> {
   return readModelInfo(filePath, { size: true }).catch((err: unknown) => (noteFailure(err, 'models', "Could not read a model file's header"), null))
 }
@@ -165,9 +166,29 @@ export class ModelRegistry extends EventEmitter {
   }
 
   private infoOf(m: ModelEntry, cached: { size: number; info: ModelInfo | null } | undefined): ModelInfo | null | undefined {
-    if (cached?.size !== m.sizeBytes) return undefined
     const chosen = this.data.kinds?.[m.id]
-    return chosen && cached.info ? { ...cached.info, kind: chosen } : cached.info
+    const fallbackChosen = (): ModelInfo => ({
+      kind: chosen!,
+      architecture: null,
+      name: m.name,
+      sizeLabel: null,
+      author: null,
+      license: null,
+      contextLength: null,
+      layers: null,
+      embeddingLength: null,
+      chatTemplate: false,
+      imatrix: null,
+      experts: null,
+      mtpLayers: null,
+      slidingWindow: null,
+      quant: m.quant ?? null,
+      split: null,
+      sizeBytes: m.sizeBytes
+    })
+    if (cached?.size !== m.sizeBytes) return chosen ? fallbackChosen() : undefined
+    if (chosen) return cached.info ? { ...cached.info, kind: chosen } : fallbackChosen()
+    return cached.info
   }
 
   setKind(id: string, kind: ModelKind | null): ModelEntry[] {
@@ -181,6 +202,12 @@ export class ModelRegistry extends EventEmitter {
 
   mtpLayers(id: string): number | null {
     return this.list().find((m) => m.id === id)?.info?.mtpLayers ?? null
+  }
+
+  /** All registered entries including unlisted companions (VAEs, text encoders, vision adapters). */
+  allEntries(): ModelEntry[] {
+    const info = this.data.info ?? {}
+    return this.data.models.map((m) => (m.remote ? m : { ...m, info: this.infoOf(m, info[m.id]) }))
   }
 
   private modelsOfKind(kind: ModelKind): ImageCompanionRef[] {
@@ -316,7 +343,7 @@ export class ModelRegistry extends EventEmitter {
     return Boolean(id && this.data.models.find((m) => m.id === id)?.remote)
   }
 
-  saveRemote(input: { id: string | null; name: string; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null }): ModelEntry {
+  saveRemote(input: { id: string | null; name: string; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null; category?: 'chat' | 'reasoning' | 'image' | 'audio' | 'other' | null }): ModelEntry {
     const name = input.name.trim().slice(0, 80)
     const model = input.model.trim()
     if (!name) throw new Error('Give it a name')
@@ -329,15 +356,32 @@ export class ModelRegistry extends EventEmitter {
     const existing = input.id ? this.data.models.find((m) => m.id === input.id && m.remote) : undefined
     if (input.id && !existing) throw new Error('That remote model was removed. Close this form and add it again as a new remote model.')
     const id = existing?.id ?? `remote-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'model'}-${Date.now().toString(36).slice(-4)}`
-    const entry: ModelEntry = { id, name, remote: { api: input.api, baseUrl, model, hasKey: false }, path: '', sizeBytes: 0, quant: null, folder: null }
+    const category = input.category !== undefined ? (input.category || undefined) : existing?.remote?.category
+    const entry: ModelEntry = {
+      id,
+      name,
+      remote: { api: input.api, baseUrl, model, hasKey: false, ...(category ? { category } : {}) },
+      path: '',
+      sizeBytes: 0,
+      quant: null,
+      folder: null
+    }
     this.data.models = [...this.data.models.filter((m) => m.id !== id), entry]
+    if (input.category !== undefined && this.data.kinds?.[id]) {
+      const kinds = { ...this.data.kinds }
+      delete kinds[id]
+      this.data.kinds = kinds
+    }
     if (input.key !== null) remoteKeys.set(id, input.key.trim() || null)
     if (input.contextSize) this.data.configs[id] = normalize({ ...this.ownConfig(id), contextSize: input.contextSize })
+    if (isImageModel(entry) && !this.getDefaultImageModel()) {
+      this.data.defaultImageModel = id
+    }
     this.changed()
     return this.list().find((m) => m.id === id)!
   }
 
-  previewRemoteTarget(input: { id?: string | null; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null }): ApiTarget {
+  previewRemoteTarget(input: { id?: string | null; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null; category?: 'chat' | 'reasoning' | 'image' | 'audio' | 'other' | null }): ApiTarget {
     if (!REMOTE_APIS.some((a) => a.id === input.api)) throw new Error('Unsupported remote API.')
     const baseUrl = input.baseUrl?.trim() ? input.baseUrl.trim().replace(/\/+$/, '') : null
     if (baseUrl && !/^https?:\/\/\S+$/i.test(baseUrl)) throw new Error('The address must start with http:// or https://')
@@ -345,7 +389,13 @@ export class ModelRegistry extends EventEmitter {
     const rawKey = input.key !== null && input.key.trim() ? input.key.trim() : savedKey
     return {
       id: input.id ?? '__probe__',
-      spec: { api: input.api, baseUrl, model: input.model.trim(), hasKey: Boolean(rawKey) },
+      spec: {
+        api: input.api,
+        baseUrl,
+        model: input.model.trim(),
+        hasKey: Boolean(rawKey),
+        ...(input.category ? { category: input.category } : {})
+      },
       key: rawKey ?? null,
       contextSize: input.contextSize || 32768
     }
@@ -367,6 +417,7 @@ export class ModelRegistry extends EventEmitter {
     if (this.data.projectors) delete this.data.projectors[id]
     if (this.data.packs) delete this.data.packs[id]
     if (this.data.imageConfigs) delete this.data.imageConfigs[id]
+    if (this.data.defaultImageModel === id) this.data.defaultImageModel = null
     if (this.data.models.length === before) return false
     this.changed()
     return true
@@ -491,30 +542,81 @@ export class ModelRegistry extends EventEmitter {
     return { mode, modelPath: entry.path, vae, tae, clipL, clipG, t5xxl, llm, llmVision, loraDir, config }
   }
 
+  getDefaultImageModel(): string | null {
+    const id = this.data.defaultImageModel
+    if (!id) return null
+    return this.data.models.some((m) => m.id === id) ? id : null
+  }
+
+  setDefaultImageModel(id: string | null): string | null {
+    if (id !== null) this.get(id)
+    this.data.defaultImageModel = id
+    this.save()
+    return this.getDefaultImageModel()
+  }
+
+  resolveLoraFiles(loras?: ImageLoraSelection[]): { id: string; path: string; stem: string; dir: string; weight: number }[] {
+    if (!loras?.length) return []
+    const out: { id: string; path: string; stem: string; dir: string; weight: number }[] = []
+    for (const item of loras) {
+      const entry = this.data.models.find((m) => m.id === item.id)
+      const resolved = entry ? entry.path : path.resolve(item.id)
+      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) continue
+      const weight = Number.isFinite(item.weight) ? item.weight : 1
+      out.push({
+        id: item.id,
+        path: resolved,
+        stem: path.basename(resolved, path.extname(resolved)),
+        dir: path.dirname(resolved),
+        weight
+      })
+    }
+    return out
+  }
+
   autoMatchImageCompanions(id: string): ImageModelConfig {
     const entry = this.get(id)
     const info = this.infoFor(id)
     const spec = resolveImageArchSpec(info?.architecture, entry.name)
+    const hadSaved = Boolean(this.data.imageConfigs?.[id])
     const current = this.getImageConfig(id)
-    if (!spec) return current
     const companions = this.imageCompanions()
-    const poolBySlot: Record<CompanionSlot, ImageCompanionRef[]> = {
-      vae: companions.vaes,
-      tae: companions.vaes,
-      clipL: companions.textEncoders,
-      clipG: companions.textEncoders,
-      t5xxl: companions.textEncoders,
-      llm: [...companions.textEncoders, ...this.modelsOfKind('chat')],
-      llmVision: companions.projectors
-    }
     const patch: Partial<ImageModelConfig> = {}
-    for (const slot of spec.slots) {
-      if (current[slot.slot]) continue
-      if (slot.slot === 'tae' && (current.vae || patch.vae)) continue
-      const re = new RegExp(slot.matchPattern, 'i')
-      const match = poolBySlot[slot.slot].find((candidate) => re.test(`${candidate.name} ${path.basename(candidate.path)}`))
-      if (match) patch[slot.slot] = match.id
+
+    if (spec) {
+      if (!hadSaved) {
+        patch.mode = spec.defaults.mode
+        patch.width = spec.defaults.width
+        patch.height = spec.defaults.height
+        patch.steps = spec.defaults.steps
+        patch.cfgScale = spec.defaults.cfgScale
+        patch.sampler = spec.defaults.sampler
+      }
+      const allLocalRefs: ImageCompanionRef[] = this.data.models
+        .filter((m) => !m.remote && m.id !== id)
+        .map((m) => ({ id: m.id, name: m.name, path: m.path }))
+      const poolBySlot: Record<CompanionSlot, ImageCompanionRef[]> = {
+        vae: [...companions.vaes, ...allLocalRefs],
+        tae: [...companions.vaes, ...allLocalRefs],
+        clipL: [...companions.textEncoders, ...allLocalRefs],
+        clipG: [...companions.textEncoders, ...allLocalRefs],
+        t5xxl: [...companions.textEncoders, ...allLocalRefs],
+        llm: [...companions.textEncoders, ...this.modelsOfKind('chat'), ...allLocalRefs],
+        llmVision: [...companions.projectors, ...allLocalRefs]
+      }
+      for (const slot of spec.slots) {
+        if (current[slot.slot]) continue
+        if (slot.slot === 'tae' && (current.vae || patch.vae)) continue
+        const re = new RegExp(slot.matchPattern, 'i')
+        const match = poolBySlot[slot.slot].find((candidate) => re.test(`${candidate.name} ${path.basename(candidate.path)}`))
+        if (match) patch[slot.slot] = match.id
+      }
     }
+
+    if (!current.loraDir && companions.loras.length > 0) {
+      patch.loraDir = path.dirname(companions.loras[0].path)
+    }
+
     return Object.keys(patch).length ? this.setImageConfig(id, patch) : current
   }
 }

@@ -180,9 +180,9 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
         className="h-full flex flex-col min-h-0"
         bodyClassName="flex-1 min-h-0 flex flex-col justify-between overflow-y-auto gap-3 p-3"
         action={
-          <span className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-accent">
-            <Shield className="h-3.5 w-3.5 text-cyan" />
-            <span className="text-white">{armour} AC</span>
+          <span className="flex items-center gap-1.5 font-ui text-[11px] font-bold text-accent">
+            <Shield className="h-3.5 w-3.5 text-tint-cyan" />
+            <span className="text-ink">{armour} AC</span>
           </span>
         }
       >
@@ -190,7 +190,7 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
           <div className="flex flex-col gap-3">
             {/* A. Paper Doll Worn Equipment */}
             <div className="flex flex-col gap-1.5">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan">
+              <span className="font-label text-[10px] font-bold caps-5 text-tint-cyan">
                 Worn Gear
               </span>
               <div className="grid grid-cols-2 gap-2">
@@ -218,11 +218,11 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
             {/* B. Dedicated Utility Belt Pouches (Count Governed by 'belt' Stat) */}
             <div className="flex flex-col gap-1.5 border-t border-line/50 pt-2.5">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[10.5px] font-bold uppercase tracking-wider text-accent flex items-center gap-1.5">
+                <span className="font-label text-[10.5px] font-bold caps-5 text-accent flex items-center gap-1.5">
                   <Package className="h-3.5 w-3.5 text-accent" />
                   Utility Belt
                 </span>
-                <span className="font-mono text-[9.5px] font-bold text-accent border border-accent/40 bg-accent/15 px-1.5 py-0.2">
+                <span className="font-ui text-[9.5px] font-bold text-accent border border-accent/40 bg-accent/15 px-1.5 py-0.2">
                   {beltSlots.length} Pockets (Stat: {beltStatVal})
                 </span>
               </div>
@@ -236,7 +236,7 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
                         key={slot.id}
                         from={slotFrom(slot.id)}
                         label={`B${index + 1}`}
-                        icon={<FlaskConical className="h-4 w-4 text-emerald-400/40" />}
+                        icon={<FlaskConical className="h-4 w-4 text-tint-green-ink/40" />}
                         item={item ? { uid: item.uid, label: itemName(item), count: item.count } : null}
                         selected={!!item && item.uid === picked}
                         tip={item ? itemTip(item) : undefined}
@@ -249,7 +249,7 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
                   })}
                 </div>
               ) : (
-                <div className="border border-line/30 bg-black/40 p-2 text-center font-mono text-[10px] text-faint">
+                <div className="border border-line/30 tone-panel-40 p-2 text-center font-ui text-[10px] text-faint">
                   No Belt Pockets (Belt Stat is 0)
                 </div>
               )}
@@ -258,16 +258,16 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
         )}
 
         {/* Quick equipment summary strip */}
-        <div className="border border-line/40 bg-black/40 p-2 flex flex-col gap-1 font-mono text-[10.5px]">
+        <div className="border border-line/40 tone-panel-40 p-2 flex flex-col gap-1 font-ui text-[10.5px]">
           <div className="flex items-center justify-between text-dim">
             <span>Main Hand</span>
-            <span className="text-white font-semibold truncate max-w-[140px]">
+            <span className="text-ink font-semibold truncate max-w-[140px]">
               {equipment?.inSlot('mainHand') ? itemName(equipment.inSlot('mainHand')!) : 'Empty'}
             </span>
           </div>
           <div className="flex items-center justify-between text-dim">
             <span>Off Hand</span>
-            <span className="text-white font-semibold truncate max-w-[140px]">
+            <span className="text-ink font-semibold truncate max-w-[140px]">
               {equipment?.inSlot('offHand') ? itemName(equipment.inSlot('offHand')!) : 'Empty'}
             </span>
           </div>
@@ -282,7 +282,7 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
         aside={`${bag.items.length} / ${size}`}
         action={
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1 font-mono text-[11.5px] font-bold text-accent">
+            <span className="flex items-center gap-1 font-ui text-[11.5px] font-bold text-accent">
               <Coins className="h-3.5 w-3.5" />
               <span>{gold} GP</span>
             </span>
@@ -299,10 +299,10 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
                   type="button"
                   onClick={() => setCategory(cat)}
                   className={cn(
-                    'px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-wider transition-all',
+                    'px-2.5 py-1 font-label text-[10.5px] font-bold caps-5 transition-all',
                     category === cat
-                      ? 'border border-cyan bg-cyan/20 text-cyan shadow-[0_0_10px_rgba(102,252,241,0.3)]'
-                      : 'border border-line/40 bg-black/40 text-faint hover:text-white hover:border-line-bright'
+                      ? 'border border-tint-cyan bg-tint-cyan/20 text-tint-cyan shadow-[0_0_10px_color-mix(in_srgb,var(--color-tint-cyan)_calc(30%*var(--glow)),transparent)]'
+                      : 'border border-line/40 tone-well-40 text-faint hover:text-ink hover:border-line-strong'
                   )}
                 >
                   {cat === 'all' ? 'All' : cat === 'gear' ? 'Gear' : 'Consumables'}
@@ -311,22 +311,22 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
             </div>
 
             {/* Encumbrance stats */}
-            <div className="flex items-center gap-1.5 font-mono text-[11px] text-dim">
-              <Weight className="h-3.5 w-3.5 text-cyan" />
+            <div className="flex items-center gap-1.5 font-ui text-[11px] text-dim">
+              <Weight className="h-3.5 w-3.5 text-tint-cyan" />
               <span>{Math.round(weight * 10) / 10} / {maxCarry} lbs</span>
             </div>
           </div>
 
           {/* Encumbrance progress bar */}
-          <div className="h-1.5 w-full bg-black/60 border border-line/40 overflow-hidden">
+          <div className="h-1.5 w-full tone-panel-60 border border-line/40 overflow-hidden">
             <div
               className={cn(
                 'h-full transition-all duration-300',
                 weight > maxCarry
                   ? 'bg-alert'
                   : weight > maxCarry * 0.8
-                  ? 'bg-amber-400'
-                  : 'bg-cyan'
+                  ? 'bg-tint-amber-ink'
+                  : 'bg-tint-cyan'
               )}
               style={{ width: `${Math.min(100, Math.round((weight / maxCarry) * 100))}%` }}
             />
@@ -371,28 +371,28 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-4 text-white">
+          <div className="flex flex-col gap-4 text-ink">
             <div className="flex items-center gap-2 border-b border-line/40 pb-2">
-              <Sparkle className="h-4 w-4 text-cyan" />
-              <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-cyan">
+              <Sparkle className="h-4 w-4 text-tint-cyan" />
+              <span className="font-label text-[11px] font-bold caps-5 text-tint-cyan">
                 Combat Loadout
               </span>
             </div>
 
-            <div className="flex flex-col gap-2 font-mono text-[11.5px]">
-              <div className="flex items-center justify-between border border-line/40 bg-black/40 px-3 py-2">
+            <div className="flex flex-col gap-2 font-ui text-[11.5px]">
+              <div className="flex items-center justify-between border border-line/40 tone-panel-40 px-3 py-2">
                 <span className="text-dim">Armor Class</span>
-                <span className="font-bold text-cyan">{armour} AC</span>
+                <span className="font-bold text-tint-cyan">{armour} AC</span>
               </div>
-              <div className="flex items-center justify-between border border-line/40 bg-black/40 px-3 py-2">
+              <div className="flex items-center justify-between border border-line/40 tone-panel-40 px-3 py-2">
                 <span className="text-dim">Movement Speed</span>
-                <span className="font-bold text-white">{speed} ft</span>
+                <span className="font-bold text-ink">{speed} ft</span>
               </div>
-              <div className="flex items-center justify-between border border-line/40 bg-black/40 px-3 py-2">
+              <div className="flex items-center justify-between border border-line/40 tone-panel-40 px-3 py-2">
                 <span className="text-dim">Belt Pockets</span>
                 <span className="font-bold text-accent">{beltSlots.length} Pockets</span>
               </div>
-              <div className="flex items-center justify-between border border-line/40 bg-black/40 px-3 py-2">
+              <div className="flex items-center justify-between border border-line/40 tone-panel-40 px-3 py-2">
                 <span className="text-dim">Carried Weight</span>
                 <span className={cn('font-bold', weight > maxCarry ? 'text-alert' : 'text-ok')}>
                   {Math.round(weight * 10) / 10} / {maxCarry} lbs
@@ -401,8 +401,8 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
             </div>
 
             {/* Belt Quick Slots Preview */}
-            <div className="border border-line/40 bg-black/40 p-3 flex flex-col gap-2">
-              <span className="font-mono text-[10.5px] uppercase tracking-wider text-accent flex items-center justify-between">
+            <div className="border border-line/40 tone-panel-40 p-3 flex flex-col gap-2">
+              <span className="font-label text-[10.5px] caps-5 text-accent flex items-center justify-between">
                 <span>Belt Pouches ({beltSlots.filter((s) => equipment?.inSlot(s.id)).length} / {beltSlots.length})</span>
                 <span className="text-faint text-[9.5px]">Governed by Belt Stat</span>
               </span>
@@ -416,12 +416,12 @@ function InventoryScreen({ entity, act, visitor }: ScreenProps) {
                       className={cn(
                         'flex items-center justify-between p-1.5 border transition-colors',
                         item
-                          ? 'border-line/40 bg-black/50 hover:border-cyan hover:bg-cyan/10 cursor-pointer'
-                          : 'border-line/20 bg-black/20 text-faint'
+                          ? 'border-line/40 tone-well-50 hover:border-tint-cyan hover:bg-tint-cyan/10 cursor-pointer'
+                          : 'border-line/20 tone-panel-20 text-faint'
                       )}
                     >
-                      <span className="font-mono text-[10px] text-accent uppercase font-bold">B{index + 1}</span>
-                      <span className={cn('truncate max-w-[160px]', item ? 'font-semibold text-white' : 'italic text-faint')}>
+                      <span className="font-label text-[10px] text-accent caps font-bold">B{index + 1}</span>
+                      <span className={cn('truncate max-w-[160px]', item ? 'font-semibold text-ink' : 'italic text-faint')}>
                         {item ? itemName(item) : 'Empty'}
                       </span>
                     </div>

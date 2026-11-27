@@ -14,7 +14,7 @@ export function CardSwapField({ value, onChange, className }: { value: CardSwap;
         setText(e.target.value)
         onChange(parseSwap(e.target.value))
       }}
-      className={cn('h-7 font-mono text-[11.5px]', className)}
+      className={cn('h-7 font-ui text-[11.5px]', className)}
     />
   )
 }

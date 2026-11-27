@@ -19,7 +19,7 @@ export function ConsistencyChart({ rows, period }: { rows: WorkoutLogRow[]; peri
             <YAxis {...AXIS} tickLine={false} allowDecimals={false} domain={[0, 7]} />
             <Tooltip
               {...TOOLTIP}
-              cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+              cursor={{ fill: 'color-mix(in srgb, var(--color-ink) 4%, transparent)' }}
               formatter={(_v, _n, item) => [
                 `${(item.payload as { days: number }).days} days`,
                 'Trained'

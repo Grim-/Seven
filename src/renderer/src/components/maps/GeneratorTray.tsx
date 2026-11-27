@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Sparkles, X, ChevronRight, ChevronLeft, RefreshCw, Sliders, RotateCcw } from 'lucide-react'
 import { generateDungeon, generateMap, renderMapToCanvas } from 'agent_map_gen'
 import type { GenerateConfig } from './GenerateMapModal'
-import { Button, Field, Input, MinMaxSlider, Segmented, Select, Toggle } from '../ui'
+import { Button, Field, Input, MinMaxSlider, NumberField, Segmented, Select, Toggle } from '../ui'
 import { noteFailure } from '../../store/problems'
 
 const DUNGEON_KINDS = [
@@ -333,27 +333,29 @@ export function GeneratorTray({ open, onClose, onGenerate }: GeneratorTrayProps)
 
     const timer = setTimeout(async () => {
       try {
+        const safeW = Math.max(16, Math.round(width || 16))
+        const safeH = Math.max(16, Math.round(height || 16))
         const config = buildActiveConfig()
         const res =
           type === 'dungeon'
             ? await generateDungeon({
                 kind: dungeonKind,
-                width,
-                height,
+                width: safeW,
+                height: safeH,
                 seed,
                 config
               })
             : await generateMap({
                 shaper: overworldKind,
-                width,
-                height,
+                width: safeW,
+                height: safeH,
                 seed,
                 config
               })
 
         if (!cancelled && canvasRef.current) {
           renderMapToCanvas(canvasRef.current, res, {
-            tileSize: Math.max(1, Math.floor(180 / Math.max(width, height)))
+            tileSize: Math.max(1, Math.floor(180 / Math.max(safeW, safeH)))
           })
           if (type === 'dungeon' && 'stats' in res) {
             setPreviewStats([
@@ -402,13 +404,13 @@ export function GeneratorTray({ open, onClose, onGenerate }: GeneratorTrayProps)
 
   return (
     <div
-      className={`absolute right-3 top-3 z-30 flex flex-col border border-line bg-black/95 shadow-[-8px_12px_32px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all ${
+      className={`absolute right-3 top-3 z-30 flex flex-col border border-line tone-panel-95 shadow-[-8px_12px_32px_color-mix(in_srgb,var(--color-shade)_85%,transparent)] backdrop-blur-[calc(var(--panel-blur)*1.5)] transition-all ${
         collapsed ? 'w-[240px]' : 'w-[380px] max-h-[calc(100%-24px)]'
       }`}
     >
       {/* Tray Header */}
-      <div className="flex items-center justify-between border-b border-line bg-black/90 px-3 py-2 shrink-0">
-        <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-accent">
+      <div className="flex items-center justify-between border-b border-line tone-panel-90 px-3 py-2 shrink-0">
+        <div className="flex items-center gap-1.5 font-label text-[11px] font-semibold caps-5 text-accent">
           <Sparkles className="h-3.5 w-3.5" />
           <span>Map Generator</span>
         </div>
@@ -439,23 +441,23 @@ export function GeneratorTray({ open, onClose, onGenerate }: GeneratorTrayProps)
         <>
           <div className="flex flex-1 min-h-0 flex-col gap-3.5 p-3 overflow-y-auto">
             {/* REALTIME LIVE PREVIEW CANVAS */}
-            <div className="relative flex flex-col items-center justify-center border border-line bg-black/80 p-2 shrink-0">
+            <div className="relative flex flex-col items-center justify-center border border-line tone-panel-80 p-2 shrink-0">
               <canvas
                 ref={canvasRef}
                 width={180}
                 height={180}
-                className="border border-line/60 bg-[#06080c] [image-rendering:pixelated]"
+                className="border border-line/60 bg-surface [image-rendering:pixelated]"
               />
               {generatingPreview && (
-                <span className="absolute bottom-3 left-3 bg-black/90 px-1.5 py-0.5 font-mono text-[9px] text-accent flex items-center gap-1 border border-line/60">
+                <span className="absolute bottom-3 left-3 tone-panel-90 px-1.5 py-0.5 font-ui text-[9px] text-accent flex items-center gap-1 border border-line/60">
                   <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Rendering...
                 </span>
               )}
               {previewStats.length > 0 && !generatingPreview && (
-                <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-dim">
+                <div className="mt-1 flex items-center gap-2 font-ui text-[10px] text-dim">
                   {previewStats.map((s) => (
                     <span key={s.label}>
-                      {s.label}: <strong className="text-white">{s.val}</strong>
+                      {s.label}: <strong className="text-ink">{s.val}</strong>
                     </span>
                   ))}
                 </div>
@@ -488,32 +490,50 @@ export function GeneratorTray({ open, onClose, onGenerate }: GeneratorTrayProps)
 
             {/* DIMENSIONS */}
             <Field label="Dimensions (Tiles)">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-[11px] text-dim">W</span>
-                  <Input
-                    type="number"
-                    min={16}
-                    value={width}
-                    onChange={(e) => {
-                      const w = Math.max(16, Number(e.target.value) || 16)
-                      setWidth(w)
-                      if (type === 'dungeon') setDungeonParams(getDungeonDefaults(dungeonKind, w, height))
-                    }}
-                  />
+              <div className="flex flex-col gap-1.5">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-ui text-[11px] text-dim">W</span>
+                    <NumberField
+                      min={16}
+                      max={1024}
+                      value={width}
+                      onChange={(w) => {
+                        if (w === undefined) return
+                        setWidth(w)
+                        if (type === 'dungeon') setDungeonParams(getDungeonDefaults(dungeonKind, w, height))
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-ui text-[11px] text-dim">H</span>
+                    <NumberField
+                      min={16}
+                      max={1024}
+                      value={height}
+                      onChange={(h) => {
+                        if (h === undefined) return
+                        setHeight(h)
+                        if (type === 'dungeon') setDungeonParams(getDungeonDefaults(dungeonKind, width, h))
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-[11px] text-dim">H</span>
-                  <Input
-                    type="number"
-                    min={16}
-                    value={height}
-                    onChange={(e) => {
-                      const h = Math.max(16, Number(e.target.value) || 16)
-                      setHeight(h)
-                      if (type === 'dungeon') setDungeonParams(getDungeonDefaults(dungeonKind, width, h))
-                    }}
-                  />
+                <div className="flex flex-wrap gap-1">
+                  {[64, 128, 256, 512].map((sz) => (
+                    <button
+                      key={sz}
+                      type="button"
+                      onClick={() => {
+                        setWidth(sz)
+                        setHeight(sz)
+                        if (type === 'dungeon') setDungeonParams(getDungeonDefaults(dungeonKind, sz, sz))
+                      }}
+                      className="border border-line/60 tone-well-40 px-1.5 py-0.5 font-data text-[10px] text-dim hover:border-accent hover:text-ink cursor-pointer"
+                    >
+                      {sz}×{sz}
+                    </button>
+                  ))}
                 </div>
               </div>
             </Field>
@@ -524,7 +544,7 @@ export function GeneratorTray({ open, onClose, onGenerate }: GeneratorTrayProps)
                 <Input
                   value={seed}
                   onChange={(e) => setSeed(e.target.value)}
-                  className="font-mono text-[12px]"
+                  className="font-ui text-[12px]"
                 />
                 <Button
                   size="sm"
@@ -540,7 +560,7 @@ export function GeneratorTray({ open, onClose, onGenerate }: GeneratorTrayProps)
 
             {/* PARAMETERS SECTION HEADER */}
             <div className="flex items-center justify-between border-t border-line/40 pt-3">
-              <span className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-accent">
+              <span className="flex items-center gap-1.5 font-label text-[11px] font-semibold caps-5 text-accent">
                 <Sliders className="h-3.5 w-3.5" />
                 Parameters
               </span>
@@ -644,22 +664,20 @@ export function GeneratorTray({ open, onClose, onGenerate }: GeneratorTrayProps)
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <Field label="River Width">
-                      <Input
-                        type="number"
+                      <NumberField
                         min={1}
                         max={6}
                         value={overworldParams.riverWidth ?? 3}
-                        onChange={(e) => setOverworldParams({ ...overworldParams, riverWidth: parseInt(e.target.value, 10) || 1 })}
+                        onChange={(v) => v !== undefined && setOverworldParams({ ...overworldParams, riverWidth: Math.round(v) })}
                       />
                     </Field>
                     <Field label="River Wander">
-                      <Input
-                        type="number"
+                      <NumberField
                         step={0.05}
-                        min={0.1}
-                        max={0.8}
+                        min={0.05}
+                        max={1}
                         value={overworldParams.riverWander ?? 0.35}
-                        onChange={(e) => setOverworldParams({ ...overworldParams, riverWander: parseFloat(e.target.value) || 0.1 })}
+                        onChange={(v) => v !== undefined && setOverworldParams({ ...overworldParams, riverWander: v })}
                       />
                     </Field>
                   </div>
@@ -714,22 +732,20 @@ export function GeneratorTray({ open, onClose, onGenerate }: GeneratorTrayProps)
 
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="Corridor Width">
-                    <Input
-                      type="number"
+                    <NumberField
                       min={1}
-                      max={5}
+                      max={8}
                       value={dungeonParams.corridorWidth}
-                      onChange={(e) => setDungeonParams({ ...dungeonParams, corridorWidth: parseInt(e.target.value, 10) || 1 })}
+                      onChange={(v) => v !== undefined && setDungeonParams({ ...dungeonParams, corridorWidth: Math.round(v) })}
                     />
                   </Field>
                   <Field label="Branching %">
-                    <Input
-                      type="number"
-                      min={10}
+                    <NumberField
+                      min={0}
                       max={100}
                       step={5}
                       value={dungeonParams.branchingChance}
-                      onChange={(e) => setDungeonParams({ ...dungeonParams, branchingChance: parseInt(e.target.value, 10) || 10 })}
+                      onChange={(v) => v !== undefined && setDungeonParams({ ...dungeonParams, branchingChance: Math.round(v) })}
                     />
                   </Field>
                 </div>
@@ -754,7 +770,7 @@ export function GeneratorTray({ open, onClose, onGenerate }: GeneratorTrayProps)
           </div>
 
           {/* PINNED FOOTER (ALWAYS VISIBLE, AUTHENTIC SEVEN BUTTONS) */}
-          <div className="flex items-center justify-end gap-2 border-t border-line/60 bg-black/95 p-3 shrink-0">
+          <div className="flex items-center justify-end gap-2 border-t border-line/60 tone-panel-95 p-3 shrink-0">
             <Button
               variant="ghost"
               onClick={onClose}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { FolderOpen } from 'lucide-react'
+import { FolderOpen, RotateCcw } from 'lucide-react'
 import { DEFAULT_PORTABILITY_PREFS } from '@shared/portability'
+import type { SaveFolderRow } from '@shared/saveFolders'
 import { Button, Input, PathRow, SaveState, Segmented, SettingCard, SettingRow, Toggle, useDraft } from '../../components/ui'
 import { engine, main } from '../../lib/ipc'
 import { useApp } from '../../store/app'
@@ -41,7 +42,7 @@ function DroppedPictures() {
 function ExportImportPrefs() {
   const prefs = useApp((s) => s.settings?.portability ?? DEFAULT_PORTABILITY_PREFS)
   const updateSettings = useApp((s) => s.updateSettings)
-  const saveNumber = (key: 'warnJsonMb' | 'warnCardMb' | 'maxUnpackMb', raw: string) => {
+  const saveNumber = (key: 'warnJsonMb' | 'warnCardMb' | 'maxUnpackMb' | 'maxPictureSide', raw: string) => {
     const n = Number(raw)
     if (!Number.isFinite(n) || n <= 0) return
     void updateSettings({ portability: { ...prefs, [key]: n } })
@@ -55,7 +56,7 @@ function ExportImportPrefs() {
           max={500}
           value={prefs.warnJsonMb}
           onChange={(e) => saveNumber('warnJsonMb', e.target.value)}
-          className="w-24 font-mono text-[12px]"
+          className="w-24 font-ui text-[12px]"
         />
       </SettingRow>
       <SettingRow label="Warn on large PNG card exports (MB)" hint="PNG cards embed compressed payloads; large worlds belong in a bundle.">
@@ -65,17 +66,27 @@ function ExportImportPrefs() {
           max={500}
           value={prefs.warnCardMb}
           onChange={(e) => saveNumber('warnCardMb', e.target.value)}
-          className="w-24 font-mono text-[12px]"
+          className="w-24 font-ui text-[12px]"
         />
       </SettingRow>
-      <SettingRow label="Maximum unpacked bundle size (MB)" hint="Safety limit when reading imported .sevenpack archives.">
+      <SettingRow label="Maximum unpacked size (MB)" hint="The most an import can unpack: a .sevenpack, a card, or a .json with the files beside it.">
         <Input
           type="number"
           min={10}
           max={4096}
           value={prefs.maxUnpackMb}
           onChange={(e) => saveNumber('maxUnpackMb', e.target.value)}
-          className="w-24 font-mono text-[12px]"
+          className="w-24 font-ui text-[12px]"
+        />
+      </SettingRow>
+      <SettingRow label="Largest theme picture (px)" hint="Theme pictures wider or taller than this are left out when the theme is saved or imported.">
+        <Input
+          type="number"
+          min={256}
+          max={32768}
+          value={prefs.maxPictureSide}
+          onChange={(e) => saveNumber('maxPictureSide', e.target.value)}
+          className="w-24 font-ui text-[12px]"
         />
       </SettingRow>
       <SettingRow label="Include linked dependencies by default" hint="Automatically pack referenced themes, game classes, traits, abilities, and maps.">
@@ -88,29 +99,42 @@ function ExportImportPrefs() {
   )
 }
 
-function KindFolderRow({ row }: { row: { kind: string; label: string; plural: string; folder: string } }) {
-  const draft = useDraft(row.folder, (folder) => engine('data.kindFolders.set', { kind: row.kind, folder }))
+function PlaceSetting({ row, onReset }: { row: SaveFolderRow; onReset: () => void }) {
+  const [ask, setAsk] = useState(row.ask)
+  const draft = useDraft(row.folder ?? '', (folder) => engine('saveFolders.set', { target: row.target, place: { folder, ask } }))
+  const changeAsk = (next: boolean) => {
+    setAsk(next)
+    void engine('saveFolders.set', { target: row.target, place: { folder: draft.draft === '' && row.folder === null ? null : draft.draft, ask: next } }).catch(failed('Could not save'))
+  }
+  const reset = () => void engine('saveFolders.set', { target: row.target, place: null }).then(onReset, failed('Could not reset'))
   return (
-    <SettingRow label={row.plural} hint={`Default folder for new ${row.plural.toLowerCase()} (e.g. ${row.kind.replace(/\./g, '_')}/). Empty uses top level.`} aside={<SaveState status={draft.status} error={draft.error} />}>
-      <div className="w-72">
-        <FolderInput value={draft.draft} onChange={draft.change} />
+    <SettingRow label={row.label} hint={`Default: ${row.home || 'top level'}`} aside={<SaveState status={draft.status} error={draft.error} />}>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="w-72">
+          <FolderInput value={draft.draft} onChange={draft.change} placeholder={row.home ?? 'top level'} />
+        </div>
+        {row.asks && <Toggle checked={ask} onChange={changeAsk} label="Ask" />}
+        <Button size="sm" variant="ghost" icon={<RotateCcw />} disabled={row.folder === null && ask === row.asks} onClick={reset}>
+          Reset
+        </Button>
       </div>
     </SettingRow>
   )
 }
 
-function KindFolders() {
-  const [rows, setRows] = useState<{ kind: string; label: string; plural: string; folder: string }[]>([])
+function Places() {
+  const [rows, setRows] = useState<SaveFolderRow[]>([])
+  const [version, setVersion] = useState(0)
   useEffect(() => {
-    void engine('data.kindFolders.list')
+    void engine('saveFolders.list')
       .then(setRows)
-      .catch(failed('Could not load kind folders'))
-  }, [])
+      .catch(failed('Could not load where things go'))
+  }, [version])
   if (!rows.length) return null
   return (
-    <SettingCard title="Default folders by kind" intro="Automatically places newly created files (character sheets, cards, weather, workouts, etc.) into their own folder unless you pick one explicitly.">
+    <SettingCard title="Where things go" intro="Where new entries, imports and files made by tools land when you don't pick a folder. Ask shows the folder choice when you create one yourself.">
       {rows.map((row) => (
-        <KindFolderRow key={row.kind} row={row} />
+        <PlaceSetting key={`${row.target}:${version}`} row={row} onReset={() => setVersion((v) => v + 1)} />
       ))}
     </SettingCard>
   )
@@ -128,7 +152,7 @@ export function FilesFolders() {
         </PathRow>
         <ToolFolders />
       </SettingCard>
-      <KindFolders />
+      <Places />
       <ModelFolders />
       <LinkedFolders />
       <DroppedPictures />

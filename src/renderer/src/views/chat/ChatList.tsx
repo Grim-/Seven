@@ -45,7 +45,7 @@ export function ChatList({ selected, onOpen, onNew, onDeleted }: { selected: str
     >
       <SearchBox value={query} onChange={setQuery} placeholder="Search chats and memory" />
       {locked && (
-        <button onClick={askUnlock} className="flex items-center gap-2 border border-line/60 bg-black/30 px-2.5 py-2 text-left text-[12px] text-dim hover:border-accent hover:text-white">
+        <button onClick={askUnlock} className="flex items-center gap-2 border border-line/60 tone-well-30 px-2.5 py-2 text-left text-[12px] text-dim hover:border-accent hover:text-ink">
           <Lock className="h-3.5 w-3.5 shrink-0 text-accent" />
           Older chats are in the vault. Unlock to see them.
         </button>
@@ -56,7 +56,7 @@ export function ChatList({ selected, onOpen, onNew, onDeleted }: { selected: str
         </div>
       ) : (
         <>
-          {list.length === 0 && !locked && <div className="p-3 text-center font-mono text-[11px] uppercase tracking-[0.18em] text-faint">[No chats yet]</div>}
+          {list.length === 0 && !locked && <div className="p-3 text-center font-label text-[11px] caps-18 text-faint">[No chats yet]</div>}
           <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
             <VirtualList count={list.length} scroller={scroller} estimate={56} overscan={10} keyOf={(i) => list[i].id} rowClassName={(i) => (i < list.length - 1 ? 'pb-1' : undefined)}>
               {(i) => {
@@ -84,23 +84,23 @@ export function ChatList({ selected, onOpen, onNew, onDeleted }: { selected: str
                     }
                     className={cn(
                       'group relative flex cursor-pointer flex-col gap-0.5 border px-2.5 py-2 transition-colors',
-                      s.id === selected ? 'border-accent/70 border-l-2 border-l-accent bg-accent/10' : 'border-transparent hover:border-line hover:bg-white/[0.03]'
+                      s.id === selected ? 'border-accent/70 border-l-2 border-l-accent bg-accent/10' : 'border-transparent hover:border-line hover:bg-ink/[0.03]'
                     )}
                   >
                     <span className="flex items-center gap-2.5">
                       <AgentAvatar agent={agent} size={28} sessionId={s.id} />
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <DecodeText className="truncate pr-12 text-[13px] text-white" text={s.title} onMount={false} />
-                        <span className="flex items-center gap-2 font-mono text-[10.5px] text-dim">
-                          <span className="truncate text-teal/80">{agent?.name ?? 'Agent'}</span>
+                        <DecodeText className="truncate pr-12 text-[13px] text-ink" text={s.title} onMount={false} />
+                        <span className="flex items-center gap-2 font-ui text-[10.5px] text-dim">
+                          <span className="truncate text-secondary/80">{agent?.name ?? 'Agent'}</span>
                           {isGameplayScene(s.scene) && (
-                            <span className="border border-cyan/50 bg-cyan/10 px-1 text-[8.5px] font-bold uppercase tracking-wider text-cyan">
+                            <span className="border border-secondary-ink/50 bg-secondary-ink/10 px-1 text-[8.5px] font-bold caps-5 text-secondary-ink">
                               GAMEPLAY
                             </span>
                           )}
                           {s.incognito && <IncognitoMark className="py-0" />}
                           <span>{formatRelative(s.updatedAt)}</span>
-                          {waiting.has(s.id) ? <span className="animate-pulse font-bold text-accent">? needs you</span> : running[s.id] && <span className="h-1.5 w-1.5 animate-pulse bg-cyan" />}
+                          {waiting.has(s.id) ? <span className="animate-pulse font-bold text-accent">? needs you</span> : running[s.id] && <span className="h-1.5 w-1.5 animate-pulse bg-secondary-ink" />}
                         </span>
                       </span>
                     </span>

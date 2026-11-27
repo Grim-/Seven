@@ -6,6 +6,9 @@ import { classify } from '../data/assets'
 import { data } from '../data/hub'
 import type { ToolContext } from './types'
 import { displayPath } from './workspace'
+import { registerPlaceTarget } from '../data/placeTargets'
+
+registerPlaceTarget({ target: 'run_command', label: 'Command output', home: 'Files/Commands', asks: false })
 
 const SKIP = new Set(['node_modules', '.git', '.venv', 'venv', '__pycache__', '.cache', '.next', 'dist', 'build', 'out-tsc', '.idea', '.vs'])
 const MAX_DEPTH = 5

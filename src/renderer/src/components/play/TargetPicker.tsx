@@ -23,7 +23,7 @@ export function TargetPicker({ context, onPick, onCancel }: { context: TargetCon
   }, [targets, onPick])
   return (
     <div className="flex flex-col gap-2.5">
-      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan">At whom?</span>
+      <span className="font-label text-[10px] font-bold caps-14 text-secondary-ink">At whom?</span>
       {targets?.length === 0 && <span className="text-[12.5px] text-dim">Nothing to target.</span>}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2.5">
         {(targets ?? []).map((t, i) => (

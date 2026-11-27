@@ -161,10 +161,10 @@ export function SoundControl() {
   }
   return (
     <div className="flex items-center gap-1.5 normal-case" title={audio.music ? (playing ? `Playing ${playing}` : 'Music on, nothing playing') : 'Music off'}>
-      <button onClick={toggle} className={cn('flex h-6 w-6 items-center justify-center', audio.music ? 'text-accent hover:text-white' : 'text-faint hover:text-white')}>
+      <button onClick={toggle} className={cn('flex h-6 w-6 items-center justify-center', audio.music ? 'text-accent hover:text-ink' : 'text-faint hover:text-ink')}>
         {audio.music ? <Music className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
       </button>
-      <button onClick={toggleVoice} title={voice?.on ? 'Voices on: agents that read aloud and scenes speak' : 'Voices off'} className={cn('flex h-6 w-6 items-center justify-center', voice?.on ? 'text-accent hover:text-white' : 'text-faint hover:text-white')}>
+      <button onClick={toggleVoice} title={voice?.on ? 'Voices on: agents that read aloud and scenes speak' : 'Voices off'} className={cn('flex h-6 w-6 items-center justify-center', voice?.on ? 'text-accent hover:text-ink' : 'text-faint hover:text-ink')}>
         {voice?.on ? <MessageSquareText className="h-3.5 w-3.5" /> : <MessageSquareOff className="h-3.5 w-3.5" />}
       </button>
       <input
@@ -176,7 +176,7 @@ export function SoundControl() {
         className="h-1 w-16 cursor-pointer appearance-none bg-line accent-[var(--color-accent)]"
       />
       {audio.music && playing && (
-        <button title="Next track" onClick={() => useAudio.setState((s) => ({ skip: s.skip + 1 }))} className="text-dim hover:text-white">
+        <button title="Next track" onClick={() => useAudio.setState((s) => ({ skip: s.skip + 1 }))} className="text-dim hover:text-ink">
           <SkipForward className="h-3 w-3" />
         </button>
       )}

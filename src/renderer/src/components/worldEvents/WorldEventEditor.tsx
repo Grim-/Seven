@@ -1,26 +1,15 @@
-import { useEffect, useState } from 'react'
-import { Check, Dices, Eye, Play, Plus, Square, Trash2, X } from 'lucide-react'
-import type { ChatMessage } from '@shared/types'
-import type { ResolvedWorldEvent, WorldEventParticipantKind, WorldEventScopeLevel, WorldEventStatus } from '@shared/game/worldEvents'
+import { Plus, Trash2, X } from 'lucide-react'
+import { eventPlace, placeScope, type WorldEvent, type WorldEventParticipantKind, type WorldEventScopeLevel } from '@shared/game/worldEvents'
 import { engine } from '../../lib/ipc'
 import { useLive } from '../../lib/useLive'
-import { failed } from '../../lib/notify'
-import { useAgents } from '../../store/agents'
-import { useSessions } from '../../store/sessions'
-import { toast } from '../../store/toasts'
-import { Markdown } from '../chat/Markdown'
-import { ModelReadyControl } from '../play/ModelReadyControl'
-import { Button, Field, Input, Select, Textarea } from '../ui'
+import { Button, Field, Fold, Input, Select, Toggle } from '../ui'
+import { LinkTextarea } from '../data/LinkTextarea'
+import { WorldScopeProvider } from '../game/worldScope'
+import { WorldPlacePick } from '../worlds/WorldPlacePick'
+import { EventTriggerEditor } from './EventTriggerEditor'
+import { OutcomeActions } from './OutcomeActions'
 
-export type EditableWorldEvent = ResolvedWorldEvent & { name: string }
-
-function messageTextOf(m: ChatMessage): string {
-  return m.parts
-    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('')
-    .trim()
-}
+export type EditableWorldEvent = WorldEvent & { name: string }
 
 export function WorldEventEditor({
   value,
@@ -29,30 +18,16 @@ export function WorldEventEditor({
   value: EditableWorldEvent
   onChange: (next: EditableWorldEvent) => void
 }) {
-  const worlds = useLive(() => engine('worlds.list'), 'worlds.changed') ?? []
-  const factions = useLive(() => engine('factions.list'), 'factions.changed') ?? []
-  const triggerActions = useLive(() => engine('triggerActions.list'), 'triggerActions.changed') ?? []
-  const allMaps = useLive(() => engine('maps.list'), 'maps.changed') ?? []
-  const allPlaces = useLive(() => engine('library.find', { query: '', kind: 'place' }), 'worlds.changed') ?? []
+  const factions =
+    useLive(
+      () => engine('factions.list', value.worldId ? { world: value.worldId } : undefined),
+      'factions.changed',
+      [value.worldId]
+    ) ?? []
   const allSheets = useLive(() => engine('library.find', { query: '', kind: 'sheet' }), 'page.changed') ?? []
   const allCreatures = useLive(() => engine('library.find', { query: '', kind: 'game_creature' }), 'game.changed') ?? []
   const allMonsters = useLive(() => engine('library.find', { query: '', kind: 'monster' }), 'dnd.changed') ?? []
-  const agents = useAgents((s) => s.list)
-  const [pickedAgentId, setPickedAgentId] = useState('')
-  const effectiveAgentId = pickedAgentId && agents.some((a) => a.id === pickedAgentId) ? pickedAgentId : (agents[0]?.id ?? '')
 
-  const [metaSessionId, setMetaSessionId] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const watchMessages = useSessions((s) => (metaSessionId ? s.messages[metaSessionId] : undefined))
-  const watchRunning = useSessions((s) => (metaSessionId ? Boolean(s.running[metaSessionId]) : false))
-
-  useEffect(() => {
-    if (!metaSessionId) return
-    void useSessions.getState().load(metaSessionId).catch(failed('Could not load meta-scene'))
-  }, [metaSessionId])
-
-  const mapOptions = allMaps.map((m) => ({ value: m.id, label: m.name }))
-  const placeOptions = allPlaces.map((p) => ({ value: p.id, label: p.title }))
   const factionOptions = factions.map((f) => ({ value: f.id, label: f.name }))
   const sheetOptions = allSheets.map((s) => ({ value: s.id, label: s.title }))
   const creatureOptions = allCreatures.map((c) => ({ value: c.id, label: c.title }))
@@ -66,212 +41,51 @@ export function WorldEventEditor({
     onChange(next)
   }
 
-  const startWatch = async () => {
-    if (!value.id) return
-    if (!effectiveAgentId) {
-      toast.info('No Agent Selected', 'Pick an agent to voice the Meta-Narrative Scene.')
-      return
-    }
-    setBusy(true)
-    try {
-      const meta = await engine('sessions.startMetaScene', {
-        worldId: value.worldId || worlds[0]?.id || '',
-        eventId: value.id,
-        agentId: effectiveAgentId
-      })
-      await useSessions.getState().load(meta.id)
-      setMetaSessionId(meta.id)
-      const kickOff = `Play out the confrontation for "${value.title}" between the participating figureheads based on their faction tensions and motivations. Stop before deciding who wins.`
-      void engine('sessions.send', { id: meta.id, text: kickOff }).catch(failed('Could not run meta-narrative scene'))
-    } catch (err) {
-      failed('Could not start Meta-Narrative Scene')(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const resolveNow = async (outcomeId?: string) => {
-    if (!value.id) return
-    setBusy(true)
-    try {
-      const resolved = await engine('worldEvents.resolve', {
-        id: value.id,
-        worldId: value.worldId || worlds[0]?.id || null,
-        outcomeId: outcomeId ?? null
-      })
-      toast.success(value.title, `Resolved: ${resolved.resolution?.outcomeLabel ?? 'Done'}`)
-    } catch (err) {
-      failed('Could not resolve World Event')(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const playAftermath = () => {
-    if (!metaSessionId || !value.resolution) return
-    const prompt = `The outcome has been decided: "${value.resolution.outcomeLabel}". Play out a brief aftermath reaction from the figureheads.`
-    void engine('sessions.send', { id: metaSessionId, text: prompt }).catch(failed('Could not play aftermath'))
-  }
-
   return (
-    <div className="flex flex-col gap-4 font-mono text-[11.5px]">
-      {/* LIVE PLAY / META-SCENE CONTROLS (WHEN SAVED) */}
-      {value.id && (
-        <div className="flex flex-col gap-2.5 border border-line/70 bg-black/50 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-accent">Play &amp; Resolution</span>
-              <Select
-                value={effectiveAgentId}
-                options={agents.map((a) => ({ value: a.id, label: a.name }))}
-                onChange={setPickedAgentId}
-                className="h-6 w-44 text-[10px]"
-              />
-            </div>
-            <ModelReadyControl agent={agents.find((a) => a.id === effectiveAgentId) ?? null} compact />
-          </div>
-
-          {value.resolution ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 border border-ok/50 bg-ok/10 px-2.5 py-2 text-[11px]">
-              <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-ok">
-                  RESOLVED ({value.resolution.mode}): {value.resolution.outcomeLabel}
-                </span>
-                {value.resolution.breakdown.length > 0 && (
-                  <span className="text-[10px] text-dim">
-                    {value.resolution.breakdown.map((b) => `${b.label} (${b.total})`).join(' · ')}
-                  </span>
-                )}
-              </div>
-              {metaSessionId && (
-                <Button size="sm" variant="primary" icon={<Play className="h-3 w-3" />} disabled={watchRunning} onClick={playAftermath}>
-                  Play Aftermath
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Button size="sm" variant="primary" icon={<Eye className="h-3 w-3" />} disabled={busy} onClick={() => void startWatch()}>
-                Watch Scene
-              </Button>
-              {value.outcomes.length > 0 && (
-                <Button size="sm" variant="badge" icon={<Dices className="h-3 w-3" />} disabled={busy} onClick={() => void resolveNow()}>
-                  Score &amp; Resolve
-                </Button>
-              )}
-              {value.outcomes.map((o) => (
-                <Button key={o.id} size="sm" variant="badge" icon={<Check className="h-3 w-3" />} disabled={busy} onClick={() => void resolveNow(o.id)}>
-                  {o.label}
-                </Button>
-              ))}
-            </div>
-          )}
-
-          {metaSessionId && (
-            <div className="flex flex-col gap-2 border-t border-line/50 pt-2">
-              <div className="flex items-center justify-between text-[10px] uppercase text-purple">
-                <span>Meta-Narrative Scene</span>
-                {watchRunning && (
-                  <Button
-                    size="sm"
-                    variant="badge"
-                    icon={<Square className="h-2.5 w-2.5" />}
-                    onClick={() => void engine('sessions.abort', { id: metaSessionId }).catch(failed('Could not stop'))}
-                    className="h-5 border-alert/70 text-alert"
-                  >
-                    Stop
-                  </Button>
-                )}
-              </div>
-              <div className="flex max-h-72 flex-col gap-2 overflow-y-auto bg-black/60 p-2.5 select-text">
-                {!watchMessages?.length ? (
-                  <span className="animate-pulse text-[11px] text-dim">Staging Meta-Narrative Scene…</span>
-                ) : (
-                  watchMessages
-                    .filter((m) => m.role === 'assistant')
-                    .map((m) => {
-                      const body = messageTextOf(m)
-                      return (
-                        <div key={m.id} className="border-l-2 border-purple/70 bg-purple/5 p-2">
-                          {body ? (
-                            <Markdown text={body} className="font-sans text-[12px] leading-relaxed text-neutral-100" />
-                          ) : (
-                            <span className="animate-pulse text-[11px] text-dim">Voicing figureheads…</span>
-                          )}
-                        </div>
-                      )
-                    })
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* CORE FIELDS (WORLD-AGNOSTIC & REUSABLE) */}
+    <WorldScopeProvider worldId={value.worldId || null}>
+    <div className="flex flex-col gap-4 font-ui text-[11.5px]">
+      {/* WORLD EVENT DEFINITION */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Field label="Title">
           <Input value={value.name} onChange={(e) => patch({ name: e.target.value })} placeholder="Border Skirmish at North Crossing" />
         </Field>
-        <Field label="Status">
-          <Select
-            value={value.status}
-            options={[
-              { value: 'dormant', label: 'Dormant' },
-              { value: 'active', label: 'Active' },
-              { value: 'resolved', label: 'Resolved' }
-            ]}
-            onChange={(status) => patch({ status: status as WorldEventStatus })}
-          />
+        <Field label="Takes place at">
+          <WorldPlacePick world={value.worldId} value={eventPlace(value) || null} onChange={(place) => patch({ scope: placeScope(place) })} />
         </Field>
-        <Field label="Scope">
-          <Select
-            value={value.scope.level}
-            options={[
-              { value: 'global', label: 'Global' },
-              { value: 'map', label: 'Map' },
-              { value: 'area', label: 'Area' },
-              { value: 'place', label: 'Place' }
-            ]}
-            onChange={(level) => patch({ scope: { ...value.scope, level: level as WorldEventScopeLevel, refId: '' } })}
-          />
+        <Field label="Initial State" hint="Play state (active/resolved) is tracked per save.">
+          <div className="flex h-8 items-center">
+            <Toggle
+              checked={Boolean(value.startsActive)}
+              onChange={(startsActive) => patch({ startsActive })}
+              label="Active when a new save starts"
+            />
+          </div>
         </Field>
       </div>
 
-      {value.scope.level !== 'global' && (
-        <Field label={value.scope.level === 'map' ? 'Target Map' : 'Target Place / Area'}>
-          <Select
-            value={value.scope.refId}
-            options={
-              value.scope.level === 'map'
-                ? [{ value: '', label: '— Choose Map —' }, ...mapOptions]
-                : [{ value: '', label: '— Choose Place —' }, ...placeOptions]
-            }
-            onChange={(refId) => patch({ scope: { ...value.scope, refId } })}
-          />
-        </Field>
-      )}
-
       <Field label="Premise (Meta-Scene Only — never leaked to Gameplay Chat)">
-        <Textarea
+        <LinkTextarea
+          rolls={false}
           rows={3}
           value={value.premise}
-          onChange={(e) => patch({ premise: e.target.value })}
+          onValue={(premise) => patch({ premise })}
           placeholder="What is happening off-screen between factions or figureheads?"
         />
       </Field>
 
+      <EventTriggerEditor world={value.worldId} value={value.trigger} onChange={(trigger) => patch({ trigger })} />
+
       {/* DIEGETIC RUMOURS */}
       <div className="flex flex-col gap-2 border border-line/50 p-3">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-cyan">Diegetic Rumours &amp; News</span>
+          <span className="text-[10px] font-bold caps-5 text-secondary-ink">Diegetic Rumours &amp; News</span>
           <Button
             size="sm"
             variant="badge"
             icon={<Plus className="h-2.5 w-2.5" />}
             onClick={() =>
               patch({
-                rumours: [...value.rumours, { id: `rumour_${value.rumours.length + 1}`, headline: '', text: '', reach: value.scope.level }]
+                rumours: [...value.rumours, { id: `rumour_${value.rumours.length + 1}`, headline: '', text: '', reach: eventPlace(value) ? 'place' : 'global' }]
               })
             }
           >
@@ -283,11 +97,13 @@ export function WorldEventEditor({
         ) : (
           value.rumours.map((r, idx) => (
             <div key={r.id} className="flex items-center gap-1.5">
-              <Input
+              <LinkTextarea
+                rolls={false}
+                rows={1}
                 value={r.text}
-                onChange={(e) =>
+                onValue={(text) =>
                   patch({
-                    rumours: value.rumours.map((x, i) => (i === idx ? { ...x, text: e.target.value } : x))
+                    rumours: value.rumours.map((x, i) => (i === idx ? { ...x, text } : x))
                   })
                 }
                 placeholder="Word is the crossing guards stopped letting outsiders through…"
@@ -323,7 +139,7 @@ export function WorldEventEditor({
       {/* FLEXIBLE PARTICIPANTS (FACTIONS, INDIVIDUAL SHEETS, CREATURES/MONSTERS, OR UNLISTED FIGURES) */}
       <div className="flex flex-col gap-2 border border-line/50 p-3">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-accent">Participants (Factions, Individuals &amp; Figures)</span>
+          <span className="text-[10px] font-bold caps-5 text-accent">Participants (Factions, Individuals &amp; Figures)</span>
           <Button
             size="sm"
             variant="badge"
@@ -370,7 +186,7 @@ export function WorldEventEditor({
                 .map((s) => ({ value: s.id, label: s.title }))
             ]
             return (
-              <div key={p.id || idx} className="flex flex-col gap-2 border border-line/40 bg-black/50 p-2">
+              <div key={p.id || idx} className="flex flex-col gap-2 border border-line/40 tone-panel-50 p-2">
                 <div className="grid grid-cols-[125px_1fr_72px_auto] items-center gap-1.5">
                   <Select
                     value={p.kind}
@@ -450,9 +266,11 @@ export function WorldEventEditor({
                 </div>
 
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  <Input
+                  <LinkTextarea
+                    rolls={false}
+                    rows={1}
                     value={p.role}
-                    onChange={(e) => updatePart({ role: e.target.value })}
+                    onValue={(role) => updatePart({ role })}
                     placeholder="Role / stake in this event (optional)"
                   />
                   {p.kind !== 'faction' && (
@@ -470,7 +288,7 @@ export function WorldEventEditor({
                     {chosen.map((cid) => (
                       <span
                         key={cid}
-                        className="inline-flex items-center gap-1 border border-cyan/50 bg-cyan/10 px-1.5 py-0.5 text-[10.5px] text-white"
+                        className="inline-flex items-center gap-1 border border-secondary-ink/50 bg-secondary-ink/10 px-1.5 py-0.5 text-[10.5px] text-ink"
                       >
                         <span>{sheetTitleOf(cid)}</span>
                         <button
@@ -502,7 +320,7 @@ export function WorldEventEditor({
       {/* OUTCOMES (ARBITRARY COUNT — NEVER HARDCODED TO 2) */}
       <div className="flex flex-col gap-2 border border-line/50 p-3">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-purple">Outcomes &amp; Trigger Actions</span>
+          <span className="text-[10px] font-bold caps-5 text-tint-purple">Outcomes &amp; Trigger Actions</span>
           <Button
             size="sm"
             variant="badge"
@@ -515,6 +333,7 @@ export function WorldEventEditor({
                     id: `outcome_${value.outcomes.length + 1}`,
                     label: '',
                     summary: '',
+                    known: '',
                     winnerFactionId: null,
                     factors: [],
                     varianceDie: 6,
@@ -532,7 +351,7 @@ export function WorldEventEditor({
           <span className="text-[10.5px] text-faint">Add as many outcomes as this event can lead to.</span>
         ) : (
           value.outcomes.map((o, idx) => (
-            <div key={o.id || idx} className="flex flex-col gap-1.5 border border-line/40 bg-black/50 p-2">
+            <div key={o.id || idx} className="flex flex-col gap-1.5 border border-line/40 tone-panel-50 p-2">
               <div className="flex flex-wrap items-center gap-1.5">
                 <Input
                   value={o.label}
@@ -554,16 +373,6 @@ export function WorldEventEditor({
                   }
                   className="w-44"
                 />
-                <Select
-                  value={o.triggerActionIds[0] ?? ''}
-                  options={[{ value: '', label: '— Trigger Action —' }, ...triggerActions.map((a) => ({ value: a.id, label: a.name }))]}
-                  onChange={(v) =>
-                    patch({
-                      outcomes: value.outcomes.map((x, i) => (i === idx ? { ...x, triggerActionIds: v ? [v] : [] } : x))
-                    })
-                  }
-                  className="w-48"
-                />
                 <button
                   type="button"
                   onClick={() => patch({ outcomes: value.outcomes.filter((_, i) => i !== idx) })}
@@ -572,19 +381,203 @@ export function WorldEventEditor({
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <Input
+              <LinkTextarea
+                rolls={false}
+                rows={1}
                 value={o.summary}
-                onChange={(e) =>
+                onValue={(summary) =>
                   patch({
-                    outcomes: value.outcomes.map((x, i) => (i === idx ? { ...x, summary: e.target.value } : x))
+                    outcomes: value.outcomes.map((x, i) => (i === idx ? { ...x, summary } : x))
                   })
                 }
-                placeholder="What changes in the world if this outcome wins?"
+                placeholder="What really happens"
               />
+              <LinkTextarea
+                rolls={false}
+                rows={1}
+                value={o.known}
+                onValue={(known) =>
+                  patch({
+                    outcomes: value.outcomes.map((x, i) => (i === idx ? { ...x, known } : x))
+                  })
+                }
+                placeholder="What people know"
+              />
+              <OutcomeActions
+                inline={o.effects}
+                onInline={(effects) => patch({ outcomes: value.outcomes.map((x, i) => (i === idx ? { ...x, effects } : x)) })}
+              />
+              <Fold label="Scoring weights" count={o.factors.length || undefined}>
+                <div className="flex flex-col gap-2 pt-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10.5px] text-dim">Variance die (dN):</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={String(o.varianceDie ?? 0)}
+                      onChange={(e) =>
+                        patch({
+                          outcomes: value.outcomes.map((x, i) =>
+                            i === idx ? { ...x, varianceDie: Math.max(0, Number(e.target.value) || 0) } : x
+                          )
+                        })
+                      }
+                      className="h-7 w-20"
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<Plus className="h-3 w-3" />}
+                      onClick={() =>
+                        patch({
+                          outcomes: value.outcomes.map((x, i) =>
+                            i === idx
+                              ? { ...x, factors: [...x.factors, { label: 'Factor', kind: 'fixed', weight: 2 }] }
+                              : x
+                          )
+                        })
+                      }
+                    >
+                      Add factor
+                    </Button>
+                  </div>
+                  {o.factors.map((fac, fIdx) => (
+                    <div key={fIdx} className="grid grid-cols-[1fr_100px_1fr_64px_auto] items-center gap-1.5">
+                      <Input
+                        value={fac.label}
+                        placeholder="Label"
+                        onChange={(e) =>
+                          patch({
+                            outcomes: value.outcomes.map((x, i) =>
+                              i === idx
+                                ? { ...x, factors: x.factors.map((f, j) => (j === fIdx ? { ...f, label: e.target.value } : f)) }
+                                : x
+                            )
+                          })
+                        }
+                        className="h-7"
+                      />
+                      <Select
+                        value={fac.kind}
+                        options={[
+                          { value: 'fixed', label: 'Fixed' },
+                          { value: 'power', label: 'Faction Power' },
+                          { value: 'flag', label: 'Save Flag' }
+                        ]}
+                        onChange={(k) =>
+                          patch({
+                            outcomes: value.outcomes.map((x, i) =>
+                              i === idx
+                                ? {
+                                    ...x,
+                                    factors: x.factors.map((f, j) =>
+                                      j === fIdx ? { ...f, kind: k as 'fixed' | 'power' | 'flag' } : f
+                                    )
+                                  }
+                                : x
+                            )
+                          })
+                        }
+                        className="h-7"
+                      />
+                      {fac.kind === 'power' ? (
+                        <div className="flex items-center gap-1">
+                          <Select
+                            value={fac.factionId ?? ''}
+                            options={[{ value: '', label: '— Faction —' }, ...factionOptions]}
+                            onChange={(factionId) =>
+                              patch({
+                                outcomes: value.outcomes.map((x, i) =>
+                                  i === idx
+                                    ? { ...x, factors: x.factors.map((f, j) => (j === fIdx ? { ...f, factionId } : f)) }
+                                    : x
+                                )
+                              })
+                            }
+                            className="h-7 flex-1"
+                          />
+                          <Select
+                            value={fac.stat ?? 'power'}
+                            options={[
+                              { value: 'power', label: 'Power' },
+                              { value: 'might', label: 'Might' },
+                              { value: 'intrigue', label: 'Intrigue' },
+                              { value: 'diplomacy', label: 'Diplomacy' },
+                              { value: 'cohesion', label: 'Cohesion' }
+                            ]}
+                            onChange={(stat) =>
+                              patch({
+                                outcomes: value.outcomes.map((x, i) =>
+                                  i === idx
+                                    ? {
+                                        ...x,
+                                        factors: x.factors.map((f, j) =>
+                                          j === fIdx
+                                            ? { ...f, stat: stat as 'power' | 'might' | 'intrigue' | 'diplomacy' | 'cohesion' }
+                                            : f
+                                        )
+                                      }
+                                    : x
+                                )
+                              })
+                            }
+                            className="h-7 w-28"
+                          />
+                        </div>
+                      ) : fac.kind === 'flag' ? (
+                        <Input
+                          value={fac.flag ?? ''}
+                          placeholder="flag_name"
+                          onChange={(e) =>
+                            patch({
+                              outcomes: value.outcomes.map((x, i) =>
+                                i === idx
+                                  ? { ...x, factors: x.factors.map((f, j) => (j === fIdx ? { ...f, flag: e.target.value } : f)) }
+                                  : x
+                              )
+                            })
+                          }
+                          className="h-7"
+                        />
+                      ) : (
+                        <span className="text-[10.5px] text-faint">Always adds weight</span>
+                      )}
+                      <Input
+                        type="number"
+                        value={String(fac.weight)}
+                        onChange={(e) =>
+                          patch({
+                            outcomes: value.outcomes.map((x, i) =>
+                              i === idx
+                                ? { ...x, factors: x.factors.map((f, j) => (j === fIdx ? { ...f, weight: Number(e.target.value) || 0 } : f)) }
+                                : x
+                            )
+                          })
+                        }
+                        className="h-7"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          patch({
+                            outcomes: value.outcomes.map((x, i) =>
+                              i === idx ? { ...x, factors: x.factors.filter((_, j) => j !== fIdx) } : x
+                            )
+                          })
+                        }
+                        className="p-1 text-dim hover:text-alert"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </Fold>
             </div>
           ))
         )}
       </div>
     </div>
+    </WorldScopeProvider>
   )
 }

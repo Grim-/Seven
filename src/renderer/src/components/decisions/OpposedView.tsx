@@ -10,12 +10,12 @@ import { OpposedSideFields } from './OpposedSideFields'
 
 function RollLine({ side, roll, won }: { side: OpposedSide; roll: OpposedRoll; won: boolean }) {
   return (
-    <div className={cn('flex items-center gap-2.5 border px-2 py-1.5 font-mono text-[12px]', won ? 'border-ok/45 bg-ok/[0.05]' : 'border-line/60')}>
-      <span className="min-w-0 flex-1 truncate text-white/90">
+    <div className={cn('flex items-center gap-2.5 border px-2 py-1.5 font-ui text-[12px]', won ? 'border-ok/45 bg-ok/[0.05]' : 'border-line/60')}>
+      <span className="min-w-0 flex-1 truncate text-ink/90">
         {side.name} · {roll.label}
       </span>
       <span className="text-dim">
-        <b className="text-accent">{roll.roll}</b> {roll.bonus < 0 ? '−' : '+'} <b className="text-white">{Math.abs(roll.bonus)}</b> = <b className="text-white">{roll.total}</b>
+        <b className="text-accent">{roll.roll}</b> {roll.bonus < 0 ? '−' : '+'} <b className="text-ink">{Math.abs(roll.bonus)}</b> = <b className="text-ink">{roll.total}</b>
       </span>
     </div>
   )
@@ -44,8 +44,8 @@ export function OpposedView({ p, done, open, status, onAnswer, onClose, editable
     return (
       <DecisionCardFrame tag="Opposed check" question={p.question} status={status}>
         {done.aRoll && <RollLine side={done.a} roll={done.aRoll} won={done.winner === 'a'} />}
-        {done.bRoll ? <RollLine side={done.b} roll={done.bRoll} won={done.winner === 'b'} /> : done.dc !== null && !done.forced && <span className="font-mono text-[12px] text-dim">against DC {done.dc}</span>}
-        <span className="font-mono text-[12px] text-white">
+        {done.bRoll ? <RollLine side={done.b} roll={done.bRoll} won={done.winner === 'b'} /> : done.dc !== null && !done.forced && <span className="font-ui text-[12px] text-dim">against DC {done.dc}</span>}
+        <span className="font-ui text-[12px] text-ink">
           {won.name} wins{done.forced ? ' (your call)' : ''}: {won.does}
         </span>
       </DecisionCardFrame>
@@ -69,7 +69,7 @@ export function OpposedView({ p, done, open, status, onAnswer, onClose, editable
             <OpposedSideFields title="against" side={b} targets={bTargets} onChange={setB} editable={editable} />
           ) : (
             <div className="flex items-center gap-2 border border-line/60 p-2.5">
-              <span className="font-mono text-[11px] text-dim">DC</span>
+              <span className="font-ui text-[11px] text-dim">DC</span>
               <NumberField value={dc} onChange={(v) => setDc(v ?? 0)} className="w-20" />
             </div>
           )}
@@ -77,8 +77,8 @@ export function OpposedView({ p, done, open, status, onAnswer, onClose, editable
       </div>
       {open && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-line/60 pt-2.5">
-          <span className="font-mono text-[18px] font-bold text-accent">{Math.round(opposedChance(aBonus.bonus, bBonus.bonus, dc) * 100)}%</span>
-          <span className="font-mono text-[11px] text-dim">{a.name} wins · {dc === null ? `ties go to ${b.name}` : `meeting DC ${dc} wins`}</span>
+          <span className="font-ui text-[18px] font-bold text-accent">{Math.round(opposedChance(aBonus.bonus, bBonus.bonus, dc) * 100)}%</span>
+          <span className="font-ui text-[11px] text-dim">{a.name} wins · {dc === null ? `ties go to ${b.name}` : `meeting DC ${dc} wins`}</span>
           <span className="flex-1" />
           <Button size="sm" variant="primary" icon={<Dices />} disabled={sending} onClick={() => void send(null)}>
             Roll

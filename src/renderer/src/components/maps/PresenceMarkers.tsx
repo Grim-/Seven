@@ -12,8 +12,8 @@ export function PresenceMarkers({ visitors, onMenu }: { visitors: PlaceVisitor[]
       {visitors.map((v) => {
         const hp = recordHealth(v.game, catalog) ?? v.dnd?.hp ?? null
         return (
-          <span key={v.sheet} title={`${v.name} · ${v.line}`} onContextMenu={onMenu && ((e) => onMenu(e, v))} className="pointer-events-auto flex w-5 flex-col gap-px">
-            <SheetPortrait image={v.image} className="h-5 w-5 border-cyan" />
+          <span key={v.sheet} data-keep title={`${v.name} · ${v.line}`} onContextMenu={onMenu && ((e) => onMenu(e, v))} className="pointer-events-auto flex w-5 flex-col gap-px">
+            <SheetPortrait image={v.image} className="h-5 w-5 border-secondary-ink" />
             {hp && <HpBar hp={hp} thin />}
           </span>
         )

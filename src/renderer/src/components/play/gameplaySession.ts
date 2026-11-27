@@ -63,8 +63,8 @@ export async function startGameplaySession(opts: StartGameplayOptions): Promise<
 
   const where = opts.placeKey
     ? opts.placeName
-      ? `${opts.placeName} (@place:${opts.placeKey})`
-      : `@place:${opts.placeKey}`
+      ? `${opts.placeName} (@world:${opts.worldId}/place/${opts.placeKey})`
+      : `@world:${opts.worldId}/place/${opts.placeKey}`
     : null
   const who = opts.playerSheet
     ? `${opts.playerName ?? opts.playerSheet} (@sheet:${opts.playerSheet})`

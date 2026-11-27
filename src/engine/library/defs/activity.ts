@@ -3,6 +3,7 @@ import { notFound } from '@shared/errors'
 import { ROUTINE_REPEATS, type Routine } from '@shared/routines'
 import { linkFor, splitLink } from '@shared/text'
 import type { Theme } from '@shared/theme'
+import { FONT_ROLES, lookOption, lookSlots } from '@shared/themeLook'
 import { dayKey, type TimelineEvent, type TimelineRow } from '@shared/timeline'
 import type { ChatMessage, ReminderRepeat, WebLogEntry } from '@shared/types'
 import { agentAccess } from '../../agents/access'
@@ -99,7 +100,9 @@ export const reminderKind: Kind = {
 const themeSummary = (t: Theme) => t.description || themeLine(t)
 
 function themeLine(t: Theme): string {
-  const bits = [`colours ${t.accent} / ${t.secondary} on ${t.base}`, t.sky !== 'off' ? `sky ${t.sky}` : '', t.light ? `mood light ${t.light.color}` : '', t.backdrop ? 'background' : '', t.effect !== 'none' ? `${t.effect} effect` : '', t.music.length ? `${t.music.length} music tracks` : '']
+  const c = t.colours
+  const fonts = Object.values(t.fonts).flatMap((f) => (f ? [f.family.split(',')[0]] : []))
+  const bits = [c.accent || c.secondary || c.bg ? `colours ${c.accent ?? "Seven's"} / ${c.secondary ?? "Seven's"} on ${c.bg ?? "Seven's"}` : '', fonts.length ? `fonts ${fonts.join(', ')}` : '', t.images.ground || t.images.surface ? 'textures' : '', t.images.frame ? 'framed panels' : '', t.scheme ? `${t.scheme} scheme` : '', t.sky !== 'off' ? `sky ${t.sky}` : '', t.light ? `mood light ${t.light.stops.map((s) => s.color).join(' → ')}` : '', t.gradient ? 'gradient' : '', t.backdrop ? 'background' : '', t.effect !== 'none' ? `${t.effect} effect` : '', t.music.length ? `${t.music.length} music tracks` : '']
   return bits.filter(Boolean).join(', ')
 }
 
@@ -118,7 +121,7 @@ export const themeKind: Kind = {
     return withJson(this, id, rest)
   },
   icon: 'palette',
-  description: "the app's looks and moods: colours, sky, mood light, background, music and sounds",
+  description: "the app's whole look and mood: colours, fonts, text styles, shapes, pictures, surface CSS, sky, mood light, background, music and sounds",
   parts: [],
   actions: ['theme_save', 'ambience', 'cue'],
   available: () => true,
@@ -143,10 +146,16 @@ export const themeKind: Kind = {
     const t = themes.get(id)
     const file = (a: string | null) => (a && data.assets.exists(a) ? data.assets.get(a).name : null)
     const sounds = Object.entries(t.sounds).filter(([, v]) => v).map(([k, v]) => `${k}: ${file(v)}`)
+    const options = lookSlots().map((slot) => `${slot}: ${lookOption(slot, t.options[slot])?.name ?? 'standard'}`)
+    const pictures = [['ground', t.images.ground], ['surface', t.images.surface], ['frame', t.images.frame?.image], ['divider', t.images.divider]].flatMap(([k, id]) => (file(id ?? null) ? [`${k} ${file(id ?? null)}`] : []))
     return [
       `# ${t.name}${t.builtin ? ' (built in, read only)' : ''}`,
       t.description,
-      `Colours: accent ${t.accent}, soft ${t.accentSoft}, secondary ${t.secondary}, base ${t.base}. Sky: ${t.sky}. Mood light: ${t.light ? `${t.light.color} at ${t.light.strength}` : 'none'}. Effect: ${t.effect}.`,
+      `Colours (unset are Seven's): ${Object.entries(t.colours).map(([k, v]) => `${k} ${v}`).join(', ') || "Seven's"}.`,
+      `Fonts: ${FONT_ROLES.flatMap((r) => (t.fonts[r] ? [`${r} ${t.fonts[r]!.family}`] : [])).join('; ') || "Seven's"}.`,
+      `Pictures: ${pictures.join(', ') || 'none'}.`,
+      `Look: ${options.join(', ')}. Scheme: ${t.scheme ?? 'dark'}. Surface CSS: ${Object.keys(t.surfaces).join(', ') || 'none'}.`,
+      `Sky: ${t.sky}. Gradient: ${t.gradient ? `${t.gradient.stops.map((s) => `${s.color} ${s.at}%`).join(', ')} at ${t.gradient.angle}°` : 'none'}. Mood light: ${t.light ? `${t.light.stops.map((s) => `${s.color} ${s.at}%`).join(', ')} at ${t.light.strength}` : 'none'}. Effect: ${t.effect}.`,
       t.backdrop ? `Background: ${[t.backdrop.colors.join(' → '), file(t.backdrop.image)].filter(Boolean).join(' with ')}, dim ${t.backdrop.dim}.` : 'No background picture.',
       `Music: ${t.music.length ? t.music.map((m) => file(m) ?? m).join(', ') : 'none'} (volume ${t.volume}). Sounds: ${sounds.length ? sounds.join(', ') : 'none'}.`
     ].filter(Boolean).join('\n')
@@ -643,6 +652,6 @@ registerKind(210, reminderKind)
 registerKind(220, chatKind)
 registerKind(240, themeKind)
 registerKind(300, messageKind)
-registerKind(310, weblogKind, 'web')
+registerModuleKind('web', weblogKind, 310)
 registerKind(330, dayKind)
 registerKind(340, routineKind)

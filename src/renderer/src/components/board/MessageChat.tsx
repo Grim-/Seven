@@ -19,9 +19,9 @@ function Message({ m, size }: { m: BoardMessage; size: number }) {
       <AgentAvatar agent={agent} size={size} />
       <div className="flex min-w-0 flex-col gap-1">
         <span className="text-[12.5px]">
-          <b className="text-white">{m.author}</b> <span className="font-mono text-[10.5px] text-faint">{formatRelative(m.at)}</span>
+          <b className="text-ink">{m.author}</b> <span className="font-ui text-[10.5px] text-faint">{formatRelative(m.at)}</span>
         </span>
-        <span className="whitespace-pre-wrap border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[12.5px] leading-relaxed text-white/90">{m.text}</span>
+        <span className="whitespace-pre-wrap border border-ink/10 bg-ink/[0.03] px-2.5 py-1.5 text-[12.5px] leading-relaxed text-ink/90">{m.text}</span>
       </div>
     </div>
   )

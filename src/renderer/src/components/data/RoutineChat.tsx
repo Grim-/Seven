@@ -29,7 +29,7 @@ export function RoutineChat({ id }: EntrySurfaceProps) {
   if (!list) return <Loading />
   if (!routine) return <EmptyState title="Removed">This routine no longer exists.</EmptyState>
   return (
-    <EntryCard title={routine.name} tag="routine" aside={<span className={routine.enabled ? 'font-mono text-[11px] text-ok' : 'font-mono text-[11px] text-faint'}>{routine.enabled ? 'ON' : 'OFF'}</span>}>
+    <EntryCard title={routine.name} tag="routine" aside={<span className={routine.enabled ? 'font-ui text-[11px] text-ok' : 'font-ui text-[11px] text-faint'}>{routine.enabled ? 'ON' : 'OFF'}</span>}>
       <div className="flex items-center gap-2.5">
         <AgentAvatar agent={agent} size={30} />
         <span className="text-[12.5px] text-dim">{routine.instruction}</span>

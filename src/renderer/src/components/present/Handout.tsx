@@ -23,7 +23,7 @@ function Letter({ h }: { h: HandoutData }) {
       {h.image && (
         <AreaMedia
           id={h.image}
-          className="mb-3 block max-h-56 w-auto border border-black/20 sepia-[0.35]"
+          className="mb-3 block max-h-56 w-auto border border-shade/20 sepia-[0.35]"
         />
       )}
       <Markdown text={h.text} />
@@ -41,7 +41,7 @@ function Note({ h }: { h: HandoutData }) {
       <div className="handout-note">
         <span className="handout-pin" />
         {h.title && (
-          <div className="mb-1.5 font-semibold underline decoration-black/30 underline-offset-4">
+          <div className="mb-1.5 font-semibold underline decoration-current/30 underline-offset-4">
             {h.title}
           </div>
         )}
@@ -60,14 +60,14 @@ function Poster({ h }: { h: HandoutData }) {
       {h.image && (
         <AreaMedia
           id={h.image}
-          className="mx-auto my-3 block max-h-64 w-auto border border-white/30 grayscale-[0.3] contrast-125"
+          className="mx-auto my-3 block max-h-64 w-auto border border-ink/30 grayscale-[0.3] contrast-125"
         />
       )}
-      <div className="text-[13px] leading-relaxed text-white/85">
+      <div className="text-[13px] leading-relaxed text-ink/85">
         <Markdown text={h.text} />
       </div>
       {h.from && (
-        <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-accent">
+        <div className="mt-3 font-label text-[11px] caps-20 text-accent">
           {h.from}
         </div>
       )}
@@ -78,17 +78,17 @@ function Poster({ h }: { h: HandoutData }) {
 function Terminal({ h }: { h: HandoutData }) {
   return (
     <div className="handout-terminal">
-      {h.title && <div className="mb-2 font-bold text-white">// {h.title}</div>}
+      {h.title && <div className="mb-2 font-bold text-ink">// {h.title}</div>}
       {h.image && (
         <AreaMedia
           id={h.image}
-          className="mb-2 block max-h-48 w-auto border border-cyan/40 opacity-90 hue-rotate-[140deg] saturate-50"
+          className="mb-2 block max-h-48 w-auto border border-secondary-ink/40 opacity-90 hue-rotate-[140deg] saturate-50"
         />
       )}
       <div className="handout-typed">
         <Markdown text={h.text} />
       </div>
-      {h.from && <div className="mt-2 text-cyan/60">-- {h.from}</div>}
+      {h.from && <div className="mt-2 text-secondary-ink/60">-- {h.from}</div>}
       <span className="handout-cursor" />
     </div>
   )
@@ -119,7 +119,7 @@ function Handout({ fields, draft }: PresentationProps) {
         <Look h={h} />
       </div>
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint">
+        <span className="font-label text-[10px] caps-16 text-faint">
           {h.style}
         </span>
         <span className="flex-1" />

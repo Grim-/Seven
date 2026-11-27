@@ -17,7 +17,7 @@ function Edit({ spec, value, onChange, close }: TokenEditProps) {
             onChange(c)
             close()
           }}
-          className={cn('border px-2.5 py-1 font-mono text-[12px]', c === value ? 'border-accent bg-accent text-black' : 'border-line/60 text-dim hover:border-dim hover:text-white')}
+          className={cn('border px-2.5 py-1 font-ui text-[12px]', c === value ? 'border-accent bg-accent text-on-accent' : 'border-line/60 text-dim hover:border-dim hover:text-ink')}
         >
           {choiceLabel(spec, c)}
         </button>

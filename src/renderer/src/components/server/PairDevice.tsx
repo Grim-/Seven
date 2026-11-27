@@ -57,18 +57,18 @@ export function PairDevice({ network, size = 'sm' }: { network: NetworkStatus; s
       >
         {info && (
           <div className="flex flex-col gap-3">
-            <p className="text-[13px] text-white/85">Scan this with the Seven app. The code only works while this window is open.</p>
-            {image && <img src={image} alt="Pairing QR code" className="h-60 w-60 self-center bg-white p-1" />}
-            <div className="flex flex-col gap-0.5 font-mono text-[12px] text-dim">
+            <p className="text-[13px] text-ink/85">Scan this with the Seven app. The code only works while this window is open.</p>
+            {image && <img src={image} alt="Pairing QR code" className="h-60 w-60 self-center bg-page p-1" />}
+            <div className="flex flex-col gap-0.5 font-ui text-[12px] text-dim">
               {info.addresses.map((a) => (
                 <span key={a}>{a}:{info.port}</span>
               ))}
-              <span className="text-white">Code {info.code}</span>
+              <span className="text-ink">Code {info.code}</span>
               <span className="break-all text-[11px]">{info.fingerprint}</span>
             </div>
             {request && (
-              <div className="flex items-center gap-1.5 border border-line/50 bg-black/40 px-2 py-1.5">
-                <span className="flex-1 text-[13px] text-white">
+              <div className="flex items-center gap-1.5 border border-line/50 tone-panel-40 px-2 py-1.5">
+                <span className="flex-1 text-[13px] text-ink">
                   Allow "{request.name}" from {request.address}?
                 </span>
                 <Button size="sm" variant="primary" icon={<Check />} onClick={allow}>

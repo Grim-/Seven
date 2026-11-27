@@ -24,10 +24,10 @@ function PlaceBody({ id, large }: { id: string; large: boolean }) {
   const files = typeof place.Files === 'string' ? place.Files : ''
   return (
     <div className={cn('grid gap-3', found && (large ? 'grid-cols-[minmax(0,1fr)_320px]' : 'grid-cols-[150px_minmax(0,1fr)]'))}>
-      {found && <MapCanvas map={found.map} shapes={found.use.shapes} places={places} here={here} still={!large} selected={key} className={cn('notch-sm bg-black/60', large ? 'h-[60vh]' : 'h-32')} />}
+      {found && <MapCanvas map={found.map} shapes={found.use.shapes} places={places} here={here} still={!large} selected={key} className={cn('notch-sm tone-panel-60', large ? 'h-[60vh]' : 'h-32')} />}
       <div className="flex min-w-0 flex-col gap-2">
-        <div className="font-mono text-[11px] text-dim">{placePath(places, key).map((k) => placeName(places, k)).join(' › ')}</div>
-        {now ? <Markdown text={now} className="border border-cyan/25 bg-cyan/[0.04] px-2.5 py-1.5 text-[12.5px] leading-relaxed text-white/90" /> : <div className="text-[12px] text-faint">Nothing is happening here.</div>}
+        <div className="font-ui text-[11px] text-dim">{placePath(places, key).map((k) => placeName(places, k)).join(' › ')}</div>
+        {now ? <Markdown text={now} className="border border-secondary-ink/25 bg-secondary-ink/[0.04] px-2.5 py-1.5 text-[12.5px] leading-relaxed text-ink/90" /> : <div className="text-[12px] text-faint">Nothing is happening here.</div>}
         {here[key]?.length ? (
           <span className="flex gap-1.5">
             <PresenceMarkers visitors={here[key]} />

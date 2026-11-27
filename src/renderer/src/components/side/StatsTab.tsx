@@ -13,14 +13,14 @@ const secs = (ms: number | null | undefined) => (typeof ms === 'number' ? `${(ms
 const k = (v: number | null | undefined) => (typeof v === 'number' ? (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)) : '—')
 
 function Head({ children }: { children: React.ReactNode }) {
-  return <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">{children}</div>
+  return <div className="mb-1.5 font-label text-[10.5px] font-semibold caps-14 text-accent-soft">{children}</div>
 }
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="border border-line/40 bg-black/40 px-2.5 py-2" title={hint}>
-      <div className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-faint">{label}</div>
-      <div className="font-mono text-[15px] text-white">{value}</div>
+    <div className="border border-line/40 tone-panel-40 px-2.5 py-2" title={hint}>
+      <div className="font-label text-[9.5px] caps-14 text-faint">{label}</div>
+      <div className="font-ui text-[15px] text-ink">{value}</div>
     </div>
   )
 }
@@ -56,7 +56,7 @@ export function StatsTab() {
         <Head>Loaded model</Head>
         {host?.modelId ? (
           <div className="grid grid-cols-2 gap-1.5">
-            <div className="col-span-2 truncate font-mono text-[12px] text-white" title={host.modelName ?? ''}>{host.modelName}</div>
+            <div className="col-span-2 truncate font-ui text-[12px] text-ink" title={host.modelName ?? ''}>{host.modelName}</div>
             <Tile label="Context" value={k(host.contextSize)} />
             <Tile label="GPU layers" value={host.gpuLayers === null ? '—' : String(host.gpuLayers)} hint={`Layers offloaded to the GPU; the rest run on the CPU${host.totalLayers ? `. The model has ${host.totalLayers} layers.` : ''}`} />
           </div>
@@ -92,7 +92,7 @@ export function StatsTab() {
       {turns.length > 1 && (
         <section>
           <Head>This chat</Head>
-          <table className="w-full font-mono text-[11px]">
+          <table className="w-full font-ui text-[11px]">
             <thead className="text-faint">
               <tr>
                 <th className="text-left font-normal">When</th>
@@ -106,7 +106,7 @@ export function StatsTab() {
               {turns.slice(-10).reverse().map((t) => (
                 <tr key={t.id}>
                   <td className="truncate pr-2">{formatRelative(t.at)}</td>
-                  <td className="text-right text-white">{n1(genRate(t.stats))}</td>
+                  <td className="text-right text-ink">{n1(genRate(t.stats))}</td>
                   <td className="text-right">{n1(t.stats.promptPerSecond)}</td>
                   <td className="text-right">{secs(t.stats.ttftMs)}</td>
                   <td className="text-right">{secs(t.stats.toolMs)}</td>
@@ -122,12 +122,12 @@ export function StatsTab() {
         {summary?.models.length ? (
           <div className="flex flex-col gap-1.5">
             {summary.models.map((m) => (
-              <div key={`${m.modelId}-${m.contextSize}-${m.gpuLayers}`} className="border border-line/40 bg-black/40 px-2.5 py-2">
-                <div className="truncate font-mono text-[11.5px] text-white" title={m.modelName}>{m.modelName}</div>
-                <div className="mb-1 font-mono text-[10px] text-faint">
+              <div key={`${m.modelId}-${m.contextSize}-${m.gpuLayers}`} className="border border-line/40 tone-panel-40 px-2.5 py-2">
+                <div className="truncate font-ui text-[11.5px] text-ink" title={m.modelName}>{m.modelName}</div>
+                <div className="mb-1 font-ui text-[10px] text-faint">
                   ctx {k(m.contextSize)} · GPU layers {m.gpuLayers ?? '—'} · {m.turns} repl{m.turns === 1 ? 'y' : 'ies'}
                 </div>
-                <div className="grid grid-cols-4 gap-1 font-mono text-[11px]">
+                <div className="grid grid-cols-4 gap-1 font-ui text-[11px]">
                   <span title="Average writing speed">W {n1(m.genPerSecond)}</span>
                   <span title="Average reading speed">R {n1(m.promptPerSecond)}</span>
                   <span title="Average time to first token">F {secs(m.ttftMs)}</span>

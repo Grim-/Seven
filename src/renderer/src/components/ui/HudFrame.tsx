@@ -13,7 +13,7 @@ export function HudFrame({ title, hint }: { title?: string; hint?: ReactNode }) 
       {CORNERS.map((c) => (
         <span key={c} className={`pointer-events-none absolute h-[22px] w-[22px] border-line ${c}`} />
       ))}
-      <div className="drag absolute inset-x-12 top-3 z-20 flex h-4 items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-faint">
+      <div className="drag absolute inset-x-12 top-3 z-20 flex h-4 items-center gap-2.5 font-label text-[10px] caps-20 text-faint">
         <span className="text-accent">//</span>
         <span className="text-dim">Seven</span>
         <span className="h-px flex-1 bg-gradient-to-r from-line to-transparent" />
@@ -21,7 +21,7 @@ export function HudFrame({ title, hint }: { title?: string; hint?: ReactNode }) 
         <span className="h-px flex-1 bg-gradient-to-l from-line to-transparent" />
         <span>{formatClock(now)}</span>
       </div>
-      {hint && <div className="pointer-events-none absolute bottom-3 left-12 z-20 font-mono text-[9.5px] uppercase tracking-[0.2em] text-faint [&_b]:font-semibold [&_b]:text-accent-soft">{hint}</div>}
+      {hint && <div className="pointer-events-none absolute bottom-3 left-12 z-20 font-label text-[9.5px] caps-20 text-faint [&_b]:font-semibold [&_b]:text-accent-soft">{hint}</div>}
     </>
   )
 }

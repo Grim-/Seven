@@ -416,14 +416,14 @@ export function TacticalActionDeck({
   return (
     <div
       className={cn(
-        'pointer-events-auto absolute bottom-2 left-1/2 -translate-x-1/2 z-40 flex flex-col font-mono select-none shadow-[0_24px_60px_rgba(0,0,0,0.98)] backdrop-blur-md',
+        'pointer-events-auto absolute bottom-2 left-1/2 -translate-x-1/2 z-40 flex flex-col font-ui select-none shadow-[0_24px_60px_color-mix(in_srgb,var(--color-shade)_98%,transparent)] backdrop-blur-[calc(var(--panel-blur)*1.5)]',
         className
       )}
     >
       {/* OPTIONAL PASSIVE TRAITS DRAWER (SHOWN WHEN PASSIVES TAB IS SELECTED) */}
       {activeCategory === 'PASSIVES' && (
-        <div className="mb-1 flex flex-wrap items-center gap-1 border border-line/70 bg-black/95 px-2 py-1.5 text-[9.5px]">
-          <span className="mr-1 font-bold uppercase tracking-wider text-purple">Traits</span>
+        <div className="mb-1 flex flex-wrap items-center gap-1 border border-line/70 tone-panel-95 px-2 py-1.5 text-[9.5px]">
+          <span className="mr-1 font-bold caps-5 text-tint-purple">Traits</span>
           {traits.length === 0 ? (
             <span className="text-faint">No innate or class traits active.</span>
           ) : (
@@ -435,7 +435,7 @@ export function TacticalActionDeck({
               const tipBody = (
                 <span className="flex min-w-44 flex-col gap-1.5">
                   {Boolean(t.params.description) && <span className="text-[11px] text-dim">{String(t.params.description)}</span>}
-                  {classTitle && <span className="font-mono text-[10px] text-cyan">from class {classTitle}</span>}
+                  {classTitle && <span className="font-ui text-[10px] text-tint-cyan">from class {classTitle}</span>}
                   <RowList
                     rows={[
                       ...(maxUses > 0 ? [{ label: 'Uses', value: `${Math.max(0, maxUses - t.uses)}/${maxUses}` }] : []),
@@ -451,16 +451,16 @@ export function TacticalActionDeck({
                   onMouseEnter={(e) => showTip(e.currentTarget, t.title, tipBody, 'top')}
                   onMouseLeave={() => hideTip('component')}
                   className={cn(
-                    'inline-flex items-center gap-1 border px-1.5 py-0.5 font-mono text-[9px] transition-colors',
-                    active ? 'border-purple/50 bg-purple/10 text-white' : 'border-line/40 bg-black/60 text-faint opacity-60'
+                    'inline-flex items-center gap-1 border px-1.5 py-0.5 font-ui text-[9px] transition-colors',
+                    active ? 'border-tint-purple/50 bg-tint-purple/10 text-ink' : 'border-line/40 tone-panel-60 text-faint opacity-60'
                   )}
                 >
-                  <Sparkles className={cn('h-2.5 w-2.5', active ? 'text-purple' : 'text-faint')} />
+                  <Sparkles className={cn('h-2.5 w-2.5', active ? 'text-tint-purple' : 'text-faint')} />
                   <span className="font-semibold">{t.title}</span>
-                  {classTitle && <span className="text-[8px] uppercase text-cyan">[{classTitle}]</span>}
+                  {classTitle && <span className="text-[8px] caps text-tint-cyan">[{classTitle}]</span>}
                   {sig && <span className="text-[8px] text-dim">{sig}</span>}
                   {t.cooldownLeft > 0 && <span className="text-[8px] text-alert">{gameTime(t.cooldownLeft)}</span>}
-                  {t.exhausted && <span className="text-[8px] text-alert">USED</span>}
+                  {t.exhausted && <span className="text-[8px] text-alert caps">Used</span>}
                 </span>
               )
             })
@@ -469,7 +469,7 @@ export function TacticalActionDeck({
       )}
 
       {/* 1. TOP SHELF: RESOURCE TELEMETRY, SPELL MATRIX & ACTIVE BUFF DOCK */}
-      <div className="flex h-7 items-center justify-between border border-line/70 border-b-0 bg-black/95 px-2.5 text-[10px]">
+      <div className="flex h-7 items-center justify-between border border-line/70 border-b-0 tone-well-95 px-2.5 text-[10px]">
         {/* LEFT: ACTION ECONOMY STATUS PIPS */}
         <div className="flex items-center gap-3">
           {/* ACTION PIP */}
@@ -480,7 +480,7 @@ export function TacticalActionDeck({
             )}
             title="Standard Action: Used for attacks, spells, and maneuvers"
           >
-            <span className={cn('h-2.5 w-2.5 rounded-none', !economy.actionUsed ? 'bg-ok shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'border border-line/40 bg-black/60')} />
+            <span className={cn('h-2.5 w-2.5 rounded-none', !economy.actionUsed ? 'bg-ok shadow-[0_0_8px_color-mix(in_srgb,var(--color-tint-green)_calc(80%*var(--glow)),transparent)]' : 'border border-line/40 tone-panel-60')} />
             <span>ACTION</span>
           </div>
 
@@ -492,7 +492,7 @@ export function TacticalActionDeck({
             )}
             title="Bonus Action: Swift abilities, off-hand strikes, and secondary spells"
           >
-            <span className={cn('h-2.5 w-2.5 rounded-none rotate-45', !economy.bonusActionUsed ? 'bg-accent shadow-[0_0_8px_rgba(255,160,0,0.8)]' : 'border border-line/40 bg-black/60')} />
+            <span className={cn('h-2.5 w-2.5 rounded-none rotate-45', !economy.bonusActionUsed ? 'bg-accent shadow-[0_0_8px_color-mix(in_srgb,rgb(255,160,0)_calc(80%*var(--glow)),transparent)]' : 'border border-line/40 tone-panel-60')} />
             <span>BONUS</span>
           </div>
 
@@ -500,55 +500,55 @@ export function TacticalActionDeck({
           <div
             className={cn(
               'flex items-center gap-1 font-bold',
-              reactionEnabled && !economy.reactionUsed ? 'text-purple' : 'text-faint line-through opacity-40'
+              reactionEnabled && !economy.reactionUsed ? 'text-tint-purple' : 'text-faint line-through opacity-40'
             )}
             title="Reaction: Opportunity attacks, shield counters, and ripostes"
           >
-            <span className={cn('h-2.5 w-2.5 rounded-none', reactionEnabled && !economy.reactionUsed ? 'bg-purple shadow-[0_0_8px_rgba(180,100,255,0.8)]' : 'border border-line/40 bg-black/60')} />
+            <span className={cn('h-2.5 w-2.5 rounded-none', reactionEnabled && !economy.reactionUsed ? 'bg-tint-purple shadow-[0_0_8px_color-mix(in_srgb,rgb(180,100,255)_calc(80%*var(--glow)),transparent)]' : 'border border-line/40 tone-panel-60')} />
             <span>REACT</span>
           </div>
 
           {/* CLASS CHARGES / ENERGY COUNTER */}
           <div
-            className="flex items-center gap-1 border-l border-line/50 pl-2.5 text-amber-400 font-bold"
+            className="flex items-center gap-1 border-l border-line/50 pl-2.5 text-tint-amber-ink font-bold"
             title="Class Charges / Tactical Power / Focus"
           >
             <Flame className="h-3 w-3" />
             <span className="text-[11px] font-extrabold tracking-tight">8</span>
-            <span className="text-[8px] text-amber-500/80">FOCUS</span>
+            <span className="text-[8px] text-tint-amber/80 caps">Focus</span>
           </div>
         </div>
 
         {/* CENTER: ROMAN NUMERAL SPELL SLOT MATRIX */}
         <div className="flex items-center gap-2.5 text-[9px] text-dim">
           <div className="flex items-center gap-0.5">
-            <span className="text-cyan font-bold mr-0.5">I</span>
+            <span className="text-tint-cyan font-bold mr-0.5">I</span>
             <span className="flex gap-0.5">
-              <span className="h-2 w-2 border border-cyan/60 bg-cyan shadow-[0_0_6px_rgba(0,216,246,0.6)]" />
-              <span className="h-2 w-2 border border-cyan/60 bg-cyan shadow-[0_0_6px_rgba(0,216,246,0.6)]" />
-              <span className="h-2 w-2 border border-cyan/60 bg-cyan shadow-[0_0_6px_rgba(0,216,246,0.6)]" />
-              <span className="h-2 w-2 border border-cyan/60 bg-cyan shadow-[0_0_6px_rgba(0,216,246,0.6)]" />
+              <span className="h-2 w-2 border border-tint-cyan/60 bg-tint-cyan shadow-[0_0_6px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]" />
+              <span className="h-2 w-2 border border-tint-cyan/60 bg-tint-cyan shadow-[0_0_6px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]" />
+              <span className="h-2 w-2 border border-tint-cyan/60 bg-tint-cyan shadow-[0_0_6px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]" />
+              <span className="h-2 w-2 border border-tint-cyan/60 bg-tint-cyan shadow-[0_0_6px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]" />
             </span>
           </div>
           <div className="flex items-center gap-0.5">
-            <span className="text-cyan font-bold mr-0.5">II</span>
+            <span className="text-tint-cyan font-bold mr-0.5">II</span>
             <span className="flex gap-0.5">
-              <span className="h-2 w-2 border border-cyan/60 bg-cyan shadow-[0_0_6px_rgba(0,216,246,0.6)]" />
-              <span className="h-2 w-2 border border-cyan/60 bg-cyan shadow-[0_0_6px_rgba(0,216,246,0.6)]" />
-              <span className="h-2 w-2 border border-cyan/60 bg-cyan shadow-[0_0_6px_rgba(0,216,246,0.6)]" />
+              <span className="h-2 w-2 border border-tint-cyan/60 bg-tint-cyan shadow-[0_0_6px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]" />
+              <span className="h-2 w-2 border border-tint-cyan/60 bg-tint-cyan shadow-[0_0_6px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]" />
+              <span className="h-2 w-2 border border-tint-cyan/60 bg-tint-cyan shadow-[0_0_6px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]" />
             </span>
           </div>
           <div className="flex items-center gap-0.5">
-            <span className="text-cyan font-bold mr-0.5">III</span>
+            <span className="text-tint-cyan font-bold mr-0.5">III</span>
             <span className="flex gap-0.5">
-              <span className="h-2 w-2 border border-cyan/60 bg-cyan shadow-[0_0_6px_rgba(0,216,246,0.6)]" />
-              <span className="h-2 w-2 border border-cyan/60 bg-cyan shadow-[0_0_6px_rgba(0,216,246,0.6)]" />
+              <span className="h-2 w-2 border border-tint-cyan/60 bg-tint-cyan shadow-[0_0_6px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]" />
+              <span className="h-2 w-2 border border-tint-cyan/60 bg-tint-cyan shadow-[0_0_6px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]" />
             </span>
           </div>
           <div className="flex items-center gap-0.5 text-faint">
             <span className="font-bold mr-0.5">IV</span>
             <span className="flex gap-0.5">
-              <span className="h-2 w-2 border border-line/40 bg-black/40" />
+              <span className="h-2 w-2 border border-line/40 tone-panel-40" />
             </span>
           </div>
         </div>
@@ -568,14 +568,14 @@ export function TacticalActionDeck({
               ))}
             </div>
           ) : (
-            <span className="text-[8px] uppercase tracking-wider text-faint">
+            <span className="text-[8px] caps-5 text-faint">
               STABLE CONCENTRATION
             </span>
           )}
 
-          <div className="flex items-center gap-1 border-l border-line/50 pl-2 text-cyan">
+          <div className="flex items-center gap-1 border-l border-line/50 pl-2 text-tint-cyan">
             <Footprints className="h-3 w-3" />
-            <strong className={speedRem > 0 ? 'text-cyan font-extrabold' : 'text-faint'}>
+            <strong className={speedRem > 0 ? 'text-tint-cyan font-extrabold' : 'text-faint'}>
               {speedRem}/{maxSpeed} FT
             </strong>
           </div>
@@ -583,7 +583,7 @@ export function TacticalActionDeck({
       </div>
 
       {/* 2. MAIN MODULAR ACTION DECK (DYNAMIC ROWS: 2, 3, or 4) */}
-      <div className="flex border border-line/70 bg-black/95 p-1 gap-1">
+      <div className="flex border border-line/70 tone-panel-95 p-1 gap-1">
         {/* PANEL 1: COMMON MANEUVERS & META ACTIONS (2 COLS X rowCount ROWS) */}
         <div
           className={cn(
@@ -611,17 +611,17 @@ export function TacticalActionDeck({
                     : `${strikeAbility ? name(strikeAbility) : 'Attack'} — click to aim, then pick a target (${strikeBadge} · [1/F])`
                 }
                 className={cn(
-                  'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
+                  'group relative flex h-9 w-9 items-center justify-center border font-ui text-[10px] font-bold transition-all',
                   strikeAiming
-                    ? 'border-cyan bg-cyan/30 text-cyan shadow-[0_0_14px_rgba(0,216,246,0.8)] animate-pulse cursor-pointer'
+                    ? 'border-tint-cyan bg-tint-cyan/30 text-tint-cyan shadow-[0_0_14px_color-mix(in_srgb,rgb(0,216,246)_calc(80%*var(--glow)),transparent)] animate-pulse cursor-pointer'
                     : canStrike
-                    ? 'border-red-500/70 bg-red-500/15 text-red-400 hover:border-red-400 hover:scale-105 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.25)]'
-                    : 'border-line/40 bg-black/60 text-faint cursor-not-allowed'
+                    ? 'border-tint-red/70 bg-tint-red/15 text-tint-red-ink hover:border-tint-red-ink hover:scale-105 cursor-pointer shadow-[0_0_10px_color-mix(in_srgb,var(--color-alert)_calc(25%*var(--glow)),transparent)]'
+                    : 'border-line/40 tone-panel-60 text-faint cursor-not-allowed'
                 )}
               >
                 <Swords className="h-4 w-4" />
-                <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">1</span>
-                <span className="absolute top-0.5 right-0.5 text-[7px] text-red-400">{strikeBadge}</span>
+                <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-ink/80">1</span>
+                <span className="absolute top-0.5 right-0.5 text-[7px] text-tint-red-ink">{strikeBadge}</span>
               </button>
             )
           })()}
@@ -638,15 +638,15 @@ export function TacticalActionDeck({
                 disabled={!canDash && inCombat}
                 title={`${dashAbility ? name(dashAbility) : 'Dash'} (${dashBadge} · [2/C])`}
                 className={cn(
-                  'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
+                  'group relative flex h-9 w-9 items-center justify-center border font-ui text-[10px] font-bold transition-all',
                   canDash
-                    ? 'border-line/60 bg-black/60 text-white hover:border-cyan hover:text-cyan hover:scale-105 cursor-pointer'
-                    : 'border-line/30 bg-black/40 text-faint cursor-not-allowed'
+                    ? 'border-line/60 tone-well-60 text-ink hover:border-tint-cyan hover:text-tint-cyan hover:scale-105 cursor-pointer'
+                    : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed'
                 )}
               >
-                <Footprints className="h-4 w-4 text-cyan" />
-                <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">C</span>
-                <span className="absolute top-0.5 right-0.5 text-[7px] text-cyan">{dashBadge}</span>
+                <Footprints className="h-4 w-4 text-tint-cyan" />
+                <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-ink/80">C</span>
+                <span className="absolute top-0.5 right-0.5 text-[7px] text-tint-cyan">{dashBadge}</span>
               </button>
             )
           })()}
@@ -663,16 +663,16 @@ export function TacticalActionDeck({
                 disabled={inCombat && !canDodge}
                 title={`${dodgeAbility ? name(dodgeAbility) : 'Dodge'} (${dodgeBadge} · [3/Z])`}
                 className={cn(
-                  'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
+                  'group relative flex h-9 w-9 items-center justify-center border font-ui text-[10px] font-bold transition-all',
                   economy.isDodging
                     ? 'border-accent bg-accent/20 text-accent cursor-default'
                     : canDodge
-                    ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent hover:scale-105 cursor-pointer'
-                    : 'border-line/30 bg-black/40 text-faint cursor-not-allowed'
+                    ? 'border-line/60 tone-well-60 text-ink hover:border-accent hover:text-accent hover:scale-105 cursor-pointer'
+                    : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed'
                 )}
               >
                 <Shield className="h-4 w-4 text-accent" />
-                <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-white/80">Z</span>
+                <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-ink/80">Z</span>
                 <span className="absolute top-0.5 right-0.5 text-[7px] text-accent">{dodgeBadge}</span>
               </button>
             )
@@ -689,24 +689,24 @@ export function TacticalActionDeck({
                 : 'Parley: Select an entity to open emergent dialogue (Meta · [P])'
             }
             className={cn(
-              'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
+              'group relative flex h-9 w-9 items-center justify-center border font-ui text-[10px] font-bold transition-all',
               targetCombatant
-                ? 'border-purple/70 bg-purple/15 text-purple hover:border-purple hover:bg-purple hover:text-black hover:scale-105 cursor-pointer shadow-[0_0_10px_rgba(180,100,255,0.3)]'
-                : 'border-line/30 bg-black/40 text-faint cursor-not-allowed'
+                ? 'border-tint-purple/70 bg-tint-purple/15 text-tint-purple hover:border-tint-purple hover:bg-tint-purple hover:text-on-accent hover:scale-105 cursor-pointer shadow-[0_0_10px_color-mix(in_srgb,rgb(180,100,255)_calc(30%*var(--glow)),transparent)]'
+                : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed'
             )}
           >
-            <MessageSquarePlus className="h-4 w-4 text-purple" />
-            <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-purple">P</span>
-            <span className="absolute top-0.5 right-0.5 text-[7px] text-purple">META</span>
+            <MessageSquarePlus className="h-4 w-4 text-tint-purple" />
+            <span className="absolute bottom-0.5 left-0.5 text-[7.5px] font-extrabold text-tint-purple">P</span>
+            <span className="absolute top-0.5 right-0.5 text-[7px] text-tint-purple caps">Meta</span>
           </button>
         </div>
 
         {/* MCRN TERMINAL DIVIDER 1 (RED ACCENT GRIPPER) */}
         <div className="flex flex-col items-center justify-center px-0.5 cursor-col-resize select-none">
-          <div className="h-full w-1 flex flex-col items-center justify-center gap-1 border-l border-r border-red-500/30 bg-red-950/20">
-            <span className="h-1 w-0.5 bg-red-500/60" />
-            <span className="h-1 w-0.5 bg-red-500/60" />
-            <span className="h-1 w-0.5 bg-red-500/60" />
+          <div className="h-full w-1 flex flex-col items-center justify-center gap-1 border-l border-r border-tint-red/30 bg-tint-red/5">
+            <span className="h-1 w-0.5 bg-tint-red/60" />
+            <span className="h-1 w-0.5 bg-tint-red/60" />
+            <span className="h-1 w-0.5 bg-tint-red/60" />
           </div>
         </div>
 
@@ -733,14 +733,14 @@ export function TacticalActionDeck({
                   onDragLeave={() => handleDragLeave(slotIndex)}
                   onDrop={(e) => handleDrop(e, slotIndex)}
                   className={cn(
-                    'relative flex h-9 w-9 select-none items-center justify-center border font-mono transition-all',
+                    'relative flex h-9 w-9 select-none items-center justify-center border font-ui transition-all',
                     isOver
-                      ? 'border-cyan bg-cyan/25 scale-105 shadow-[0_0_12px_rgba(0,216,246,0.5)]'
-                      : 'border-line/40 bg-black/60 hover:border-line'
+                      ? 'border-tint-cyan bg-tint-cyan/25 scale-105 shadow-[0_0_12px_color-mix(in_srgb,rgb(0,216,246)_calc(50%*var(--glow)),transparent)]'
+                      : 'border-line/40 tone-well-60 hover:border-line'
                   )}
                   title={`Class Slot ${i + 1} (${isLocked ? 'Locked' : 'Empty · Drag ability here'})`}
                 >
-                  <span className="text-[10px] text-line-bright/20 font-mono">+</span>
+                  <span className="text-[10px] text-line-strong/20 font-ui">+</span>
                 </div>
               )
             }
@@ -759,12 +759,12 @@ export function TacticalActionDeck({
               const body = (
                 <span className="flex min-w-44 flex-col gap-1.5">
                   {sourceClassTitle && (
-                    <span className="font-mono text-[10px] text-cyan">
+                    <span className="font-ui text-[10px] text-tint-cyan">
                       from class {sourceClassTitle}
                     </span>
                   )}
                   {a?.item && (
-                    <span className="font-mono text-[10px] text-purple">
+                    <span className="font-ui text-[10px] text-tint-purple">
                       from {String(a.item.params.label || a.item.id)}
                     </span>
                   )}
@@ -808,20 +808,20 @@ export function TacticalActionDeck({
                   onMouseEnter={(e) => showTip(e.currentTarget, label, body, 'top')}
                   onMouseLeave={() => hideTip('component')}
                   className={cn(
-                    'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
+                    'group relative flex h-9 w-9 items-center justify-center border font-ui text-[10px] font-bold transition-all',
                     isLocked ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
-                    isOver && 'border-cyan bg-cyan/25 scale-105 shadow-[0_0_12px_rgba(0,216,246,0.6)]',
+                    isOver && 'border-tint-cyan bg-tint-cyan/25 scale-105 shadow-[0_0_12px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]',
                     slotAvailable
-                      ? cn(theme.border, theme.bg, theme.color, 'hover:scale-105 hover:border-cyan')
-                      : 'border-line/40 bg-black/60 text-faint opacity-50',
-                    aiming && a && aiming === a.uid && 'border-cyan bg-cyan/30 text-cyan shadow-[0_0_14px_rgba(0,216,246,0.8)] animate-pulse'
+                      ? cn(theme.border, theme.bg, theme.color, 'hover:scale-105 hover:border-tint-cyan')
+                      : 'border-line/40 tone-panel-60 text-faint opacity-50',
+                    aiming && a && aiming === a.uid && 'border-tint-cyan bg-tint-cyan/30 text-tint-cyan shadow-[0_0_14px_color-mix(in_srgb,rgb(0,216,246)_calc(80%*var(--glow)),transparent)] animate-pulse'
                   )}
                 >
                   <Icon className="h-4 w-4 transition-transform group-hover:scale-110" />
 
                   {sourceClassTitle && (
                     <span
-                      className="absolute bottom-0.5 left-0.5 border border-cyan/40 bg-black/85 px-0.5 text-[6.5px] font-bold uppercase text-cyan leading-none"
+                      className="absolute bottom-0.5 left-0.5 border border-tint-cyan/40 tone-panel-85 px-0.5 text-[6.5px] font-bold caps text-tint-cyan leading-none"
                       title={`Class ability: ${sourceClassTitle}`}
                     >
                       {sourceClassTitle.slice(0, 3)}
@@ -831,7 +831,7 @@ export function TacticalActionDeck({
                   {/* UPCAST / TIER INDICATOR BADGE (+) */}
                   {isUpcastable && (
                     <span
-                      className="absolute top-0.5 right-0.5 text-[8px] font-extrabold text-cyan/90 leading-none"
+                      className="absolute top-0.5 right-0.5 text-[8px] font-extrabold text-tint-cyan/90 leading-none"
                       title="Tier / Variable Upcast"
                     >
                       +
@@ -848,10 +848,10 @@ export function TacticalActionDeck({
 
         {/* MCRN TERMINAL DIVIDER 2 (RED ACCENT GRIPPER) */}
         <div className="flex flex-col items-center justify-center px-0.5 cursor-col-resize select-none">
-          <div className="h-full w-1 flex flex-col items-center justify-center gap-1 border-l border-r border-red-500/30 bg-red-950/20">
-            <span className="h-1 w-0.5 bg-red-500/60" />
-            <span className="h-1 w-0.5 bg-red-500/60" />
-            <span className="h-1 w-0.5 bg-red-500/60" />
+          <div className="h-full w-1 flex flex-col items-center justify-center gap-1 border-l border-r border-tint-red/30 bg-tint-red/5">
+            <span className="h-1 w-0.5 bg-tint-red/60" />
+            <span className="h-1 w-0.5 bg-tint-red/60" />
+            <span className="h-1 w-0.5 bg-tint-red/60" />
           </div>
         </div>
 
@@ -878,14 +878,14 @@ export function TacticalActionDeck({
                   onDragLeave={() => handleDragLeave(slotIndex)}
                   onDrop={(e) => handleDrop(e, slotIndex)}
                   className={cn(
-                    'relative flex h-9 w-9 select-none items-center justify-center border font-mono transition-all',
+                    'relative flex h-9 w-9 select-none items-center justify-center border font-ui transition-all',
                     isOver
-                      ? 'border-cyan bg-cyan/25 scale-105 shadow-[0_0_12px_rgba(0,216,246,0.5)]'
-                      : 'border-line/40 bg-black/60 hover:border-line'
+                      ? 'border-tint-cyan bg-tint-cyan/25 scale-105 shadow-[0_0_12px_color-mix(in_srgb,rgb(0,216,246)_calc(50%*var(--glow)),transparent)]'
+                      : 'border-line/40 tone-well-60 hover:border-line'
                   )}
                   title={`Item Slot ${i + 1} (${isLocked ? 'Locked' : 'Empty · Drag item here'})`}
                 >
-                  <span className="text-[10px] text-line-bright/20 font-mono">+</span>
+                  <span className="text-[10px] text-line-strong/20 font-ui">+</span>
                 </div>
               )
             }
@@ -936,17 +936,17 @@ export function TacticalActionDeck({
                 }
                 onMouseLeave={() => hideTip('component')}
                 className={cn(
-                  'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all',
+                  'group relative flex h-9 w-9 items-center justify-center border font-ui text-[10px] font-bold transition-all',
                   isLocked ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
-                  isOver && 'border-cyan bg-cyan/25 scale-105 shadow-[0_0_12px_rgba(0,216,246,0.6)]',
+                  isOver && 'border-tint-cyan bg-tint-cyan/25 scale-105 shadow-[0_0_12px_color-mix(in_srgb,rgb(0,216,246)_calc(60%*var(--glow)),transparent)]',
                   item && item.usable()
-                    ? cn(theme.border, theme.bg, theme.color, 'hover:scale-105 hover:border-cyan')
-                    : 'border-line/40 bg-black/60 text-faint'
+                    ? cn(theme.border, theme.bg, theme.color, 'hover:scale-105 hover:border-tint-cyan')
+                    : 'border-line/40 tone-panel-60 text-faint'
                 )}
               >
                 <Icon className="h-4 w-4 transition-transform group-hover:scale-110" />
                 {count > 1 && (
-                  <span className="absolute right-0.5 bottom-0.5 border border-accent/40 bg-black/90 px-0.5 text-[7.5px] font-bold text-accent">
+                  <span className="absolute right-0.5 bottom-0.5 border border-accent/40 tone-panel-90 px-0.5 text-[7.5px] font-bold text-accent">
                     {count}
                   </span>
                 )}
@@ -957,10 +957,10 @@ export function TacticalActionDeck({
 
         {/* MCRN TERMINAL DIVIDER 3 (RED ACCENT GRIPPER) */}
         <div className="flex flex-col items-center justify-center px-0.5 cursor-col-resize select-none">
-          <div className="h-full w-1 flex flex-col items-center justify-center gap-1 border-l border-r border-red-500/30 bg-red-950/20">
-            <span className="h-1 w-0.5 bg-red-500/60" />
-            <span className="h-1 w-0.5 bg-red-500/60" />
-            <span className="h-1 w-0.5 bg-red-500/60" />
+          <div className="h-full w-1 flex flex-col items-center justify-center gap-1 border-l border-r border-tint-red/30 bg-tint-red/5">
+            <span className="h-1 w-0.5 bg-tint-red/60" />
+            <span className="h-1 w-0.5 bg-tint-red/60" />
+            <span className="h-1 w-0.5 bg-tint-red/60" />
           </div>
         </div>
 
@@ -983,14 +983,14 @@ export function TacticalActionDeck({
             }}
             title={rangedMode ? 'Loadout: Ranged weapon active (Click for Melee)' : 'Loadout: Melee weapon active (Click for Ranged)'}
             className={cn(
-              'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all cursor-pointer',
+              'group relative flex h-9 w-9 items-center justify-center border font-ui text-[10px] font-bold transition-all cursor-pointer',
               rangedMode
-                ? 'border-sky-400 bg-sky-400/20 text-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.3)]'
-                : 'border-red-500/70 bg-red-500/15 text-red-400 hover:border-red-400'
+                ? 'border-tint-sky-ink bg-tint-sky-ink/20 text-tint-sky-ink shadow-[0_0_10px_color-mix(in_srgb,var(--color-tint-sky-ink)_calc(30%*var(--glow)),transparent)]'
+                : 'border-tint-red/70 bg-tint-red/15 text-tint-red-ink hover:border-tint-red-ink'
             )}
           >
             {rangedMode ? <Crosshair className="h-4 w-4" /> : <Swords className="h-4 w-4" />}
-            <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-white/80">WPN</span>
+            <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-ink/80">WPN</span>
           </button>
 
           {/* 2. NON-LETHAL ATTACKS TOGGLE */}
@@ -1002,14 +1002,14 @@ export function TacticalActionDeck({
             }}
             title={nonLethal ? 'Non-Lethal: Active (Enemies knocked unconscious at 0 HP)' : 'Non-Lethal: Inactive (Normal damage kills)'}
             className={cn(
-              'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all cursor-pointer',
+              'group relative flex h-9 w-9 items-center justify-center border font-ui text-[10px] font-bold transition-all cursor-pointer',
               nonLethal
-                ? 'border-emerald-400 bg-emerald-400/20 text-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.4)]'
-                : 'border-line/40 bg-black/60 text-faint hover:border-white'
+                ? 'border-tint-green-ink bg-tint-green-ink/20 text-tint-green-ink shadow-[0_0_10px_color-mix(in_srgb,var(--color-ok)_calc(40%*var(--glow)),transparent)]'
+                : 'border-line/40 tone-well-60 text-faint hover:border-ink'
             )}
           >
             <Heart className="h-4 w-4" />
-            <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-white/80">STN</span>
+            <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-ink/80">STN</span>
             <span className="absolute top-0.5 right-0.5 text-[6.5px]">{nonLethal ? 'ON' : 'OFF'}</span>
           </button>
 
@@ -1022,14 +1022,14 @@ export function TacticalActionDeck({
             }}
             title={dualWield ? 'Dual Wield: Auto-strike with off-hand weapon' : 'Dual Wield: Off-hand striking disabled'}
             className={cn(
-              'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all cursor-pointer',
+              'group relative flex h-9 w-9 items-center justify-center border font-ui text-[10px] font-bold transition-all cursor-pointer',
               dualWield
-                ? 'border-accent bg-accent/20 text-accent shadow-[0_0_10px_rgba(255,160,0,0.4)]'
-                : 'border-line/40 bg-black/60 text-faint hover:border-white'
+                ? 'border-accent bg-accent/20 text-accent shadow-[0_0_10px_color-mix(in_srgb,rgb(255,160,0)_calc(40%*var(--glow)),transparent)]'
+                : 'border-line/40 tone-well-60 text-faint hover:border-ink'
             )}
           >
             <Layers className="h-4 w-4" />
-            <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-white/80">DUAL</span>
+            <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-ink/80 caps">Dual</span>
           </button>
 
           {/* 4. REACTION TOGGLE */}
@@ -1041,14 +1041,14 @@ export function TacticalActionDeck({
             }}
             title={reactionEnabled ? 'Reaction: Armed for opportunity attacks' : 'Reaction: Held (Will not trigger automatically)'}
             className={cn(
-              'group relative flex h-9 w-9 items-center justify-center border font-mono text-[10px] font-bold transition-all cursor-pointer',
+              'group relative flex h-9 w-9 items-center justify-center border font-ui text-[10px] font-bold transition-all cursor-pointer',
               reactionEnabled
-                ? 'border-purple/70 bg-purple/20 text-purple shadow-[0_0_10px_rgba(180,100,255,0.3)]'
-                : 'border-line/40 bg-black/60 text-faint hover:border-white'
+                ? 'border-tint-purple/70 bg-tint-purple/20 text-tint-purple shadow-[0_0_10px_color-mix(in_srgb,rgb(180,100,255)_calc(30%*var(--glow)),transparent)]'
+                : 'border-line/40 tone-well-60 text-faint hover:border-ink'
             )}
           >
             <Radio className="h-4 w-4" />
-            <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-white/80">REAC</span>
+            <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-ink/80 caps">Reac</span>
           </button>
 
           {/* 5. DEFENSIVE GUARD (Shown if >= 3 rows) */}
@@ -1057,10 +1057,10 @@ export function TacticalActionDeck({
               type="button"
               onClick={() => toast.info('Defensive Guard', 'Guard stance: +1 AC against melee attackers')}
               title="Guard Stance: Raise guard to parry incoming physical strikes"
-              className="group relative flex h-9 w-9 items-center justify-center border border-line/40 bg-black/60 font-mono text-[10px] font-bold text-dim hover:border-cyan hover:text-cyan cursor-pointer transition-all"
+              className="group relative flex h-9 w-9 items-center justify-center border border-line/40 tone-well-60 font-ui text-[10px] font-bold text-dim hover:border-tint-cyan hover:text-tint-cyan cursor-pointer transition-all"
             >
               <Shield className="h-4 w-4" />
-              <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-white/80">DEF</span>
+              <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-ink/80">DEF</span>
             </button>
           )}
 
@@ -1070,10 +1070,10 @@ export function TacticalActionDeck({
               type="button"
               onClick={() => toast.info('Overwatch', 'Overwatch: Reserve action to shoot moving enemies')}
               title="Overwatch: Hold action to attack the first hostile that enters line of sight"
-              className="group relative flex h-9 w-9 items-center justify-center border border-line/40 bg-black/60 font-mono text-[10px] font-bold text-dim hover:border-amber-400 hover:text-amber-400 cursor-pointer transition-all"
+              className="group relative flex h-9 w-9 items-center justify-center border border-line/40 tone-well-60 font-ui text-[10px] font-bold text-dim hover:border-tint-amber-ink hover:text-tint-amber-ink cursor-pointer transition-all"
             >
               <Crosshair className="h-4 w-4" />
-              <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-white/80">OVR</span>
+              <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-ink/80">OVR</span>
             </button>
           )}
 
@@ -1083,10 +1083,10 @@ export function TacticalActionDeck({
               type="button"
               onClick={() => toast.info('Sprint', 'Sprint stance: Max velocity')}
               title="Sprint: Tactical sprint stance"
-              className="group relative flex h-9 w-9 items-center justify-center border border-line/40 bg-black/60 font-mono text-[10px] font-bold text-dim hover:border-ok hover:text-ok cursor-pointer transition-all"
+              className="group relative flex h-9 w-9 items-center justify-center border border-line/40 tone-well-60 font-ui text-[10px] font-bold text-dim hover:border-ok hover:text-ok cursor-pointer transition-all"
             >
               <Footprints className="h-4 w-4" />
-              <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-white/80">SPR</span>
+              <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-ink/80">SPR</span>
             </button>
           )}
 
@@ -1096,20 +1096,20 @@ export function TacticalActionDeck({
               type="button"
               onClick={() => toast.info('Reload', 'Reload ranged magazines')}
               title="Reload: Tactical ammunition reload"
-              className="group relative flex h-9 w-9 items-center justify-center border border-line/40 bg-black/60 font-mono text-[10px] font-bold text-dim hover:border-sky-400 hover:text-sky-400 cursor-pointer transition-all"
+              className="group relative flex h-9 w-9 items-center justify-center border border-line/40 tone-well-60 font-ui text-[10px] font-bold text-dim hover:border-tint-sky-ink hover:text-tint-sky-ink cursor-pointer transition-all"
             >
               <Zap className="h-4 w-4" />
-              <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-white/80">RLD</span>
+              <span className="absolute bottom-0.5 left-0.5 text-[7px] font-extrabold text-ink/80">RLD</span>
             </button>
           )}
         </div>
 
         {/* MCRN TERMINAL DIVIDER 4 (RED ACCENT GRIPPER) */}
         <div className="flex flex-col items-center justify-center px-0.5 cursor-col-resize select-none">
-          <div className="h-full w-1 flex flex-col items-center justify-center gap-1 border-l border-r border-red-500/30 bg-red-950/20">
-            <span className="h-1 w-0.5 bg-red-500/60" />
-            <span className="h-1 w-0.5 bg-red-500/60" />
-            <span className="h-1 w-0.5 bg-red-500/60" />
+          <div className="h-full w-1 flex flex-col items-center justify-center gap-1 border-l border-r border-tint-red/30 bg-tint-red/5">
+            <span className="h-1 w-0.5 bg-tint-red/60" />
+            <span className="h-1 w-0.5 bg-tint-red/60" />
+            <span className="h-1 w-0.5 bg-tint-red/60" />
           </div>
         </div>
 
@@ -1123,10 +1123,10 @@ export function TacticalActionDeck({
               onClick={toggleLock}
               title={isLocked ? 'Deck Locked: Click to unlock and reorder slots' : 'Deck Unlocked: Click to lock against accidental dragging'}
               className={cn(
-                'flex h-6 w-6 items-center justify-center border font-mono transition-all cursor-pointer',
+                'flex h-6 w-6 items-center justify-center border font-ui transition-all cursor-pointer',
                 isLocked
-                  ? 'border-line/60 bg-black/60 text-dim hover:border-white hover:text-white'
-                  : 'border-accent bg-accent/20 text-accent shadow-[0_0_8px_rgba(255,160,0,0.5)]'
+                  ? 'border-line/60 tone-well-60 text-dim hover:border-ink hover:text-ink'
+                  : 'border-accent bg-accent/20 text-accent shadow-[0_0_8px_color-mix(in_srgb,rgb(255,160,0)_calc(50%*var(--glow)),transparent)]'
               )}
             >
               {isLocked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
@@ -1139,11 +1139,11 @@ export function TacticalActionDeck({
                 onClick={() => toggleRows(-1)}
                 disabled={rowCount <= 2}
                 title="Collapse row height"
-                className="flex h-6 w-5 items-center justify-center border border-line/50 bg-black/60 text-dim hover:border-cyan hover:text-cyan disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                className="flex h-6 w-5 items-center justify-center border border-line/50 tone-well-60 text-dim hover:border-tint-cyan hover:text-tint-cyan disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
               >
                 <Minus className="h-2.5 w-2.5" />
               </button>
-              <span className="px-1 text-[8.5px] font-bold text-white">
+              <span className="px-1 text-[8.5px] font-bold text-ink">
                 {rowCount}R
               </span>
               <button
@@ -1151,7 +1151,7 @@ export function TacticalActionDeck({
                 onClick={() => toggleRows(1)}
                 disabled={rowCount >= 4}
                 title="Expand row height"
-                className="flex h-6 w-5 items-center justify-center border border-line/50 bg-black/60 text-dim hover:border-cyan hover:text-cyan disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                className="flex h-6 w-5 items-center justify-center border border-line/50 tone-well-60 text-dim hover:border-tint-cyan hover:text-tint-cyan disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
               >
                 <Plus className="h-2.5 w-2.5" />
               </button>
@@ -1160,13 +1160,13 @@ export function TacticalActionDeck({
 
           {/* TURN STATUS DISPLAY */}
           <div className="flex flex-col gap-0.5 py-0.5">
-            <span className="text-[7.5px] uppercase tracking-wider text-faint">
+            <span className="text-[7.5px] caps-5 text-faint">
               {inCombat ? 'TACTICAL TURN' : 'EXPLORATION'}
             </span>
             <span
               className={cn(
                 'truncate text-[9px] font-bold',
-                isPlayerTurn ? 'text-cyan' : inCombat ? 'text-alert' : 'text-white'
+                isPlayerTurn ? 'text-tint-cyan' : inCombat ? 'text-alert' : 'text-ink'
               )}
             >
               {isPlayerTurn
@@ -1183,9 +1183,9 @@ export function TacticalActionDeck({
             onClick={endTurn}
             disabled={!inCombat || !isPlayerTurn}
             className={cn(
-              'flex h-7 items-center justify-center gap-1 border px-2 text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer',
+              'flex h-7 items-center justify-center gap-1 border px-2 text-[9px] font-bold caps-5 transition-all cursor-pointer',
               isPlayerTurn
-                ? 'border-cyan bg-cyan text-black hover:bg-cyan/90 shadow-[0_0_12px_rgba(0,216,246,0.5)]'
+                ? 'border-tint-cyan bg-tint-cyan text-on-accent hover:bg-tint-cyan/90 shadow-[0_0_12px_color-mix(in_srgb,rgb(0,216,246)_calc(50%*var(--glow)),transparent)]'
                 : 'border-line/40 bg-line/20 text-faint cursor-not-allowed opacity-40'
             )}
           >
@@ -1197,23 +1197,23 @@ export function TacticalActionDeck({
 
       {/* 3. FULL-WIDTH MOVEMENT GAUGE TRACK (RUNNING ACROSS THE ENTIRE DECK) */}
       <div
-        className="relative h-1.5 w-full border-t border-b border-line/60 bg-black/90 overflow-hidden"
+        className="relative h-1.5 w-full border-t border-b border-line/60 tone-panel-90 overflow-hidden"
         title={`Tactical Movement: ${speedRem}/${maxSpeed} FT remaining`}
       >
         <div
-          className="h-full bg-cyan shadow-[0_0_10px_rgba(0,216,246,0.8)] transition-all duration-200"
+          className="h-full bg-tint-cyan shadow-[0_0_10px_color-mix(in_srgb,rgb(0,216,246)_calc(80%*var(--glow)),transparent)] transition-all duration-200"
           style={{ width: `${speedPercent}%` }}
         />
         {/* Discrete 5-foot tick marks across the gauge */}
         <div className="absolute inset-0 flex justify-between pointer-events-none opacity-30">
           {Array.from({ length: 6 }).map((_, i) => (
-            <span key={i} className="h-full w-px bg-white" />
+            <span key={i} className="h-full w-px bg-ink" />
           ))}
         </div>
       </div>
 
       {/* 4. BOTTOM FILTER TABS & DYNAMIC CLASS DRAWER */}
-      <div className="flex h-5 items-center gap-1 border border-line/70 border-t-0 bg-black/95 px-2 text-[8.5px] font-bold text-dim">
+      <div className="flex h-5 items-center gap-1 border border-line/70 border-t-0 tone-well-95 px-2 text-[8.5px] font-bold text-dim">
         {(
           [
             { id: 'ALL', label: '[ALL]' },
@@ -1229,16 +1229,16 @@ export function TacticalActionDeck({
             type="button"
             onClick={() => setActiveCategory(tab.id)}
             className={cn(
-              'px-1.5 py-0.2 uppercase transition-colors cursor-pointer',
+              'px-1.5 py-0.2 caps transition-colors cursor-pointer',
               activeCategory === tab.id
-                ? 'bg-cyan text-black font-extrabold shadow-[0_0_8px_rgba(0,216,246,0.5)]'
-                : 'hover:text-white text-faint'
+                ? 'bg-tint-cyan text-on-accent font-extrabold shadow-[0_0_8px_color-mix(in_srgb,rgb(0,216,246)_calc(50%*var(--glow)),transparent)]'
+                : 'hover:text-ink text-faint'
             )}
           >
             {tab.label}
           </button>
         ))}
-        <span className="ml-auto text-[8px] text-faint font-mono">
+        <span className="ml-auto text-[8px] text-faint font-ui">
           MCRN TACTICAL CONSOLE
         </span>
       </div>

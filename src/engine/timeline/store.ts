@@ -148,6 +148,7 @@ class Timeline extends EventEmitter {
 
   forget(kind: string, entry: string): void {
     this.forgetMatching(entry, (k) => k === kind)
+    this.emit('forgot', kind, entry)
   }
 
   forgetMatching(entry: string, kind: (kind: string) => boolean): void {

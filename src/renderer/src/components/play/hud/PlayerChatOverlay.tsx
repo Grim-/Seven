@@ -168,10 +168,10 @@ export function PlayerChatOverlay({
     return (
       <div
         className={cn(
-          'pointer-events-auto absolute bottom-0 left-3 z-50 flex h-7 items-center gap-2 border border-b-0 bg-black/95 px-2.5 font-mono text-[10px] font-bold uppercase tracking-wider shadow-[0_-4px_18px_rgba(0,0,0,0.85)] backdrop-blur-md transition-colors',
+          'pointer-events-auto absolute bottom-0 left-3 z-50 flex h-7 items-center gap-2 border border-b-0 tone-well-95 px-2.5 font-label text-[10px] font-bold caps-5 shadow-[0_-4px_18px_color-mix(in_srgb,var(--color-shade)_85%,transparent)] backdrop-blur-[calc(var(--panel-blur)*1.5)] transition-colors',
           sessionRunning || (worldId && !gameplaySession)
-            ? 'border-accent/70 text-white'
-            : 'border-line/70 text-dim hover:border-cyan hover:text-white',
+            ? 'border-accent/70 text-ink'
+            : 'border-line/70 text-dim hover:border-tint-cyan hover:text-ink',
           className
         )}
       >
@@ -181,11 +181,11 @@ export function PlayerChatOverlay({
           title="Expand Gameplay Chat drawer (overlays action bar)"
           className="flex items-center gap-1.5 cursor-pointer"
         >
-          <MessageSquare className={cn('h-3 w-3 shrink-0', sessionRunning ? 'text-accent animate-pulse' : 'text-cyan')} />
-          <span className="text-white">{gameplaySession ? 'GAMEPLAY' : 'CHAT'}</span>
-          {boundAgent && <span className="max-w-[110px] truncate font-normal text-cyan">· {boundAgent.name}</span>}
+          <MessageSquare className={cn('h-3 w-3 shrink-0', sessionRunning ? 'text-accent animate-pulse' : 'text-tint-cyan')} />
+          <span className="text-ink">{gameplaySession ? 'GAMEPLAY' : 'CHAT'}</span>
+          {boundAgent && <span className="max-w-[110px] truncate font-normal text-tint-cyan">· {boundAgent.name}</span>}
           {worldId && !gameplaySession && (
-            <span className="border border-accent/60 bg-accent/15 px-1 text-[8.5px] text-accent">START</span>
+            <span className="border border-accent/60 bg-accent/15 px-1 text-[8.5px] text-accent caps">Start</span>
           )}
           {sessionRunning && <span className="h-1.5 w-1.5 bg-accent animate-pulse" />}
           <ChevronUp className="h-3 w-3 text-dim" />
@@ -197,19 +197,19 @@ export function PlayerChatOverlay({
   return (
     <div
       className={cn(
-        'pointer-events-auto absolute bottom-0 left-1/2 -translate-x-1/2 z-50 flex flex-col border border-b-0 border-line bg-black/95 font-mono select-none shadow-[0_-12px_40px_rgba(0,0,0,0.95)] backdrop-blur-md transition-all duration-200 ease-out',
+        'pointer-events-auto absolute bottom-0 left-1/2 -translate-x-1/2 z-50 flex flex-col border border-b-0 border-line tone-panel-95 font-ui select-none shadow-[0_-12px_40px_color-mix(in_srgb,var(--color-shade)_95%,transparent)] backdrop-blur-[calc(var(--panel-blur)*1.5)] transition-all duration-200 ease-out',
         'w-[min(760px,calc(100%-24px))]',
         tall ? 'h-[min(560px,74vh)]' : 'h-[min(360px,50vh)]',
         className
       )}
     >
       {/* HEADER STRIP */}
-      <div className="flex h-7 shrink-0 items-center justify-between border-b border-line/40 bg-subtle/50 px-2.5 text-[10px] font-bold uppercase tracking-wider text-dim">
+      <div className="flex h-7 shrink-0 items-center justify-between border-b border-line/40 bg-ink/5 px-2.5 text-[10px] font-bold caps-5 text-dim">
         <div className="flex min-w-0 items-center gap-1.5">
-          <MessageSquare className={cn('h-3 w-3 shrink-0', sessionRunning ? 'text-accent animate-pulse' : 'text-cyan')} />
-          <span className="text-white">{gameplaySession ? 'GAMEPLAY' : 'PLAYER CHAT'}</span>
+          <MessageSquare className={cn('h-3 w-3 shrink-0', sessionRunning ? 'text-accent animate-pulse' : 'text-tint-cyan')} />
+          <span className="text-ink">{gameplaySession ? 'GAMEPLAY' : 'PLAYER CHAT'}</span>
           {boundAgent && (
-            <span className="truncate font-normal text-cyan">
+            <span className="truncate font-normal text-tint-cyan">
               · {boundAgent.name}
             </span>
           )}
@@ -226,7 +226,7 @@ export function PlayerChatOverlay({
                 type="button"
                 onClick={() => void rolloverGameplaySession(gameplaySession.id).catch(failed('Could not roll over Gameplay Chat'))}
                 title="Continue in a fresh session (zero compaction: keeps live state + last exchange)"
-                className="border border-line/40 bg-black/40 p-0.5 text-dim hover:border-ok hover:text-ok transition-colors cursor-pointer"
+                className="border border-line/40 tone-well-40 p-0.5 text-dim hover:border-ok hover:text-ok transition-colors cursor-pointer"
               >
                 <RefreshCw className="h-2.5 w-2.5" />
               </button>
@@ -234,7 +234,7 @@ export function PlayerChatOverlay({
                 type="button"
                 onClick={() => openChat(gameplaySession.id)}
                 title="Open bound Gameplay Chat"
-                className="border border-line/40 bg-black/40 p-0.5 text-dim hover:border-cyan hover:text-cyan transition-colors cursor-pointer"
+                className="border border-line/40 tone-well-40 p-0.5 text-dim hover:border-tint-cyan hover:text-tint-cyan transition-colors cursor-pointer"
               >
                 <ExternalLink className="h-2.5 w-2.5" />
               </button>
@@ -242,7 +242,7 @@ export function PlayerChatOverlay({
                 type="button"
                 onClick={handleDetach}
                 title="Detach Gameplay Chat from this world"
-                className="border border-line/40 bg-black/40 p-0.5 text-dim hover:border-alert hover:text-alert transition-colors cursor-pointer"
+                className="border border-line/40 tone-well-40 p-0.5 text-dim hover:border-alert hover:text-alert transition-colors cursor-pointer"
               >
                 <Unlink className="h-2.5 w-2.5" />
               </button>
@@ -251,7 +251,7 @@ export function PlayerChatOverlay({
           <button
             type="button"
             onClick={() => setTall(!tall)}
-            className="border border-line/40 bg-black/40 px-1.5 py-0.5 text-[8.5px] text-dim hover:border-accent hover:text-white transition-colors cursor-pointer"
+            className="border border-line/40 tone-well-40 px-1.5 py-0.5 text-[8.5px] text-dim hover:border-accent hover:text-ink transition-colors cursor-pointer"
           >
             {tall ? 'COMPACT' : 'TALL'}
           </button>
@@ -259,7 +259,7 @@ export function PlayerChatOverlay({
             type="button"
             onClick={() => setOpen(false)}
             title="Collapse chat to bottom bar (Esc)"
-            className="flex items-center gap-0.5 border border-line/40 bg-black/40 px-1.5 py-0.5 text-[8.5px] text-dim hover:border-accent hover:text-white transition-colors cursor-pointer"
+            className="flex items-center gap-0.5 border border-line/40 tone-well-40 px-1.5 py-0.5 text-[8.5px] text-dim hover:border-accent hover:text-ink transition-colors cursor-pointer"
           >
             <ChevronDown className="h-3 w-3" />
           </button>
@@ -275,7 +275,7 @@ export function PlayerChatOverlay({
                   value={effectiveAgentId}
                   onChange={(e) => setPickedAgentId(e.target.value)}
                   aria-label="Choose agent for Gameplay Chat"
-                  className="h-6 min-w-0 flex-1 border border-line/70 bg-black/90 px-1.5 font-mono text-[10px] text-white outline-none focus:border-accent"
+                  className="h-6 min-w-0 flex-1 border border-line/70 tone-well-90 px-1.5 font-ui text-[10px] text-ink outline-none focus:border-accent"
                 >
                   {agents.length === 0 && presets.length === 0 ? (
                     <option value="">No agents available</option>
@@ -311,7 +311,7 @@ export function PlayerChatOverlay({
             </div>
           )}
           {/* CHAT LOG STREAM */}
-          <div ref={scrollRef} className="flex min-h-[60px] flex-1 flex-col gap-1.5 overflow-y-auto bg-black/40 p-2 text-[11px] select-text">
+          <div ref={scrollRef} className="flex min-h-[60px] flex-1 flex-col gap-1.5 overflow-y-auto tone-panel-40 p-2 text-[11px] select-text">
             {gameplaySession && sessionMessages ? (
               sessionMessages.length === 0 ? (
                 <span className="text-[10px] text-faint">
@@ -328,17 +328,17 @@ export function PlayerChatOverlay({
                       key={m.id}
                       className={cn(
                         'border-l-2 p-1.5 leading-relaxed',
-                        isAssistant ? 'border-accent bg-accent/5 text-white/95' : 'border-cyan bg-cyan/5 text-cyan'
+                        isAssistant ? 'border-accent bg-accent/5 text-ink/95' : 'border-tint-cyan bg-tint-cyan/5 text-tint-cyan'
                       )}
                     >
-                      <div className="flex justify-between text-[8px] font-bold uppercase tracking-wider text-faint">
+                      <div className="flex justify-between text-[8px] font-bold caps-5 text-faint">
                         <span>{isAssistant ? (boundAgent?.name ?? 'DM') : playerName}</span>
                         <span>{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                       <div className="mt-0.5 text-[11px]">
                         {body ? (
                           isAssistant ? (
-                            <Markdown text={body} className="font-sans text-[11.5px] leading-relaxed text-neutral-100" />
+                            <Markdown text={body} className="font-body text-[11.5px] leading-relaxed text-ink" />
                           ) : (
                             <span className="whitespace-pre-wrap">{body}</span>
                           )
@@ -363,13 +363,13 @@ export function PlayerChatOverlay({
                   className={cn(
                     'border-l-2 p-1.5 leading-relaxed',
                     c.kind === 'npc'
-                      ? 'border-accent bg-accent/5 text-white/90'
+                      ? 'border-accent bg-accent/5 text-ink/90'
                       : c.kind === 'pc'
-                      ? 'border-cyan bg-cyan/5 text-cyan'
-                      : 'border-purple bg-purple/5 text-purple'
+                      ? 'border-tint-cyan bg-tint-cyan/5 text-tint-cyan'
+                      : 'border-tint-purple bg-tint-purple/5 text-tint-purple'
                   )}
                 >
-                  <div className="flex justify-between text-[8px] font-bold uppercase tracking-wider text-faint">
+                  <div className="flex justify-between text-[8px] font-bold caps-5 text-faint">
                     <span>{c.speaker}</span>
                     <span>{c.at}</span>
                   </div>
@@ -381,8 +381,8 @@ export function PlayerChatOverlay({
 
           {/* MANUAL CRPG CHOICE TREE (WHEN NPC DIALOGUE IS ACTIVE) */}
           {activeNode && (
-            <div className="flex flex-col gap-1.5 border-t border-line/60 bg-subtle/80 p-2.5">
-              <div className="flex items-center justify-between border-b border-line/40 pb-1 text-[9px] font-bold uppercase tracking-wider text-accent">
+            <div className="flex flex-col gap-1.5 border-t border-line/60 tone-surface-80 p-2.5">
+              <div className="flex items-center justify-between border-b border-line/40 pb-1 text-[9px] font-bold caps-5 text-accent">
                 <span>{activeNode.speakerName ?? 'NPC'}</span>
                 <button
                   type="button"
@@ -392,7 +392,7 @@ export function PlayerChatOverlay({
                   [CLOSE]
                 </button>
               </div>
-              <div className="text-[11px] leading-relaxed text-white">
+              <div className="text-[11px] leading-relaxed text-ink">
                 &ldquo;{activeNode.prompt}&rdquo;
               </div>
 
@@ -403,10 +403,10 @@ export function PlayerChatOverlay({
                     key={choice.id}
                     type="button"
                     onClick={() => pickChoice(choice)}
-                    className="group flex items-center justify-between border border-line/60 bg-black/60 p-1.5 text-left text-[10.5px] text-dim hover:border-accent hover:bg-accent/10 hover:text-white transition-colors cursor-pointer"
+                    className="group flex items-center justify-between border border-line/60 tone-well-60 p-1.5 text-left text-[10.5px] text-dim hover:border-accent hover:bg-accent/10 hover:text-ink transition-colors cursor-pointer"
                   >
                     <span>
-                      <strong className="mr-1.5 text-cyan">[{i + 1}]</strong>
+                      <strong className="mr-1.5 text-tint-cyan">[{i + 1}]</strong>
                       {choice.check ? (
                         <span className="font-semibold text-accent">
                           [{choice.check.stat.toUpperCase()} DC {choice.check.dc}]{' '}
@@ -421,7 +421,7 @@ export function PlayerChatOverlay({
           )}
 
           {/* INPUT COMPOSER STRIP */}
-          <div className="flex flex-col gap-1 border-t border-line/40 bg-black/80 p-2">
+          <div className="flex flex-col gap-1 border-t border-line/40 tone-panel-80 p-2">
             <div className="flex items-center justify-between text-[9px] text-faint">
               <span>{targetName ? `Speaking to ${targetName}` : 'World dialogue / action'}</span>
             </div>
@@ -442,7 +442,7 @@ export function PlayerChatOverlay({
                     ? `Say something to ${targetName}...`
                     : `Speak or describe action (*I examine the room*)...`
                 }
-                className="h-7 flex-1 border border-line bg-black/60 px-2 font-mono text-[11px] text-white placeholder:text-faint focus:border-accent outline-none"
+                className="h-7 flex-1 border border-line tone-well-60 px-2 font-ui text-[11px] text-ink placeholder:text-faint focus:border-accent outline-none"
               />
               {sessionRunning ? (
                 <Button

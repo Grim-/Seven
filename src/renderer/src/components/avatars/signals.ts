@@ -1,7 +1,7 @@
 import type { AvatarSize } from '@shared/avatars'
 import { NEUTRAL_MOOD, moodDef, type Activity, type MoodName } from '@shared/moods'
 import type { AnimatedColors } from '../animated/Animated'
-import { cssHex } from '../../lib/cssColors'
+import { useThemes } from '../../store/themes'
 
 export interface AvatarMood {
   name: MoodName
@@ -36,12 +36,6 @@ export interface AvatarSignals {
 }
 
 const BLEND_MS = 400
-const COLORS_MS = 1000
-const COLOR_VARS: [keyof AnimatedColors, string][] = [
-  ['accent', '--color-accent'],
-  ['secondary', '--color-teal'],
-  ['base', '--color-bg']
-]
 const RATE_CHARS = 120
 
 const pointer = { x: 0, y: 0, known: false }
@@ -67,8 +61,6 @@ interface Blend {
 }
 
 export class SignalSource {
-  private colors: AnimatedColors = { accent: '#22d3ee', secondary: '#a855f7', base: '#000000' }
-  private colorsAt = 0
   changed: (() => void) | null = null
   activityChanged: ((from: Activity, to: Activity) => void) | null = null
   reactionTriggered: ((kind: string, durationMs: number, detail?: Record<string, unknown>) => void) | null = null
@@ -145,7 +137,7 @@ export class SignalSource {
       reaction: this.reaction,
       tool: this.tool,
       gaze: this.gazeFrom(el),
-      colors: this.colorsFrom(el, time),
+      colors: useThemes.getState().palette,
       size,
       voice: 0
     }
@@ -155,16 +147,6 @@ export class SignalSource {
     const { from, to, at } = this.blend
     const p = at ? smooth(Math.min(1, Math.max(0, (time - at) / BLEND_MS))) : 1
     return { name: p >= 0.5 ? to.name : from.name, energy: from.energy + (to.energy - from.energy) * p, warmth: from.warmth + (to.warmth - from.warmth) * p, strength: from.strength + (to.strength - from.strength) * p }
-  }
-
-  private colorsFrom(el: HTMLElement | null, time: number): AnimatedColors {
-    if (!el || time - this.colorsAt < COLORS_MS) return this.colors
-    this.colorsAt = time
-    const style = getComputedStyle(el)
-    const next = { ...this.colors }
-    for (const [key, name] of COLOR_VARS) next[key] = cssHex(style, name, next[key])
-    this.colors = next
-    return next
   }
 
   private gazeFrom(el: HTMLElement | null): { x: number; y: number } | null {

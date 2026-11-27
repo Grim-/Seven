@@ -39,7 +39,7 @@ export function ChatSettings({
   return (
     <Popover
       title="Agent chat settings (thinking, reasoning style, permissions, toolset, character, portrait size)"
-      className="w-80 gap-3 p-3 font-mono"
+      className="w-80 gap-3 p-3 font-ui"
       side={side}
       align={align}
       trigger={
@@ -56,7 +56,7 @@ export function ChatSettings({
       <div className="flex items-center gap-2.5 border-b border-line/60 pb-2.5">
         <AgentAvatar agent={agent} size={30} showCharacterOverlay={false} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px] font-bold uppercase tracking-wider text-white">
+          <div className="truncate text-[12px] font-bold caps-5 text-ink">
             {agent.name}
           </div>
           <div className="truncate text-[10px] text-dim">

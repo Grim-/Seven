@@ -14,7 +14,7 @@ export function EdgeRail({ children }: { children: ReactNode }) {
 export function RailItem({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="border border-line/50 bg-black/75 px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.18em] text-dim">{label}</span>
+      <span className="border border-line/50 tone-panel-75 px-1.5 py-0.5 font-label text-[9.5px] caps-18 text-dim">{label}</span>
       {children}
     </div>
   )

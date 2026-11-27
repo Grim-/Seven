@@ -63,6 +63,7 @@ export const KEYBIND_DEFS: KeybindDef[] = [
   // App and navigation
   { id: 'app.search', group: 'app', label: 'Search everything', hint: 'Open the command and library search palette.', defaultSpec: { code: 'KeyK', ctrl: true, display: 'Ctrl+K' } },
   { id: 'app.playMode', group: 'app', label: 'Toggle Play / Chat view', hint: 'Switch between Chat and Play.', defaultSpec: { code: 'KeyG', ctrl: true, shift: true, display: 'Ctrl+Shift+G' } },
+  { id: 'app.plainLook', group: 'app', label: 'Seven theme', hint: 'Switch to the Seven theme, and back again, without opening Settings.', defaultSpec: { code: 'Digit0', ctrl: true, alt: true, display: 'Ctrl+Alt+0' } },
   { id: 'app.settingsSearch', group: 'app', label: 'Focus Settings search', hint: 'Focus the search box inside Settings.', defaultSpec: { code: 'Slash', display: '/' } },
 
   // Chat and commands

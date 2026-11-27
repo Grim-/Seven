@@ -1,0 +1,13 @@
+import './colours'
+import './tints'
+import './fonts'
+import './type'
+import './lettering'
+import './shape'
+import './images'
+import './ornament'
+import './options'
+import './scheme'
+import './fade'
+
+export { skinSections, type SkinSection } from './registry'

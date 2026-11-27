@@ -90,15 +90,15 @@ export function LootTableEditor({ value, onChange }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-5 font-mono text-[12px] select-none p-4 max-w-4xl">
+    <div className="flex flex-col gap-5 font-ui text-[12px] select-none p-4 max-w-4xl">
       {/* 1. TABLE IDENTIFICATION & ROLLS */}
-      <div className="flex flex-col gap-3 border border-line/60 bg-black/60 p-3.5">
+      <div className="flex flex-col gap-3 border border-line/60 tone-panel-60 p-3.5">
         <Field label="LOOT TABLE NAME">
           <Input
             value={value.name}
             placeholder="e.g. Dungeon Chest Tier 1, Forest Forage Table, Blacksmith Stock"
             onChange={(e) => onChange({ ...value, name: e.target.value })}
-            className="h-8 font-bold text-white text-[13px]"
+            className="h-8 font-bold text-ink text-[13px]"
           />
         </Field>
 
@@ -139,11 +139,11 @@ export function LootTableEditor({ value, onChange }: Props) {
       {/* 2. DROP POOL HEADER & TEST TOOL */}
       <div className="flex items-center justify-between border-b border-line pb-2">
         <div className="flex items-center gap-3">
-          <span className="font-bold uppercase tracking-wider text-white text-[13px] flex items-center gap-2">
-            <Gem className="h-4 w-4 text-cyan" /> Drop Pool ({value.entries.length} Entries)
+          <span className="font-bold caps-5 text-ink text-[13px] flex items-center gap-2">
+            <Gem className="h-4 w-4 text-tint-cyan" /> Drop Pool ({value.entries.length} Entries)
           </span>
-          <span className="bg-panel border border-line px-2 py-0.5 text-[10px] text-faint">
-            Total Weight: <strong className="text-cyan">{totalWeight}</strong>
+          <span className="tone-well-50 border border-line px-2 py-0.5 text-[10px] text-faint">
+            Total Weight: <strong className="text-tint-cyan">{totalWeight}</strong>
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -178,12 +178,12 @@ export function LootTableEditor({ value, onChange }: Props) {
             <button
               type="button"
               onClick={() => setTestResult(null)}
-              className="text-[10px] text-dim hover:text-white"
+              className="text-[10px] text-dim hover:text-ink"
             >
               Dismiss
             </button>
           </div>
-          <p className="text-white font-medium">{testResult.summary}</p>
+          <p className="text-ink font-medium">{testResult.summary}</p>
           {testResult.subTablesRolled.length > 0 && (
             <span className="text-[10px] text-dim">
               Cascaded through sub-tables: {testResult.subTablesRolled.join(', ')}
@@ -194,7 +194,7 @@ export function LootTableEditor({ value, onChange }: Props) {
 
       {/* 3. DROP POOL ENTRIES */}
       {value.entries.length === 0 ? (
-        <div className="flex flex-col items-center justify-center border border-dashed border-line/60 bg-black/40 p-8 text-center text-dim text-[11px] gap-2">
+        <div className="flex flex-col items-center justify-center border border-dashed border-line/60 tone-panel-40 p-8 text-center text-dim text-[11px] gap-2">
           <span>This loot table has no drops configured yet.</span>
           <span className="text-[10px] text-faint">
             Add items, currency amounts, repo pulls, or nested tables with weighted chances.
@@ -218,17 +218,17 @@ export function LootTableEditor({ value, onChange }: Props) {
             return (
               <div
                 key={entry.id}
-                className="border border-line/70 bg-black/70 p-3 flex flex-col gap-2.5 transition-colors hover:border-line"
+                className="border border-line/70 tone-well-70 p-3 flex flex-col gap-2.5 transition-colors hover:border-line"
               >
                 {/* ROW 1: WEIGHT, PROBABILITY %, TYPE, DELETE */}
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-faint uppercase font-bold shrink-0">
+                  <span className="text-[10px] text-faint caps font-bold shrink-0">
                     #{idx + 1}
                   </span>
 
                   {/* WEIGHT INPUT */}
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[10px] text-dim uppercase">Weight:</span>
+                    <span className="text-[10px] text-dim caps">Weight:</span>
                     <Input
                       type="number"
                       min={1}
@@ -236,13 +236,13 @@ export function LootTableEditor({ value, onChange }: Props) {
                       onChange={(e) =>
                         handleUpdateEntry(entry.id, { weight: Math.max(1, Number(e.target.value)) })
                       }
-                      className="h-7 w-16 text-center text-[11.5px] font-bold text-cyan"
+                      className="h-7 w-16 text-center text-[11.5px] font-bold text-tint-cyan"
                     />
                   </div>
 
                   {/* CALCULATED PERCENTAGE PILL */}
                   <div
-                    className="flex items-center gap-1 px-2 py-1 bg-cyan/10 border border-cyan/30 text-[11px] font-bold text-cyan shrink-0"
+                    className="flex items-center gap-1 px-2 py-1 bg-tint-cyan/10 border border-tint-cyan/30 text-[11px] font-bold text-tint-cyan shrink-0"
                     title={`Relative chance based on weight ${entry.weight} / total ${totalWeight}`}
                   >
                     <span>{pct}%</span>

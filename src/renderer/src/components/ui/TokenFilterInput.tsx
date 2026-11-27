@@ -101,7 +101,7 @@ export function TokenFilterInput({
             type="button"
             onClick={() => removeType(t)}
             title={`Remove type:${t} filter`}
-            className="inline-flex items-center gap-1 border border-cyan/60 bg-cyan/15 px-1.5 py-0.5 font-mono text-[10px] leading-none text-cyan hover:border-alert hover:bg-alert/15 hover:text-alert cursor-pointer"
+            className="inline-flex items-center gap-1 border border-secondary-ink/60 bg-secondary-ink/15 px-1.5 py-0.5 font-ui text-[10px] leading-none text-secondary-ink hover:border-alert hover:bg-alert/15 hover:text-alert cursor-pointer"
           >
             <span>type:{t}</span>
             <X className="h-2.5 w-2.5" />
@@ -113,7 +113,7 @@ export function TokenFilterInput({
             type="button"
             onClick={() => removeTag(t)}
             title={`Remove #${t} filter`}
-            className="inline-flex items-center gap-1 border border-accent/60 bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] leading-none text-accent hover:border-alert hover:bg-alert/15 hover:text-alert cursor-pointer"
+            className="inline-flex items-center gap-1 border border-accent/60 bg-accent/15 px-1.5 py-0.5 font-ui text-[10px] leading-none text-accent hover:border-alert hover:bg-alert/15 hover:text-alert cursor-pointer"
           >
             <span>#{t}</span>
             <X className="h-2.5 w-2.5" />
@@ -142,7 +142,7 @@ export function TokenFilterInput({
           placeholder={hasAny ? 'Filter…' : placeholder}
           spellCheck={false}
           className={cn(
-            'min-w-[4.5rem] flex-1 bg-transparent px-1 text-white outline-none placeholder:text-faint',
+            'min-w-[4.5rem] flex-1 bg-transparent px-1 text-ink outline-none placeholder:text-faint',
             compact ? 'h-4.5 text-[12px]' : 'h-5 text-[12.5px]'
           )}
         />
@@ -150,7 +150,7 @@ export function TokenFilterInput({
       {showSuggestions && (
         <div
           className={cn(
-            'flex flex-wrap gap-1 border border-line/50 bg-black/95 p-1.5 shadow-lg',
+            'flex flex-wrap gap-1 border border-line/50 tone-panel-95 p-1.5 shadow-lg',
             compact ? 'absolute right-0 top-full z-40 mt-1 w-72 max-w-[80vw]' : 'mt-1'
           )}
         >
@@ -164,7 +164,7 @@ export function TokenFilterInput({
                 if (!types.includes(low)) onTypesChange([...types, low])
                 onChange(value.replace(/(?:^|\s)type:[^\s]*$/i, '').trim())
               }}
-              className="border border-line/50 bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-dim hover:border-cyan/60 hover:text-cyan cursor-pointer"
+              className="border border-line/50 tone-well-50 px-1.5 py-0.5 font-ui text-[10px] text-dim hover:border-secondary-ink/60 hover:text-secondary-ink cursor-pointer"
             >
               type:{t.id} <span className="text-faint">{t.count}</span>
             </button>
@@ -179,7 +179,7 @@ export function TokenFilterInput({
                 if (!tags.includes(low)) onTagsChange([...tags, low])
                 onChange(value.replace(/(?:^|\s)(?:#|tag:)[^\s]*$/i, '').trim())
               }}
-              className="border border-line/50 bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-dim hover:border-accent/60 hover:text-accent cursor-pointer"
+              className="border border-line/50 tone-well-50 px-1.5 py-0.5 font-ui text-[10px] text-dim hover:border-accent/60 hover:text-accent cursor-pointer"
             >
               #{t.id} <span className="text-faint">{t.count}</span>
             </button>

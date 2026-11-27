@@ -47,7 +47,7 @@ export function PermissionsPanel({ className }: { className?: string }) {
       }
       intro={
         <>
-        Commands run in <span className="text-white">{shell ? `${shell.name} (${shell.path})` : 'no shell found'}</span>. They are not sandboxed: a
+        Commands run in <span className="text-ink">{shell ? `${shell.name} (${shell.path})` : 'no shell found'}</span>. They are not sandboxed: a
         command can do anything you can. Your approval is the real safeguard; the rules below reduce how often you are asked and catch obvious
         mistakes, but no list of patterns can stop every way of writing a command.
         </>

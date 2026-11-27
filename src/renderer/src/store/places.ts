@@ -13,6 +13,7 @@ interface PlacesState {
 const CACHE_PREFIX = 'seven.place.'
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
 const pending = new Map<string, unknown>()
+const inFlight = new Set<string>()
 
 export function readCachedPlace(key: string): unknown {
   if (!key.startsWith('view.')) return undefined
@@ -32,12 +33,21 @@ function writeCachedPlace(key: string, value: unknown): void {
 function commitPlace(key: string, value: unknown): void {
   if (!usePlaces.getState().loaded) return
   pending.set(key, value)
+  if (inFlight.has(key)) return
+  inFlight.add(key)
   void engine('places.set', { key, value })
     .then(() => {
-      if (pending.get(key) === value) pending.delete(key)
+      inFlight.delete(key)
+      const latest = pending.get(key)
+      if (Object.is(latest, value)) {
+        pending.delete(key)
+      } else if (pending.has(key) && !timers.has(key)) {
+        commitPlace(key, latest)
+      }
     })
     .catch((err) => {
-      if (pending.get(key) === value) pending.delete(key)
+      inFlight.delete(key)
+      if (Object.is(pending.get(key), value)) pending.delete(key)
       failed('Could not remember where you were')(err)
     })
 }

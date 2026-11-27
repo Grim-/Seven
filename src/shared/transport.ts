@@ -20,6 +20,7 @@ export interface TransportCapabilities {
   sendFile?: (file: File) => Promise<string>
   assetUrl?: (id: string, name: string) => string
   form?: boolean
+  startColors?: boolean
 }
 
 export type TransportNeed = keyof TransportCapabilities

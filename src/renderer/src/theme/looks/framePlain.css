@@ -1,0 +1,5 @@
+@layer components {
+  html[data-look-frame='plain'] :is(.card-deks, .shell-slate, .widget-frame)::after {
+    content: none;
+  }
+}

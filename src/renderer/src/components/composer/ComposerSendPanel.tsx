@@ -42,18 +42,18 @@ export function ComposerSendPanel({ draft, agent, onAgent, onLoad, onSaved }: Pr
     )
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3.5 overflow-y-auto border border-line/40 bg-black/40 p-3 font-mono">
+    <div className="flex h-full min-h-0 flex-col gap-3.5 overflow-y-auto border border-line/40 tone-panel-40 p-3 font-ui">
       {/* Telemetry Shelf */}
       <div className="flex flex-col gap-1 border-b border-line/40 pb-2.5">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-accent">PROMPT TELEMETRY</span>
+        <span className="text-[10px] font-bold caps-5 text-accent">Prompt telemetry</span>
         <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px]">
-          <div className="border border-line/40 bg-black/50 px-2 py-1">
-            <span className="block text-[9.5px] text-faint">ENTITIES</span>
-            <span className="font-bold text-cyan">{refCount} attached</span>
+          <div className="border border-line/40 tone-panel-50 px-2 py-1">
+            <span className="block text-[9.5px] caps text-faint">Entities</span>
+            <span className="font-bold text-secondary-ink">{refCount} attached</span>
           </div>
-          <div className="border border-line/40 bg-black/50 px-2 py-1">
+          <div className="border border-line/40 tone-panel-50 px-2 py-1">
             <span className="block text-[9.5px] text-faint">EST. TOKENS</span>
-            <span className="font-bold text-white">~{tokenCount}</span>
+            <span className="font-bold text-ink">~{tokenCount}</span>
           </div>
         </div>
       </div>
@@ -67,7 +67,7 @@ export function ComposerSendPanel({ draft, agent, onAgent, onLoad, onSaved }: Pr
           icon={<MessageSquarePlus />}
           disabled={empty || busy}
           onClick={() => void run(() => sendToChat(null, agent ?? fallback, draft.text), 'Could not start the chat')}
-          className="mt-1 font-bold uppercase tracking-wider"
+          className="mt-1 font-bold caps-5 "
         >
           Start the chat
         </Button>

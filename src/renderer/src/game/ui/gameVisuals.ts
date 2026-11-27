@@ -33,11 +33,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: FlaskConical,
       category: 'Alchemy',
-      color: 'text-emerald-400',
-      border: 'border-emerald-500/50',
-      bg: 'bg-emerald-500/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(52,211,153,0.2)]',
-      badge: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+      color: 'text-tint-green-ink',
+      border: 'border-tint-green/50',
+      bg: 'bg-tint-green/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-ok)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-green/40 bg-tint-green/15 text-tint-green-ink'
     }
   },
   {
@@ -45,11 +45,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: Heart,
       category: 'Restoration',
-      color: 'text-emerald-400',
-      border: 'border-emerald-500/50',
-      bg: 'bg-emerald-500/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(52,211,153,0.2)]',
-      badge: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+      color: 'text-tint-green-ink',
+      border: 'border-tint-green/50',
+      bg: 'bg-tint-green/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-ok)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-green/40 bg-tint-green/15 text-tint-green-ink'
     }
   },
   {
@@ -57,11 +57,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: Scroll,
       category: 'Arcane',
-      color: 'text-purple-400',
-      border: 'border-purple-500/50',
-      bg: 'bg-purple-500/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(192,132,252,0.2)]',
-      badge: 'border-purple-500/40 bg-purple-500/15 text-purple-300'
+      color: 'text-tint-purple-ink',
+      border: 'border-tint-purple/50',
+      bg: 'bg-tint-purple/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-tint-purple-ink)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-purple/40 bg-tint-purple/15 text-tint-purple-ink'
     }
   },
   {
@@ -69,11 +69,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: Skull,
       category: 'Affliction',
-      color: 'text-purple-400',
-      border: 'border-purple-500/50',
-      bg: 'bg-purple-500/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(192,132,252,0.2)]',
-      badge: 'border-purple-500/40 bg-purple-500/15 text-purple-300'
+      color: 'text-tint-purple-ink',
+      border: 'border-tint-purple/50',
+      bg: 'bg-tint-purple/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-tint-purple-ink)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-purple/40 bg-tint-purple/15 text-tint-purple-ink'
     }
   },
   {
@@ -81,11 +81,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: Flame,
       category: 'Fire',
-      color: 'text-amber-400',
-      border: 'border-amber-500/50',
-      bg: 'bg-amber-500/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(245,158,11,0.2)]',
-      badge: 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+      color: 'text-tint-amber-ink',
+      border: 'border-tint-amber/50',
+      bg: 'bg-tint-amber/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-tint-amber)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-amber/40 bg-tint-amber/15 text-tint-amber-ink'
     }
   },
   {
@@ -93,11 +93,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: Droplets,
       category: 'Frost',
-      color: 'text-sky-400',
-      border: 'border-sky-500/50',
-      bg: 'bg-sky-500/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(56,189,248,0.2)]',
-      badge: 'border-sky-500/40 bg-sky-500/15 text-sky-300'
+      color: 'text-tint-sky-ink',
+      border: 'border-tint-sky/50',
+      bg: 'bg-tint-sky/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-tint-sky-ink)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-sky/40 bg-tint-sky/15 text-tint-sky-ink'
     }
   },
   {
@@ -105,11 +105,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: Zap,
       category: 'Lightning',
-      color: 'text-yellow-400',
-      border: 'border-yellow-500/50',
-      bg: 'bg-yellow-500/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(250,204,21,0.2)]',
-      badge: 'border-yellow-500/40 bg-yellow-500/15 text-yellow-300'
+      color: 'text-tint-yellow-ink',
+      border: 'border-tint-yellow/50',
+      bg: 'bg-tint-yellow/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,rgb(250,204,21)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-yellow/40 bg-tint-yellow/15 text-tint-yellow-ink'
     }
   },
   {
@@ -117,11 +117,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: Shield,
       category: 'Defense',
-      color: 'text-cyan',
-      border: 'border-cyan/50',
-      bg: 'bg-cyan/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(102,252,241,0.2)]',
-      badge: 'border-cyan/40 bg-cyan/15 text-cyan'
+      color: 'text-tint-cyan',
+      border: 'border-tint-cyan/50',
+      bg: 'bg-tint-cyan/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-tint-cyan)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-cyan/40 bg-tint-cyan/15 text-tint-cyan'
     }
   },
   {
@@ -129,11 +129,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: Swords,
       category: 'Combat',
-      color: 'text-amber-400',
-      border: 'border-amber-500/50',
-      bg: 'bg-amber-500/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(245,158,11,0.2)]',
-      badge: 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+      color: 'text-tint-amber-ink',
+      border: 'border-tint-amber/50',
+      bg: 'bg-tint-amber/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-tint-amber)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-amber/40 bg-tint-amber/15 text-tint-amber-ink'
     }
   },
   {
@@ -141,11 +141,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: Shirt,
       category: 'Apparel',
-      color: 'text-sky-400',
-      border: 'border-sky-500/50',
-      bg: 'bg-sky-500/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(56,189,248,0.2)]',
-      badge: 'border-sky-500/40 bg-sky-500/15 text-sky-300'
+      color: 'text-tint-sky-ink',
+      border: 'border-tint-sky/50',
+      bg: 'bg-tint-sky/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-tint-sky-ink)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-sky/40 bg-tint-sky/15 text-tint-sky-ink'
     }
   },
   {
@@ -153,11 +153,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
     visual: {
       Icon: Sparkles,
       category: 'Arcana',
-      color: 'text-cyan',
-      border: 'border-cyan/50',
-      bg: 'bg-cyan/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(102,252,241,0.2)]',
-      badge: 'border-cyan/40 bg-cyan/15 text-cyan'
+      color: 'text-tint-cyan',
+      border: 'border-tint-cyan/50',
+      bg: 'bg-tint-cyan/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-tint-cyan)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-cyan/40 bg-tint-cyan/15 text-tint-cyan'
     }
   }
 ]
@@ -165,11 +165,11 @@ const RULES: Array<{ test: RegExp; visual: GameVisual }> = [
 const DEFAULT_ITEM_VISUAL: GameVisual = {
   Icon: Package,
   category: 'Gear',
-  color: 'text-white/80',
+  color: 'text-ink/80',
   border: 'border-line/60',
-  bg: 'bg-white/[0.04]',
-  glow: 'shadow-[inset_0_0_8px_rgba(255,255,255,0.05)]',
-  badge: 'border-line/60 bg-white/[0.05] text-dim'
+  bg: 'bg-ink/[0.04]',
+  glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,rgb(255,255,255)_calc(5%*var(--glow)),transparent)]',
+  badge: 'border-line/60 bg-ink/[0.05] text-dim'
 }
 
 export function getGameVisual(label: string, hint = '', fallback: 'item' | 'ability' = 'item'): GameVisual {
@@ -180,11 +180,11 @@ export function getGameVisual(label: string, hint = '', fallback: 'item' | 'abil
     return {
       Icon: Sparkles,
       category: 'Ability',
-      color: 'text-cyan',
-      border: 'border-cyan/50',
-      bg: 'bg-cyan/10',
-      glow: 'shadow-[inset_0_0_8px_rgba(102,252,241,0.2)]',
-      badge: 'border-cyan/40 bg-cyan/15 text-cyan'
+      color: 'text-tint-cyan',
+      border: 'border-tint-cyan/50',
+      bg: 'bg-tint-cyan/10',
+      glow: 'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--color-tint-cyan)_calc(20%*var(--glow)),transparent)]',
+      badge: 'border-tint-cyan/40 bg-tint-cyan/15 text-tint-cyan'
     }
   }
   return DEFAULT_ITEM_VISUAL
@@ -216,10 +216,10 @@ export function combatVitalsOf(entity: GameEntity, catalog: Catalog): CombatVita
   const carry = Math.round(statNumber(entity, catalog, 'carry weight', statNumber(entity, catalog, 'carryweight', 90)))
   const belt = Math.round(statNumber(entity, catalog, 'belt slots', statNumber(entity, catalog, 'belt', 4)))
   return [
-    { key: 'ac', label: 'Armor', value: `${armour} AC`, Icon: Shield, toneClass: 'border-cyan/40 bg-cyan/10 text-cyan' },
-    { key: 'init', label: 'Init', value: signedMod, Icon: Zap, toneClass: 'border-yellow-500/40 bg-yellow-500/10 text-yellow-400' },
-    { key: 'speed', label: 'Speed', value: `${speed} ft`, Icon: Footprints, toneClass: 'border-sky-500/40 bg-sky-500/10 text-sky-300' },
-    { key: 'carry', label: 'Carry', value: `${carry} lb`, Icon: Package, toneClass: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
+    { key: 'ac', label: 'Armor', value: `${armour} AC`, Icon: Shield, toneClass: 'border-tint-cyan/40 bg-tint-cyan/10 text-tint-cyan' },
+    { key: 'init', label: 'Init', value: signedMod, Icon: Zap, toneClass: 'border-tint-yellow/40 bg-tint-yellow/10 text-tint-yellow-ink' },
+    { key: 'speed', label: 'Speed', value: `${speed} ft`, Icon: Footprints, toneClass: 'border-tint-sky/40 bg-tint-sky/10 text-tint-sky-ink' },
+    { key: 'carry', label: 'Carry', value: `${carry} lb`, Icon: Package, toneClass: 'border-tint-green/40 bg-tint-green/10 text-tint-green-ink' },
     { key: 'belt', label: 'Belt', value: String(belt), Icon: Sparkles, toneClass: 'border-accent/40 bg-accent/10 text-accent' }
   ]
 }

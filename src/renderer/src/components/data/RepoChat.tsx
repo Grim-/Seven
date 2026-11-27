@@ -49,7 +49,7 @@ export function RepoChat({ id }: EntrySurfaceProps) {
       <TraitChips traits={[...repo.values.slice(0, SHOWN).map((v, i) => ({ key: String(i), label: displayTrait(v) })), ...(more > 0 ? [{ key: 'more', label: `+ ${more} more` }] : [])]} />
       {rolled !== null && (
         <div className="flex items-baseline gap-2">
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">Rolled</span>
+          <span className="font-label text-[10.5px] caps-14 text-faint">Rolled</span>
           <span className="font-semibold text-accent">{withReferences(rolled)}</span>
         </div>
       )}
@@ -63,10 +63,10 @@ function BigRoll({ id, large }: { id: string; large: boolean }) {
   if (!repo) return <Loading />
   return (
     <div className={cn('flex flex-col items-center justify-center gap-3 text-center', large ? 'h-[60vh]' : 'h-full')}>
-      {large && <span className="font-mono text-[12px] uppercase tracking-[0.2em] text-faint">{repo.title}</span>}
-      <span className={cn('font-mono font-bold text-accent', large ? 'text-[56px]' : 'text-[22px]')}>{rolled !== null ? withReferences(rolled) : '—'}</span>
+      {large && <span className="font-label text-[12px] caps-20 text-faint">{repo.title}</span>}
+      <span className={cn('font-ui font-bold text-accent', large ? 'text-[56px]' : 'text-[22px]')}>{rolled !== null ? withReferences(rolled) : '—'}</span>
       <RollButton roll={roll} label={rolled === null ? 'Roll' : 'Roll again'} />
-      {!large && <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{repo.values.length} values</span>}
+      {!large && <span className="font-label text-[10px] caps-14 text-faint">{repo.values.length} values</span>}
     </div>
   )
 }

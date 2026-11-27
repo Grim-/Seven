@@ -24,7 +24,7 @@ export function Profile() {
       title="You"
       actions={
         <>
-          <span className="font-mono text-[10.5px] text-faint">kept in this vault</span>
+          <span className="font-ui text-[10.5px] text-faint">kept in this vault</span>
           <SaveState status={autosave.status} error={autosave.error} />
         </>
       }

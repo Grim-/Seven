@@ -44,7 +44,7 @@ export function PlayPanel({ character, where, onClose }: { character: string | n
       : decisions.filter((d) => (tab === 'rolled' ? d.mode === 'roll' : d.mode === 'pick')).map((d) => ({ id: d.id, name: d.name, sub: d.mode === 'roll' ? `d${d.die}` : d.options.length ? `${d.options.length} kept` : `${d.count} written by the agent`, tags: d.tags }))
   const key = `${tab}:${current ?? 'new'}:${fresh}`
   return (
-    <div className="flex h-full min-h-0 flex-col border border-accent/60 bg-black/95 shadow-[0_-12px_30px_rgba(0,0,0,0.6)]">
+    <div className="flex h-full min-h-0 flex-col border border-accent/60 tone-panel-95 shadow-[0_-12px_30px_color-mix(in_srgb,var(--color-shade)_60%,transparent)]">
       <ShellTabs value={tab} options={TABS} onChange={setTab}>
         <Button size="sm" variant="ghost" icon={<X />} title="Close" onClick={onClose} />
       </ShellTabs>

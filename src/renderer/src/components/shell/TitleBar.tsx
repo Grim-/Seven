@@ -6,12 +6,14 @@ import { main, on } from '../../lib/ipc'
 import { allowedRequest } from '../../lib/transport'
 import { useSessions } from '../../store/sessions'
 import { useAgents } from '../../store/agents'
+import { useImageHost } from '../../store/image'
 import { useModels } from '../../store/models'
 import { useVault } from '../../store/vault'
 import { openChat } from '../../lib/library'
 import { cn } from '../../lib/cn'
 import { failed } from '../../lib/notify'
 import { noteFailure } from '../../store/problems'
+import { skinSurface } from '../skins/skinSurface'
 
 const pretty = (name: string) => name.replace(/_/g, ' ')
 
@@ -52,12 +54,50 @@ function usePhasesBySession(): Record<string, TurnPhase> {
   return phases
 }
 
-function Pulse() {
+function TitleBarHeartbeat({ active }: { active: boolean }) {
+  if (!active) return null
   return (
-    <svg viewBox="0 0 60 14" className="h-3.5 w-12 shrink-0 text-accent" fill="none">
-      <path d="M0 7h14l3-5 4 10 4-8 3 3h32" stroke="currentColor" strokeOpacity="0.25" strokeWidth="1.2" />
-      <path d="M0 7h14l3-5 4 10 4-8 3 3h32" stroke="currentColor" strokeWidth="1.4" className="seven-trace" />
-    </svg>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] overflow-hidden text-accent">
+      {/* Full-width repeating ECG heartbeat baseline across the entire title bar */}
+      <svg className="h-full w-full" preserveAspectRatio="none">
+        <defs>
+          <pattern id="seven-ecg-tile" width="180" height="40" patternUnits="userSpaceOnUse">
+            <path
+              d="M0 22 H52 L58 19 L64 22 H74 L80 26 L87 7 L94 34 L100 17 L105 22 H118 Q125 14 132 22 H180"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.25"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#seven-ecg-tile)" opacity="0.22" />
+      </svg>
+
+      {/* Traveling bright heartbeat pulse sweeping edge-to-edge across the entire bar */}
+      <div
+        className="absolute inset-0"
+        style={{
+          maskImage:
+            'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'180\' height=\'40\' viewBox=\'0 0 180 40\'%3E%3Cpath d=\'M0 22 H52 L58 19 L64 22 H74 L80 26 L87 7 L94 34 L100 17 L105 22 H118 Q125 14 132 22 H180\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E")',
+          WebkitMaskImage:
+            'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'180\' height=\'40\' viewBox=\'0 0 180 40\'%3E%3Cpath d=\'M0 22 H52 L58 19 L64 22 H74 L80 26 L87 7 L94 34 L100 17 L105 22 H118 Q125 14 132 22 H180\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E")',
+          maskRepeat: 'repeat-x',
+          WebkitMaskRepeat: 'repeat-x',
+          maskSize: '180px 40px',
+          WebkitMaskSize: '180px 40px'
+        }}
+      >
+        <div
+          className="seven-heartbeat-sweep h-full w-full"
+          style={{
+            background:
+              'linear-gradient(90deg, transparent 0%, transparent 38%, color-mix(in srgb, var(--color-accent) 45%, transparent) 44%, var(--color-accent) 52%, color-mix(in srgb, var(--color-ink) 90%, var(--color-accent)) 56%, transparent 62%, transparent 100%)'
+          }}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -74,12 +114,9 @@ function Activity({ running }: { running: string[] }) {
     <button
       onClick={() => openChat(id)}
       title={session ? `${session.title}: open the chat` : 'Open the chat'}
-      className="no-drag relative z-[2] ml-5 flex min-w-0 items-center gap-2 border-l border-line/50 pl-4 font-mono text-[11px] text-white/80 hover:text-white phone:ml-2 phone:gap-1.5 phone:pl-2"
+      className="no-drag relative z-[2] ml-5 flex min-w-0 items-center gap-2 border-l border-line/50 pl-4 font-ui text-[11px] text-ink/85 hover:text-ink phone:ml-2 phone:gap-1.5 phone:pl-2"
     >
-      <span className="contents phone:hidden">
-        <Pulse />
-      </span>
-      <span className="truncate text-teal/90">{agent?.name ?? 'Agent'}</span>
+      <span className="truncate text-secondary/95">{agent?.name ?? 'Agent'}</span>
       <span className="flex h-3.5 w-3.5 shrink-0 items-center text-dim [&>svg]:h-3.5 [&>svg]:w-3.5">{icon}</span>
       <span className="truncate text-dim">{text}</span>
       {running.length > 1 && <span className="shrink-0 border border-line/60 px-1 text-[10px] text-faint">+{running.length - 1}</span>}
@@ -94,9 +131,9 @@ function Clock() {
     return () => clearInterval(timer)
   }, [])
   return (
-    <span className="relative z-[2] flex items-baseline gap-2 font-mono tabular-nums">
-      <span className="text-[10.5px] uppercase tracking-[0.14em] text-faint phone:hidden">{now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-      <span className="text-[13px] text-white/85 phone:text-[12px]">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+    <span className="relative z-[2] flex items-baseline gap-2 font-data tabular-nums">
+      <span className="text-[10.5px] caps-14 text-faint phone:hidden">{now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+      <span className="text-[13px] text-ink/85 phone:text-[12px]">{now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
     </span>
   )
 }
@@ -110,7 +147,7 @@ function VaultGlyph() {
     <button
       title={status.unlocked ? 'Vault open: click to lock' : 'Vault locked: click to unlock'}
       onClick={() => (status.unlocked ? void lock().catch(failed('Could not lock')) : ask())}
-      className={cn('no-drag relative z-[2] flex h-7 w-7 items-center justify-center', status.unlocked ? 'text-dim hover:text-accent' : 'text-accent hover:text-white')}
+      className={cn('no-drag relative z-[2] flex h-7 w-7 items-center justify-center', status.unlocked ? 'text-dim hover:text-accent' : 'text-accent hover:text-ink')}
     >
       {status.unlocked ? <LockOpen className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
     </button>
@@ -129,6 +166,11 @@ export function TitleBar() {
   const [maximized, setMaximized] = useState(false)
   const runningMap = useSessions((s) => s.running)
   const running = Object.keys(runningMap).filter((id) => runningMap[id])
+  const modelLoading = useModels((s) => s.host.status === 'loading')
+  const imageBusy = useImageHost(
+    (s) => s.generating || s.host.status === 'loading' || s.host.status === 'generating' || s.host.busyCount > 0
+  )
+  const isRunning = running.length > 0 || modelLoading || imageBusy
 
   const windowed = allowedRequest('main', 'window.isMaximized')
 
@@ -140,10 +182,12 @@ export function TitleBar() {
 
   return (
     <header
-      className="drag scanlines relative z-50 flex h-10 shrink-0 select-none items-center border-b border-line bg-gradient-to-r from-accent/10 via-black/60 to-black/80 pl-4 phone:pl-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.9),0_0_15px_color-mix(in_srgb,var(--color-accent)_8%,transparent)]"
+      {...skinSurface('top-bar')}
+      className="drag scanlines relative z-50 flex h-10 shrink-0 select-none items-center border-b border-line bg-gradient-to-r from-accent/10 via-panel/60 to-panel/80 pl-4 phone:pl-2.5 shadow-[0_10px_30px_color-mix(in_srgb,var(--color-shade)_90%,transparent),var(--shadow-glow)]"
       onDoubleClick={windowed ? () => void main('window.toggleMaximize').then(setMaximized, failed('Could not resize the window')) : undefined}
     >
-      <span className="relative z-[2] shrink-0 font-mono text-[19px] font-light tracking-[0.12em] text-white phone:text-[15px]">
+      <TitleBarHeartbeat active={isRunning} />
+      <span className="relative z-[2] shrink-0 font-ui text-[19px] font-light tracking-[0.12em] text-ink phone:text-[15px]">
         <span className="text-accent">//</span>SEVEN
       </span>
       <Activity running={running} />
@@ -153,16 +197,16 @@ export function TitleBar() {
         <VaultGlyph />
       </div>
       {windowed && <div className="no-drag relative z-[2] flex h-full">
-        <button className="flex h-full w-12 items-center justify-center text-dim hover:bg-white/5 hover:text-white" onClick={() => void main('window.minimize').catch(failed('Could not minimise the window'))}>
+        <button className="flex h-full w-12 items-center justify-center text-dim hover:bg-ink/5 hover:text-ink" onClick={() => void main('window.minimize').catch(failed('Could not minimise the window'))}>
           <Minus className="h-4 w-4" />
         </button>
         <button
-          className="flex h-full w-12 items-center justify-center text-dim hover:bg-white/5 hover:text-white"
+          className="flex h-full w-12 items-center justify-center text-dim hover:bg-ink/5 hover:text-ink"
           onClick={() => void main('window.toggleMaximize').then(setMaximized, failed('Could not resize the window'))}
         >
           {maximized ? <Copy className="h-3.5 w-3.5 -scale-x-100" /> : <Square className="h-3.5 w-3.5" />}
         </button>
-        <button className="flex h-full w-12 items-center justify-center text-dim hover:bg-alert hover:text-white" onClick={() => void main('window.close').catch(failed('Could not close the window'))}>
+        <button className="flex h-full w-12 items-center justify-center text-dim hover:bg-alert hover:text-ink" onClick={() => void main('window.close').catch(failed('Could not close the window'))}>
           <X className="h-4 w-4" />
         </button>
       </div>}

@@ -15,9 +15,9 @@ export function RecentSessions({ history, today, limit, onOpen }: { history: Wor
         const rows = history.rows.filter((r) => r.date === date)
         const used = [...new Set(rows.map((r) => (r.workout ? (workouts.get(r.workout) ?? 'removed workout') : null)).filter(Boolean))]
         return (
-          <button key={date} onClick={() => onOpen(date)} className="flex flex-col gap-1 border-b border-line/25 px-3 py-2 text-left hover:bg-white/[0.03]">
+          <button key={date} onClick={() => onOpen(date)} className="flex flex-col gap-1 border-b border-line/25 px-3 py-2 text-left hover:bg-ink/[0.03]">
             <span className="flex items-baseline gap-2">
-              <span className="text-[13px] font-semibold text-white">{dayLabel(date)}</span>
+              <span className="text-[13px] font-semibold text-ink">{dayLabel(date)}</span>
               <span className="text-[11.5px] text-faint">
                 {agoText(date, today)} · {used.length ? used.map((u) => showName(u!)).join(', ') : 'no workout'} · {rows.reduce((n, r) => n + r.values.length, 0)} sets
               </span>
@@ -25,7 +25,7 @@ export function RecentSessions({ history, today, limit, onOpen }: { history: Wor
             {rows.map((r, i) => (
               <span key={i} className="flex gap-3 text-[12.5px]">
                 <span className="w-44 shrink-0 truncate text-dim">{showName(names.get(r.exercise)?.name ?? 'removed exercise')}</span>
-                <span className="font-mono text-white">
+                <span className="font-ui text-ink">
                   {valuesText(r.values)}
                   <UnitLabel unit={names.get(r.exercise)?.unit ?? ''} />
                 </span>

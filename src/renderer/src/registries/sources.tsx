@@ -1,11 +1,12 @@
 import { useState, type ComponentType } from 'react'
 import { FileUp, Plus } from 'lucide-react'
-import { hitDetail, type GatherItem, type LibraryHit } from '@shared/types'
+import { hitDetail, type GatherItem } from '@shared/types'
 import { Button, Input, SearchBox, Textarea } from '../components/ui'
-import { engine, main } from '../lib/ipc'
+import { main } from '../lib/ipc'
 import { toast } from '../store/toasts'
 import { importPaths } from '../lib/importFiles'
 import { errorText } from '../lib/format'
+import { useLibraryFind } from '../lib/useLibraryFind'
 
 export interface SourceInputProps {
   onAdd: (item: GatherItem) => void
@@ -57,21 +58,14 @@ function WebInput({ onAdd }: SourceInputProps) {
 
 function LibraryInput({ onAdd }: SourceInputProps) {
   const [query, setQuery] = useState('')
-  const [hits, setHits] = useState<LibraryHit[]>([])
-  const search = (q: string) => {
-    setQuery(q)
-    if (!q.trim()) return setHits([])
-    void engine('library.find', { query: q, kind: null })
-      .then((h) => setHits(h.slice(0, 12)))
-      .catch(() => setHits([]))
-  }
+  const hits = useLibraryFind(query, null, 12, Boolean(query.trim())) ?? []
   return (
     <div className="flex flex-col gap-1.5">
-      <SearchBox value={query} onChange={search} />
+      <SearchBox value={query} onChange={setQuery} />
       <div className="flex max-h-48 flex-col overflow-y-auto">
         {hits.map((h) => (
-          <button key={`${h.kind}/${h.id}`} onClick={() => onAdd({ source: 'library', title: h.title, data: { entry: `${h.kind}/${h.id}` } })} className="flex items-center gap-2 px-2 py-1 text-left text-[12.5px] text-white/85 hover:bg-accent/10">
-            <span className="font-mono text-[10px] uppercase text-faint">{h.kind}</span>
+          <button key={`${h.kind}/${h.id}`} onClick={() => onAdd({ source: 'library', title: h.title, data: { entry: `${h.kind}/${h.id}` } })} className="flex items-center gap-2 px-2 py-1 text-left text-[12.5px] text-ink/85 hover:bg-accent/10">
+            <span className="font-label text-[10px] caps text-faint">{h.kind}</span>
             <span className="truncate">{h.title}</span>
             <span className="ml-auto truncate text-[11px] text-dim">{hitDetail(h)}</span>
           </button>

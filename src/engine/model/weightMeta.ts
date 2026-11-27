@@ -73,6 +73,7 @@ async function readByteRange(source: string, how: HeaderRead, start: number, len
 
 function kindFromName(name: string): { kind: ModelKind; architecture: string | null } {
   const lower = name.toLowerCase().replace(/\\/g, '/')
+  if (/(^|[/_.\-])(control[-_]?vector|control[-_]?vectors|cvector)([/_.\-]|$)/.test(lower)) return { kind: 'control_vector', architecture: 'control-vector' }
   if (/(^|[/_.\-])(lora|loras|lycoris|dora|lokr|loha)([/_.\-]|$)/.test(lower)) return { kind: 'lora', architecture: 'lora' }
   if (/mmproj/i.test(lower)) return { kind: 'projector', architecture: 'clip-vision' }
   if (/(^|[/_.\-])(vae|vaes|vae_approx|taesd|taef1|taeqi|taehv|taew)([/_.\-]|$)/.test(lower) || /(^|\/)(ae|flux2-vae|qwen_image_vae|qwen_image_2\.1_vae.*|sdxl_vae)\.(safetensors|sft|ckpt)$/.test(lower)) {

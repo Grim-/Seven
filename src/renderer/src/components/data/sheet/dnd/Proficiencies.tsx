@@ -15,7 +15,7 @@ export function Proficiencies({ dnd, onChange }: { dnd: DndStats; onChange: (pat
       <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1 text-[12.5px]">
         {ROWS.map((r) => [
           <span key={`${r.key}-l`} className="text-faint">{r.label}</span>,
-          <InlineEdit key={r.key} value={dnd.proficiencies[r.key]} placeholder={r.placeholder} onSave={(v) => onChange({ proficiencies: { ...dnd.proficiencies, [r.key]: v } })} className="text-white" />
+          <InlineEdit key={r.key} value={dnd.proficiencies[r.key]} placeholder={r.placeholder} onSave={(v) => onChange({ proficiencies: { ...dnd.proficiencies, [r.key]: v } })} className="text-ink" />
         ])}
       </div>
     </Section>

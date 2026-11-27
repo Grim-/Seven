@@ -8,6 +8,7 @@ import { dataRoot } from '../util/paths'
 import { readJson, removePath, writeJson } from '../util/fs'
 import { chatFiles } from '../sessions/access'
 import { timeline } from '../timeline/store'
+import { checkThemeFiles } from './pictures'
 
 const AMBIENCE_FILE = 'ambience.json'
 
@@ -58,7 +59,7 @@ class ThemeStore extends EventEmitter {
   save(input: Omit<Partial<Theme>, 'id'> & { id?: string | null }): Theme {
     const existing = input.id ? this.find(input.id) : input.name ? this.find(input.name) : null
     if (existing?.builtin) throw new Error(`${existing.name} is built in and can't be changed. Save a copy under a new name instead (theme set to the new name, copy_of "${existing.name}").`)
-    const clean = cleanTheme(input, existing ?? SEVEN_THEME)
+    const clean = checkThemeFiles(cleanTheme(input, existing ?? SEVEN_THEME))
     if (!existing && !input.name?.trim()) throw new Error('A new theme needs a name')
     const clash = this.list().find((t) => t.id !== existing?.id && t.name.toLowerCase() === clean.name.toLowerCase())
     if (clash) throw new Error(`There is already a theme called ${clash.name}. Pick another name, or change that theme instead.`)
@@ -78,6 +79,7 @@ class ThemeStore extends EventEmitter {
     if (t.builtin) throw new Error(`${t.name} is built in and can't be deleted`)
     removePath(this.file(t.id))
     timeline.forget('theme', t.id)
+    this.emit('deleted', t.id)
     this.emit('changed', this.list())
   }
 

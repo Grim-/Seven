@@ -34,17 +34,17 @@ export function EntrySelect({
   }
 
   return (
-    <div className={cn('relative flex flex-col gap-1 font-mono', className)}>
-      <div className="flex items-center gap-1.5 border border-line bg-panel px-2 py-1">
+    <div className={cn('relative flex flex-col gap-1 font-ui', className)}>
+      <div className="flex items-center gap-1.5 border border-line tone-well-50 px-2 py-1">
         {parsed ? (
           <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
             <div className="flex items-center gap-1.5 truncate">
               {parsed.kind === 'sheet' ? (
                 <User className="h-3.5 w-3.5 text-accent shrink-0" />
               ) : (
-                <FileText className="h-3.5 w-3.5 text-cyan shrink-0" />
+                <FileText className="h-3.5 w-3.5 text-tint-cyan shrink-0" />
               )}
-              <span className="text-[11px] font-bold text-white truncate">
+              <span className="text-[11px] font-bold text-ink truncate">
                 {parsed.kind}:{parsed.id}
               </span>
             </div>
@@ -54,7 +54,7 @@ export function EntrySelect({
                 type="button"
                 onClick={() => openEntry(parsed.kind, parsed.id)}
                 title="Open entry"
-                className="flex items-center gap-0.5 text-[9px] text-cyan hover:text-white transition-colors"
+                className="flex items-center gap-0.5 text-[9px] text-tint-cyan hover:text-ink transition-colors"
               >
                 <ExternalLink className="h-2.5 w-2.5" />
                 <span>Open</span>
@@ -84,7 +84,7 @@ export function EntrySelect({
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="border border-line/60 bg-line/20 px-2 py-0.5 text-[9.5px] font-bold text-cyan hover:border-cyan hover:text-white transition-colors cursor-pointer"
+            className="border border-line/60 bg-line/20 px-2 py-0.5 text-[9.5px] font-bold text-tint-cyan hover:border-tint-cyan hover:text-ink transition-colors cursor-pointer"
           >
             Browse
           </button>

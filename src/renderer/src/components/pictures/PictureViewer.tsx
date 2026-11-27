@@ -8,6 +8,7 @@ import { closePictures, usePictureViewer, type PictureRequest } from './pictureS
 import { useStepper } from './useStepper'
 import { useEscapeLayer } from '../../lib/escape'
 import { matchesKeybind } from '../../store/keybinds'
+import { ZoomableImageViewport } from './ZoomableImageViewport'
 
 export function PictureViewerHost() {
   const request = usePictureViewer((s) => s.request)
@@ -18,9 +19,14 @@ export function PictureViewerHost() {
 function PictureViewer({ request }: { request: PictureRequest }) {
   const assets = useData((s) => s.assets)
   const [playing, setPlaying] = useState(request.seconds !== null)
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null)
   const count = request.ids.length
   const { index: at, step } = useStepper(count, request.at, request.seconds, playing)
   const asset = assets.find((a) => a.id === request.ids[at])
+
+  useEffect(() => {
+    setDims(null)
+  }, [asset?.id])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -37,11 +43,22 @@ function PictureViewer({ request }: { request: PictureRequest }) {
   useEscapeLayer(true, closePictures)
 
   return (
-    <div className="fixed inset-0 z-[120] flex flex-col bg-black/90" onClick={closePictures}>
-      <div className="flex shrink-0 items-center gap-2 px-4 py-2" onClick={(e) => e.stopPropagation()}>
-        <span className="min-w-0 truncate font-mono text-[12px] text-white">{asset?.name ?? 'A file that no longer exists'}</span>
+    <div
+      className="fixed inset-0 z-[120] flex flex-col bg-scrim/92"
+      onContextMenu={(e) => {
+        e.preventDefault()
+        closePictures()
+      }}
+    >
+      <div className="z-20 flex shrink-0 items-center gap-2 border-b border-line/40 tone-panel-85 px-4 py-2 backdrop-blur-[var(--panel-blur)]" onClick={(e) => e.stopPropagation()}>
+        <span className="min-w-0 truncate font-ui text-[12px] text-ink">{asset?.name ?? 'A file that no longer exists'}</span>
+        {dims && (
+          <span className="font-data text-[11px] text-secondary-ink">
+            {dims.w} × {dims.h}
+          </span>
+        )}
         {count > 1 && (
-          <span className="font-mono text-[11px] text-faint">
+          <span className="font-ui text-[11px] text-faint">
             {at + 1} of {count}
           </span>
         )}
@@ -57,18 +74,40 @@ function PictureViewer({ request }: { request: PictureRequest }) {
         )}
         <Button size="sm" variant="ghost" icon={<X />} title="Close" onClick={closePictures} />
       </div>
-      <div className="relative flex min-h-0 flex-1 items-center justify-center px-14 pb-6">
+
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         {asset ? (
           asset.kind === 'video' ? (
-            <video key={asset.id} src={assetUrl(asset)} controls autoPlay className="max-h-full max-w-full" onClick={(e) => e.stopPropagation()} />
+            <div className="flex h-full w-full items-center justify-center p-6" onClick={closePictures}>
+              <video key={asset.id} src={assetUrl(asset)} controls autoPlay className="max-h-full max-w-full" onClick={(e) => e.stopPropagation()} />
+            </div>
           ) : (
-            <img key={asset.id} src={assetUrl(asset)} alt={asset.name} draggable={false} className="max-h-full max-w-full object-contain" style={{ animation: 'reveal-fade 0.4s ease-out both' }} onClick={(e) => e.stopPropagation()} />
+            <ZoomableImageViewport
+              imageKey={asset.id}
+              src={assetUrl(asset)}
+              alt={asset.name}
+              onDimensions={setDims}
+              onBackdropClick={closePictures}
+            />
           )
         ) : null}
+
         {count > 1 && (
           <>
-            <Button variant="secondary" icon={<ChevronLeft />} title="Previous" onClick={(e) => (e.stopPropagation(), step(-1))} className="absolute left-3 top-1/2 -translate-y-1/2" />
-            <Button variant="secondary" icon={<ChevronRight />} title="Next" onClick={(e) => (e.stopPropagation(), step(1))} className="absolute right-3 top-1/2 -translate-y-1/2" />
+            <Button
+              variant="secondary"
+              icon={<ChevronLeft />}
+              title="Previous"
+              onClick={(e) => (e.stopPropagation(), step(-1))}
+              className="absolute left-3 top-1/2 z-20 -translate-y-1/2"
+            />
+            <Button
+              variant="secondary"
+              icon={<ChevronRight />}
+              title="Next"
+              onClick={(e) => (e.stopPropagation(), step(1))}
+              className="absolute right-3 top-1/2 z-20 -translate-y-1/2"
+            />
           </>
         )}
       </div>

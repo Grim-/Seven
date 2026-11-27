@@ -1,6 +1,7 @@
 import { CONDITIONS, type EffectGroup } from '../../effectGroups'
 import { entryLink, registerComponent, type TooltipRow } from '../../core'
 import { ActionPiece, type ActionEvent, type UseContext } from '../Action'
+import { BUFF_KIND } from '../../templateKinds'
 import { Buffs } from '../Buffs'
 import { Concentrating, Concentration } from '../buff/Concentration'
 
@@ -26,7 +27,7 @@ export class ApplyBuff extends ActionPiece {
     const buffs = event.target?.comp(Buffs)
     const def = event.user.catalog.template(ApplyBuff.PARAMS.buff.templateKind, String(this.params.buff))
     if (!def) return this.report(event, {}, 'There is no such buff to apply.')
-    const label = entryLink(ApplyBuff.PARAMS.buff.templateKind, String(this.params.buff))
+    const label = entryLink(BUFF_KIND, String(this.params.buff))
     if (!buffs) return this.report(event, { buff: String(this.params.buff) }, `${name} cannot gain ${label}.`)
     const applied = buffs.apply(def, event.user)
     if (!applied) return this.report(event, { buff: String(this.params.buff) }, `${label} did not take on ${name}.`)

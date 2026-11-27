@@ -38,7 +38,7 @@ export function GameWindow({
   return (
     <div
       className={cn(
-        'pointer-events-auto absolute left-1/2 top-[calc(50%-44px)] -translate-x-1/2 -translate-y-1/2 w-[1120px] max-w-[calc(100vw-32px)] h-[530px] max-h-[calc(100vh-140px)] z-30 flex flex-col border border-line-bright bg-[#080d12]/95 backdrop-blur-md shadow-[0_24px_64px_rgba(0,0,0,0.95)]',
+        'pointer-events-auto absolute left-1/2 top-[calc(50%-44px)] -translate-x-1/2 -translate-y-1/2 w-[1120px] max-w-[calc(100vw-32px)] h-[530px] max-h-[calc(100vh-140px)] z-30 flex flex-col border border-line-strong tone-surface-95 backdrop-blur-[calc(var(--panel-blur)*1.5)] shadow-[0_24px_64px_color-mix(in_srgb,var(--color-shade)_95%,transparent)]',
         className
       )}
       onContextMenu={(e) => e.stopPropagation()}
@@ -48,8 +48,8 @@ export function GameWindow({
       ))}
 
       {/* Header bar */}
-      <div className="flex h-11 shrink-0 items-stretch border-b border-line/60 bg-black/60">
-        <div className="flex items-center px-4 font-mono text-[11.5px] font-bold uppercase tracking-[0.2em] text-accent border-r border-line/40">
+      <div className="flex h-11 shrink-0 items-stretch border-b border-line/60 tone-well-60">
+        <div className="flex items-center px-4 font-label text-[11.5px] font-bold caps-20 text-accent border-r border-line/40">
           {title}
         </div>
         {tabs?.map((t) => (
@@ -60,14 +60,14 @@ export function GameWindow({
             className={cn(
               'flex items-center gap-2 border-r border-line/40 px-4 text-[12.5px] font-medium transition-all [&_svg]:h-4 [&_svg]:w-4',
               t.id === tab
-                ? 'bg-accent/15 text-white shadow-[inset_0_-2px_0_var(--color-accent)] font-semibold'
-                : 'text-dim hover:bg-white/[0.04] hover:text-white'
+                ? 'bg-accent/15 text-ink shadow-[inset_0_-2px_0_var(--color-accent)] font-semibold'
+                : 'text-dim hover:bg-ink/[0.04] hover:text-ink'
             )}
           >
             {t.icon}
             <span>{t.label}</span>
             {t.keyHint && (
-              <kbd className="border border-line/60 bg-black/50 px-1.5 py-0.5 font-mono text-[9.5px] text-faint">
+              <kbd className="border border-line/60 tone-panel-50 px-1.5 py-0.5 font-ui text-[9.5px] text-faint">
                 {t.keyHint}
               </kbd>
             )}
@@ -87,7 +87,7 @@ export function GameWindow({
       {/* Viewport */}
       <div className="flex min-h-0 flex-1">
         {side && (
-          <div className="flex w-56 shrink-0 flex-col gap-3 overflow-y-auto border-r border-line/50 bg-black/40 p-3">
+          <div className="flex w-56 shrink-0 flex-col gap-3 overflow-y-auto border-r border-line/50 tone-panel-40 p-3">
             {side}
           </div>
         )}

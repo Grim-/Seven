@@ -52,14 +52,14 @@ function DayRow({
   return (
     <GridRow onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && commit()}>
       <span className="min-w-0">
-        <span className="block truncate text-[13px] font-semibold text-white">
+        <span className="block truncate text-[13px] font-semibold text-ink">
           {showName(name)}
           <UnitLabel unit={unit} />
         </span>
         {workoutName && <span className="text-[11px] text-faint">{showName(workoutName)}</span>}
       </span>
       <SetBoxes values={draft} onChange={setDraft} />
-      <span className="text-right font-mono text-[13px] text-white">
+      <span className="text-right font-ui text-[13px] text-ink">
         {numbersOf(draft)
           .reduce((a, b) => a + b, 0)
           .toLocaleString()}

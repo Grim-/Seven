@@ -1,4 +1,4 @@
-import { avatarRendererInfo, type Avatar } from '@shared/avatars'
+import { avatarRendererInfo, avatarTreatmentInfo, type Avatar, type TreatmentEntry } from '@shared/avatars'
 import type { SettingValues } from '@shared/settingSpec'
 import { MOODS, ACTIVITIES } from '@shared/moods'
 import type { Kind } from '../library/kinds'
@@ -20,6 +20,11 @@ function valuesText(values: SettingValues): string {
     .join(', ')
 }
 
+function treatmentText(t: TreatmentEntry): string[] {
+  const label = avatarTreatmentInfo(t.type)?.label ?? t.type
+  return [`Treatment ${label} (${t.type}): ${valuesText(t.settings)}`, ...Object.entries(t.poses).map(([pose, values]) => `  Pose ${pose}: ${valuesText(values)}`)]
+}
+
 function avatarText(a: Avatar): string {
   const renderer = avatarRendererInfo(a.renderer)
   return [
@@ -28,7 +33,8 @@ function avatarText(a: Avatar): string {
     `Drawn by ${renderer?.label ?? a.renderer}: ${renderer?.description ?? ''}`,
     `Settings: ${valuesText(a.settings)}`,
     renderer?.poseSettings.length ? `Pose settings: ${renderer.poseSettings.join(', ')}` : '',
-    ...Object.entries(a.poses).map(([pose, values]) => `Pose ${pose}: ${valuesText(values)}`)
+    ...Object.entries(a.poses).map(([pose, values]) => `Pose ${pose}: ${valuesText(values)}`),
+    ...(a.treatments ?? []).flatMap(treatmentText)
   ]
     .filter(Boolean)
     .join('\n')

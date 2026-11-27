@@ -48,7 +48,7 @@ function SettingsForm({ module }: { module: ModuleInfo }) {
             <Toggle checked={values[s.name] === true} onChange={(v) => setValues({ ...values, [s.name]: v })} label={values[s.name] === true ? 'On' : 'Off'} />
           ) : s.type === 'folder' ? (
             <div className="flex gap-2">
-              <Input value={values[s.name] === undefined || values[s.name] === null ? '' : String(values[s.name])} onChange={(e) => setValues({ ...values, [s.name]: e.target.value })} className="flex-1 font-mono text-[12.5px]" />
+              <Input value={values[s.name] === undefined || values[s.name] === null ? '' : String(values[s.name])} onChange={(e) => setValues({ ...values, [s.name]: e.target.value })} className="flex-1 font-ui text-[12.5px]" />
               <Button
                 size="sm"
                 variant="secondary"
@@ -64,7 +64,7 @@ function SettingsForm({ module }: { module: ModuleInfo }) {
               type={s.secret ? 'password' : s.type === 'number' ? 'number' : 'text'}
               value={values[s.name] === undefined || values[s.name] === null ? '' : String(values[s.name])}
               onChange={(e) => setValues({ ...values, [s.name]: e.target.value })}
-              className="font-mono text-[12.5px]"
+              className="font-ui text-[12.5px]"
             />
           )}
         </Field>
@@ -114,19 +114,19 @@ function Detail({ module }: { module: ModuleInfo }) {
         </>
       }
     >
-      {module.description && <p className="text-[13px] text-white/85">{module.description}</p>}
+      {module.description && <p className="text-[13px] text-ink/85">{module.description}</p>}
       {module.dependencies.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 font-mono text-[11.5px]">
-          <span className="uppercase tracking-[0.14em] text-faint">Requires</span>
+        <div className="flex flex-wrap items-center gap-2 font-ui text-[11.5px]">
+          <span className="caps-14 text-faint">Requires</span>
           {module.dependencies.map((dep) => (
-            <span key={dep} className={module.missingDependencies.includes(dep) ? 'border border-accent/60 px-1.5 text-accent' : 'border border-line/50 px-1.5 text-white/85'}>
+            <span key={dep} className={module.missingDependencies.includes(dep) ? 'border border-accent/60 px-1.5 text-accent' : 'border border-line/50 px-1.5 text-ink/85'}>
               {dep}
             </span>
           ))}
         </div>
       )}
       {module.state === 'missing-dependency' && (
-        <div className="flex flex-wrap items-center gap-2 border border-accent/40 bg-accent/[0.06] px-3 py-2 text-[12.5px] text-white/90">
+        <div className="flex flex-wrap items-center gap-2 border border-accent/40 bg-accent/[0.06] px-3 py-2 text-[12.5px] text-ink/90">
           <span>Inactive until these are on: {module.missingDependencies.join(', ')}.</span>
           {module.missingDependencies.map((dep) => (
             <Button key={dep} size="sm" variant="primary" icon={<Power />} onClick={() => void run('Could not switch on', engine('tools.enable', { id: dep }))}>
@@ -135,16 +135,16 @@ function Detail({ module }: { module: ModuleInfo }) {
           ))}
         </div>
       )}
-      {module.error && <div className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3 py-2 font-mono text-[12px] text-alert">{module.error}</div>}
+      {module.error && <div className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3 py-2 font-ui text-[12px] text-alert">{module.error}</div>}
       {module.state === 'needs-enabling' && (
-        <div className="border border-accent/40 bg-accent/[0.06] px-3 py-2 text-[12.5px] text-white/90">
+        <div className="border border-accent/40 bg-accent/[0.06] px-3 py-2 text-[12.5px] text-ink/90">
           This module runs code inside Seven. Check what it does, then switch it on. If its files change later it pauses until you switch it on again.
         </div>
       )}
       {module.state === 'changed' && (
-        <div className="flex flex-col gap-1.5 border border-accent/40 bg-accent/[0.06] px-3 py-2 text-[12.5px] text-white/90">
+        <div className="flex flex-col gap-1.5 border border-accent/40 bg-accent/[0.06] px-3 py-2 text-[12.5px] text-ink/90">
           <span>The module's files changed since you switched it on, so it is paused. Check the changes, then switch it on again.</span>
-          <ul className="font-mono text-[11.5px] text-accent">
+          <ul className="font-ui text-[11.5px] text-accent">
             {module.changedFiles.map((f) => (
               <li key={f}>{f}</li>
             ))}
@@ -166,25 +166,25 @@ function Detail({ module }: { module: ModuleInfo }) {
         <div className="flex flex-col gap-4">
           <ModuleAdds module={module} />
           {module.mcp && (
-            <div className="grid grid-cols-[120px_1fr] gap-y-1 border border-line/40 bg-black/25 p-3 font-mono text-[12px]">
+            <div className="grid grid-cols-[120px_1fr] gap-y-1 border border-line/40 tone-panel-25 p-3 font-ui text-[12px]">
               <span className="text-faint">Transport</span>
-              <span className="text-white/90">{module.mcp.transport}</span>
+              <span className="text-ink/90">{module.mcp.transport}</span>
               <span className="text-faint">Server</span>
-              <span className="break-all text-white/90">{module.mcp.target}</span>
+              <span className="break-all text-ink/90">{module.mcp.target}</span>
               <span className="text-faint">Connection</span>
-              <span className="text-white/90">{module.mcp.status}</span>
+              <span className="text-ink/90">{module.mcp.status}</span>
             </div>
           )}
           <ToolApiList module={module} />
           {module.settings.length > 0 && (
             <div>
-              <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Settings</div>
+              <div className="mb-1.5 font-label text-[10.5px] font-semibold caps-14 text-accent-soft">Settings</div>
               <SettingsForm key={module.id} module={module} />
             </div>
           )}
           {(module.actions ?? []).length > 0 && (
             <div className="flex flex-col gap-2">
-              <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Actions</div>
+              <div className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">Actions</div>
               {module.actions.map((a) => (
                 <ActionButton key={a.name} module={module} name={a.name} label={a.label} description={a.description} />
               ))}
@@ -298,7 +298,7 @@ function ImportMcp({ onClose }: { onClose: () => void }) {
       }
     >
       <Field label="mcp.json" hint='Paste a config in the usual format: {"mcpServers": {"name": {"command": "...", "args": [...]}}}. Each server becomes a folder in your tools folder.'>
-        <Textarea rows={12} value={json} onChange={(e) => setJson(e.target.value)} className="font-mono text-[12px]" />
+        <Textarea rows={12} value={json} onChange={(e) => setJson(e.target.value)} className="font-ui text-[12px]" />
       </Field>
     </Modal>
   )
@@ -325,8 +325,8 @@ function ModuleQuickToggle({ module }: { module: ModuleInfo }) {
       title={isOn ? `Switch off ${module.name}` : `Switch on ${module.name}`}
       className={
         isOn
-          ? 'inline-flex items-center gap-1 border border-emerald-500/60 bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-300 transition-colors hover:bg-emerald-500/25 disabled:opacity-45'
-          : 'inline-flex items-center gap-1 border border-line/70 bg-black/75 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-dim transition-colors hover:border-accent/70 hover:text-white disabled:opacity-45'
+          ? 'inline-flex items-center gap-1 border border-tint-green/60 bg-tint-green/15 px-2 py-0.5 font-label text-[10px] font-semibold caps-8 text-tint-green-ink transition-colors hover:bg-tint-green/25 disabled:opacity-45'
+          : 'inline-flex items-center gap-1 border border-line/70 tone-well-75 px-2 py-0.5 font-label text-[10px] font-semibold caps-8 text-dim transition-colors hover:border-accent/70 hover:text-ink disabled:opacity-45'
       }
     >
       <Power className="h-3 w-3" />

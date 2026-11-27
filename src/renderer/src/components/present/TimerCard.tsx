@@ -35,7 +35,7 @@ function TimerCard({ fields, draft }: PresentationProps) {
         title={label}
         body={
           <div className="flex flex-col gap-2">
-            <div className="font-mono text-[34px] font-bold tabular-nums leading-none text-white">{state === 'done' ? '00:00' : clock(state === 'starting' ? (typeof fields.seconds === 'number' ? fields.seconds * 1000 : 0) : left)}</div>
+            <div className="font-data text-[34px] font-bold tabular-nums leading-none text-ink">{state === 'done' ? '00:00' : clock(state === 'starting' ? (typeof fields.seconds === 'number' ? fields.seconds * 1000 : 0) : left)}</div>
             <SegmentBar value={state === 'running' ? left / span : state === 'done' ? 0 : 1} tone={state === 'done' ? 'hot' : undefined} />
             {state === 'running' && id && (
               <div>

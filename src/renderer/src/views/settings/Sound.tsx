@@ -30,7 +30,7 @@ export function Sound() {
         <SettingRow wide label="Piper (optional, better voices)" hint="Piper is a free offline voice program: point to piper.exe and a folder of .onnx voices (each with its .onnx.json).">
           <div className="flex w-full flex-col gap-2">
             <div className="flex gap-2">
-              <Input readOnly value={voice.piperPath} placeholder="piper.exe" className="font-mono text-[12px]" />
+              <Input readOnly value={voice.piperPath} placeholder="piper.exe" className="font-ui text-[12px]" />
               <Button
                 variant="badge"
                 onClick={async () => {
@@ -42,7 +42,7 @@ export function Sound() {
               </Button>
             </div>
             <div className="flex gap-2">
-              <Input readOnly value={voice.piperVoices} placeholder="Voices folder" className="font-mono text-[12px]" />
+              <Input readOnly value={voice.piperVoices} placeholder="Voices folder" className="font-ui text-[12px]" />
               <Button
                 variant="badge"
                 onClick={async () => {

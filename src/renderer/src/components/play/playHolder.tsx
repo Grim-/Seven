@@ -37,7 +37,7 @@ export function placePlay(world: string, placeKey: string, place: WorldEntity, c
     save: (kind, value) => engine('worlds.put', { id: world, type: PLACE_TYPE_KEY, key: placeKey, entity: { [FIELD[kind]]: value } }),
     keepLabel: 'Keep on this place',
     character,
-    where: worldWhere(`@place:${placeKey}`, agents, world, character)
+    where: worldWhere(`@world:${world}/place/${placeKey}`, agents, world, character)
   }
 }
 

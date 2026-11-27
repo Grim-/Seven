@@ -37,10 +37,10 @@ function BuffsPanel({ comp, catalog, changed }: PanelProps<Buffs>) {
           />
         ) : undefined
       }
-      bodyClassName="p-3"
+      bodyClassName="p-2.5"
     >
       {comp.held.length === 0 ? (
-        <span className="font-mono text-[11.5px] text-faint">No active buffs or status effects.</span>
+        <span className="font-ui text-[11.5px] text-faint">No active buffs or status effects.</span>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {comp.held.map((b) => {
@@ -59,7 +59,7 @@ function BuffsPanel({ comp, catalog, changed }: PanelProps<Buffs>) {
                     e.currentTarget,
                     label,
                     <div className="flex flex-col gap-1">
-                      <span className="font-mono text-[10.5px] text-dim">
+                      <span className="font-ui text-[10.5px] text-dim">
                         {gameTime(b.remaining)} remaining{b.stacks > 1 ? ` · ×${b.stacks} stacks` : ''}
                       </span>
                       <RowList rows={rows} />
@@ -75,13 +75,13 @@ function BuffsPanel({ comp, catalog, changed }: PanelProps<Buffs>) {
                 )}
               >
                 <Icon className={cn('h-3.5 w-3.5 shrink-0', visual.color)} />
-                <span className="font-semibold text-white">{label}</span>
+                <span className="font-semibold text-ink">{label}</span>
                 {b.stacks > 1 && (
-                  <span className="border border-accent/40 bg-black/60 px-1 font-mono text-[10px] font-bold text-accent">
+                  <span className="border border-accent/40 tone-panel-60 px-1 font-ui text-[10px] font-bold text-accent">
                     ×{b.stacks}
                   </span>
                 )}
-                <span className="font-mono text-[10.5px] text-dim">{gameTime(b.remaining)}</span>
+                <span className="font-ui text-[10.5px] text-dim">{gameTime(b.remaining)}</span>
                 <button
                   type="button"
                   title="Remove buff"

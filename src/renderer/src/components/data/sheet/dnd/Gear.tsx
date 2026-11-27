@@ -9,11 +9,11 @@ export function Gear({ dnd, onChange }: { dnd: DndStats; onChange: (patch: Parti
   const gear = useCompendiumList('equipment')
   return (
     <Section title="Equipment">
-      <div className="flex flex-wrap gap-x-3 font-mono text-[12px]">
+      <div className="flex flex-wrap gap-x-3 font-ui text-[12px]">
         {DND_COINS.map((c) => (
           <span key={c} className="flex items-baseline gap-1">
-            <InlineNumber value={dnd.coins[c]} min={0} onSave={(n) => onChange({ coins: { ...dnd.coins, [c]: n } })} className={dnd.coins[c] ? 'text-white' : 'text-faint'} />
-            <span className="text-[10.5px] uppercase text-accent-soft">{c}</span>
+            <InlineNumber value={dnd.coins[c]} min={0} onSave={(n) => onChange({ coins: { ...dnd.coins, [c]: n } })} className={dnd.coins[c] ? 'text-ink' : 'text-faint'} />
+            <span className="text-[10.5px] caps text-accent-soft">{c}</span>
           </span>
         ))}
       </div>

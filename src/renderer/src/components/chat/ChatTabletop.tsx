@@ -108,10 +108,10 @@ export function UserBoardBar() {
       onClick={() => setMode({ showDecks: !mode.showDecks })}
       title={mode.showDecks ? 'Hide card decks on chat' : 'Show card decks on chat'}
       className={cn(
-        'flex h-6 w-fit shrink-0 items-center gap-1 border px-1.5 font-mono text-[9.5px] uppercase tracking-wider transition-colors cursor-pointer',
+        'flex h-6 w-fit shrink-0 items-center gap-1 border px-1.5 font-label text-[9.5px] caps-5 transition-colors cursor-pointer',
         mode.showDecks
           ? 'border-accent/70 bg-accent/15 text-accent'
-          : 'border-line/60 bg-black/60 text-dim hover:border-accent hover:text-white'
+          : 'border-line/60 tone-well-60 text-dim hover:border-accent hover:text-ink'
       )}
     >
       <WalletCards className="h-3 w-3" />
@@ -140,17 +140,17 @@ export function UserBoardBar() {
               label: `${s.index}: ${s.label}`
             }))}
             onChange={setActiveSurface}
-            className="h-6 w-32 font-mono text-[10px]"
+            className="h-6 w-32 font-ui text-[10px]"
           />
           <button
             type="button"
             onClick={toggleSwitcher}
             title="SurfaceTop Overview Switcher (Ctrl+Space)"
             className={cn(
-              'flex h-6 items-center gap-1 border border-l-0 px-1.5 font-mono text-[9.5px] uppercase transition-colors cursor-pointer',
+              'flex h-6 items-center gap-1 border border-l-0 px-1.5 font-label text-[9.5px] caps transition-colors cursor-pointer',
               switcherOpen
                 ? 'border-accent bg-accent/20 text-accent'
-                : 'border-line/60 bg-black/60 text-dim hover:border-accent hover:text-white'
+                : 'border-line/60 tone-well-60 text-dim hover:border-accent hover:text-ink'
             )}
           >
             <Layers className="h-3 w-3" />
@@ -165,7 +165,7 @@ export function UserBoardBar() {
           value={mode.creatorSheetId ?? sheets[0]?.id ?? ''}
           options={sheets.map((s) => ({ value: s.id, label: showName(s.title) }))}
           onChange={(creatorSheetId) => setMode({ creatorSheetId })}
-          className="h-6 w-36 font-mono text-[10px]"
+          className="h-6 w-36 font-ui text-[10px]"
         />
       )}
 
@@ -180,10 +180,10 @@ export function UserBoardBar() {
                 : 'Pin chat open in foreground'
             }
             className={cn(
-              'flex h-6 items-center gap-1 border px-1.5 font-mono text-[9.5px] uppercase tracking-wider transition-colors cursor-pointer',
+              'flex h-6 items-center gap-1 border px-1.5 font-label text-[9.5px] caps-5 transition-colors cursor-pointer',
               mode.pinnedChat
                 ? 'border-accent bg-accent/15 text-accent'
-                : 'border-line/60 bg-black/60 text-dim hover:border-accent hover:text-white'
+                : 'border-line/60 tone-well-60 text-dim hover:border-accent hover:text-ink'
             )}
           >
             <Pin className="h-3 w-3" />
@@ -194,7 +194,7 @@ export function UserBoardBar() {
             type="button"
             onClick={openAddPicker}
             title="Add entry or widget to this SurfaceTop"
-            className="flex h-6 items-center gap-1 border border-line/60 bg-black/60 px-1.5 font-mono text-[9.5px] uppercase tracking-wider text-dim hover:border-accent hover:text-white cursor-pointer"
+            className="flex h-6 items-center gap-1 border border-line/60 tone-well-60 px-1.5 font-label text-[9.5px] caps-5 text-dim hover:border-accent hover:text-ink cursor-pointer"
           >
             <Plus className="h-3 w-3" />
             <span>Add</span>
@@ -206,12 +206,12 @@ export function UserBoardBar() {
         title="Board options"
         side="top"
         align="start"
-        className="flex w-72 flex-col gap-2.5 p-3 font-mono text-[11px]"
-        triggerClassName="flex h-6 w-6 items-center justify-center border border-line/60 bg-black/60 text-dim hover:border-accent hover:text-white"
+        className="flex w-72 flex-col gap-2.5 p-3 font-ui text-[11px]"
+        triggerClassName="flex h-6 w-6 items-center justify-center border border-line/60 tone-well-60 text-dim hover:border-accent hover:text-ink"
         trigger={<SlidersHorizontal className="h-3 w-3" />}
       >
         <div className="flex flex-col gap-1">
-          <span className="text-[9.5px] font-bold uppercase tracking-[0.16em] text-accent-soft">Active Board</span>
+          <span className="text-[9.5px] font-bold caps-16 text-accent-soft">Active Board</span>
           <div className="flex items-center gap-1">
             {boards.length > 0 ? (
               <Select
@@ -228,16 +228,16 @@ export function UserBoardBar() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <span className="text-[9.5px] font-bold uppercase tracking-[0.16em] text-accent-soft">Layout</span>
+          <span className="text-[9.5px] font-bold caps-16 text-accent-soft">Layout</span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => setMode({ layoutMode: 'tabletop', editingGrid: false })}
               className={cn(
-                'flex h-7 flex-1 items-center justify-center gap-1 border text-[10px] font-semibold uppercase cursor-pointer',
+                'flex h-7 flex-1 items-center justify-center gap-1 border text-[10px] font-semibold caps cursor-pointer',
                 mode.layoutMode === 'tabletop'
                   ? 'border-accent bg-accent/20 text-accent'
-                  : 'border-line/60 bg-black/50 text-dim hover:text-white'
+                  : 'border-line/60 tone-well-50 text-dim hover:text-ink'
               )}
             >
               <LayoutGrid className="h-3 w-3" />
@@ -247,10 +247,10 @@ export function UserBoardBar() {
               type="button"
               onClick={() => setMode({ layoutMode: 'grid' })}
               className={cn(
-                'flex h-7 flex-1 items-center justify-center gap-1 border text-[10px] font-semibold uppercase cursor-pointer',
+                'flex h-7 flex-1 items-center justify-center gap-1 border text-[10px] font-semibold caps cursor-pointer',
                 mode.layoutMode === 'grid'
                   ? 'border-accent bg-accent/20 text-accent'
-                  : 'border-line/60 bg-black/50 text-dim hover:text-white'
+                  : 'border-line/60 tone-well-50 text-dim hover:text-ink'
               )}
             >
               <Grid className="h-3 w-3" />
@@ -261,10 +261,10 @@ export function UserBoardBar() {
               onClick={() => setMode({ layoutMode: 'creator' })}
               title="Dual-panel Character Creator: Character Sheet on the left, Chat on the right"
               className={cn(
-                'flex h-7 flex-1 items-center justify-center gap-1 border text-[10px] font-semibold uppercase cursor-pointer',
+                'flex h-7 flex-1 items-center justify-center gap-1 border text-[10px] font-semibold caps cursor-pointer',
                 mode.layoutMode === 'creator'
                   ? 'border-accent bg-accent/20 text-accent'
-                  : 'border-line/60 bg-black/50 text-dim hover:text-white'
+                  : 'border-line/60 tone-well-50 text-dim hover:text-ink'
               )}
             >
               <UserRound className="h-3 w-3" />
@@ -275,11 +275,11 @@ export function UserBoardBar() {
 
         {dashboard && (
           <div className="flex items-center justify-between border-t border-line/40 pt-2">
-            <span className="text-[10px] uppercase text-dim">Surface Background</span>
+            <span className="text-[10px] caps text-dim">Surface Background</span>
             <button
               type="button"
               onClick={() => setEditingBackdrop(true)}
-              className="flex h-6 items-center gap-1 border border-line/60 bg-black/50 px-2 text-[10px] font-semibold uppercase text-dim hover:border-accent hover:text-white cursor-pointer"
+              className="flex h-6 items-center gap-1 border border-line/60 tone-well-50 px-2 text-[10px] font-semibold caps text-dim hover:border-accent hover:text-ink cursor-pointer"
             >
               <ImageIcon className="h-3 w-3" />
               <span>{activeSlot.label}…</span>
@@ -288,11 +288,11 @@ export function UserBoardBar() {
         )}
 
         <div className="flex items-center justify-between border-t border-line/40 pt-2">
-          <span className="text-[10px] uppercase text-dim">Chat Mode</span>
+          <span className="text-[10px] caps text-dim">Chat Mode</span>
           <button
             type="button"
             onClick={() => setMode({ windowed: false, peekTable: false })}
-            className="flex h-6 items-center gap-1 border border-line/60 bg-black/50 px-2 text-[10px] font-semibold uppercase text-dim hover:border-accent hover:text-white cursor-pointer"
+            className="flex h-6 items-center gap-1 border border-line/60 tone-well-50 px-2 text-[10px] font-semibold caps text-dim hover:border-accent hover:text-ink cursor-pointer"
           >
             <MessageSquare className="h-3 w-3" />
             <span>Default Chat</span>
@@ -362,14 +362,14 @@ function CharacterCreatorLeftPanel({
               value={activeSheet?.id ?? ''}
               options={sheets.map((s) => ({ value: s.id, label: showName(s.title) }))}
               onChange={(creatorSheetId) => setMode({ creatorSheetId })}
-              className="h-5 w-36 font-mono text-[10px]"
+              className="h-5 w-36 font-ui text-[10px]"
             />
           )}
           <button
             type="button"
             onClick={createNewCharacter}
             title="Create new character sheet"
-            className="flex h-5 items-center gap-0.5 border border-line/60 bg-black/60 px-1.5 font-mono text-[9px] uppercase tracking-wider text-accent hover:border-accent hover:text-white cursor-pointer"
+            className="flex h-5 items-center gap-0.5 border border-line/60 tone-well-60 px-1.5 font-label text-[9px] caps-5 text-accent hover:border-accent hover:text-ink cursor-pointer"
           >
             <Plus className="h-2.5 w-2.5" />
             <span>New</span>
@@ -382,7 +382,7 @@ function CharacterCreatorLeftPanel({
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
           <UserRound className="h-10 w-10 text-dim" />
-          <div className="font-mono text-[12px] uppercase tracking-[0.14em] text-white">No character sheet yet</div>
+          <div className="font-label text-[12px] caps-14 text-ink">No character sheet yet</div>
           <p className="max-w-xs text-[12.5px] text-dim">
             Create a character sheet here or ask the agent in chat to create and fill one out with you.
           </p>

@@ -16,7 +16,7 @@ function Edit({ value, onChange, close }: TokenEditProps) {
             onChange(v)
             close()
           }}
-          className={cn('border px-3 py-1 font-mono text-[12px]', (value === true) === v ? 'border-accent bg-accent text-black' : 'border-line/60 text-dim hover:border-dim hover:text-white')}
+          className={cn('border px-3 py-1 font-ui text-[12px]', (value === true) === v ? 'border-accent bg-accent text-on-accent' : 'border-line/60 text-dim hover:border-dim hover:text-ink')}
         >
           {v ? 'Yes' : 'No'}
         </button>

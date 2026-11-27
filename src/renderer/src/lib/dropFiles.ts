@@ -32,6 +32,11 @@ export async function importInto(dropped: DroppedFile[], folder: string): Promis
   }
 }
 
+export function pictureFolder(): string | null {
+  const prefs = useApp.getState().settings?.droppedPictures
+  return prefs && !prefs.ask ? prefs.folder : null
+}
+
 export function placePictures(dropped: DroppedFile[], ask: boolean): void {
   if (!dropped.length) return
   const prefs = useApp.getState().settings?.droppedPictures

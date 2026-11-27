@@ -5,16 +5,16 @@ export function PaneHeader({ title, titleHint, count, onTitle, onTitleMenu, back
   return (
     <>
       {back && (
-        <button onClick={back.onClick} className="flex items-center gap-1 border-b border-line/40 px-2.5 py-1.5 text-left font-mono text-[11px] text-accent hover:text-white">
+        <button onClick={back.onClick} className="flex items-center gap-1 border-b border-line/40 px-2.5 py-1.5 text-left font-ui text-[11px] text-accent hover:text-ink">
           <ChevronLeft className="h-3.5 w-3.5" />
           {back.label}
         </button>
       )}
       <div className="flex items-center gap-1 border-b border-line/40 px-2.5 py-1.5">
-        <button title={titleHint} onClick={onTitle} onContextMenu={onTitleMenu} className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-white hover:text-accent">
+        <button title={titleHint} onClick={onTitle} onContextMenu={onTitleMenu} className="font-label text-[11px] font-bold caps-20 text-ink hover:text-accent">
           {title}
         </button>
-        {count !== undefined && <span className="ml-1 font-mono text-[10.5px] text-faint">{count}</span>}
+        {count !== undefined && <span className="ml-1 font-data text-[10.5px] text-faint">{count}</span>}
         {children && <span className="ml-auto flex items-center">{children}</span>}
       </div>
     </>

@@ -3,15 +3,10 @@ import { isReactionPose } from '@shared/moods'
 import { frameMedia, frameText } from '@shared/settingSpec'
 import { BaseAvatar } from '../BaseAvatar'
 import { registerAvatarDrawer } from '../drawers'
+import { moodRgb } from '../moodColor'
 import type { AvatarSignals } from '../signals'
 
 const OVERSCAN = 1.06
-const WARM = [74, 222, 128]
-const BRIGHT = [250, 204, 21]
-const HOT = [255, 30, 60]
-const COLD = [60, 90, 170]
-
-const mix = (a: number[], b: number[], p: number) => a.map((v, i) => Math.round(v + (b[i] - v) * p))
 
 class PictureAvatar extends BaseAvatar {
   protected override ownsMedia = true
@@ -62,7 +57,7 @@ class PictureAvatar extends BaseAvatar {
 
     const amount = this.num('tint', key) * Math.min(1, Math.hypot(energy, warmth))
     if (amount > 0.01) {
-      const rgb = warmth >= 0 ? mix(WARM, BRIGHT, Math.max(0, energy)) : energy >= 0 ? HOT : COLD
+      const rgb = moodRgb(energy, warmth)
       ctx.globalCompositeOperation = 'color'
       ctx.fillStyle = `rgba(${rgb.join(',')},${amount})`
       ctx.fillRect(0, 0, w, h)

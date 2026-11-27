@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 import { Channel, type EventMessage } from '@shared/protocol'
 import { defaultBounds, keepWindowState, loadWindowState } from './windowState'
+import { startColorsArg, type StartColors } from '@shared/startColors'
 
 export type RendererMode = 'app'
 
@@ -23,7 +24,7 @@ function denyPopups(win: BrowserWindow): void {
   })
 }
 
-export function createAppWindow(options: { show: boolean; onEvent: (message: EventMessage) => void }): BrowserWindow {
+export function createAppWindow(options: { show: boolean; onEvent: (message: EventMessage) => void; startColors: StartColors | null }): BrowserWindow {
   const state = loadWindowState()
   const win = new BrowserWindow({
     ...(state?.bounds ?? defaultBounds()),
@@ -31,9 +32,9 @@ export function createAppWindow(options: { show: boolean; onEvent: (message: Eve
     minHeight: 600,
     show: false,
     frame: false,
-    backgroundColor: '#090a0d',
+    backgroundColor: options.startColors?.ground ?? '#090a0d',
     title: 'Seven',
-    webPreferences: { preload, sandbox: false, plugins: true, webviewTag: true }
+    webPreferences: { preload, sandbox: false, plugins: true, webviewTag: true, additionalArguments: options.startColors ? [startColorsArg(options.startColors)] : [] }
   })
 
   if (options.show)

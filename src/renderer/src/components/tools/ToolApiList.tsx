@@ -44,14 +44,14 @@ function ParamNode({ param, depth = 0 }: { param: ToolParamDoc; depth?: number }
 
   return (
     <div className={depth > 0 ? 'ml-3 border-l border-line/40 pl-3 pt-1.5' : 'py-2'}>
-      <div className="flex flex-wrap items-baseline gap-2 font-mono text-[11.5px]">
-        <span className="font-semibold text-white">{param.name}</span>
+      <div className="flex flex-wrap items-baseline gap-2 font-ui text-[11.5px]">
+        <span className="font-semibold text-ink">{param.name}</span>
         {param.required ? (
-          <span className="border border-accent/50 bg-accent/10 px-1 py-0.5 text-[9.5px] uppercase tracking-[0.08em] text-accent">
+          <span className="border border-accent/50 bg-accent/10 px-1 py-0.5 text-[9.5px] caps-8 text-accent">
             required
           </span>
         ) : (
-          <span className="border border-line/40 px-1 py-0.5 text-[9.5px] uppercase tracking-[0.08em] text-faint">
+          <span className="border border-line/40 px-1 py-0.5 text-[9.5px] caps-8 text-faint">
             optional
           </span>
         )}
@@ -62,10 +62,10 @@ function ParamNode({ param, depth = 0 }: { param: ToolParamDoc; depth?: number }
       {param.description && <p className="mt-1 text-[12px] text-dim">{param.description}</p>}
 
       {shownChoices.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1 font-mono text-[10.5px]">
-          <span className="mr-1 text-[9.5px] uppercase tracking-[0.1em] text-faint">Choices:</span>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1 font-ui text-[10.5px]">
+          <span className="mr-1 text-[9.5px] caps-10 text-faint">Choices:</span>
           {shownChoices.map((choice) => (
-            <span key={choice} className="border border-line/45 bg-black/35 px-1.5 py-0.5 text-white/85">
+            <span key={choice} className="border border-line/45 tone-panel-35 px-1.5 py-0.5 text-ink/85">
               {choice}
             </span>
           ))}
@@ -81,7 +81,7 @@ function ParamNode({ param, depth = 0 }: { param: ToolParamDoc; depth?: number }
           {allChoices && choices.length > CHOICE_PREVIEW_LIMIT && (
             <button
               type="button"
-              className="px-1.5 py-0.5 text-faint underline underline-offset-2 hover:text-white"
+              className="px-1.5 py-0.5 text-faint underline underline-offset-2 hover:text-ink"
               onClick={() => setAllChoices(false)}
             >
               show less
@@ -141,7 +141,7 @@ function ToolCard({
   }
 
   return (
-    <div className="flex flex-col border border-line/45 bg-black/25">
+    <div className="flex flex-col border border-line/45 tone-panel-25">
       <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
         <button
           type="button"
@@ -150,13 +150,13 @@ function ToolCard({
           aria-expanded={open}
         >
           <span className="text-faint">{open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</span>
-          <span className="truncate font-mono text-[12.5px]">
+          <span className="truncate font-ui text-[12.5px]">
             <span className="font-semibold text-accent">{tool.name}</span>
             <span className="text-dim">(</span>
             {tool.params.map((p, i) => (
               <span key={p.name}>
                 {i > 0 && <span className="text-faint">, </span>}
-                <span className={p.required ? 'text-white/90' : 'text-dim'}>
+                <span className={p.required ? 'text-ink/90' : 'text-dim'}>
                   {p.name}
                   {!p.required && '?'}
                 </span>
@@ -168,11 +168,11 @@ function ToolCard({
 
         <div className="flex flex-wrap items-center gap-1.5">
           {descOverridden && (
-            <span className="border border-accent/40 bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-accent-soft">
+            <span className="border border-accent/40 bg-accent/10 px-1.5 py-0.5 font-label text-[10px] caps-8 text-accent-soft">
               Edited
             </span>
           )}
-          <span className="border border-line/40 px-1.5 py-0.5 font-mono text-[10px] text-faint">
+          <span className="border border-line/40 px-1.5 py-0.5 font-ui text-[10px] text-faint">
             {tool.params.length === 1 ? '1 param' : `${tool.params.length} params`}
           </span>
           <div className="w-48 max-w-full">
@@ -189,7 +189,7 @@ function ToolCard({
                   if (updated) useTools.getState().setList(updated)
                 })
               }}
-              className={permOverridden ? 'h-7 border-accent/60 font-mono text-[11px] text-accent' : 'h-7 font-mono text-[11px] text-dim'}
+              className={permOverridden ? 'h-7 border-accent/60 font-ui text-[11px] text-accent' : 'h-7 font-ui text-[11px] text-dim'}
             />
           </div>
           {permOverridden && (
@@ -219,7 +219,7 @@ function ToolCard({
               rows={2}
               value={descDraft}
               onChange={(e) => setDescDraft(e.target.value)}
-              className="font-mono text-[12px]"
+              className="font-ui text-[12px]"
             />
             <div className="flex flex-wrap items-center gap-1.5">
               <Button size="sm" variant="primary" disabled={savingDesc} onClick={() => void saveDesc(descDraft)}>
@@ -237,7 +237,7 @@ function ToolCard({
           </div>
         ) : (
           <div className="flex items-start justify-between gap-2">
-            <p className="text-[12.5px] text-white/80">
+            <p className="text-[12.5px] text-ink/80">
               {tool.description || <span className="italic text-faint">No description.</span>}
             </p>
             <div className="flex shrink-0 items-center gap-1">
@@ -265,9 +265,9 @@ function ToolCard({
       </div>
 
       {open && (
-        <div className="flex flex-col gap-2 border-t border-line/35 bg-black/30 px-3 py-2.5">
+        <div className="flex flex-col gap-2 border-t border-line/35 tone-panel-30 px-3 py-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
+            <span className="font-label text-[10px] font-semibold caps-14 text-faint">
               Parameters & API Schema
             </span>
             <div className="flex items-center gap-1">
@@ -291,7 +291,7 @@ function ToolCard({
           </div>
 
           {tool.params.length === 0 ? (
-            <span className="font-mono text-[11.5px] text-faint">Takes no parameters.</span>
+            <span className="font-ui text-[11.5px] text-faint">Takes no parameters.</span>
           ) : (
             <div className="flex flex-col divide-y divide-line/25">
               {tool.params.map((p) => (
@@ -301,7 +301,7 @@ function ToolCard({
           )}
 
           {showSchema && (
-            <pre className="max-h-72 overflow-auto border border-line/40 bg-black/50 p-2.5 font-mono text-[11px] leading-relaxed text-white/80">
+            <pre className="max-h-72 overflow-auto border border-line/40 tone-panel-50 p-2.5 font-ui text-[11px] leading-relaxed text-ink/80">
               {JSON.stringify(tool.schema, null, 2)}
             </pre>
           )}
@@ -326,11 +326,11 @@ export function ToolApiList({ module }: { module: ModuleInfo }) {
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">
+          <span className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">
             Tool API & Permissions
           </span>
           {module.tools.length > 0 && (
-            <span className="border border-line/45 px-1.5 py-0.5 font-mono text-[10px] text-faint">
+            <span className="border border-line/45 px-1.5 py-0.5 font-ui text-[10px] text-faint">
               {module.tools.length}
             </span>
           )}

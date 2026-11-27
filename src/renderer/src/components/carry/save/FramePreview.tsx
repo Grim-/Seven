@@ -26,5 +26,5 @@ export function FramePreview({ bitmap, info, framed, canvasRef }: { bitmap: Imag
       live = false
     }
   }, [bitmap, framed, key, canvasRef])
-  return <canvas ref={canvasRef} className="block max-h-full max-w-full object-contain shadow-[0_0_40px_color-mix(in_srgb,var(--color-accent)_14%,transparent)]" />
+  return <canvas ref={canvasRef} className="block max-h-full max-w-full object-contain shadow-[0_0_40px_color-mix(in_srgb,var(--color-accent)_calc(14%*var(--glow)),transparent)]" />
 }

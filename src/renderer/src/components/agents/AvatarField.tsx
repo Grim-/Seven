@@ -35,11 +35,11 @@ export function AvatarField({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-1.5">
-        <button type="button" title="None" onClick={() => onChange(null)} style={{ width: TILE, height: TILE }} className={cn('border font-mono text-[10px] uppercase', !value ? 'border-white text-white' : 'border-line text-faint hover:text-white')}>
+        <button type="button" title="None" onClick={() => onChange(null)} style={{ width: TILE, height: TILE }} className={cn('border font-label text-[10px] caps', !value ? 'border-ink text-ink' : 'border-line text-faint hover:text-ink')}>
           None
         </button>
         {list.map((a) => (
-          <button key={a.id} type="button" title={a.name} onClick={() => onChange({ kind: 'avatar', id: a.id })} className={cn('border-2', chosen === a.id ? 'border-white' : 'border-transparent hover:border-line')}>
+          <button key={a.id} type="button" title={a.name} onClick={() => onChange({ kind: 'avatar', id: a.id })} className={cn('border-2', chosen === a.id ? 'border-ink' : 'border-transparent hover:border-line')}>
             <LiveAvatar avatar={a} size={TILE} />
           </button>
         ))}

@@ -4,6 +4,7 @@ import { data } from '../data/hub'
 import { writeUserFile } from '../util/fs'
 import { USER, kindNamed, resolveEntry, type Kind } from '../library/kinds'
 import { assetsIn, swapAssets } from '../library/packing'
+import { fileArrived, freshFiles, ownerOf, type Arrived } from '../data/filing'
 import { isPng } from './png'
 import { decodeCardPng, encodeCardPng, peekCardPng } from '../portability/codec'
 
@@ -132,10 +133,14 @@ export function carryOpen(source: CarrySource, mode: CarryMode): CarryOpened {
   const { body, fileData } = decoded
   if (body.text !== null) return { entry: null, text: body.text }
   const ids = new Map<string, string>()
+  const fresh = freshFiles()
+  const arrived: Arrived[] = []
   for (const f of body.files) {
     const added = data.assets.registerBytes(f.name, fileData.get(f.id) ?? Buffer.alloc(0), { tool: 'carry', sessionId: null, original: f.name })
     ids.set(f.id, added.id)
+    if (fresh(added)) arrived.push({ meta: added, owner: ownerOf(f.id, body.entries) })
   }
+  fileArrived(arrived)
   const made: { kind: string; old: string; id: string }[] = []
   const entry = (old: string, kindName?: string) => made.find((m) => m.old === old && (!kindName || m.kind === kindName))?.id ?? old
   for (const e of body.entries) {

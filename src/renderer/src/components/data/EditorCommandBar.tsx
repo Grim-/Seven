@@ -73,8 +73,8 @@ const LINK_ANYTHING: EditorCommand = { id: 'at', title: 'Link anything in Seven'
 const TABLE: EditorCommand[] = [
   { id: 'row', title: 'Add a row below', icon: icon(Rows3), run: (e) => e.chain().focus().addRowAfter().run() },
   { id: 'column', title: 'Add a column to the right', icon: icon(Columns3), run: (e) => e.chain().focus().addColumnAfter().run() },
-  { id: 'droprow', title: 'Remove this row', icon: <span className="font-mono text-[11px]">−row</span>, run: (e) => e.chain().focus().deleteRow().run() },
-  { id: 'dropcolumn', title: 'Remove this column', icon: <span className="font-mono text-[11px]">−col</span>, run: (e) => e.chain().focus().deleteColumn().run() },
+  { id: 'droprow', title: 'Remove this row', icon: <span className="font-ui text-[11px]">−row</span>, run: (e) => e.chain().focus().deleteRow().run() },
+  { id: 'dropcolumn', title: 'Remove this column', icon: <span className="font-ui text-[11px]">−col</span>, run: (e) => e.chain().focus().deleteColumn().run() },
   { id: 'droptable', title: 'Delete the table', icon: icon(Trash2), run: (e) => e.chain().focus().deleteTable().run() }
 ]
 
@@ -91,7 +91,7 @@ export function CommandButtons({ editor, commands }: { editor: Editor; commands:
             ev.preventDefault()
             c.run(editor)
           }}
-          className={cn('flex h-8 min-w-8 items-center justify-center px-1.5', c.on?.(editor) ? 'bg-accent/20 text-accent' : 'text-dim hover:bg-accent/10 hover:text-white')}
+          className={cn('flex h-8 min-w-8 items-center justify-center px-1.5', c.on?.(editor) ? 'bg-accent/20 text-accent' : 'text-dim hover:bg-accent/10 hover:text-ink')}
         >
           {c.icon}
         </button>
@@ -106,7 +106,7 @@ export function EditorCommandBar({ editor, bare = false }: { editor: Editor | nu
   const state = useEditorState({ editor, selector: (ctx) => ({ step: ctx.transactionNumber, table: ctx.editor?.isActive('table') ?? false, block: HEADINGS.find((h) => ctx.editor && h.on?.(ctx.editor))?.id ?? 'text' }) })
   if (!editor || !state) return null
   return (
-    <div className={cn('flex flex-wrap items-center divide-x divide-line/40', bare ? 'border border-line/40' : 'border-b border-line/50 bg-black/60 py-1')}>
+    <div className={cn('flex flex-wrap items-center divide-x divide-line/40', bare ? 'border border-line/40' : 'border-b border-line/50 tone-panel-60 py-1')}>
       <div className="px-1.5">
         <Select value={state.block} options={HEADINGS.map((h) => ({ value: h.id, label: h.title }))} onChange={(id) => HEADINGS.find((h) => h.id === id)?.run(editor)} className="h-8 w-32 text-[12.5px]" />
       </div>

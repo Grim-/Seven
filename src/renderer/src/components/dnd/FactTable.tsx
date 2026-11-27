@@ -10,7 +10,7 @@ function FactLinks({ kind, value }: { kind: CompendiumKind; value: string }) {
   const list = useCompendiumList(kind)
   const names = value.split(/,\s*/).filter(Boolean)
   return (
-    <span className="text-[13.5px] text-white">
+    <span className="text-[13.5px] text-ink">
       {names.map((name, i) => {
         const ref = list.find(name)
         return (
@@ -32,9 +32,9 @@ function FactLinks({ kind, value }: { kind: CompendiumKind; value: string }) {
 
 function Fact({ f, value }: { f: FactDef; value: string }) {
   return (
-    <div className="flex min-w-[7rem] max-w-[26rem] flex-col gap-0.5 border border-line/40 bg-black/40 px-3 py-1.5">
+    <div className="flex min-w-[7rem] max-w-[26rem] flex-col gap-0.5 border border-line/40 tone-panel-40 px-3 py-1.5">
       <Eyebrow className="text-[10px]">{f.label}</Eyebrow>
-      {f.link ? <FactLinks kind={f.link} value={value} /> : <span className="text-[13.5px] text-white">{value}</span>}
+      {f.link ? <FactLinks kind={f.link} value={value} /> : <span className="text-[13.5px] text-ink">{value}</span>}
     </div>
   )
 }
@@ -52,18 +52,18 @@ export function FactTable({ kind, entry }: { kind: CompendiumKind; entry: Compen
           <Fact key={f.key} f={f} value={String(entry.facts[f.key])} />
         ))}
         {checks.map((f) => (
-          <span key={f.key} className="self-center border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-accent">
+          <span key={f.key} className="self-center border border-accent/50 bg-accent/10 px-2 py-0.5 font-label text-[10.5px] caps-12 text-accent">
             {f.label}
           </span>
         ))}
       </div>
       {abilities.length > 0 && (
-        <div className="grid max-w-xl grid-cols-6 border border-line/40 bg-black/40">
+        <div className="grid max-w-xl grid-cols-6 border border-line/40 tone-panel-40">
           {abilities.map((f) => (
             <div key={f.key} className="flex flex-col items-center py-1.5">
               <Eyebrow className="text-[10px]">{f.key}</Eyebrow>
-              <span className="font-mono text-[16px] font-bold text-white">{String(entry.facts[f.key])}</span>
-              <span className="font-mono text-[11px] text-cyan">{modifier(Number(entry.facts[f.key]))}</span>
+              <span className="font-ui text-[16px] font-bold text-ink">{String(entry.facts[f.key])}</span>
+              <span className="font-ui text-[11px] text-secondary-ink">{modifier(Number(entry.facts[f.key]))}</span>
             </div>
           ))}
         </div>

@@ -20,7 +20,7 @@ export function CompendiumEditor({ kind, entry, onChange }: { kind: CompendiumKi
           {facts.map((f) =>
             f.type === 'check' ? (
               <label key={f.key} className="flex items-center gap-2 pt-5 text-[13px] text-dim">
-                <input type="checkbox" checked={entry.facts[f.key] === true} onChange={(e) => fact(f.key, e.target.checked)} className="h-4 w-4 accent-[rgb(255,201,25)]" />
+                <input type="checkbox" checked={entry.facts[f.key] === true} onChange={(e) => fact(f.key, e.target.checked)} className="h-4 w-4 accent-[var(--color-accent)]" />
                 {f.label}
               </label>
             ) : (

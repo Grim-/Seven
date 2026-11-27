@@ -1,4 +1,4 @@
-import { Dices, Download, FolderOpen, Hash, Link, MessageSquarePlus, MessageSquareQuote, PanelRight, Pencil, Plus, RefreshCw, Trash2, Upload, X } from 'lucide-react'
+import { CopyPlus, Dices, Download, FolderOpen, Hash, Link, MessageSquarePlus, MessageSquareQuote, PanelRight, Pencil, Plus, RefreshCw, Trash2, Upload, X } from 'lucide-react'
 import type { LibraryHit, LibrarySection } from '@shared/types'
 import { showName } from '@shared/ids'
 import { askConfirm, askText, openMenu, type MenuItem, confirmDelete } from '../../components/ui'
@@ -8,7 +8,7 @@ import { errorText } from '../../lib/format'
 import { exportKindMenu, exportMenu } from '../../lib/exporting'
 import { openPortableExport, openPortableImportFromFiles } from '../../components/portability/portabilityStore'
 import { toast } from '../../store/toasts'
-import { rebuildIndex, type DataSelection, entryLink } from '../../store/data'
+import { rebuildIndex, type DataSelection, entryLink, entryRef } from '../../store/data'
 import { useApp } from '../../store/app'
 import { kindUi } from '../../registries/kinds'
 import { failed, copyText } from '../../lib/notify'
@@ -88,7 +88,7 @@ export function entryMenuAt(e: React.MouseEvent, kind: string, id: string, title
 }
 
 export function deleteEntry(section: LibrarySection, id: string, title: string, after?: () => void): void {
-  const entry = `${section.kind}/${id}`
+  const entry = entryRef(section.kind, id)
   confirmDelete(`Delete ${showName(title)}?`, `This removes it from ${section.plural} for good.`, () => engine('library.remove', { entry }), () => {
     after?.()
     useDataHistory.getState().forgetEntry(section.kind, id)
@@ -110,7 +110,7 @@ export function deleteEntries(section: LibrarySection, ids: string[], after?: ()
       let failCount = 0
       for (const id of ids) {
         try {
-          await engine('library.remove', { entry: `${section.kind}/${id}` })
+          await engine('library.remove', { entry: entryRef(section.kind, id) })
           useDataHistory.getState().forgetEntry(section.kind, id)
           removed += 1
         } catch {
@@ -185,16 +185,16 @@ export function KindSelectionBar({
   onClear: () => void
 }) {
   return (
-    <div className="flex items-center gap-1.5 font-mono text-[11px]">
+    <div className="flex items-center gap-1.5 font-ui text-[11px]">
       <span className="border border-accent/50 bg-accent/10 px-2 py-0.5 text-accent">{picked.length} selected</span>
-      <button type="button" onClick={onSelectAll} className="border border-line/60 px-2 py-0.5 text-dim hover:text-white">
+      <button type="button" onClick={onSelectAll} className="border border-line/60 px-2 py-0.5 text-dim hover:text-ink">
         All ({total})
       </button>
       {exportable && (
         <button
           type="button"
           onClick={() => openPortableExport({ kind, entries: picked })}
-          className="inline-flex items-center gap-1 border border-line/60 px-2 py-0.5 text-dim hover:border-cyan/60 hover:text-cyan"
+          className="inline-flex items-center gap-1 border border-line/60 px-2 py-0.5 text-dim hover:border-secondary-ink/60 hover:text-secondary-ink"
         >
           <Download className="h-3 w-3" /> Export
         </button>
@@ -208,7 +208,7 @@ export function KindSelectionBar({
           <Trash2 className="h-3 w-3" /> Delete
         </button>
       )}
-      <button type="button" onClick={onClear} title="Clear selection (Esc)" className="p-0.5 text-faint hover:text-white">
+      <button type="button" onClick={onClear} title="Clear selection (Esc)" className="p-0.5 text-faint hover:text-ink">
         <X className="h-3.5 w-3.5" />
       </button>
     </div>
@@ -266,7 +266,7 @@ export function startChatItems(link: string, first: string[] = [], start: (agent
 }
 
 export function entryActions(section: LibrarySection, hit: LibraryHit, ctx: { open: () => void; select: (s: DataSelection | null) => void; selected: DataSelection | null }): MenuItem[] {
-  const entry = `${section.kind}/${hit.id}`
+  const entry = entryRef(section.kind, hit.id)
   const link = entryLink(section.kind, hit.id)
   const ui = kindUi(section.kind)
   const own = ui.menu ? ui.menu({ kind: section.kind, id: hit.id, title: hit.title, select: ctx.select, selected: ctx.selected }) : []
@@ -300,6 +300,16 @@ export function entryActions(section: LibrarySection, hit: LibraryHit, ctx: { op
         askText(`Rename ${showName(hit.title)}`, 'Name', showName(hit.title), async (name) => {
           await engine('library.rename', { entry, name }).catch(failed('Could not rename'))
         })
+    })
+  if (section.carriable && !own.some((i) => i.label === 'Duplicate'))
+    items.push({
+      label: 'Duplicate',
+      icon: <CopyPlus />,
+      onSelect: () =>
+        void engine('library.duplicate', { entry }).then((made) => {
+          ctx.select(made)
+          toast.success('Duplicated', showName(hit.title))
+        }, failed('Could not duplicate'))
     })
   if (own.length) items.push({ label: '', separator: true }, ...own)
   if (section.exportable) items.push({ label: '', separator: true }, ...exportMenu(entry, section.carriable ? showName(hit.title) : null))

@@ -1,14 +1,9 @@
-import { GAME_SIGNALS } from '@shared/game/core'
 import { BrowsePick } from '../../ui/BrowsePick'
+import { useSignalOptions } from '../linkEvents'
 import { registerParamEditor, type ParamEditorProps } from './registry'
 
 function SignalPick({ value, onChange }: ParamEditorProps) {
-  const options = GAME_SIGNALS.map((s) => ({
-    value: s.id,
-    label: s.id ? `${s.label} (${s.id})` : s.label,
-    group: s.group,
-    note: s.note
-  }))
+  const options = useSignalOptions()
   return (
     <BrowsePick
       value={typeof value === 'string' ? value : ''}

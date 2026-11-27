@@ -30,6 +30,7 @@ export interface StarterDef {
 
 export interface DefType {
   type: string
+  kind?: string
   label: string
   plural: string
   icon: string
@@ -37,7 +38,12 @@ export interface DefType {
   params: ParamSchema
   starter: StarterDef[]
   line(def: GameDef): string
+  brief?(def: GameDef, holder: StatHolder | null): { title: string; text: string }
   addTo(data: CatalogData, def: GameDef): void
+}
+
+export interface StatHolder {
+  value(statId: string): number
 }
 
 const types = new Map<string, DefType>()
@@ -51,7 +57,7 @@ export function defTypes(): DefType[] {
 }
 
 export function defType(type: string): DefType | null {
-  return types.get(type) ?? null
+  return types.get(type) ?? [...types.values()].find((t) => t.kind === type) ?? null
 }
 
 export function defId(name: string): string {

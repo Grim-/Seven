@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Flame, Footprints, MessageSquarePlus, Swords, UserPlus } from 'lucide-react'
+import { Footprints, MessageSquarePlus, Swords, UserPlus } from 'lucide-react'
 import { usableAbilities } from '@shared/game/components'
 import { GameEntity } from '@shared/game/core'
-import { mapArea, mapInPlay, placePath, type MapData, type PlaceVisitor, type WorldMapUse } from '@shared/maps'
+import { mapArea, mapInPlay, mapUseInPlay, placePath, type MapData, type PlaceVisitor, type WorldMapUse } from '@shared/maps'
 import { showName } from '@shared/ids'
 import { placedKey } from '@shared/effects'
 import type { MapToken } from '../maps/TokenLayer'
 import type { EffectTargetRef } from '@shared/effects'
-import { ActionBar, Button, EmptyState, Eyebrow, Modal, Popover, ShellTabs, openMenu, type MenuItem } from '../ui'
+import { ActionBar, Button, EmptyState, Eyebrow, Modal, ShellTabs, openMenu, type MenuItem } from '../ui'
 import { SlateContainer } from '../entries/EntrySlate'
 import { Markdown } from '../chat/Markdown'
 import { EntryPicker } from '../library/EntryPicker'
@@ -27,7 +27,6 @@ import { usePlayScene } from '../play/scenes/sceneStore'
 import type { PlayAim, PlayHud } from '../play/scenes/PlayScene'
 import { useLatest } from '../../game/react/useLatest'
 import { SavePicker } from '../play/SavePicker'
-import { entryMenuAt } from '../../views/data/entryMenu'
 import { useCurrentSave } from '../play/useSaves'
 import { useTriggerPlay } from '../play/triggers/useTriggerPlay'
 import { isTypingTarget, matchesKeybind } from '../../store/keybinds'
@@ -43,6 +42,7 @@ import { placeName } from '../maps/placeShapes'
 import { useWorldMaps } from '../maps/useMap'
 import { usePresenceData } from '../maps/usePresence'
 import { WorldMapLoad } from '../maps/WorldMapView'
+import { EventsBadge } from '../worldEvents/EventsBadge'
 import { objectHandlers } from '../maps/objectActions'
 import { useMapTokens } from '../maps/useMapTokens'
 import { failed } from '../../lib/notify'
@@ -69,7 +69,7 @@ function PlayCard({ world, placeKey, data, player, onClose }: { world: string; p
   const now = typeof place.Now === 'string' ? place.Now : ''
   const there = here[placeKey] ?? []
   const breadcrumb = placePath(places, placeKey).map((k) => placeName(places, k)).join(' › ')
-  const actions: MenuItem[] = [{ label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(sceneLink(`@place:${placeKey}`, player) ?? '', agentsOf(there)) }]
+  const actions: MenuItem[] = [{ label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(sceneLink(`@world:${world}/place/${placeKey}`, player) ?? '', agentsOf(there)) }]
   return (
     <SlateContainer
       title={placeName(places, placeKey)}
@@ -81,7 +81,7 @@ function PlayCard({ world, placeKey, data, player, onClose }: { world: string; p
       className="pointer-events-auto absolute right-3 top-3 z-20 flex max-h-[calc(100%-24px)] w-[340px] flex-col"
     >
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-        {now ? <Markdown text={now} className="border border-cyan/25 bg-cyan/[0.04] px-2.5 py-1.5 text-[13px] leading-relaxed text-white/90" /> : <span className="text-[12px] text-faint">Nothing is happening here.</span>}
+        {now ? <Markdown text={now} className="border border-secondary-ink/25 bg-secondary-ink/[0.04] px-2.5 py-1.5 text-[13px] leading-relaxed text-ink/90" /> : <span className="text-[12px] text-faint">Nothing is happening here.</span>}
         {there.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <Eyebrow>Who is here</Eyebrow>
@@ -111,7 +111,8 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo, embedded = fal
   const catalog = useGameCatalog()
   const save = useCurrentSave(world)
   const flagState = JSON.stringify([save?.flags ?? {}, save?.thingFlags ?? {}])
-  const shownMap = useMemo(() => mapInPlay(map, use, save?.flags ?? {}, (id) => save?.thingFlags[placedKey({ map: map.id, id })] ?? {}), [map, use.layerGating, use.propGating, flagState])
+  const shownMap = useMemo(() => mapInPlay(map, use, save?.flags ?? {}, (id) => save?.thingFlags[placedKey({ map: map.id, id })] ?? {}), [map, use.layerGating, use.propGating, use.layers, use.layerOf, flagState])
+  const live = useMemo(() => mapUseInPlay(use, save?.flags ?? {}), [use, flagState])
 
   const timeDef = catalog ? (catalog.time(save?.clockId ?? '') ?? catalog.times()[0] ?? null) : null
   const roundSeconds = timeDef?.roundSeconds ?? 0
@@ -165,7 +166,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo, embedded = fal
     onApproach: nav ? (t, cb) => nav.smartApproach(t, cb) : undefined
   })
 
-  const allTokens = people.tokens
+  const allTokens = people.tokens.filter((t) => !(t.visitor.token in use.stand) || t.visitor.token in live.stand)
   const latestTokens = useLatest(allTokens)
   const tokensSig = allTokens
     .map((t) => `${t.visitor.sheet}:${t.visitor.token}:${t.at.x},${t.at.y}:${t.visitor.hp?.cur ?? ''}/${t.visitor.hp?.max ?? ''}:${JSON.stringify(t.visitor.game ?? null)}`)
@@ -270,7 +271,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo, embedded = fal
       ? (allTokens.find((t) => (t.visitor.token === who || t.visitor.sheet === who) && t.visitor.sheet !== player) ?? null)
       : null
   const deck = useDeckInUse(player ? { character: player } : null)
-  const where = worldWhere(at ? `@place:${at}` : null, at ? agentsOf(data.here[at] ?? []) : [], world, player)
+  const where = worldWhere(at ? `@world:${world}/place/${at}` : null, at ? agentsOf(data.here[at] ?? []) : [], world, player)
   useEscapeLayer(shown !== null || token !== null, () => {
     pickPlace(null)
     useDialogue.getState().closeDialogue()
@@ -386,7 +387,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo, embedded = fal
             },
             {
               label: `Talk to ${showName(t.visitor.name)}`,
-              icon: <MessageSquarePlus className="h-4 w-4 text-cyan" />,
+              icon: <MessageSquarePlus className="h-4 w-4 text-secondary-ink" />,
               onSelect: () => pickWhoRef.current(t.visitor.token)
             },
             {
@@ -407,11 +408,11 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo, embedded = fal
   )
 
   return (
-    <div className="relative min-h-0 flex-1 border border-line/40 bg-black/40">
+    <div className="relative min-h-0 flex-1 border border-line/40 tone-panel-40">
       <PlayStage
         world={world}
         save={save}
-        triggers={triggers.triggers}
+        triggers={live.triggers ?? []}
         onTrigger={triggers.fire}
         onTime={setTime}
         onClock={setClock}
@@ -421,7 +422,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo, embedded = fal
         }}
         onBattleMove={(at) => void useGameState.getState().moveActor(at)}
         map={shownMap}
-        shapes={use.shapes}
+        shapes={live.shapes}
         places={data.places}
         here={data.here}
         place={`play.${world}.${map.id}`}
@@ -459,8 +460,8 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo, embedded = fal
       
       {/* NO PLAYER BANNER - INTERACTIVE TO CHOOSE CHARACTER IMMEDIATELY */}
       {!player && (
-        <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-3 border border-alert bg-black/95 px-4 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.85)]">
-          <span className="font-mono text-[11px] font-bold text-alert">[ ! NO ACTIVE PLAYER CHARACTER ]</span>
+        <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-3 border border-alert tone-panel-95 px-4 py-2 shadow-[0_8px_24px_color-mix(in_srgb,var(--color-shade)_85%,transparent)]">
+          <span className="font-ui text-[11px] font-bold text-alert">[ ! NO ACTIVE PLAYER CHARACTER ]</span>
           <span className="text-[12px] text-dim">Select which character you are playing as:</span>
           <Button
             size="sm"
@@ -481,7 +482,7 @@ function PlayMap({ world, map, use, uses, data, player, at, onGo, embedded = fal
           title="Select Active Player Character"
           onClose={() => setShowPickPlayer(false)}
         >
-          <div className="flex flex-col gap-3 font-mono">
+          <div className="flex flex-col gap-3 font-ui">
             <p className="text-[12px] text-dim">
               Choose a character from your library to take control of in this world:
             </p>
@@ -564,8 +565,8 @@ function You({
     >
       <SheetPortrait image={me?.image ?? null} className="h-7 w-7 border border-accent" />
       <span className="flex flex-col">
-        <span className="text-[12.5px] font-semibold text-white">{me?.name ?? player}</span>
-        <span className="font-mono text-[10.5px] text-dim">{me?.line ?? 'Player Character'}</span>
+        <span className="text-[12.5px] font-semibold text-ink">{me?.name ?? player}</span>
+        <span className="font-ui text-[10.5px] text-dim">{me?.line ?? 'Player Character'}</span>
       </span>
       {me?.game && catalog ? (
         <span className="w-28">
@@ -589,8 +590,6 @@ export function WorldPlay({ world, embedded = false }: { world: string; embedded
   const at = here ? (Object.entries(here).find(([, list]) => list.some((v) => v.sheet === player))?.[0] ?? null) : null
   const [picked, setPicked] = useState<string | null>(null)
   const [showTopPickModal, setShowTopPickModal] = useState(false)
-  const worldEventsList = useLive(() => engine('worldEvents.list', { worldId: world }), 'worldEvents.changed') ?? []
-  const activeEventCount = worldEventsList.filter((e) => e.status === 'active').length
   const home = uses?.find((u) => at && u.shapes[at])?.map ?? uses?.[0]?.map ?? null
   const current = uses?.find((u) => u.map === picked)?.map ?? home
   const names = useLive(() => engine('maps.list'), 'maps.changed')
@@ -604,45 +603,7 @@ export function WorldPlay({ world, embedded = false }: { world: string; embedded
               onPick={() => setShowTopPickModal(true)}
             />
             <span className="flex-1" />
-            <Popover
-              align="end"
-              trigger={
-                <span className="inline-flex h-6 cursor-pointer items-center gap-1.5 border border-line/70 bg-black/80 px-2 font-mono text-[10px] font-bold uppercase tracking-wider text-dim hover:border-accent hover:text-white">
-                  <Flame className={activeEventCount > 0 ? 'h-3 w-3 text-accent animate-pulse' : 'h-3 w-3'} />
-                  <span>Events{activeEventCount > 0 ? ` (${activeEventCount})` : ''}</span>
-                </span>
-              }
-              className="w-72 p-2 font-mono text-[11px]"
-            >
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between border-b border-line/50 pb-1">
-                  <span className="text-[9.5px] font-bold uppercase tracking-wider text-accent">World Events</span>
-                  <button
-                    type="button"
-                    onClick={() => openEntry('world_event', '__new')}
-                    className="border border-line/60 px-1.5 py-0.5 text-[9px] uppercase text-cyan hover:border-cyan cursor-pointer"
-                  >
-                    + New
-                  </button>
-                </div>
-                {worldEventsList.length === 0 ? (
-                  <span className="py-2 text-center text-[10px] text-faint">No world events yet.</span>
-                ) : (
-                  worldEventsList.map((ev) => (
-                    <button
-                      key={ev.id}
-                      type="button"
-                      onClick={() => openEntry('world_event', ev.id)}
-                      onContextMenu={(e) => entryMenuAt(e, 'world_event', ev.id, ev.title, [])}
-                      className="flex w-full items-center justify-between gap-2 border border-line/40 bg-black/60 px-2 py-1.5 text-left hover:border-accent hover:text-white cursor-pointer"
-                    >
-                      <span className="truncate text-white">{ev.title}</span>
-                      <span className="shrink-0 text-[8.5px] uppercase text-dim">{ev.status}</span>
-                    </button>
-                  ))
-                )}
-              </div>
-            </Popover>
+            <EventsBadge worldId={world} />
             <SavePicker world={world} />
             {uses && uses.length > 1 && <ShellTabs value={current ?? ''} options={uses.map((u) => ({ value: u.map, label: names?.find((m) => m.id === u.map)?.name ?? u.map }))} onChange={setPicked} />}
           </div>
@@ -653,7 +614,7 @@ export function WorldPlay({ world, embedded = false }: { world: string; embedded
             title="Select Active Player Character"
             onClose={() => setShowTopPickModal(false)}
           >
-            <div className="flex flex-col gap-3 font-mono">
+            <div className="flex flex-col gap-3 font-ui">
               <p className="text-[12px] text-dim">
                 Choose which character you want to control in this world:
               </p>

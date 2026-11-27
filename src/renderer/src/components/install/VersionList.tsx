@@ -29,7 +29,7 @@ export function VersionList({ state }: { state: InstallHelperState }) {
           const s = status(state, v)
           return (
             <GridRow key={v.id} selected={v.id === picked} onClick={() => setPicked(v.id)} onContextMenu={(e) => openMenu(e, v.label, versionActions(state, v))}>
-              <span className="truncate font-mono text-[12.5px] text-white" title={v.folder}>
+              <span className="truncate font-ui text-[12.5px] text-ink" title={v.folder}>
                 {v.tag ?? v.id}
               </span>
               <span className="truncate text-[12.5px]">{v.label}</span>
@@ -46,7 +46,7 @@ export function VersionList({ state }: { state: InstallHelperState }) {
         <div className="flex flex-col gap-3 p-3.5">
           <FactGrid>
             <Fact label="Folder" wide>
-              <span className="font-mono text-[12px]">{selected.folder}</span>
+              <span className="font-ui text-[12px]">{selected.folder}</span>
             </Fact>
             <Fact label="Checksum">{selected.checksum === null ? 'Not published' : selected.checksum ? 'Matched' : 'Did not match'}</Fact>
             <Fact label="Checked">{selected.check ? formatRelative(selected.check.at) : 'Never'}</Fact>

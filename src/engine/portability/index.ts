@@ -21,6 +21,7 @@ import { secure } from '../util/secure'
 import { writeUserFile } from '../util/fs'
 import { USER, kindNamed, type Kind } from '../library/kinds'
 import { assetsIn, freeName, swapAssets } from '../library/packing'
+import { fileArrived, freshFiles } from '../data/filing'
 import { isPng } from '../carry/png'
 import {
   decodeBundleArchive,
@@ -34,10 +35,15 @@ import {
   peekCardPng,
   peekJsonEnvelope,
   type DecodedPayload,
+  type LooseFile,
   type PeekHeader
 } from './codec'
 import { buildCarryAbout, collectPortableBundle, estimatePortableBundle, isPortableKind } from './pack'
 import { readPortabilityPrefs } from './prefs'
+import { ImportPlace, folderName, usersOf } from './placement'
+import { looseFiles } from './loose'
+import { tags as tagStore } from '../library/tags'
+import { fileKind, folderKind } from '../library/defs/content'
 
 export interface PortableKindSummary {
   kind: string
@@ -194,10 +200,11 @@ export function portabilityExport(req: PortableExportRequest): PortableExportRes
     req.splitMode === 'kind'
       ? [...new Set(req.items.map((i) => i.kind))].map((kindName) => {
           const k = kindNamed(kindName)
+          const rawBase = k?.plural ?? kindName
           return {
             key: kindName,
             subDir: '',
-            fileBase: k?.plural ?? kindName,
+            fileBase: req.prefixKind ? `${kindName}_${rawBase}` : rawBase,
             items: req.items.filter((i) => i.kind === kindName)
           }
         })
@@ -207,7 +214,7 @@ export function portabilityExport(req: PortableExportRequest): PortableExportRes
           return {
             key: `${spec.kind}/${spec.id}`,
             subDir: k?.plural ?? spec.kind,
-            fileBase: title,
+            fileBase: req.prefixKind ? `${spec.kind}_${title}` : title,
             items: [spec]
           }
         })
@@ -242,13 +249,18 @@ export function portabilityExport(req: PortableExportRequest): PortableExportRes
   }
 }
 
-function readSourceBytes(source: PortableSource): { bytes: Buffer; ext: string; text: string | null } {
+function looseFor(source: PortableSource, used: number, maxBytes: number): LooseFile | null {
+  return 'path' in source ? looseFiles(source.path, { left: maxBytes - used }) : null
+}
+
+function readSourceBytes(source: PortableSource, maxBytes: number): { bytes: Buffer; ext: string; text: string | null } {
   if ('text' in source) {
     const buf = Buffer.from(source.text, 'utf8')
     const ext = source.name ? path.extname(source.name).toLowerCase() : '.json'
     return { bytes: buf, ext, text: source.text }
   }
   if ('path' in source) {
+    if (fs.statSync(source.path).size > maxBytes) throw new Error(`${path.basename(source.path)} is over the unpack limit. Raise "Maximum unpacked size" in Settings to open it.`)
     const bytes = fs.readFileSync(source.path)
     return { bytes, ext: path.extname(source.path).toLowerCase(), text: null }
   }
@@ -322,7 +334,7 @@ async function peekOneSource(
   const vaultUnlocked = Boolean(secure.keys?.privateKey)
 
   try {
-    const { bytes, ext, text } = readSourceBytes(source)
+    const { bytes, ext, text } = readSourceBytes(source, maxBytes)
 
     if (isPng(bytes)) {
       let header: PeekHeader | null
@@ -438,7 +450,7 @@ async function peekOneSource(
     if (isPortableJsonEnvelope(parsed)) {
       const header: PeekHeader = password
         ? (() => {
-            const d = decodeJsonEnvelope(parsed, password)
+            const d = decodeJsonEnvelope(parsed, password, looseFor(source, bytes.length, maxBytes))
             return {
               version: d.version,
               protection: d.protection,
@@ -447,10 +459,11 @@ async function peekOneSource(
               locked: false,
               wrongVaultKey: false,
               body: d.body,
-              fileData: d.fileData
+              fileData: d.fileData,
+              missing: d.missing
             }
           })()
-        : peekJsonEnvelope(parsed)
+        : peekJsonEnvelope(parsed, looseFor(source, bytes.length, maxBytes))
       const items = header.body ? buildPeekItems(header.body.entries) : []
       return {
         source,
@@ -466,7 +479,8 @@ async function peekOneSource(
         hasPicture: false,
         items,
         text: header.body?.text ?? null,
-        fileCount: header.body?.files.length ?? 0
+        fileCount: header.body?.files.length ?? 0,
+        missingFiles: header.missing ?? []
       }
     }
 
@@ -527,38 +541,43 @@ export async function portabilityPeek(input: {
 export async function portabilityImport(req: PortableImportRequest): Promise<PortableImportResult> {
   const prefs = readPortabilityPrefs()
   const maxBytes = prefs.maxUnpackMb * 1024 * 1024
-  const { bytes, ext, text } = readSourceBytes(req.source)
+  const { bytes, ext, text } = readSourceBytes(req.source, maxBytes)
 
   let pictureAssetId: string | null = null
-  const keepPicture = (): string | null => {
+  const keepPicture = (into: ImportPlace | null): string | null => {
     if ('asset' in req.source) return req.source.asset
     if ('path' in req.source && isPng(bytes)) {
+      const fresh = freshFiles()
       const added = data.assets.registerBytes(path.basename(req.source.path), bytes, {
         tool: 'portability',
         sessionId: null,
         original: path.basename(req.source.path)
       })
+      if (fresh(added)) {
+        if (into) data.assets.move(added.id, into.folder('Files'))
+        else fileArrived([{ meta: added, owner: null }], req.pictureFolder)
+      }
       return added.id
     }
     return null
   }
 
   if (req.keepPictureOnly) {
-    pictureAssetId = keepPicture()
-    return { imported: [], skipped: [], text: null, pictureAssetId }
+    pictureAssetId = keepPicture(null)
+    return { imported: [], skipped: [], text: null, pictureAssetId, folder: null }
   }
 
   let decoded: DecodedPayload
   if (isPng(bytes)) {
     decoded = decodeCardPng(bytes, req.password)
-    if (req.keepPicture) pictureAssetId = keepPicture()
   } else if (looksLikeZip(bytes, ext)) {
     decoded = await decodeBundleArchive(bytes, maxBytes, req.password)
   } else {
     const rawText = text ?? bytes.toString('utf8')
     const parsed = JSON.parse(rawText) as unknown
     if (isPortableJsonEnvelope(parsed)) {
-      decoded = decodeJsonEnvelope(parsed, req.password)
+      decoded = decodeJsonEnvelope(parsed, req.password, looseFor(req.source, bytes.length, maxBytes))
+      if (decoded.missing?.length) throw new Error(`These files aren't in the export or beside it: ${decoded.missing.join(', ')}`)
     } else {
       const sourceLabel = 'path' in req.source ? path.basename(req.source.path, ext) : 'name' in req.source && req.source.name ? path.basename(req.source.name, ext) : 'Imported entry'
       const entries = rawJsonEntries(parsed, req.targetKind, sourceLabel)
@@ -575,22 +594,35 @@ export async function portabilityImport(req: PortableImportRequest): Promise<Por
   }
 
   if (decoded.body.text !== null && !decoded.body.entries.length) {
-    return { imported: [], skipped: [], text: decoded.body.text, pictureAssetId }
+    if (req.keepPicture && isPng(bytes)) pictureAssetId = keepPicture(null)
+    return { imported: [], skipped: [], text: decoded.body.text, pictureAssetId, folder: null }
   }
 
+  const place = new ImportPlace(req.folder, decoded.about?.title || sourceTitle(req.source, ext) || 'Import')
+  if (req.keepPicture && isPng(bytes)) pictureAssetId = keepPicture(place)
   const assetIds = new Map<string, string>()
+  const fresh = freshFiles()
+  const arrived: { from: string; id: string; parent: string | null }[] = []
   for (const f of decoded.body.files) {
     const buf = decoded.fileData.get(f.id) ?? Buffer.alloc(0)
     const added = data.assets.registerBytes(f.name, buf, { tool: 'portability', sessionId: null, original: f.name })
     assetIds.set(f.id, added.id)
+    if (fresh(added)) arrived.push({ from: f.id, id: added.id, parent: added.parent ?? null })
   }
 
   const resolutionMap = new Map((req.resolutions ?? []).map((r) => [r.index, r.mode]))
   const made: { kind: string; old: string; id: string }[] = []
+  const landed = new Map<number, { kind: Kind; id: string; folder: string }>()
+  const values = decoded.body.entries.map((e) => e.value)
+  const owners = new Set(decoded.body.files.flatMap((f) => {
+    const users = usersOf(f.id, values)
+    return users.length === 1 ? users : []
+  }))
   const imported: PortableImportEntryResult[] = []
   const skipped: { title: string; reason: string }[] = []
+  const canonical = (name: string) => kindNamed(name)?.kind ?? name
   const entryResolver = (old: string, kindName?: string) =>
-    made.find((m) => m.old === old && (!kindName || m.kind === kindName))?.id ?? old
+    made.find((m) => m.old === old && (!kindName || canonical(m.kind) === canonical(kindName)))?.id ?? old
 
   decoded.body.entries.forEach((e, index) => {
     const k = kindNamed(e.kind)
@@ -610,17 +642,61 @@ export async function portabilityImport(req: PortableImportRequest): Promise<Por
     }
     const replace = mode === 'replace' ? existingId : null
     const swappedValue = swapAssets(e.value, assetIds)
-    const newId = k.unpack(swappedValue, { replace, parent: null, entry: entryResolver })
+    const own = `${folderName(k.plural)}/${folderName(e.title)}`
+    const parent = replace || !k.pageTypes?.length ? null : place.folder(owners.has(index) && !k.placesOwnFiles ? own : folderName(k.plural))
+    const newId = k.unpack(swappedValue, { replace, parent, entry: entryResolver })
+    landed.set(index, { kind: k, id: newId, folder: own })
     made.push({ kind: e.kind, old: e.id, id: newId })
     const effectiveMode = replace ? 'replace' : 'copy'
     imported.push({ kind: e.kind, id: newId, title: k.title(newId), mode: effectiveMode })
   })
 
+  placeArrived(arrived, values, landed, place, req.pictureFolder)
+  if (req.tags?.length) {
+    for (const { kind, id } of landed.values()) tagStore.change(kind.kind, id, req.tags, [])
+    for (const file of arrived) tagStore.change(fileKind.kind, file.id, req.tags, [])
+  }
+
   return {
     imported,
     skipped,
     text: decoded.body.text,
-    pictureAssetId
+    pictureAssetId,
+    folder: madeFolder(place.made())
+  }
+}
+
+function madeFolder(id: string | null): { kind: string; id: string } | null {
+  return id ? { kind: folderKind.kind, id } : null
+}
+
+function sourceTitle(source: PortableImportRequest['source'], ext: string): string | null {
+  if ('path' in source) return path.basename(source.path, ext)
+  if ('name' in source && source.name) return path.basename(source.name, ext)
+  return null
+}
+
+function placeArrived(
+  arrived: { from: string; id: string; parent: string | null }[],
+  values: unknown[],
+  landed: Map<number, { kind: Kind; id: string; folder: string }>,
+  place: ImportPlace,
+  pictureFolder: string | null | undefined
+): void {
+  for (const file of arrived) {
+    const meta = data.assets.metaFor(file.id)
+    if (!meta || (meta.parent ?? null) !== file.parent) continue
+    if (meta.kind === 'image' && typeof pictureFolder === 'string') {
+      data.assets.move(file.id, pictureFolder ? data.pages.makeFolders(pictureFolder) : null)
+      continue
+    }
+    const users = usersOf(file.from, values).filter((i) => landed.has(i))
+    const only = users.length === 1 ? landed.get(users[0]) : undefined
+    if (!only) {
+      data.assets.move(file.id, place.folder(users.length ? 'Shared' : 'Files'))
+      continue
+    }
+    data.assets.move(file.id, place.folder(only.folder))
   }
 }
 

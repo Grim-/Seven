@@ -16,8 +16,8 @@ export function PackRow({ pack, on, setOn }: { pack: PackView; on: string[]; set
       <div className="flex flex-col gap-1.5 px-3.5 pb-3 text-[12px]">
         {pack.why && <span className="text-dim">{pack.why}</span>}
         {pack.sets.map((s) => (
-          <span key={s.key} className={pack.overridden.includes(s.key) ? 'text-faint line-through' : 'text-white/80'}>
-            {s.label}: <span className="font-mono">{shown(s.value)}</span>
+          <span key={s.key} className={pack.overridden.includes(s.key) ? 'text-faint line-through' : 'text-ink/80'}>
+            {s.label}: <span className="font-ui">{shown(s.value)}</span>
             {pack.overridden.includes(s.key) && <span className="ml-2 no-underline">a later pack sets this</span>}
           </span>
         ))}

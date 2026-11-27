@@ -95,7 +95,7 @@ export function TriggerActionSelect({
                 variant="ghost"
                 onClick={handleOpenEdit}
                 title="Edit this in-game action inline"
-                className="h-full px-2 text-dim hover:text-cyan border border-line/40 shrink-0"
+                className="h-full px-2 text-dim hover:text-tint-cyan border border-line/40 shrink-0"
                 icon={<Pencil className="h-3 w-3" />}
               />
             )}
@@ -105,8 +105,8 @@ export function TriggerActionSelect({
               variant="secondary"
               onClick={handleOpenCreate}
               title="Create new in-game trigger action inline"
-              className="h-full px-2 text-[11px] font-bold text-cyan border border-cyan/40 hover:bg-cyan/10 shrink-0"
-              icon={<Plus className="h-3 w-3 text-cyan" />}
+              className="h-full px-2 text-[11px] font-bold text-tint-cyan border border-tint-cyan/40 hover:bg-tint-cyan/10 shrink-0"
+              icon={<Plus className="h-3 w-3 text-tint-cyan" />}
             >
               {inlineButtonLabel}
             </Button>
@@ -121,7 +121,7 @@ export function TriggerActionSelect({
           onClose={() => setModalOpen(false)}
           wide
           footer={
-            <div className="flex items-center justify-between w-full font-mono text-[11px]">
+            <div className="flex items-center justify-between w-full font-ui text-[11px]">
               <span className="text-dim">
                 Will be saved to in-game actions and immediately selected in the dropdown.
               </span>

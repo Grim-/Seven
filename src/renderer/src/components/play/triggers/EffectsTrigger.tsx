@@ -37,7 +37,7 @@ registerTriggerUi('effects', {
     const defs = cleanComponents(trigger.values.effects)
     if (!defs.length) return
     const caster = String(trigger.values.caster ?? '') || trigger.id
-    const target = ctx.save?.creatures.some((c) => c.uid === ctx.sheet) ? { creature: ctx.sheet } : { sheet: ctx.sheet }
+    const target = { sheet: ctx.sheet }
     engine('effects.run', { defs, user: { placed: { map: ctx.map, id: caster } }, target, world: ctx.world })
       .then(async (done) => {
         triggerOutcomeVfx(done, [ctx.sheet ? `sheet:${ctx.sheet}` : null])

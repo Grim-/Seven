@@ -59,14 +59,14 @@ function KindSection({
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-1 border-b border-line/50 py-1.5">
-        <button onClick={onToggle} title={open ? 'Collapse' : 'Expand'} className="p-0.5 text-accent-soft hover:text-white">
+        <button onClick={onToggle} title={open ? 'Collapse' : 'Expand'} className="p-0.5 text-accent-soft hover:text-ink">
           <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`} />
         </button>
         <button
           onClick={onOpenAll ?? onToggle}
           onContextMenu={onHeaderMenu}
           title={section.description}
-          className={`flex flex-1 items-center gap-1.5 text-left font-mono text-[11px] font-bold uppercase tracking-[0.16em] hover:text-white ${current?.kind === section.kind && current.id === 'all' ? 'text-white' : 'text-accent-soft'}`}
+          className={`flex flex-1 items-center gap-1.5 text-left font-label text-[11px] font-bold caps-16 hover:text-ink ${current?.kind === section.kind && current.id === 'all' ? 'text-ink' : 'text-accent-soft'}`}
         >
           <KindIcon name={section.icon} className="h-3.5 w-3.5" />
           {section.plural}
@@ -89,12 +89,12 @@ function KindSection({
             )
           })}
           {!expanded && section.count > entries.length && (
-            <button onClick={() => setExpanded(true)} className="px-2 py-1 text-left font-mono text-[10.5px] uppercase tracking-[0.14em] text-dim hover:text-accent">
+            <button onClick={() => setExpanded(true)} className="px-2 py-1 text-left font-label text-[10.5px] caps-14 text-dim hover:text-accent">
               Show all {section.count}
             </button>
           )}
           {expanded && (
-            <button onClick={() => setExpanded(false)} className="px-2 py-1 text-left font-mono text-[10.5px] uppercase tracking-[0.14em] text-dim hover:text-accent">
+            <button onClick={() => setExpanded(false)} className="px-2 py-1 text-left font-label text-[10.5px] caps-14 text-dim hover:text-accent">
               Show fewer
             </button>
           )}
@@ -133,7 +133,7 @@ export function PanelBrowser({ selected, select, only = null }: { selected: Data
     <div className="flex h-full min-h-0 flex-col gap-2 p-2.5">
       <SearchBox value={query} onChange={setQuery} />
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1">
-        {sections === null && <div className="px-2 py-1.5 font-mono text-[11px] text-dim">Loading…</div>}
+        {sections === null && <div className="px-2 py-1.5 font-ui text-[11px] text-dim">Loading…</div>}
         {sections?.map((sec) => (
           <KindSection
             key={sec.kind}

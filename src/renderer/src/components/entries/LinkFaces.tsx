@@ -33,7 +33,7 @@ export function LinkFaces({ text }: { text: string }) {
   if (!refs.length) return null
   return (
     <div className="mt-2.5 flex flex-col items-end gap-1.5 w-full">
-      <div className="flex items-center justify-between w-full border-t border-line/40 pt-1.5 font-mono text-[10px] uppercase tracking-wider text-dim">
+      <div className="flex items-center justify-between w-full border-t border-line/40 pt-1.5 font-label text-[10px] caps-5 text-dim">
         <span className="flex items-center gap-1.5 text-accent font-semibold">
           <Paperclip className="h-3 w-3" />
           ATTACHED CONTEXT ({refs.length})
@@ -41,7 +41,7 @@ export function LinkFaces({ text }: { text: string }) {
         <button
           type="button"
           onClick={() => setShown(!shown)}
-          className="text-faint hover:text-white transition-colors cursor-pointer"
+          className="text-faint hover:text-ink transition-colors cursor-pointer"
         >
           {shown ? '[-] COLLAPSE' : '[+] EXPAND'}
         </button>

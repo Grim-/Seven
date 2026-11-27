@@ -17,10 +17,10 @@ function useRecent() {
 function Row({ e }: { e: WebLogEntry }) {
   return (
     <>
-      <span className="shrink-0 font-mono text-[10.5px] text-faint">{formatRelative(e.at)}</span>
-      <span className="shrink-0 font-mono text-[10px] uppercase text-teal">{e.kind}</span>
-      <span className="min-w-0 flex-1 truncate font-mono text-[11.5px]">{e.target}</span>
-      <span className={cn('shrink-0 font-mono text-[10px] uppercase', ALLOWED.includes(e.outcome) ? 'text-ok' : 'text-alert')}>{e.outcome}</span>
+      <span className="shrink-0 font-ui text-[10.5px] text-faint">{formatRelative(e.at)}</span>
+      <span className="shrink-0 font-label text-[10px] caps text-secondary">{e.kind}</span>
+      <span className="min-w-0 flex-1 truncate font-ui text-[11.5px]">{e.target}</span>
+      <span className={cn('shrink-0 font-label text-[10px] caps', ALLOWED.includes(e.outcome) ? 'text-ok' : 'text-alert')}>{e.outcome}</span>
     </>
   )
 }
@@ -45,7 +45,7 @@ export function WebLogWidget() {
         <BigStat value={allowed} label="allowed today" />
         <BigStat value={today.length - allowed} label="stopped" className="text-alert" />
       </div>
-      {recent[0] && <span className="truncate font-mono text-[11px] text-dim">last: {recent[0].target}</span>}
+      {recent[0] && <span className="truncate font-ui text-[11px] text-dim">last: {recent[0].target}</span>}
     </div>
   )
 }

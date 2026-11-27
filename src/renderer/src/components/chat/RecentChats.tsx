@@ -28,7 +28,7 @@ export function RecentChats({ conv, onPick }: { conv: Conversation; onPick: () =
           icon={<AgentAvatar agent={agents.find((a) => a.id === s.agentId)} size={22} />}
           title={s.title}
           subtitle={formatRelative(s.updatedAt)}
-          meta={running[s.id] ? <span className="h-1.5 w-1.5 animate-pulse bg-cyan" /> : undefined}
+          meta={running[s.id] ? <span className="h-1.5 w-1.5 animate-pulse bg-secondary-ink" /> : undefined}
           onClick={() => {
             conv.go(s.id)
             onPick()

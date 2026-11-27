@@ -20,7 +20,7 @@ export function DraftPart({ messageId }: { messageId: string }) {
     )
   }
   return (
-    <div className="my-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-cyan/80">
+    <div className="my-2 flex items-center gap-2 font-label text-[11px] caps-14 text-secondary-ink/80">
       <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
       Writing {draft.name} call
       <span className="text-faint normal-case tracking-normal">{draft.text.length.toLocaleString()} chars</span>

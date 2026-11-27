@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Download } from 'lucide-react'
-import { MODEL_KINDS, type HubFile, type SystemStats } from '@shared/types'
+import { MODEL_KINDS, type HubFile, type ModelKind, type SystemStats } from '@shared/types'
 import { Button, SettingRow, TraitChips } from '../ui'
 import { headerKey, useHub } from '../../store/hub'
 import { useDownloads } from '../../store/downloads'
@@ -18,6 +18,7 @@ export function HubFileRow({
   folder,
   stats,
   allowCompanions = false,
+  expectedKind,
   selected,
   onToggleSelect
 }: {
@@ -26,6 +27,7 @@ export function HubFileRow({
   folder: string | null
   stats: SystemStats | null
   allowCompanions?: boolean
+  expectedKind?: ModelKind
   selected?: boolean
   onToggleSelect?: () => void
 }) {
@@ -58,7 +60,8 @@ export function HubFileRow({
       file: file.file,
       name: file.name,
       folder: folder ?? '',
-      total: bytes
+      total: bytes,
+      ...(expectedKind ? { expectedKind } : {})
     }).catch(failed('Could not start the download'))
 
   const traits = [

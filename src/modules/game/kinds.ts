@@ -1,5 +1,10 @@
-import { defTypes, type DefType, type GameDef } from '@shared/game/defs'
-import { ENTRY_WIDGET, type Kind } from '../../engine/library/kinds'
+import { defTypes, type DefType, type GameDef, type StatHolder } from '@shared/game/defs'
+import { GameEntity } from '@shared/game/core'
+import { Stats } from '@shared/game/components'
+import { agentSheets } from '@shared/types'
+import { agentAccess } from '../../engine/agents/access'
+import { gameCatalog } from './characters'
+import { ENTRY_WIDGET, type Kind, type KindContext } from '../../engine/library/kinds'
 import { freeName } from '../../engine/library/packing'
 import { gameDefSwap, gameDefUses } from '../../engine/portability/kindPackers'
 import { gameDefs } from './store'
@@ -13,17 +18,35 @@ function defText(type: DefType, def: GameDef): string {
   return [`# ${def.name}`, `${type.label}, id \`${def.id}\`: ${type.line(def)}`, def.notes, rows.join('\n')].filter(Boolean).join('\n\n')
 }
 
+function holderFor(ctx: KindContext): StatHolder | null {
+  const agent = ctx.agentId ? agentAccess.get(ctx.agentId) : null
+  if (!agent) return null
+  for (const id of agentSheets(agent)) {
+    try {
+      const record = getSheet(id).game
+      if (!record) continue
+      const stats = GameEntity.fromRecord(record, gameCatalog()).comp(Stats)
+      if (stats) return { value: (statId) => stats.value(statId) }
+    } catch {
+      continue
+    }
+  }
+  return null
+}
+
 function located(type: DefType, ref: string): GameDef {
   const found = gameDefs.find(type.type, ref)
-  if (!found) throw new Error(`No ${type.label.toLowerCase()} "${ref}". Use find with kind ${type.type} to list them.`)
+  if (!found) throw new Error(`No ${type.label.toLowerCase()} "${ref}". Use find with kind ${type.kind ?? type.type} to list them.`)
   return found
 }
 
 function kindOf(type: DefType): Kind {
   const k = type.type
+  const link = type.kind ?? k
   const text = (ref: string) => defText(type, located(type, ref))
   return {
-    kind: k,
+    kind: link,
+    ...(link !== k ? { aliases: [k] } : {}),
     presents: { chat: true, widget: ENTRY_WIDGET },
     label: type.label,
     plural: type.plural,
@@ -58,12 +81,13 @@ function kindOf(type: DefType): Kind {
         .list(k)
         .filter((d) => !q || d.name.toLowerCase().includes(q) || d.id.includes(q) || d.notes.toLowerCase().includes(q))
         .slice(0, limit)
-        .map((d) => ({ kind: k, id: d.id, title: d.name }))
+        .map((d) => ({ kind: link, id: d.id, title: d.name }))
     },
     resolve: (ref) => gameDefs.find(k, ref)?.id ?? null,
     line: (ref) => type.line(located(type, ref)),
     card: text,
     full: text,
+    ...(type.brief ? { brief: (ref: string, ctx: KindContext) => type.brief!(located(type, ref), holderFor(ctx)) } : {}),
     title: (ref) => located(type, ref).name,
     remove: (ref) => void gameDefs.remove(k, located(type, ref).id),
     rename: (ref, name) => {

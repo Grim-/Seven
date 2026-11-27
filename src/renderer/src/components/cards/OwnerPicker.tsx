@@ -25,7 +25,7 @@ export function OwnerPicker({ owner, title, menuTitle, nobody, onPick }: { owner
     }, failed('Could not list the characters'))
   const where = (e: MouseEvent): MenuEvent => ({ preventDefault() {}, stopPropagation() {}, clientX: e.clientX, clientY: e.clientY })
   return (
-    <button type="button" title={title} className="flex items-center gap-1 font-mono text-[11px] text-accent-soft hover:text-white" onClick={(e) => choose(where(e))} onContextMenu={(e) => {
+    <button type="button" title={title} className="flex items-center gap-1 font-ui text-[11px] text-accent-soft hover:text-ink" onClick={(e) => choose(where(e))} onContextMenu={(e) => {
       e.preventDefault()
       choose(where(e))
     }}>

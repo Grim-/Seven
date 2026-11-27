@@ -8,7 +8,7 @@ export function BackBar({ onBack, kind, children }: { onBack: () => void; kind?:
       <Button size="sm" variant="primary" icon={<ChevronLeft />} onClick={onBack} className="pl-1.5 pr-3">
         Back
       </Button>
-      {kind && <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{kind}</span>}
+      {kind && <span className="ml-auto font-label text-[10px] caps-14 text-faint">{kind}</span>}
       {children}
     </div>
   )

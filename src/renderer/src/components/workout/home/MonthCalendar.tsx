@@ -30,7 +30,7 @@ export function MonthCalendar({ history, today, month, selected, onMonth, onPick
     >
       <div className="grid grid-cols-7 gap-1">
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-          <span key={d} className="text-center font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
+          <span key={d} className="text-center font-label text-[10px] caps-10 text-faint">
             {d}
           </span>
         ))}
@@ -45,11 +45,11 @@ export function MonthCalendar({ history, today, month, selected, onMonth, onPick
                 'flex min-h-16 flex-col gap-0.5 border px-1.5 py-1 text-left',
                 what ? 'border-accent/40 bg-accent/10' : 'border-line/25 hover:border-line/60',
                 date === today && 'outline outline-1 outline-accent',
-                date === selected && 'border-white/70',
+                date === selected && 'border-ink/70',
                 !inMonth && 'opacity-35'
               )}
             >
-              <span className={cn('font-mono text-[11px]', what ? 'text-accent' : date === today ? 'text-accent' : 'text-faint')}>
+              <span className={cn('font-ui text-[11px]', what ? 'text-accent' : date === today ? 'text-accent' : 'text-faint')}>
                 {Number(date.slice(8))}
                 {date === today ? ' today' : ''}
               </span>

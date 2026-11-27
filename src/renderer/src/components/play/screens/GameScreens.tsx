@@ -65,7 +65,7 @@ function ScreenWindow({
   const tabs = gameScreens()
   return (
     <div
-      className="pointer-events-auto absolute inset-0 z-40 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
+      className="pointer-events-auto absolute inset-0 z-40 flex items-center justify-center bg-scrim/55 p-4 backdrop-blur-[2px]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onOpen(null)
       }}
@@ -83,10 +83,10 @@ function ScreenWindow({
                 type="button"
                 onClick={() => onOpen(t.id)}
                 className={cn(
-                  'flex h-5 items-center gap-1 border px-1.5 font-mono text-[9.5px] uppercase tracking-wider transition-colors cursor-pointer',
+                  'flex h-5 items-center gap-1 border px-1.5 font-label text-[9.5px] caps-5 transition-colors cursor-pointer',
                   t.id === screen.id
                     ? 'border-accent bg-accent/20 text-accent'
-                    : 'border-line/50 bg-black/60 text-dim hover:border-line hover:text-white'
+                    : 'border-line/50 tone-well-60 text-dim hover:border-line hover:text-ink'
                 )}
               >
                 <span>{t.label}</span>

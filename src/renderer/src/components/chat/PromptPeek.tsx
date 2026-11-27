@@ -53,18 +53,18 @@ function PromptSectionCard({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left font-mono text-[11px]"
+          className="flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left font-ui text-[11px]"
         >
           <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 transition-transform', tone.text, !collapsed && 'rotate-90')} />
-          <span className={cn('shrink-0 font-semibold uppercase tracking-[0.08em]', tone.text)}>{section.label}</span>
-          <span className="min-w-0 flex-1 truncate font-sans text-[11px] text-dim">{section.detail}</span>
+          <span className={cn('shrink-0 font-semibold caps-8 ', tone.text)}>{section.label}</span>
+          <span className="min-w-0 flex-1 truncate font-body text-[11px] text-dim">{section.detail}</span>
           <span className="shrink-0 text-[10.5px] text-faint">
             ~{formatPromptTokens(section.tokens)} tok · {share}
           </span>
         </button>
       </Tooltip>
       {!collapsed && (
-        <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words border-t border-line/20 px-3 py-2 font-mono text-[11.5px] leading-relaxed text-white/90">
+        <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words border-t border-line/20 px-3 py-2 font-mono text-[11.5px] leading-relaxed text-ink/90">
           {section.text}
         </pre>
       )}
@@ -208,7 +208,7 @@ export function PromptPeek() {
             setPinned(true)
           }
         }}
-        className={cn('flex h-7 w-7 shrink-0 items-center justify-center border', pinned ? 'border-accent/70 text-accent' : 'border-line/60 text-dim hover:text-white')}
+        className={cn('flex h-7 w-7 shrink-0 items-center justify-center border', pinned ? 'border-accent/70 text-accent' : 'border-line/60 text-dim hover:text-ink')}
       >
         <ScrollText className="h-4 w-4" />
       </button>
@@ -231,7 +231,7 @@ export function PromptPeek() {
             <div className="record-header flex shrink-0 items-center gap-2">
               <span className="min-w-0 flex-1 truncate">What the agent sees</span>
               {view && (
-                <span className="shrink-0 font-mono text-[10px] normal-case tracking-normal text-faint">
+                <span className="shrink-0 font-ui text-[10px] normal-case tracking-normal text-faint">
                   {view.format !== 'none' ? `${view.format} · ` : ''}
                   {view.tokens !== null ? `~${view.tokens.toLocaleString()} tokens · ` : ''}
                   {view.text.length.toLocaleString()} chars
@@ -261,8 +261,8 @@ export function PromptPeek() {
             </div>
             {view?.note && <div className="relative z-[2] shrink-0 border-b border-line/40 px-3 py-1.5 text-[11.5px] text-dim">{view.note}</div>}
             {sources.length > 0 && (
-              <div className="relative z-[2] flex shrink-0 flex-col gap-2 border-b border-line/40 bg-black/35 px-3 py-2">
-                <div className="segment-mask flex h-1.5 w-full overflow-hidden bg-white/[0.06]">
+              <div className="relative z-[2] flex shrink-0 flex-col gap-2 border-b border-line/40 tone-panel-35 px-3 py-2">
+                <div className="segment-mask flex h-1.5 w-full overflow-hidden bg-ink/[0.06]">
                   {sources.map((src) => {
                     const tone = sourceTone(src.sourceId)
                     const widthPct = totalSectionTokens ? Math.max(1, (src.tokens / totalSectionTokens) * 100) : 0
@@ -287,7 +287,7 @@ export function PromptPeek() {
                     )
                   })}
                 </div>
-                <div className="flex max-h-20 flex-wrap items-center gap-1.5 overflow-y-auto font-mono text-[10.5px]">
+                <div className="flex max-h-20 flex-wrap items-center gap-1.5 overflow-y-auto font-ui text-[10.5px]">
                   {sources.map((src) => {
                     const tone = sourceTone(src.sourceId)
                     const active = activeSource === src.sourceId
@@ -322,7 +322,7 @@ export function PromptPeek() {
                     <button
                       type="button"
                       onClick={() => setActiveSource(null)}
-                      className="border border-line/50 px-1.5 py-0.5 text-dim hover:text-white"
+                      className="border border-line/50 px-1.5 py-0.5 text-dim hover:text-ink"
                     >
                       Show all
                     </button>
@@ -331,7 +331,7 @@ export function PromptPeek() {
                     <button
                       type="button"
                       onClick={toggleAllTools}
-                      className="border border-line/50 px-1.5 py-0.5 text-dim hover:text-white"
+                      className="border border-line/50 px-1.5 py-0.5 text-dim hover:text-ink"
                     >
                       {allToolsFolded ? 'Expand tools' : 'Fold tools'}
                     </button>
@@ -343,7 +343,7 @@ export function PromptPeek() {
               {error ? (
                 <div className="text-[12px] text-alert">{error}</div>
               ) : !view ? (
-                <div className="font-mono text-[11px] text-dim">Loading…</div>
+                <div className="font-ui text-[11px] text-dim">Loading…</div>
               ) : visibleSections.length > 0 ? (
                 <div className="flex min-w-0 flex-col gap-1.5">
                   {visibleSections.map((sec) => (
@@ -359,7 +359,7 @@ export function PromptPeek() {
                   ))}
                 </div>
               ) : (
-                <pre className="whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-white/90">{view.text}</pre>
+                <pre className="whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-ink/90">{view.text}</pre>
               )}
             </div>
           </div>,

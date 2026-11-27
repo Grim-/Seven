@@ -1,4 +1,5 @@
-import { cssHex } from '../../../lib/cssColors'
+import { solid } from '../../../lib/skins/roles'
+import { currentRoles } from '../../../lib/skins/useRoleColours'
 
 export interface FramePalette {
   accent: string
@@ -9,12 +10,6 @@ export interface FramePalette {
 }
 
 export function readFramePalette(): FramePalette {
-  const style = getComputedStyle(document.documentElement)
-  return {
-    accent: cssHex(style, '--color-accent', '#ffc919'),
-    secondary: cssHex(style, '--color-teal', '#00e5ff'),
-    base: cssHex(style, '--color-bg', '#090a0d'),
-    mono: style.getPropertyValue('--font-mono').trim() || 'monospace',
-    sans: style.getPropertyValue('--font-sans').trim() || 'sans-serif'
-  }
+  const { colours, fonts } = currentRoles()
+  return { accent: solid(colours.accent), secondary: solid(colours.secondary), base: solid(colours.bg), mono: fonts.mono, sans: fonts.sans }
 }

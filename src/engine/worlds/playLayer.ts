@@ -40,7 +40,13 @@ setSheetLayer({
     const save = saves.read(id)
     const held = save?.characters[sheet]
     if (!save || !held) return null
-    return { game: held.game, where: held.where, gameRules: worlds.exists(save.world) ? worlds.meta(save.world).rules : '' }
+    return {
+      game: held.game,
+      where: held.where,
+      gameRules: worlds.exists(save.world) ? worlds.meta(save.world).rules : '',
+      world: save.world,
+      almanacId: save.almanacId ?? null
+    }
   },
   writeGame: (sheet, id, game) => void saves.change(id, (s) => ({ ...s, characters: { ...s.characters, [sheet]: { ...(s.characters[sheet] ?? { where: '' }), game } } })),
   writeWhere: (sheet, id, where) => void saves.change(id, (s) => ({ ...s, characters: { ...s.characters, [sheet]: { ...(s.characters[sheet] ?? { game: null }), where } } }))

@@ -41,7 +41,7 @@ export function PickDecisionForm({ character, where }: { character: string | nul
           </Button>
         ) : (
           <>
-            <span className="font-mono text-[11px] text-dim">options to write</span>
+            <span className="font-ui text-[11px] text-dim">options to write</span>
             <NumberField value={count} min={1} onChange={(v) => setCount(v ?? 1)} className="w-20" />
             <Button size="sm" variant="primary" icon={<MessageSquare />} disabled={!question.trim() || !where.onText} onClick={ask}>
               Ask the agent

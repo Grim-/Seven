@@ -30,6 +30,7 @@ import { useAgentIdOf, useConversation } from '../../lib/conversation'
 import { saveTrayKinds, useKindList } from '../../lib/kinds'
 import { useDrawerPrefs } from '../../lib/listPrefs'
 import { noteFailure } from '../../store/problems'
+import { skinSurface } from '../skins/skinSurface'
 
 const MIN = 280
 const MAX = 900
@@ -134,20 +135,20 @@ export function PanelItems({ tab, empty }: { tab: string; empty: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center border-b border-line/40 px-2.5 py-1">
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{shown.length} item{shown.length === 1 ? '' : 's'}</span>
+        <span className="font-label text-[10px] caps-14 text-faint">{shown.length} item{shown.length === 1 ? '' : 's'}</span>
         <button
           onClick={() => void usePanel.getState().clear(panelKey, tab)}
-          className="ml-auto flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-dim hover:text-alert"
+          className="ml-auto flex items-center gap-1 font-label text-[10px] caps-14 text-dim hover:text-alert"
         >
           <Trash2 className="h-3 w-3" /> Clear
         </button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
         {shown.map((item) => (
-          <div key={item.id} className="flex flex-col border border-line/50 bg-black/40">
+          <div key={item.id} className="flex flex-col border border-line/50 tone-panel-40">
             <div className="flex items-center gap-2 border-b border-line/40 px-2.5 py-1">
-              <span className="truncate text-[12px] text-white">{item.view.title ?? item.module}</span>
-              <span className="ml-auto shrink-0 font-mono text-[10px] text-faint">{formatRelative(item.updatedAt)}</span>
+              <span className="truncate text-[12px] text-ink">{item.view.title ?? item.module}</span>
+              <span className="ml-auto shrink-0 font-ui text-[10px] text-faint">{formatRelative(item.updatedAt)}</span>
               <button title="Remove" onClick={() => void usePanel.getState().remove(panelKey, item.id)} className="text-dim hover:text-alert">
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -227,18 +228,18 @@ export function SidePanelToggle({ className }: { className?: string }) {
       className={cn(
         'bracket-right group relative w-3.5 shrink-0 self-stretch min-h-[48px] cursor-pointer select-none border-y border-l transition-all outline-none',
         open
-          ? 'border-accent/80 bg-accent/15 text-accent shadow-[0_0_10px_color-mix(in_srgb,var(--color-accent)_25%,transparent)]'
-          : 'border-line bg-black/60 text-dim hover:border-accent hover:bg-accent/10',
+          ? 'border-accent/80 bg-accent/15 text-accent shadow-[0_0_10px_color-mix(in_srgb,var(--color-accent)_calc(25%*var(--glow)),transparent)]'
+          : 'border-line tone-well-60 text-dim hover:border-accent hover:bg-accent/10',
         className
       )}
     >
       <span
         className={cn(
           'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[1.5px] h-5 transition-all',
-          open ? 'bg-accent shadow-[0_0_8px_var(--color-accent)]' : 'bg-dim/70 group-hover:bg-accent'
+          open ? 'bg-accent shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_calc(100%*var(--glow)),transparent)]' : 'bg-dim/70 group-hover:bg-accent'
         )}
       />
-      {unseen > 0 && <span className="absolute -top-1 -left-1 h-2 w-2 bg-accent shadow-[0_0_6px_var(--color-accent)]" />}
+      {unseen > 0 && <span className="absolute -top-1 -left-1 h-2 w-2 bg-accent shadow-[0_0_6px_color-mix(in_srgb,var(--color-accent)_calc(100%*var(--glow)),transparent)]" />}
     </button>
   )
 }
@@ -263,7 +264,7 @@ function KindTab({ kind, label }: { kind: string; label: string }) {
       {!home && <BackBar onBack={() => setSel({ kind, id: 'all' })} kind={label} />}
       <div className="flex min-h-0 flex-1 flex-col">
         {!section ? (
-          <div className="px-2 py-1.5 font-mono text-[11px] text-dim">Loading…</div>
+          <div className="px-2 py-1.5 font-ui text-[11px] text-dim">Loading…</div>
         ) : (
           <KindPane section={section} selected={sel} select={select} />
         )}
@@ -299,7 +300,7 @@ export function SidePanel() {
     <div
       aria-hidden
       onClick={() => save({ open: false })}
-      className="hidden phone:block absolute inset-0 z-20 bg-black/60 backdrop-blur-[1px]"
+      className="hidden phone:block absolute inset-0 z-20 bg-scrim/60 backdrop-blur-[1px]"
     />
     <Gutter resets="side" />
     <SidePane
@@ -309,10 +310,10 @@ export function SidePanel() {
       max={MAX}
       reset={DEFAULTS.width}
       onWidth={(w) => save({ width: w })}
-      className="phone:absolute phone:inset-y-0 phone:right-0 phone:z-30 phone:w-[min(22rem,92vw)]! phone:max-w-[92vw]! phone:bg-bg phone:shadow-[-8px_0_24px_rgba(0,0,0,0.7)]"
+      className="phone:absolute phone:inset-y-0 phone:right-0 phone:z-30 phone:w-[min(22rem,92vw)]! phone:max-w-[92vw]! phone:bg-bg phone:shadow-[-8px_0_24px_color-mix(in_srgb,var(--color-shade)_70%,transparent)]"
     >
     <motion.div className="flex h-full w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, ease: 'easeOut' }}>
-      <section className="panel-box flex min-h-0 w-full flex-col overflow-hidden">
+      <section {...skinSurface('sidebar')} className="panel-box flex min-h-0 w-full flex-col overflow-hidden">
         <header className="flex shrink-0 items-center gap-1 border-b border-line/60 px-2 py-1.5">
           <button
             onClick={(e) => {
@@ -341,14 +342,14 @@ export function SidePanel() {
                   : [])
               ])
             }}
-            className="flex min-w-0 flex-1 items-center gap-2 border border-accent/60 bg-accent/10 px-2.5 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent hover:bg-accent/15"
+            className="flex min-w-0 flex-1 items-center gap-2 border border-accent/60 bg-accent/10 px-2.5 py-1 font-label text-[10.5px] font-semibold caps-14 text-accent hover:bg-accent/15"
           >
             {current.icon}
             <span className="truncate">{current.label}</span>
             {tabs.some((tab) => tab.id !== current.id && unseenIn(items, seen, panelKey, tab.id) > 0) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
             <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0" />
           </button>
-          <button title="Hide side panel" onClick={() => save({ open: false })} className="flex h-6 w-6 shrink-0 items-center justify-center text-dim hover:text-white">
+          <button title="Hide side panel" onClick={() => save({ open: false })} className="flex h-6 w-6 shrink-0 items-center justify-center text-dim hover:text-ink">
             <X className="h-4 w-4" />
           </button>
         </header>
@@ -459,8 +460,8 @@ export function OutputTray() {
           ])
         }}
         className={cn(
-          'relative flex h-6 items-center gap-1.5 border px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors',
-          active ? 'border-accent/70 bg-accent/15 text-accent' : 'border-line/50 text-dim hover:border-line hover:text-white'
+          'relative flex h-6 items-center gap-1.5 border px-2 font-label text-[10px] font-semibold caps-12 transition-colors',
+          active ? 'border-accent/70 bg-accent/15 text-accent' : 'border-line/50 text-dim hover:border-line hover:text-ink'
         )}
       >
         {t.icon}
@@ -492,21 +493,21 @@ export function OutputTray() {
       <div className={cn('pointer-events-none absolute inset-x-2 bottom-full overflow-hidden transition-[height] duration-300', expanded ? 'h-[78vh]' : 'h-[44vh]')}>
         <section
           className={cn(
-            'panel-box pointer-events-auto absolute inset-0 flex flex-col overflow-hidden border-b-0 shadow-[0_-12px_30px_rgba(0,0,0,0.6)] transition-transform duration-300 ease-out',
+            'panel-box pointer-events-auto absolute inset-0 flex flex-col overflow-hidden border-b-0 shadow-[0_-12px_30px_color-mix(in_srgb,var(--color-shade)_60%,transparent)] transition-transform duration-300 ease-out',
             current ? 'translate-y-0' : 'translate-y-full'
           )}
         >
           {shown && (
             <>
               <header className="flex shrink-0 items-center gap-2 border-b border-line/50 px-2.5 py-1.5">
-                <span className="flex items-center gap-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent">
+                <span className="flex items-center gap-2 font-label text-[10.5px] font-semibold caps-14 text-accent">
                   {shown.icon}
                   {shown.label}
                 </span>
-                <button title={expanded ? 'Shrink' : 'Expand'} onClick={() => setTray({ expanded: !expanded })} className="ml-auto flex h-6 w-6 items-center justify-center text-dim hover:text-white">
+                <button title={expanded ? 'Shrink' : 'Expand'} onClick={() => setTray({ expanded: !expanded })} className="ml-auto flex h-6 w-6 items-center justify-center text-dim hover:text-ink">
                   {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
                 </button>
-                <button title="Hide" onClick={() => setTray({ tab: null })} className="flex h-6 w-6 items-center justify-center text-dim hover:text-white">
+                <button title="Hide" onClick={() => setTray({ tab: null })} className="flex h-6 w-6 items-center justify-center text-dim hover:text-ink">
                   <X className="h-4 w-4" />
                 </button>
               </header>
@@ -515,7 +516,7 @@ export function OutputTray() {
           )}
         </section>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 bg-black/40 px-3 pt-2">
+      <div className="flex flex-wrap items-center gap-1.5 tone-panel-40 px-3 pt-2">
         {front.map((t) => tabButton(t))}
         {more.length > 0 && (
           <Popover
@@ -524,8 +525,8 @@ export function OutputTray() {
             align="start"
             className="flex max-h-[50vh] w-56 flex-col items-stretch gap-1.5 p-2"
             triggerClassName={cn(
-              'h-6 gap-1.5 border px-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors',
-              moreActive ? 'border-accent/70 bg-accent/15 text-accent' : 'border-line/50 text-dim hover:border-line hover:text-white'
+              'h-6 gap-1.5 border px-2 font-label text-[10px] font-semibold caps-12 transition-colors',
+              moreActive ? 'border-accent/70 bg-accent/15 text-accent' : 'border-line/50 text-dim hover:border-line hover:text-ink'
             )}
             trigger={
               <>

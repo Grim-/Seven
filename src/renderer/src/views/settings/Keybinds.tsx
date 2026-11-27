@@ -43,8 +43,8 @@ function KeyCap({ children, dimmed = false }: { children: string; dimmed?: boole
     <kbd
       className={
         dimmed
-          ? 'inline-flex min-w-7 items-center justify-center border border-dashed border-line px-2 py-0.5 font-mono text-[11px] text-dim'
-          : 'inline-flex min-w-7 items-center justify-center border border-line bg-black/70 px-2 py-0.5 font-mono text-[11.5px] font-semibold text-accent shadow-[0_1px_0_rgba(255,255,255,0.06)]'
+          ? 'inline-flex min-w-7 items-center justify-center border border-dashed border-line px-2 py-0.5 font-ui text-[11px] text-dim'
+          : 'inline-flex min-w-7 items-center justify-center border border-line tone-well-70 px-2 py-0.5 font-ui text-[11.5px] font-semibold text-accent shadow-[0_1px_0_color-mix(in_srgb,var(--color-ink)_6%,transparent)]'
       }
     >
       {children}
@@ -58,7 +58,7 @@ function KeyBadge({ spec }: { spec: KeybindSpec }) {
     <span className="inline-flex items-center gap-1">
       {spec.display.split('+').map((part, idx) => (
         <span key={`${spec.display}:${idx}`} className="inline-flex items-center gap-1">
-          {idx > 0 && <span className="font-mono text-[10px] text-dim">+</span>}
+          {idx > 0 && <span className="font-ui text-[10px] text-dim">+</span>}
           <KeyCap>{part}</KeyCap>
         </span>
       ))}
@@ -122,7 +122,7 @@ export function Keybinds() {
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     {isRecording ? (
                       <>
-                        <span className="border border-accent bg-accent/15 px-3 py-1 font-mono text-[11.5px] font-bold text-accent animate-pulse">
+                        <span className="border border-accent bg-accent/15 px-3 py-1 font-ui text-[11.5px] font-bold text-accent animate-pulse">
                           Press keys… (Esc cancels)
                         </span>
                         <Button size="sm" variant="ghost" onClick={() => setListening(null)}>
@@ -166,7 +166,7 @@ export function Keybinds() {
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {isRecording ? (
                   <>
-                    <span className="border border-accent bg-accent/15 px-3 py-1 font-mono text-[11.5px] font-bold text-accent animate-pulse">
+                    <span className="border border-accent bg-accent/15 px-3 py-1 font-ui text-[11.5px] font-bold text-accent animate-pulse">
                       Press any key… (Esc cancels)
                     </span>
                     <Button size="sm" variant="ghost" onClick={() => setListening(null)}>

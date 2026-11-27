@@ -15,14 +15,14 @@ export function SavedList({ items, current, onPick, onNew, newLabel, placeholder
   const needle = q.trim().toLowerCase()
   const shown = items.filter((i) => !needle || i.name.toLowerCase().includes(needle) || i.sub.toLowerCase().includes(needle) || i.tags.some((t) => t.includes(needle)))
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-line/60 bg-white/[0.02]">
+    <aside className="flex w-72 shrink-0 flex-col border-r border-line/60 bg-ink/[0.02]">
       <div className="border-b border-line/60 p-3">
         <SearchBox value={q} onChange={setQ} placeholder={placeholder} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {shown.map((i) => (
-          <button key={i.id} type="button" onClick={() => onPick(i.id)} className={cn('flex w-full flex-col gap-0.5 border-b border-l-2 border-b-line/30 px-3 py-2.5 text-left', i.id === current ? 'border-l-accent bg-accent/10' : 'border-l-transparent hover:bg-white/[0.04]')}>
-            <span className="text-[13.5px] font-semibold text-white">{i.name}</span>
+          <button key={i.id} type="button" onClick={() => onPick(i.id)} className={cn('flex w-full flex-col gap-0.5 border-b border-l-2 border-b-line/30 px-3 py-2.5 text-left', i.id === current ? 'border-l-accent bg-accent/10' : 'border-l-transparent hover:bg-ink/[0.04]')}>
+            <span className="text-[13.5px] font-semibold text-ink">{i.name}</span>
             <span className="truncate text-[12px] text-dim">{i.sub}</span>
           </button>
         ))}

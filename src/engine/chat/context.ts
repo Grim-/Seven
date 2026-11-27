@@ -1,15 +1,16 @@
 import { noteFailure } from '../util/report'
 import { toolGuide } from '../tools/signature'
-import { characterMindFor, sheetMarkdown } from '../library/sheets'
+import { characterMindFor, sheetMarkdownOf } from '../library/sheets'
+import { sheetIn } from '../library/holds'
 import os from 'node:os'
-import { agentSheets, type AgentProfile, type PromptSection } from '@shared/types'
+import { agentSheets, chatPlayer, type AgentProfile, type PromptSection } from '@shared/types'
 import type { ToolDef } from '../tools/types'
 import { detectShell } from '../tools/shell'
 import { modules } from '../modules/registry'
 import { linkedFolders } from '../folders/store'
 import { placesGuide } from '../present/guide'
-import { kindsOwnedBy, libraryGuide } from '../library/kinds'
-import { worldGuide } from '../worlds/ops'
+import { hydrateAllForAgent, kindsOwnedBy, libraryGuide } from '../library/kinds'
+import { bindingOrNull, worldGuide } from '../worlds/ops'
 import { userSection } from '../user/identity'
 import { styles } from '../mind/styles'
 import { agentDeckSummary } from '../cards/decks'
@@ -21,11 +22,13 @@ import { getFactionStance } from '@shared/game/factions'
 import { worldEventMetaMarkdown } from '@shared/game/worldEvents'
 import { localPlaceMermaid, placePath, placesIn } from '@shared/maps'
 import { PLACE_TYPE_KEY } from '@shared/world'
+import { actorLink } from '@shared/worldNpcs'
 import { almanacs } from '../almanac/store'
 import { factions } from '../factions/store'
 import { getSheet } from '../library/sheets'
 import { worlds } from '../worlds/store'
 import { worldEvents } from '../worlds/events'
+import { chatWorld } from '../worlds/chatWorld'
 import { whoIsHere } from '../worlds/presence'
 
 const ROLEPLAY = [
@@ -95,20 +98,34 @@ function filled(text: string, vars: Record<string, string>): string {
   return text.replace(/\{\{(\w+)\}\}/g, (m, key: string) => vars[key] ?? m)
 }
 
+function userCharacterSection(agent: AgentProfile, scene?: SessionSceneBinding | null): string {
+  const world = chatWorld(scene, agent).world
+  const sheet = scene?.playerSheet || chatPlayer(agent, world && worlds.exists(world) ? worlds.meta(world).player : null)
+  if (!sheet) return ''
+  let name = ''
+  try {
+    name = getSheet(sheet).title
+  } catch (err) {
+    noteFailure(err, 'chat', "Could not read the user's character")
+  }
+  return `## Playing as\nThe user is playing ${linkFor('sheet', sheet)}${name ? ` (${name})` : ''}.`
+}
+
 function characterOf(agent: AgentProfile, scene?: SessionSceneBinding | null): string {
   const sceneSheets = (scene?.characters ?? [])
     .map((c) => stripRef(c).replace(/^sheet:/i, '').trim())
     .filter(Boolean)
   const sheets = [...new Set([...agentSheets(agent), ...sceneSheets])]
   if (!sheets.length) return ''
+  const campaign = scene?.almanacId || null
   try {
     if (sheets.length === 1) {
-      return `## Your character\n${sheetMarkdown(sheets[0], true).replace(/^# /, '### ').replace(/\n## /g, '\n#### ')}`
+      return `## Your character\n${sheetMarkdownOf(sheetIn(sheets[0], campaign), true).replace(/^# /, '### ').replace(/\n## /g, '\n#### ')}`
     }
     return `## Your characters\nYou play or narrate the following characters in this conversation:\n\n${sheets
       .map((s) => {
         try {
-          return sheetMarkdown(s, true).replace(/^# /, '### ').replace(/\n## /g, '\n#### ')
+          return sheetMarkdownOf(sheetIn(s, campaign), true).replace(/^# /, '### ').replace(/\n## /g, '\n#### ')
         } catch {
           return ''
         }
@@ -204,19 +221,19 @@ function guidesSection(tools: ToolDef[]): string {
   return ['## Tool guides', 'How each of your tools works is on its guide page. Read the guide before you use its tools for the first time in a chat, and again whenever one of its calls fails.', ...lines].join('\n')
 }
 
-export type InstructionSection = Omit<PromptSection, 'tokens' | 'kind'>
+export type InstructionSection = Omit<PromptSection, 'tokens' | 'kind'> & { live?: boolean; authored?: boolean; hydrate?: boolean; depth?: number }
 
-function pushSection(out: InstructionSection[], id: string, sourceId: string, label: string, detail: string, text: string): void {
+function pushSection(out: InstructionSection[], id: string, sourceId: string, label: string, detail: string, text: string, flags: { live?: boolean; authored?: boolean; hydrate?: boolean; depth?: number } = {}): void {
   const clean = text.trim()
   if (!clean) return
-  out.push({ id, sourceId, label, detail, text: clean })
+  out.push({ id, sourceId, label, detail, text: clean, ...flags })
 }
 
-function metaEventSceneSection(scene: SessionSceneBinding): { detail: string; text: string } | null {
-  if (!scene.worldId || !scene.eventId) return null
-  const ev = worldEvents.find(scene.eventId, scene.worldId)
+function metaEventSceneSection(scene: SessionSceneBinding, world: string | null): { detail: string; text: string } | null {
+  if (!world || !scene.eventId) return null
+  const ev = worldEvents.find(scene.eventId, world)
   if (!ev) return null
-  const allFactions = factions.list()
+  const allFactions = factions.list(world, 'play')
   const factionName = (id: string) => allFactions.find((f) => f.id === id)?.name ?? id
   const participantDetails = ev.participants.flatMap((p) => {
     const fName = p.factionId ? factionName(p.factionId) : ''
@@ -224,18 +241,26 @@ function metaEventSceneSection(scene: SessionSceneBinding): { detail: string; te
     if (p.kind === 'faction') {
       const f = allFactions.find((x) => x.id === (p.refId || p.factionId))
       const label = f?.name ?? p.name ?? p.refId ?? 'Faction'
+      const traitsText = f?.temperament?.length ? ` · Traits: ${f.temperament.join(', ')}` : ''
+      const doctrineText = f?.doctrine?.trim() ? ` · Doctrine: ${f.doctrine.trim()}` : ''
+      const statsText = f?.stats
+        ? ` · [${Object.entries(f.stats)
+            .map(([k, v]) => `${k} ${v}`)
+            .join(', ')}]`
+        : ''
+      const powerVal = f?.power !== undefined ? `${f.power}/100` : String(p.power)
       const charIds = p.characters ?? []
       if (!charIds.length) {
         const rosterHint = f?.roster?.length ? ` · typical roster: ${f.roster.join(', ')}` : ''
         return [
-          `${label}${roleTag} — power ${p.power}${rosterHint} (no named leader listed; improvise a fitting representative for this faction)`
+          `${label}${roleTag} — power ${powerVal}${statsText}${traitsText}${doctrineText}${rosterHint} (no named leader listed; improvise a fitting representative for this faction)`
         ]
       }
       return charIds.map((sheetId) => {
         try {
           const s = getSheet(sheetId)
           const voice = s.mind?.voiceConstraints?.trim() || s.values?.Speech?.trim() || ''
-          return `${s.title || s.id} (@sheet:${s.id}) representing ${label}${roleTag}${voice ? ` · Voice: ${voice}` : ''}`
+          return `${s.title || s.id} (${actorLink(s.id)}) representing ${label}${roleTag}${voice ? ` · Voice: ${voice}` : ''}`
         } catch {
           return `${sheetId} representing ${label}${roleTag}`
         }
@@ -246,7 +271,7 @@ function metaEventSceneSection(scene: SessionSceneBinding): { detail: string; te
         const s = getSheet(p.refId)
         const voice = s.mind?.voiceConstraints?.trim() || s.values?.Speech?.trim() || ''
         return [
-          `${s.title || s.id} (@sheet:${s.id})${fName ? ` of ${fName}` : ''}${roleTag}${voice ? ` · Voice: ${voice}` : ''}`
+          `${s.title || s.id} (${actorLink(s.id)})${fName ? ` of ${fName}` : ''}${roleTag}${voice ? ` · Voice: ${voice}` : ''}`
         ]
       } catch {
         return [`${p.name || p.refId}${fName ? ` of ${fName}` : ''}${roleTag}`]
@@ -281,16 +306,20 @@ function metaEventSceneSection(scene: SessionSceneBinding): { detail: string; te
   return { detail: `Meta-Narrative Scene · ${ev.title}`, text: stage }
 }
 
-function almanacSceneSection(scene: SessionSceneBinding | null | undefined): { detail: string; text: string } | null {
+function almanacSceneSection(scene: SessionSceneBinding | null | undefined, world: string | null): { detail: string; text: string } | null {
   if (!scene) return null
-  if (scene.mode === 'meta') return metaEventSceneSection(scene)
-  if (!scene.almanacId && !scene.worldId) return null
+  if (scene.mode === 'meta') return metaEventSceneSection(scene, world)
+  if (!scene.almanacId && !world) return null
   const alm = scene.almanacId ? almanacs.find(scene.almanacId) : null
-  const worldId = scene.worldId ?? alm?.worldId ?? null
+  const worldId = world
   if (!alm && !worldId) return null
   const clockSec = scene.worldTime ?? alm?.currentTime ?? 0
   const isSessionOne = alm ? alm.entries.length === 0 : false
-  const where = scene.where || (scene.placeKey ? `@place:${scene.placeKey}` : '') || alm?.opening?.startingWhere || ''
+  const where =
+    scene.where ||
+    (scene.placeKey ? (world ? `@world:${world}/place/${scene.placeKey}` : `@place:${scene.placeKey}`) : '') ||
+    alm?.opening?.startingWhere ||
+    ''
   const chars = scene.characters.length ? scene.characters : (alm?.cast ?? [])
   let roomBreadcrumb = ''
   let roomLooks = ''
@@ -310,14 +339,14 @@ function almanacSceneSection(scene: SessionSceneBinding | null | undefined): { d
       roomNow = typeof curPlace?.Now === 'string' ? curPlace.Now.trim() : ''
       roomMermaid = localPlaceMermaid(places, currentKey)
       const visitors = whoIsHere(worldId)[currentKey] ?? []
-      roomPresence = visitors.map((v) => `${v.name} (@sheet:${v.sheet})`)
+      roomPresence = visitors.map((v) => `${v.name} (${actorLink(v.sheet)})`)
     }
   }
 
   const lines = [
     alm ? '## Almanac scene' : '## Gameplay scene',
     ...(worldId ? [`- Active World: @world:${worldId}`] : []),
-    ...(scene.playerSheet ? [`- Player character: @sheet:${scene.playerSheet}`] : []),
+    ...(scene.playerSheet ? [`- Player character: ${actorLink(scene.playerSheet)}`] : []),
     ...(alm
       ? [
           `- Active Almanac: @almanac:${alm.id} (${alm.title})`,
@@ -339,7 +368,7 @@ function almanacSceneSection(scene: SessionSceneBinding | null | undefined): { d
     ...(roomPresence !== null
       ? [
           `- Present in this exact room right now: ${roomPresence.length ? roomPresence.join(', ') : 'nobody else'}`,
-          '- Room-scoped perception: You only perceive characters, objects, and immediate exits of your current place. Do NOT assume or reveal who is in other rooms or how rooms beyond your immediate exits connect until the player moves there or inspects them (`read @place:<key>`).'
+          '- Room-scoped perception: You only perceive characters, objects, and immediate exits of your current place. Do NOT assume or reveal who is in other rooms or how rooms beyond your immediate exits connect until the player moves there or inspects them (`read @world:<world>/place/<key>`).'
         ]
       : chars.length
         ? [`- Scene cast present: ${chars.join(', ')}`]
@@ -387,6 +416,7 @@ function dmModeSection(tools: ToolDef[]): string {
     '- You are the Game Master and narrator. The user plays their character; you voice everyone and everything else.',
     '- Describe only what the player\'s character can perceive: the current place, who is here, and its exits. Never reveal other places, hidden people or secrets until the player finds them.',
     '- Take tone, rules and the opening from the bound world and Almanac. In Session 1, open with the opening situation.',
+    '- Stat- and state-driven NPC behaviour: Let each NPC\'s sheet fields, active `doing` / `goal` / `mood`, faction stance, and live `@stat` values (such as Anger, Fear, Trust, Loyalty, Morale, or Health) steer how they react, speak, negotiate, or yield—and update their state or stats via character tools when a scene changes them.',
     ...DM_TOOL_RULES.filter((r) => tools.some((t) => t.name === r.tool)).map((r) => `- ${r.rule}`)
   ].join('\n')
 }
@@ -403,25 +433,27 @@ export function buildInstructionSections(
   const charText = characterOf(agent, scene)
   if (charText) {
     const count = agentSheets(agent).length
-    pushSection(out, 'agent-character', 'agent', 'Character sheet', `${count} character sheet${count === 1 ? '' : 's'} worn by this agent`, charText)
+    pushSection(out, 'agent-character', 'agent', 'Character sheet', `${count} character sheet${count === 1 ? '' : 's'} worn by this agent`, charText, { live: true, authored: true, depth: 1 })
   }
-  pushSection(out, 'agent-prompt', 'agent', 'Agent system prompt', `Custom system prompt configured on "${agent.name || 'Agent'}"`, agent.systemPrompt)
-  const sceneBlock = almanacSceneSection(scene)
+  pushSection(out, 'agent-prompt', 'agent', 'Agent system prompt', `Custom system prompt configured on "${agent.name || 'Agent'}"`, agent.systemPrompt, { authored: true })
+  const sceneBlock = almanacSceneSection(scene, chatWorld(scene, agent).world)
   if (sceneBlock) {
-    pushSection(out, 'almanac-scene', 'world', 'Almanac scene', sceneBlock.detail, sceneBlock.text)
+    pushSection(out, 'almanac-scene', 'world', 'Almanac scene', sceneBlock.detail, sceneBlock.text, { live: true })
   }
   if (dm) pushSection(out, 'dm-mode', 'world', 'DM Mode', 'Game Master rules added because this chat runs in DM Mode', dmModeSection(tools))
 
   if (!tools.length) {
-    pushSection(out, 'agent-rels', 'agent', 'Pinned relationships', 'Pinned character relationships on this agent', agentRelationshipsSection(agent))
-    pushSection(out, 'user', 'user', 'About you', 'Your user profile name and bio from Settings', userSection())
+    pushSection(out, 'agent-rels', 'agent', 'Pinned relationships', 'Pinned character relationships on this agent', agentRelationshipsSection(agent), { live: true, authored: true })
+    pushSection(out, 'user', 'user', 'About you', 'Your user profile name and bio from Settings', userSection(), { authored: true })
+    pushSection(out, 'user-character', 'user', 'Playing as', 'The character you are playing in this chat', userCharacterSection(agent, scene), { live: true, hydrate: true })
     pushSection(out, 'agent-roleplay', 'agent', 'Reply format', 'Roleplay formatting rules (agent roleplay mode is on)', agent.roleplay ? ROLEPLAY : '')
-    pushSection(out, 'mind-reasoning', 'mind', 'Reasoning & voice filter', 'Reasoning style and voice constraints on agent or character', reasoningDirective(agent, tools))
-    pushSection(out, 'mind-memory', 'mind', 'Pinned memories', 'Memories pinned into default context from Mind', memorySection(memoryText))
+    pushSection(out, 'mind-reasoning', 'mind', 'Reasoning & voice filter', 'Reasoning style and voice constraints on agent or character', reasoningDirective(agent, tools), { authored: true })
+    pushSection(out, 'mind-memory', 'mind', 'Pinned memories', 'Memories pinned into default context from Mind', memorySection(memoryText), { authored: true })
     return out
   }
 
-  pushSection(out, 'user', 'user', 'About you', 'Your user profile name and bio from Settings', userSection())
+  pushSection(out, 'user', 'user', 'About you', 'Your user profile name and bio from Settings', userSection(), { authored: true })
+  pushSection(out, 'user-character', 'user', 'Playing as', 'The character you are playing in this chat', userCharacterSection(agent, scene), { live: true, hydrate: true })
 
   const env = [`- Operating system: ${os.type()} (${process.platform})`]
   const folders = linkedFolders.forAgent(agent.id)
@@ -459,18 +491,18 @@ export function buildInstructionSections(
     ].join('\n')
   )
   pushSection(out, 'agent-roleplay', 'agent', 'Reply format', 'Roleplay formatting rules (agent roleplay mode is on)', agent.roleplay ? ROLEPLAY : '')
-  pushSection(out, 'mind-reasoning', 'mind', 'Reasoning & voice filter', 'Reasoning style and voice constraints on agent or character', reasoningDirective(agent, tools))
+  pushSection(out, 'mind-reasoning', 'mind', 'Reasoning & voice filter', 'Reasoning style and voice constraints on agent or character', reasoningDirective(agent, tools), { authored: true })
   pushSection(out, 'library-guide', 'library', 'Library & kinds', 'Registered data kinds and @kind:id linking instructions (from core/library)', libraryGuide(tools.map((t) => t.name), agent.id, guideLinkFor))
   pushSection(out, 'present-guide', 'present', 'Places & UI panels', 'Chat display and dashboard/panel placement instructions', placesGuide(tools))
   if (tools.some((t) => t.name === 'world_recall')) {
-    pushSection(out, 'world-guide', 'world', 'World guide', 'Bound world context and entity lookup rules (from World module)', worldGuide(agent.world, tools.some((t) => t.name === 'world_create')))
+    pushSection(out, 'world-guide', 'world', 'World guide', 'Bound world context and entity lookup rules (from World module)', worldGuide(bindingOrNull(agent.id), tools.some((t) => t.name === 'world_create')))
   }
   if (tools.some((t) => t.name === 'play_card')) {
-    pushSection(out, 'cards-deck', 'cards', 'Agent deck', 'Summary of cards currently in this agent deck (from Cards module)', agentDeckSummary(agent))
+    pushSection(out, 'cards-deck', 'cards', 'Agent deck', 'Summary of cards currently in this agent deck (from Cards module)', agentDeckSummary(agent), { live: true })
   }
-  pushSection(out, 'agent-rels', 'agent', 'Pinned relationships', 'Pinned character relationships on this agent', agentRelationshipsSection(agent))
+  pushSection(out, 'agent-rels', 'agent', 'Pinned relationships', 'Pinned character relationships on this agent', agentRelationshipsSection(agent), { live: true, authored: true })
   pushSection(out, 'tool-guides', 'tools', 'Tool guide links', 'Links to Seven:<Module> pages for enabled tool modules', guidesSection(tools))
-  pushSection(out, 'mind-memory', 'mind', 'Pinned memories', 'Memories pinned into default context from Mind', memorySection(memoryText))
+  pushSection(out, 'mind-memory', 'mind', 'Pinned memories', 'Memories pinned into default context from Mind', memorySection(memoryText), { authored: true })
   return out
 }
 
@@ -486,10 +518,38 @@ export function buildInstructions(
     .join('\n\n')
 }
 
+export function buildHydratedInstructions(
+  agent: AgentProfile,
+  tools: ToolDef[],
+  memoryText = '',
+  scene?: SessionSceneBinding | null,
+  dm = false
+): string {
+  const sections = buildInstructionSections(agent, tools, memoryText, scene, dm)
+  const hydrated = (s: InstructionSection) => Boolean(s.authored || s.hydrate)
+  const texts = hydrateAllForAgent(sections.filter(hydrated).map((s) => ({ text: s.text, depth: s.depth ?? 0 })), { agentId: agent.id })
+  let next = 0
+  return sections.map((s) => (hydrated(s) ? texts[next++] : s.text)).join('\n\n')
+}
+
+export function buildInstructionSetup(
+  agent: AgentProfile,
+  tools: ToolDef[],
+  memoryText = '',
+  scene?: SessionSceneBinding | null,
+  dm = false
+): string {
+  return buildInstructionSections(agent, tools, memoryText, scene, dm)
+    .filter((s) => !s.live)
+    .map((s) => s.text)
+    .join('\n\n')
+}
+
 const FROZEN_HEADINGS: { prefix: string; sourceId: string; label: string; detail: string }[] = [
   { prefix: '## Your character', sourceId: 'agent', label: 'Character sheet', detail: 'Character sheet(s) linked when this chat started' },
   { prefix: '## Almanac scene', sourceId: 'world', label: 'Almanac scene', detail: 'Active Almanac scene binding (world clock, location, cast, threads, recent outcomes)' },
   { prefix: '## DM Mode', sourceId: 'world', label: 'DM Mode', detail: 'Game Master rules (this chat runs in DM Mode)' },
+  { prefix: '## Playing as', sourceId: 'user', label: 'Playing as', detail: 'The character you were playing when this chat started' },
   { prefix: '## The user', sourceId: 'user', label: 'About you', detail: 'User profile section frozen when this chat started' },
   { prefix: '## Environment', sourceId: 'environment', label: 'Environment & workspace', detail: 'OS, workspace, and folder info frozen when this chat started' },
   { prefix: '## Tools', sourceId: 'tools', label: 'Tool rules', detail: 'Base tool-use rules frozen when this chat started' },

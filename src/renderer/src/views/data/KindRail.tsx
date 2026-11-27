@@ -5,7 +5,7 @@ import { KindIcon } from '../../lib/library'
 import { cn } from '../../lib/cn'
 import { SETUP_GROUP, railGroups, railKind } from './groups'
 import { entryMenuAt, kindMenuAt } from './entryMenu'
-import { isFileFavouriteKind, useFavourites } from '../../lib/favourites'
+import { isFileFavouriteKind, useFavourites, whenFavouriteExists } from '../../lib/favourites'
 import { ListRow } from '../../components/ui'
 import { useRememberedLocation } from '../../lib/window'
 import type { DataSelection } from '../../store/data'
@@ -60,7 +60,7 @@ export function KindRail({
       )}
       {favourites.length > 0 && (
         <div className="mt-2">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-faint">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 font-label text-[10px] font-bold caps-18 text-faint">
             <Star className="h-3 w-3" />
             Favourites
           </div>
@@ -71,7 +71,7 @@ export function KindRail({
                 <ListRow
                   key={`${p.kind}/`}
                   active={current === p.kind && (!picked?.id || picked.id === 'all')}
-                  onClick={() => onPick(p.kind)}
+                  onClick={() => whenFavouriteExists(p, () => onPick(p.kind))}
                   onMenu={section ? (e) => kindMenuAt(e, section, menuSelect) : undefined}
                   icon={<KindIcon name={p.icon} className="h-3.5 w-3.5" />}
                   title={showName(p.label)}
@@ -84,7 +84,7 @@ export function KindRail({
               <ListRow
                 key={`${p.kind}/${id}`}
                 active={picked?.kind === p.kind && picked.id === id}
-                onClick={() => (onPickEntry ? onPickEntry(p.kind, id) : select({ kind: p.kind, id }))}
+                onClick={() => whenFavouriteExists(p, () => (onPickEntry ? onPickEntry(p.kind, id) : select({ kind: p.kind, id })))}
                 onMenu={(e) => entryMenuAt(e, p.kind, id, p.label)}
                 icon={<KindIcon name={p.icon} className="h-3.5 w-3.5" />}
                 title={showName(p.label)}
@@ -98,7 +98,7 @@ export function KindRail({
         const hasCurrent = group.sections.some((s) => s.kind === current)
         return (
           <div key={group.name} className="mt-2">
-            <button onClick={() => onToggle(group.name === SETUP_GROUP ? `open:${group.name}` : group.name)} className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-faint hover:text-white">
+            <button onClick={() => onToggle(group.name === SETUP_GROUP ? `open:${group.name}` : group.name)} className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left font-label text-[10px] font-bold caps-18 text-faint hover:text-ink">
               <ChevronRight className={cn('h-3 w-3 transition-transform', !shut && 'rotate-90')} />
               {group.name}
             </button>

@@ -22,7 +22,7 @@ export function CardAdder({ have, onAdd, onMenu }: { have: DeckEntry[]; onAdd: (
               <button key={c.id} type="button" className="shell-row flex w-full items-center gap-2 px-1.5 py-1.5 text-left text-[12.5px]" onClick={() => onAdd(c.title)} onContextMenu={(e) => onMenu(e, c.title)}>
                 <Plus className="h-3.5 w-3.5 shrink-0 text-accent" />
                 <span className="min-w-0 flex-1 truncate">{showName(c.title)}</span>
-                {n > 0 && <span className="font-mono text-[11px] font-bold text-accent">×{n}</span>}
+                {n > 0 && <span className="font-ui text-[11px] font-bold text-accent">×{n}</span>}
               </button>
             )
           })

@@ -25,10 +25,10 @@ export function SavePicker({ world }: { world: string }) {
     openMenu(e, 'Saves', items)
   }
   return (
-    <button type="button" onClick={open} className="flex h-8 items-center gap-2 border border-line/50 bg-black/60 px-2.5 text-[12.5px] text-white hover:border-line-hover">
-      <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-dim">Save</span>
+    <button type="button" onClick={open} className="flex h-8 items-center gap-2 border border-line/50 tone-well-60 px-2.5 text-[12.5px] text-ink hover:border-line-hover">
+      <span className="font-label text-[10.5px] caps-12 text-dim">Save</span>
       {current?.name ?? '…'}
-      {current && current.characters.length > 0 && <span className="font-mono text-[10.5px] text-dim">{current.characters.length} in it</span>}
+      {current && current.characters.length > 0 && <span className="font-ui text-[10.5px] text-dim">{current.characters.length} in it</span>}
       <ChevronDown className="h-3.5 w-3.5 text-dim" />
     </button>
   )

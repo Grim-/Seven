@@ -43,8 +43,8 @@ export function ActionRoll({ result, effects, where, onAgain }: { result: Action
       <div className="flex items-center gap-3">
         <SheetPortrait image={result.character?.image ?? null} className="h-16 w-16" />
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-[15px] font-semibold leading-snug text-white">{result.attempt}</span>
-          <span className="font-mono text-[11px] text-dim">
+          <span className="text-[15px] font-semibold leading-snug text-ink">{result.attempt}</span>
+          <span className="font-ui text-[11px] text-dim">
             {result.character ? showName(result.character.name) : 'No character'} · {NEEDS_LABEL[result.needs]}
           </span>
         </div>
@@ -54,11 +54,11 @@ export function ActionRoll({ result, effects, where, onAgain }: { result: Action
         return (
           <div key={i} className={cn('grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 border px-2.5 py-2', !shown ? 'border-line/40' : r.passed ? 'border-ok/50 bg-ok/[0.06]' : 'border-alert/40 bg-alert/[0.05]')}>
             <Die value={r.roll} rolling={!shown} />
-            <span className="font-mono text-[12px] text-dim">
-              <b className="text-white">{r.label}</b> {r.bonus < 0 ? '−' : '+'}
-              {Math.abs(r.bonus)} · {shown ? <>{r.roll} {r.bonus < 0 ? '−' : '+'} {Math.abs(r.bonus)} = <b className="text-white">{r.total}</b> against {r.target}</> : <>needs {r.target}</>}
+            <span className="font-ui text-[12px] text-dim">
+              <b className="text-ink">{r.label}</b> {r.bonus < 0 ? '−' : '+'}
+              {Math.abs(r.bonus)} · {shown ? <>{r.roll} {r.bonus < 0 ? '−' : '+'} {Math.abs(r.bonus)} = <b className="text-ink">{r.total}</b> against {r.target}</> : <>needs {r.target}</>}
             </span>
-            <span className={cn('w-10 text-right font-mono text-[10px] font-bold uppercase tracking-[0.16em]', r.passed ? 'text-ok' : 'text-alert')}>{shown ? (r.passed ? 'Pass' : 'Fail') : ''}</span>
+            <span className={cn('w-10 text-right font-label text-[10px] font-bold caps-16 ', r.passed ? 'text-ok' : 'text-alert')}>{shown ? (r.passed ? 'Pass' : 'Fail') : ''}</span>
           </div>
         )
       })}

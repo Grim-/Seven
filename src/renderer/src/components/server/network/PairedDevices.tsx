@@ -39,13 +39,13 @@ export function PairedDevices({ network }: { network: NetworkStatus }) {
       <GridTable columns={COLUMNS} empty={network.devices.length ? false : 'No device is paired. Pair one with the button above.'}>
         {network.devices.map((d) => (
           <GridRow key={d.id}>
-            <span className="truncate text-[12px] text-white">{d.name}</span>
-            <span className="text-right font-mono text-[11px] text-faint">{formatRelative(d.pairedAt)}</span>
-            <span className="text-right font-mono text-[11px] text-faint">{formatRelative(d.lastSeen)}</span>
-            <span className="truncate font-mono text-[12px] text-white/85">{d.address ?? '—'}</span>
+            <span className="truncate text-[12px] text-ink">{d.name}</span>
+            <span className="text-right font-ui text-[11px] text-faint">{formatRelative(d.pairedAt)}</span>
+            <span className="text-right font-ui text-[11px] text-faint">{formatRelative(d.lastSeen)}</span>
+            <span className="truncate font-ui text-[12px] text-ink/85">{d.address ?? '—'}</span>
             <Segmented value={d.level} options={REMOTE_LEVELS.map((l) => ({ value: l.id, label: l.label, hint: l.description }))} onChange={(level) => setLevel(d.id, level)} />
             <span className="flex items-center justify-end gap-1.5">
-              {d.connected && <span className="font-mono text-[11px] text-ok">Now</span>}
+              {d.connected && <span className="font-ui text-[11px] text-ok">Now</span>}
               <Button size="sm" variant="ghost" icon={<Trash2 />} onClick={() => revoke(d.id)}>
                 Revoke
               </Button>
@@ -68,7 +68,7 @@ export function PairedDevices({ network }: { network: NetworkStatus }) {
           </>
         }
       >
-        <p className="text-[13px] text-white/85">Gives Seven a new identity. Every paired device is disconnected at once and loses access until you pair it again.</p>
+        <p className="text-[13px] text-ink/85">Gives Seven a new identity. Every paired device is disconnected at once and loses access until you pair it again.</p>
       </Modal>
     </SettingCard>
   )

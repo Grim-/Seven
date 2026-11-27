@@ -107,10 +107,10 @@ function CheckPanel({ trigger, ctx }: TriggerPanelProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-0.5">
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-dim">
+        <span className="font-label text-[10.5px] caps-14 text-dim">
           {check.label} check{opponent ? ` · against ${opponent.name}` : ''}
         </span>
-        <span className="text-[17px] font-semibold text-white">{question}</span>
+        <span className="text-[17px] font-semibold text-ink">{question}</span>
       </div>
       <WhoRolls label="Who rolls?" people={people} value={who} onPick={setWho} locked={done !== null} />
       <RollTally faces={settled?.result.roll.faces ?? null} rolling={rolling} lines={mine.lines} total={mine.total} needs={needs} verdict={settled ? settled.result.passed : null} />
@@ -123,7 +123,7 @@ function CheckPanel({ trigger, ctx }: TriggerPanelProps) {
       {settled && (
         <>
           <RollVerdict passed={settled.result.passed} />
-          {outcome && <Markdown text={outcome} className="text-[13.5px] leading-relaxed text-white/90" />}
+          {outcome && <Markdown text={outcome} className="text-[13.5px] leading-relaxed text-ink/90" />}
           {settled.result.passed && (item || gold > 0) && <ItemReward sheet={settled.by.sheet} item={item} count={Number(v.passCount) || 1} gold={gold} />}
           <ActionBar items={[playOutItem(checkText(question, showName(settled.by.name), settled.result, opponent?.name ?? '', outcome), where), { label: 'Close', icon: <X />, onSelect: closePlay }]} />
         </>
@@ -144,7 +144,7 @@ function CheckEditor({ trigger, world, onValues }: TriggerEditorProps) {
   const passItem = String(v.passItem || '')
 
   return (
-    <div className="flex flex-col gap-3 font-mono text-[12px]">
+    <div className="flex flex-col gap-3 font-ui text-[12px]">
       <FieldGrid dense>
         <Field label="What is tried" tip="Shown at the top, such as 'Search the well'. Empty uses trigger name.">
           <Input

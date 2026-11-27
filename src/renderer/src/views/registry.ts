@@ -1,5 +1,5 @@
 import { createElement, useMemo, type ComponentType, type ReactNode } from 'react'
-import { Blocks, Bot, Clapperboard, Cpu, Database, Download, FolderOpen, Gamepad2, Gauge, Image as ImageIcon, LayoutDashboard, MessageSquare, NotebookPen, Server, Settings, Wrench } from 'lucide-react'
+import { Blocks, BookOpen, Bot, Clapperboard, Cpu, Database, Download, FolderOpen, Gamepad2, Gauge, Image as ImageIcon, LayoutDashboard, MessageSquare, NotebookPen, Server, Settings, Wrench } from 'lucide-react'
 import type { ViewId } from '@shared/types'
 import type { WindowApp } from '../store/windows'
 import { useApp } from '../store/app'
@@ -12,6 +12,7 @@ import { AgentsView } from './AgentsView'
 import { ModelsView } from './ModelsView'
 import { ToolsView } from './ToolsView'
 import { SettingsView } from './SettingsView'
+import { GuidesView } from './GuidesView'
 import { DataView } from './DataView'
 import { KindsView } from './KindsView'
 import { DashboardsView } from './DashboardsView'
@@ -102,6 +103,7 @@ export const MAIN_VIEWS: MainView[] = [
   { id: 'speed', label: 'Model speed', icon: icon(Gauge), Component: SpeedView, nav: null },
   { id: 'server', label: 'Servers', icon: icon(Server), Component: ServerView, nav: null },
   { id: 'kinds', label: 'Kinds', icon: icon(Blocks), Component: KindsView, nav: null },
+  { id: 'guides', label: 'Guides', icon: icon(BookOpen), Component: GuidesView, nav: 'settings' },
   { id: 'settings', label: 'Settings', icon: icon(Settings), Component: SettingsView, nav: 'settings' }
 ]
 

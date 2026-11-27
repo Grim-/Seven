@@ -23,7 +23,7 @@ export function FolderInput({ value, onChange, placeholder = 'pictures/imports' 
             onChange(current)
           }
         }}
-        className="font-mono text-[12px]"
+        className="font-ui text-[12px]"
       />
       {focus && <SuggestList options={options} pick={pick} onPick={onChange} className="right-0" />}
     </div>

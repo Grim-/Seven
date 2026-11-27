@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from
 import { Activity, Aperture, Eye, ImagePlus, Plus, UserRound } from 'lucide-react'
 import type { CharacterSheet } from '@shared/types'
 import { showName } from '@shared/ids'
+import { actorEntry, splitNpcRef } from '@shared/worldNpcs'
 import { Button, InlineTitle, SaveState, Segmented, Select, moved, useReorder, useAutosavedState } from '../../ui'
 import { engine, on } from '../../../lib/ipc'
 import { toast } from '../../../store/toasts'
@@ -21,11 +22,12 @@ import { sheetImageContext, useRegisterImageContext } from '../../../lib/imagePr
 import { sheetFacets, type SheetDraft, type SheetFacet } from './facets'
 import { StoryTab } from './story/StoryTab'
 import { useModuleList } from '../../../registries/useModuleList'
+import { useOpenedAt } from '../../../lib/library'
 
 type Draft = SheetDraft
 const CORE = 'sheet'
 
-export function SheetEditor({ start, compact: compactProp }: { start: CharacterSheet; compact?: boolean }) {
+export function SheetEditor({ start, compact: compactProp, only, campaign = null }: { start: CharacterSheet; compact?: boolean; only?: string[]; campaign?: string | null }) {
   const insideSlate = useContext(InsideSlateContext)
   const compact = compactProp ?? insideSlate
   const [liveSheet, setLiveSheet] = useState<CharacterSheet>(start)
@@ -61,6 +63,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
 
   const facets = useModuleList(sheetFacets)
   const [picked, setTab] = useState<string | null>(null)
+  useOpenedAt('sheet', start.id, setTab)
   const [opened, setOpened] = useState<string[]>([])
   const [image, setImage] = useState(start.image)
   const [adding, setAdding] = useState(false)
@@ -149,6 +152,8 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
           scheduleSync()
         }
       }),
+      on('npcs.changed', scheduleSync),
+      on('saves.changed', scheduleSync),
       on('dnd.changed', scheduleSync),
       on('game.changed', scheduleSync),
       on('stories.changed', scheduleSync)
@@ -183,29 +188,30 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
   const kept = Object.keys(sheet.values).filter((k) => !sheet.fields.includes(k) && sheet.values[k]?.trim())
   const setPicture = (id: string | null) => {
     setImage(id)
-    void engine('data.pages.image', { id: start.id, image: id }).catch(failed('Could not set the portrait'))
+    void engine('sheets.setImage', { id: start.id, image: id }).catch(failed('Could not set the portrait'))
   }
   const togglePreview = () => {
     if (preview !== null) return setPreview(null)
+    const entry = actorEntry(start.id)
     void saver.flush().then(() =>
-      engine('library.read', { entry: `sheet/${start.id}` })
+      engine('library.read', { entry: `${entry.kind}/${entry.id}` })
         .then(setPreview)
         .catch(failed('Could not build it'))
     )
   }
 
   const profileCards = (
-    <section className="flex flex-col gap-2.5 border border-line/45 bg-black/40 p-3.5">
+    <section className="flex flex-col gap-2.5 border border-line/45 tone-panel-40 p-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/35 pb-2">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-accent">
+          <span className="font-label text-[11px] font-bold caps-16 text-accent">
             Character Profile &amp; Persona
           </span>
-          <span className="border border-ok/40 bg-ok/10 px-1.5 py-0.5 font-mono text-[9.5px] uppercase text-ok">
+          <span className="border border-ok/40 bg-ok/10 px-1.5 py-0.5 font-label text-[9.5px] caps text-ok">
             Always in prompt
           </span>
         </div>
-        <span className="font-mono text-[11px] text-dim">{sheet.fields.length} cards · #random supported</span>
+        <span className="font-ui text-[11px] text-dim">{sheet.fields.length} cards · #random supported</span>
       </div>
       {adding && <AddFieldBar fields={sheet.fields} kept={kept} onAdd={add} onClose={() => setAdding(false)} />}
       <div
@@ -232,7 +238,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
         ))}
         <button
           onClick={() => setAdding(true)}
-          className="flex min-h-20 items-center justify-center gap-2 border border-dashed border-line/50 font-mono text-[11px] uppercase tracking-[0.14em] text-faint hover:border-accent hover:text-accent cursor-pointer"
+          className="flex min-h-20 items-center justify-center gap-2 border border-dashed border-line/50 font-label text-[11px] caps-14 text-faint hover:border-accent hover:text-accent cursor-pointer"
         >
           <Plus className="h-4 w-4" /> Add field
         </button>
@@ -244,7 +250,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
             <button
               key={h}
               onClick={() => add(h)}
-              className="border border-teal/50 px-2 py-0.5 font-mono text-[11px] text-teal hover:border-teal hover:text-white cursor-pointer"
+              className="border border-secondary/50 px-2 py-0.5 font-ui text-[11px] text-secondary hover:border-secondary hover:text-ink cursor-pointer"
             >
               ↩ {h}
             </button>
@@ -261,8 +267,8 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
       mind={sheet.mind}
       profile={profileCards}
       compact={compact}
+      campaign={campaign}
       onChange={(story) => change({ ...sheet, story })}
-      onMindChange={(mind) => change({ ...sheet, mind })}
       onOpenFacet={setTab}
     />
   )
@@ -281,7 +287,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
     ...shown.map((f) => ({
       value: f.id,
       label: f.label(sheet),
-      body: <f.Tab sheet={liveSheet} draft={sheet} change={change} open={setTab} />
+      body: <f.Tab sheet={liveSheet} draft={sheet} change={change} open={setTab} campaign={campaign} />
     }))
   ]
   const systems = shown.filter((f) => f.system).map((f) => f.label(sheet))
@@ -292,7 +298,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
     <div
       className={cn(
         'flex min-h-0 flex-1 flex-col',
-        compact ? 'gap-2.5' : 'overflow-y-auto border border-line/60 bg-black/70'
+        compact ? 'gap-2.5' : 'overflow-y-auto border border-line/60 tone-panel-70'
       )}
     >
       {compact ? (
@@ -301,7 +307,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
             type="button"
             title={image ? 'Change portrait' : 'Add a portrait'}
             onClick={() => void pickPicture(image, { what: 'a character portrait', context: sheetContext }).then((r) => r && setPicture(r.id))}
-            className="group/portrait relative h-16 w-16 shrink-0 overflow-hidden border border-line-strong bg-black/60 cursor-pointer"
+            className="group/portrait relative h-16 w-16 shrink-0 overflow-hidden border border-line-strong tone-well-60 cursor-pointer"
           >
             {image ? (
               <AssetMedia id={image} className="h-full w-full object-cover" />
@@ -310,15 +316,15 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
                 <UserRound className="h-6 w-6" />
               </span>
             )}
-            <span className="absolute inset-x-0 bottom-0 flex items-center justify-center bg-black/75 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-accent opacity-0 group-hover/portrait:opacity-100">
+            <span className="absolute inset-x-0 bottom-0 flex items-center justify-center tone-panel-75 py-0.5 font-label text-[8.5px] caps-5 text-accent opacity-0 group-hover/portrait:opacity-100">
               <ImagePlus className="h-2.5 w-2.5" />
             </span>
           </button>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-accent-soft">Character</span>
+              <span className="font-label text-[9.5px] caps-20 text-accent-soft">{splitNpcRef(start.id) ? 'World NPC' : 'Character'}</span>
               {changedTabs.length > 0 && (
-                <span className="flex items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-mono text-[8.5px] font-bold uppercase tracking-[0.14em] text-accent animate-pulse">
+                <span className="flex items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-label text-[8.5px] font-bold caps-14 text-accent animate-pulse">
                   <Activity className="h-2.5 w-2.5" />
                   LIVE EDIT
                 </span>
@@ -328,12 +334,12 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
             <InlineTitle
               value={showName(sheet.title)}
               onSave={(title) => change({ ...sheet, title })}
-              className="text-[19px] font-bold leading-tight tracking-wide text-white"
+              className="text-[19px] font-bold leading-tight tracking-wide text-ink"
             />
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[10px] text-dim">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-ui text-[10px] text-dim">
               <span>{sheet.fields.length} fields</span>
               {wornBy.length > 0 && <span>Worn by {wornBy.join(', ')}</span>}
-              {systems.length > 0 && <span className="text-teal">{systems.join(' + ')}</span>}
+              {systems.length > 0 && <span className="text-secondary">{systems.join(' + ')}</span>}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -396,7 +402,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
         />
       )}
 
-      {preview === null && (
+      {preview === null && !only && (
         <div className={cn('flex flex-wrap items-center gap-2.5', !compact && 'px-4 pt-3')}>
           <Segmented
             value={tab}
@@ -407,7 +413,7 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
             }))}
           />
           {!compact && (
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+            <span className="font-label text-[10px] caps-12 text-faint">
               System: {systems.length ? systems.join(' + ') : 'narrative'}
             </span>
           )}
@@ -426,6 +432,8 @@ export function SheetEditor({ start, compact: compactProp }: { start: CharacterS
         <div className={cn('text-[13px]', compact ? 'py-2' : 'p-5')}>
           <Markdown text={preview} />
         </div>
+      ) : only ? (
+        only.flatMap((id) => tabs.filter((t) => t.value === id).map((t) => <div key={t.value}>{t.body}</div>))
       ) : (
         tabs.find((t) => t.value === tab)?.body
       )}

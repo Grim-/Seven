@@ -7,7 +7,7 @@ export function ComposerTool({ title, active, onClick, children }: { title: stri
       type="button"
       title={title}
       onClick={onClick}
-      className={cn('notch-sm flex h-10 w-9 shrink-0 items-center justify-center border bg-black/60 hover:border-accent hover:text-accent [&>svg]:h-4 [&>svg]:w-4', active ? 'border-accent text-accent' : 'border-line text-dim')}
+      className={cn('notch-sm flex h-10 w-9 shrink-0 items-center justify-center border tone-well-60 hover:border-accent hover:text-accent [&>svg]:h-4 [&>svg]:w-4', active ? 'border-accent text-accent' : 'border-line text-dim')}
     >
       {children}
     </button>

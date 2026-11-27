@@ -74,20 +74,20 @@ export function AgentNarrationStream({
   return (
     <div
       className={cn(
-        'pointer-events-auto flex flex-col font-mono select-none transition-all duration-300 ease-out shadow-2xl backdrop-blur-md',
+        'pointer-events-auto flex flex-col font-ui select-none transition-all duration-300 ease-out shadow-2xl backdrop-blur-[calc(var(--panel-blur)*1.5)]',
         'w-[min(580px,calc(100vw-480px))]',
         pinned || expanded || sessionRunning
-          ? 'border border-accent/60 bg-black/95 opacity-100'
-          : 'border border-line/60 bg-black/85 opacity-95 hover:opacity-100 hover:border-accent/50',
+          ? 'border border-accent/60 tone-panel-95 opacity-100'
+          : 'border border-line/60 tone-well-85 opacity-95 hover:opacity-100 hover:border-accent/50',
         className
       )}
     >
       {/* HEADER / TRANSMISSION TELEMETRY */}
-      <div className="flex h-6 items-center justify-between border-b border-line/40 bg-white/[0.02] px-2 text-[9px] font-bold uppercase tracking-wider text-dim">
+      <div className="flex h-6 items-center justify-between border-b border-line/40 bg-ink/[0.02] px-2 text-[9px] font-bold caps-5 text-dim">
         <div className="flex items-center gap-1.5 text-accent truncate">
           <Radio className={cn('h-3 w-3 text-accent', sessionRunning && 'animate-pulse')} />
-          <span className="text-white">{sessionRunning ? 'LIVE // DM NARRATING…' : 'TRANSMISSION // DM NARRATION'}</span>
-          {latestEntry?.at && <span className="text-faint font-mono">[{latestEntry.at}]</span>}
+          <span className="text-ink">{sessionRunning ? 'LIVE // DM NARRATING…' : 'TRANSMISSION // DM NARRATION'}</span>
+          {latestEntry?.at && <span className="text-faint font-ui">[{latestEntry.at}]</span>}
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
@@ -99,7 +99,7 @@ export function AgentNarrationStream({
               'border px-1 py-0.2 text-[8px] transition-colors cursor-pointer',
               pinned
                 ? 'border-accent bg-accent/20 text-accent font-bold'
-                : 'border-line/40 text-faint hover:text-white'
+                : 'border-line/40 text-faint hover:text-ink'
             )}
           >
             {pinned ? 'PINNED' : 'PIN'}
@@ -110,7 +110,7 @@ export function AgentNarrationStream({
               type="button"
               onClick={() => setExpanded(!expanded)}
               title={expanded ? 'Show latest only' : 'View narrative history'}
-              className="flex items-center gap-0.5 border border-line/40 px-1 py-0.2 text-[8px] text-faint hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-0.5 border border-line/40 px-1 py-0.2 text-[8px] text-faint hover:text-ink transition-colors cursor-pointer"
             >
               <span>{expanded ? 'LATEST' : 'HISTORY'}</span>
               {expanded ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />}
@@ -135,7 +135,7 @@ export function AgentNarrationStream({
       {/* STREAM PROSE CONTENT */}
       <div
         className={cn(
-          'flex flex-col gap-1.5 overflow-y-auto px-3 py-1.5 text-[11px] leading-relaxed text-white select-text',
+          'flex flex-col gap-1.5 overflow-y-auto px-3 py-1.5 text-[11px] leading-relaxed text-ink select-text',
           expanded ? 'max-h-64' : 'max-h-20'
         )}
       >
@@ -152,11 +152,11 @@ export function AgentNarrationStream({
               className={cn('border-l border-accent/70 pl-2.5 py-0.5', !expanded && 'cursor-pointer')}
             >
               {expanded && (
-                <div className="text-[9px] font-bold uppercase text-accent mb-0.5">
+                <div className="text-[9px] font-bold caps text-accent mb-0.5">
                   {entry.speaker || 'WORLD NARRATOR'}
                 </div>
               )}
-              <Markdown text={entry.text} className={cn('font-sans text-[11.5px] text-neutral-100 antialiased leading-relaxed', !expanded && 'line-clamp-2')} />
+              <Markdown text={entry.text} className={cn('font-body text-[11.5px] text-ink antialiased leading-relaxed', !expanded && 'line-clamp-2')} />
             </div>
           ))
         )}

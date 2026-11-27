@@ -18,9 +18,9 @@ export function ExerciseProgress({ unit, series, metric, target }: { unit: strin
             <CartesianGrid stroke={GRID} vertical={false} />
             <XAxis dataKey="label" {...AXIS} tickLine={false} minTickGap={20} />
             <YAxis {...AXIS} tickLine={false} allowDecimals={false} width={44} />
-            <Tooltip {...TOOLTIP} cursor={{ stroke: 'rgba(255,201,25,0.4)' }} formatter={(v) => [metricText(Number(v)), metric === 'best' ? 'Best set' : 'Total']} />
-            {top !== null && <ReferenceLine y={top} stroke="rgba(255,255,255,0.35)" label={{ value: 'top of target', fill: 'rgba(255,255,255,0.55)', fontSize: 11, position: 'insideTopRight' }} />}
-            <Line dataKey={metric} stroke={ACCENT} strokeWidth={2} dot={{ r: 4, fill: ACCENT, stroke: '#0b0d12', strokeWidth: 2 }} activeDot={{ r: 5 }} isAnimationActive={false} />
+            <Tooltip {...TOOLTIP} cursor={{ stroke: 'color-mix(in srgb, var(--color-accent) 40%, transparent)' }} formatter={(v) => [metricText(Number(v)), metric === 'best' ? 'Best set' : 'Total']} />
+            {top !== null && <ReferenceLine y={top} stroke="color-mix(in srgb, var(--color-ink) 35%, transparent)" label={{ value: 'top of target', fill: 'color-mix(in srgb, var(--color-ink) 55%, transparent)', fontSize: 11, position: 'insideTopRight' }} />}
+            <Line dataKey={metric} stroke={ACCENT} strokeWidth={2} dot={{ r: 4, fill: ACCENT, stroke: 'var(--color-bg)', strokeWidth: 2 }} activeDot={{ r: 5 }} isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -43,10 +43,10 @@ export function SessionTable({ unit, series }: { unit: string; series: SessionPo
       <tbody className="tabular-nums">
         {[...series].reverse().map((p) => (
           <tr key={p.date} className="border-b border-line/15">
-            <td className="py-1 text-white/85">{p.date}</td>
-            <td className="py-1 font-mono text-white/85">{p.values.map((v) => metricText(v)).join(' · ')}</td>
-            <td className="py-1 text-right text-white">{metricText(p.best)}</td>
-            <td className="py-1 text-right text-white">{metricText(p.total)}</td>
+            <td className="py-1 text-ink/85">{p.date}</td>
+            <td className="py-1 font-ui text-ink/85">{p.values.map((v) => metricText(v)).join(' · ')}</td>
+            <td className="py-1 text-right text-ink">{metricText(p.best)}</td>
+            <td className="py-1 text-right text-ink">{metricText(p.total)}</td>
           </tr>
         ))}
       </tbody>

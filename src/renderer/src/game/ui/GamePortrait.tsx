@@ -29,19 +29,19 @@ export function GamePortrait({
       onClick={onClick}
       className={cn(
         'relative flex w-full items-start gap-2.5 px-2.5 py-2 text-left transition-colors',
-        onClick && 'cursor-pointer hover:bg-white/[0.04]',
+        onClick && 'cursor-pointer hover:bg-ink/[0.04]',
         active && 'bg-accent/10',
         className
       )}
     >
       <SheetPortrait image={visitor.image} usedBy={`The portrait of ${showName(visitor.name)}`} className={cn('h-10 w-10 shrink-0', active && 'border-accent')} />
       <span className="flex min-w-0 flex-1 flex-col gap-1 pr-2">
-        <span className="truncate text-[13px] font-semibold text-white">{showName(visitor.name)}</span>
+        <span className="truncate text-[13px] font-semibold text-ink">{showName(visitor.name)}</span>
         {visitor.game && catalog ? (
           <RecordBars record={visitor.game} catalog={catalog} compact />
         ) : visitor.dnd?.hp ? (
           <div className="flex items-center gap-1.5 text-[10px]">
-            <div className="h-2 flex-1 border border-line/40 bg-black/60">
+            <div className="h-2 flex-1 border border-line/40 tone-panel-60">
               <div
                 className="h-full bg-alert transition-all"
                 style={{
@@ -49,12 +49,12 @@ export function GamePortrait({
                 }}
               />
             </div>
-            <span className="font-mono text-[9px] text-dim">
+            <span className="font-ui text-[9px] text-dim">
               {visitor.dnd.hp.cur}/{visitor.dnd.hp.max}
             </span>
           </div>
         ) : visitor.line ? (
-          <span className="truncate font-mono text-[10px] text-dim">{visitor.line}</span>
+          <span className="truncate font-ui text-[10px] text-dim">{visitor.line}</span>
         ) : null}
       </span>
       {trailing}

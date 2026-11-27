@@ -4,7 +4,6 @@ import { entryWidget } from '../../registries/widgets'
 import { GameDefScreen, NEW_DEF } from './GameDefScreen'
 import { GameDefChat, GameDefWidget } from './GameDefChat'
 import { SaveChat, SaveScreen, SaveWidget } from './SaveScreen'
-import './creatureTokens'
 import './character/facet'
 import '../play/gameplayCard'
 import './character/health'
@@ -16,7 +15,7 @@ registerKindUi('game_save', {
 })
 
 for (const type of defTypes())
-  registerKindUi(type.type, {
+  registerKindUi(type.kind ?? type.type, {
     present: { Screen: GameDefScreen, Chat: GameDefChat, Stage: GameDefChat, Widget: entryWidget(GameDefWidget) },
     addLabel: `New ${type.label.toLowerCase()}`,
     add: (kind, select) => () => select({ kind, id: NEW_DEF })

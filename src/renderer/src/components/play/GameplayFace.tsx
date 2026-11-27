@@ -8,7 +8,7 @@ export function GameplayFace({ card }: { card: Card }) {
   const g = cleanGameplay(card.raw.gameplay)
   return (
     <div className="flex flex-col gap-[0.65em]">
-      <span className="leading-[1.5] text-white/90">
+      <span className="leading-[1.5] text-ink/90">
         Roll <b>{g.check ?? 'd20'}</b>
         {signed(g.bonus)} against {g.defence ? <b>the target's {g.defence}</b> : <b>DC {g.dc}</b>}
       </span>

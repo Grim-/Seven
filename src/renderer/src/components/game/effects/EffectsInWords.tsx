@@ -31,7 +31,7 @@ export function EffectsInWords({ tree }: { tree: LaneNodes[] }) {
     <section className="flex flex-col gap-2">
       <Eyebrow>In words</Eyebrow>
       {tree.map((l) => (
-        <div key={l.lane.event} className="flex flex-col gap-1 text-[13.5px] leading-relaxed text-white/80">
+        <div key={l.lane.event} className="flex flex-col gap-1 text-[13.5px] leading-relaxed text-ink/80">
           <Eyebrow className="text-faint">{l.lane.label}</Eyebrow>
           {l.nodes.length ? <Lines nodes={l.nodes} depth={0} /> : <p className="text-faint">Nothing.</p>}
         </div>

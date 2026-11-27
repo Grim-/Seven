@@ -9,7 +9,8 @@ import { useSessions } from './sessions'
 import { toast } from './toasts'
 import { noteFailure, startProblems } from './problems'
 import { useData } from './data'
-import { useThemes } from './themes'
+import { applyTheme, useThemes } from './themes'
+import { DEFAULT_THEME_ID } from '@shared/theme'
 import { useAvatars } from './avatars'
 import { useDashboards } from './dashboards'
 import { useTools } from './tools'
@@ -49,7 +50,15 @@ import { focusedConversation, openChat, openConversations, recheckOpen } from '.
 import { useWindows } from './windows'
 import { usePlaces } from './places'
 import { useDownloads } from './downloads'
+import { checkConversions } from './conversions'
+import { dropFavourites } from '../lib/favourites'
+import { dropRecent } from '../lib/recentData'
 import { failed } from '../lib/notify'
+
+function dropGone(gone: (entry: { kind: string; id: string | null }) => boolean): void {
+  dropFavourites(gone)
+  dropRecent(gone)
+}
 
 export type WindowMode = 'app'
 
@@ -107,6 +116,7 @@ async function loadEngineState(retried = false): Promise<void> {
       await useSessions.getState().load(focused.sessionId).catch(() => undefined)
     }
     recheckOpen()
+    checkConversions()
   } catch (err) {
     if (!isLockedError(err)) toast.error('Could not reach the engine', errorText(err))
   } finally {
@@ -167,6 +177,7 @@ export async function bootstrap(windowMode: WindowMode = 'app'): Promise<void> {
   on('tools.changed', (list) => {
     useTools.getState().setList(list)
     recheckOpen()
+    void useData.getState().refresh().catch(noteFailure('library', 'Could not refresh the library'))
   })
   on('player.command', runPlayerCommand)
   on('mind.changed', () => recheckOpen())
@@ -221,15 +232,27 @@ export async function bootstrap(windowMode: WindowMode = 'app'): Promise<void> {
   on('agent.reaction', (r) => useReactions.getState().onReaction(r))
   on('ui.notify', ({ title, message }) => toast.info(title, message))
   on('tool.output', ({ partId, chunk }) => useSessions.getState().onOutput(partId, chunk))
-  on('page.changed', ({ id, meta }) => useData.getState().onPage(id, meta))
-  on('asset.changed', ({ id, meta }) => useData.getState().onAsset(id, meta))
+  on('page.changed', ({ id, meta }) => {
+    useData.getState().onPage(id, meta)
+    if (!meta) dropGone((p) => p.id === id)
+  })
+  on('asset.changed', ({ id, meta }) => {
+    useData.getState().onAsset(id, meta)
+    if (!meta) dropGone((p) => p.id === id)
+  })
+  on('entry.removed', ({ kind, id }) => dropGone((p) => p.kind === kind && p.id === id))
+  on('kind.removed', ({ kind }) => dropGone((p) => p.kind === kind))
   on('dashboard.changed', ({ id, dashboard }) => {
     useDashboards.getState().onChanged(id, dashboard)
     void usePlaces.getState().refresh()
   })
   on('themes.changed', (list) => useThemes.setState({ list }))
+  on('themes.deleted', ({ id }) => {
+    if (useThemes.getState().preview?.id === id) useThemes.setState({ preview: null })
+    if (useApp.getState().settings?.defaultTheme === id) applyTheme(DEFAULT_THEME_ID)
+  })
   on('avatars.changed', (list) => useAvatars.setState({ list }))
-  on('ambience.changed', ({ sessionId, ambience }) => useThemes.getState().setAmbience(sessionId, ambience))
+    on('ambience.changed', ({ sessionId, ambience }) => useThemes.getState().setAmbience(sessionId, ambience))
   startProblems(mode)
 
   const [settings, info, status, vault] = await Promise.all([main('settings.get'), main('app.info'), main('engine.status'), main('vault.status')])

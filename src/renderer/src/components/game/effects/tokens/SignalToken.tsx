@@ -1,5 +1,6 @@
-import { GAME_SIGNALS, signalLabel } from '@shared/game/core'
+import { signalLabel } from '@shared/game/core'
 import { BrowseList } from '../../../ui/BrowsePick'
+import { useSignalOptions } from '../../linkEvents'
 import { registerEffectToken, type TokenEditProps, type TokenProps } from './registry'
 
 function Text({ value }: TokenProps) {
@@ -8,12 +9,7 @@ function Text({ value }: TokenProps) {
 }
 
 function Edit({ value, onChange, close }: TokenEditProps) {
-  const options = GAME_SIGNALS.map((s) => ({
-    value: s.id,
-    label: s.id ? `${s.label} (${s.id})` : s.label,
-    group: s.group,
-    note: s.note
-  }))
+  const options = useSignalOptions()
   return (
     <BrowseList
       options={options}

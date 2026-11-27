@@ -39,6 +39,14 @@ export interface SettingSpec {
   options?: SettingOption[]
   themed?: boolean
   hint?: string
+  onlyWith?: { setting: string; atLeast: number }
+}
+
+export function specShown(spec: SettingSpec, values: SettingValues): boolean {
+  if (!spec.onlyWith) return true
+  const v = values[spec.onlyWith.setting]
+  const count = Array.isArray(v) ? v.length : v ? 1 : 0
+  return count >= spec.onlyWith.atLeast
 }
 
 export interface SettingType {

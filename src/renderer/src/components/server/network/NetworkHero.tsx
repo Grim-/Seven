@@ -20,7 +20,7 @@ export function NetworkHero({ network, settings, change }: { network: NetworkSta
             onChange={turn}
           />
           {network.listening && network.addresses.length > 0 && (
-            <div className="flex flex-col gap-0.5 border border-line/40 bg-black/40 px-3 py-1.5 font-mono text-[11.5px] text-white/85">
+            <div className="flex flex-col gap-0.5 border border-line/40 tone-panel-40 px-3 py-1.5 font-ui text-[11.5px] text-ink/85">
               {network.addresses.map((a) => (
                 <span key={a}>
                   {a}:{network.settings.port}
@@ -38,16 +38,16 @@ export function NetworkHero({ network, settings, change }: { network: NetworkSta
             onChange={(announce) => change({ announce })}
             color="var(--color-teal)"
           />
-          {settings.announce && <Input value={settings.announceName} onChange={(e) => change({ announceName: e.target.value })} placeholder="This PC's name, as devices show it" spellCheck={false} className="h-8 font-mono text-[12px]" />}
+          {settings.announce && <Input value={settings.announceName} onChange={(e) => change({ announceName: e.target.value })} placeholder="This PC's name, as devices show it" spellCheck={false} className="h-8 font-ui text-[12px]" />}
         </div>
-        <div className="flex flex-col justify-between gap-2 border border-purple/50 bg-purple/10 px-3 py-2.5 shadow-[inset_3px_0_0_var(--color-purple)]">
+        <div className="flex flex-col justify-between gap-2 border border-tint-purple/50 bg-tint-purple/10 px-3 py-2.5 shadow-[inset_3px_0_0_var(--color-purple)]">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[13px] font-semibold text-white">Pair a phone</span>
+            <span className="text-[13px] font-semibold text-ink">Pair a phone</span>
             <span className="text-[11.5px] leading-snug text-faint">{network.listening ? 'Scan the code with the Seven app to use the whole of Seven from it.' : 'Turn network access on to pair a device.'}</span>
           </div>
           <div className="flex items-center gap-3">
             <PairDevice network={network} size="md" />
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-dim">
+            <span className="font-label text-[10.5px] caps-16 text-dim">
               {network.devices.length} paired · {connected} connected
             </span>
           </div>

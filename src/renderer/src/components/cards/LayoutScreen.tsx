@@ -66,7 +66,7 @@ function Editor({ pageId, title, start }: { pageId: string; title: string; start
       <div className="flex flex-wrap items-start gap-6">
         <div className="flex flex-col items-center gap-2">
           <CardFace name={showName(title)} layout={layout} values={samples} edit={{ picked, hint: (slot) => PLACE_LABELS[placeFor(slot)], onSlot }} className="w-80" />
-          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">Click a part of the card to fill it</span>
+          <span className="font-label text-[10px] caps-12 text-faint">Click a part of the card to fill it</span>
         </div>
         <div className="flex min-w-[22rem] flex-1 flex-col gap-4">
           <Field label="Colour" group>

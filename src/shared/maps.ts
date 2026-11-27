@@ -1,5 +1,5 @@
 import type { Point, ShapeForm, Size } from './shapes'
-import { PLACE_TYPE_KEY, recordKey } from './world'
+import { PLACE_TYPE_KEY, WORLD_LINK_KIND, recordKey, worldPart } from './world'
 import type { DndStats } from './dnd'
 import type { EntityRecord } from './game/core/GameEntity'
 import { cleanTrigger, type TriggerDef } from './game/triggers'
@@ -250,10 +250,91 @@ export function checkConditionGating(
 export interface WorldMapUse {
   map: string
   shapes: Record<string, ShapeForm>
+  /** Logical region/area zones splitting up this map (separate from place zones). */
+  regionShapes?: Record<string, ShapeForm>
+  /** Explicit spawn/placement point per place key on this map. */
+  spawns?: Record<string, Point>
   stand: Record<string, Standing>
   triggers?: TriggerDef[]
   layerGating?: Record<string, ConditionGating>
   propGating?: Record<string, ConditionGating>
+  layers?: MapUseLayer[]
+  layerOf?: Record<string, string>
+  links?: MapLink[]
+}
+
+export interface MapUseLayer {
+  id: string
+  name: string
+  parent: string | null
+  gating: ConditionGating
+}
+
+export interface MapLink {
+  id: string
+  from: string
+  to: string
+}
+
+export const PROP_THING = 'prop'
+export const TRIGGER_THING = 'trigger'
+export const SPAWNER_THING = 'spawner'
+export const TOKEN_THING = 'token'
+export const PLACE_THING = 'place'
+export const REGION_THING = 'region'
+
+export const mapThingKey = (type: string, id: string): string => `${type}:${id}`
+
+export function mapThingOf(key: string): { type: string; id: string } {
+  const at = key.indexOf(':')
+  return { type: key.slice(0, at), id: key.slice(at + 1) }
+}
+
+export function layerChainOn(layers: MapUseLayer[], id: string | null | undefined, flags: Flags): boolean {
+  const seen = new Set<string>()
+  for (let at = id; at && !seen.has(at); ) {
+    seen.add(at)
+    const layer = layers.find((l) => l.id === at)
+    if (!layer) return true
+    if (!checkConditionGating(layer.gating, flags)) return false
+    at = layer.parent
+  }
+  return true
+}
+
+export function layerOn(use: Pick<WorldMapUse, 'layers' | 'layerOf'>, thing: string, flags: Flags): boolean {
+  return layerChainOn(use.layers ?? [], use.layerOf?.[thing], flags)
+}
+
+export function mapUseInPlay(use: WorldMapUse, flags: Flags): WorldMapUse {
+  if (!use.layers?.length) return use
+  const on = (type: string) => (id: string) => layerOn(use, mapThingKey(type, id), flags)
+  const keep = <T>(rec: Record<string, T> | undefined, type: string): Record<string, T> => Object.fromEntries(Object.entries(rec ?? {}).filter(([k]) => on(type)(k)))
+  return {
+    ...use,
+    shapes: keep(use.shapes, PLACE_THING),
+    regionShapes: keep(use.regionShapes, REGION_THING),
+    spawns: keep(use.spawns, PLACE_THING),
+    stand: keep(use.stand, TOKEN_THING),
+    triggers: (use.triggers ?? []).filter((t) => on(TRIGGER_THING)(t.id))
+  }
+}
+
+export function forgetMapThing(use: WorldMapUse, key: string): WorldMapUse {
+  const { [key]: _gone, ...layerOf } = use.layerOf ?? {}
+  return { ...use, layerOf, links: (use.links ?? []).filter((l) => l.from !== key && l.to !== key) }
+}
+
+export function layerDescendants(layers: MapUseLayer[], id: string): Set<string> {
+  const out = new Set<string>([id])
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const l of layers) if (l.parent && out.has(l.parent) && !out.has(l.id)) {
+      out.add(l.id)
+      grew = true
+    }
+  }
+  return out
 }
 
 export type JourneyKind = 'moved' | 'action' | 'decision'
@@ -425,16 +506,51 @@ function cleanGating(raw: unknown): Record<string, ConditionGating> {
   return out
 }
 
+export function cleanSpawns(raw: unknown): Record<string, Point> {
+  const out: Record<string, Point> = {}
+  for (const [key, v] of Object.entries(obj(raw))) {
+    const o = obj(v)
+    if (typeof o.x === 'number' && Number.isFinite(o.x) && typeof o.y === 'number' && Number.isFinite(o.y)) {
+      out[key] = { x: Math.round(o.x), y: Math.round(o.y) }
+    }
+  }
+  return out
+}
+
 export function cleanMapUses(raw: unknown): WorldMapUse[] {
   const list = Array.isArray(obj(raw).maps) ? (obj(raw).maps as unknown[]) : []
   return list.map(obj).filter((u) => typeof u.map === 'string' && u.map).map((u) => ({
     map: String(u.map),
     shapes: cleanShapes(u.shapes),
+    regionShapes: cleanShapes(u.regionShapes),
+    spawns: cleanSpawns(u.spawns),
     stand: cleanStand(u.stand),
     triggers: cleanTriggers(u.triggers),
     layerGating: cleanGating(u.layerGating),
-    propGating: cleanGating(u.propGating)
+    propGating: cleanGating(u.propGating),
+    layers: cleanUseLayers(u.layers),
+    layerOf: cleanLayerOf(u.layerOf),
+    links: cleanLinks(u.links)
   }))
+}
+
+function cleanUseLayers(raw: unknown): MapUseLayer[] {
+  const list = Array.isArray(raw) ? raw.map(obj).filter((l) => str(l.id)) : []
+  const ids = new Set(list.map((l) => str(l.id)))
+  return list.map((l) => ({
+    id: str(l.id),
+    name: str(l.name).trim() || 'Layer',
+    parent: str(l.parent) && ids.has(str(l.parent)) && str(l.parent) !== str(l.id) ? str(l.parent) : null,
+    gating: cleanGating({ g: l.gating }).g ?? {}
+  }))
+}
+
+function cleanLayerOf(raw: unknown): Record<string, string> {
+  return Object.fromEntries(Object.entries(obj(raw)).filter((e): e is [string, string] => typeof e[1] === 'string' && Boolean(e[1])))
+}
+
+function cleanLinks(raw: unknown): MapLink[] {
+  return (Array.isArray(raw) ? raw.map(obj) : []).filter((l) => str(l.from) && str(l.to) && str(l.from) !== str(l.to)).map((l) => ({ id: str(l.id) || crypto.randomUUID(), from: str(l.from), to: str(l.to) }))
 }
 
 function cleanSpawner(raw: unknown): CreatureSpawner | null {
@@ -523,7 +639,7 @@ export type Flags = Record<string, string | number | boolean>
 export function mapInPlay(map: MapData, use: WorldMapUse, flags: Flags, own: (object: string) => Flags): MapData {
   const states = new Map(mapObjects(map.layers).map((o) => [o.id, resolveObjectState(o, { ...flags, ...own(o.id) })]))
   const shown = (layer: MapLayer): MapLayer => {
-    const gated = checkConditionGating(use.layerGating?.[layer.id], flags) && checkConditionGating(use.propGating?.[layer.id], flags)
+    const gated = checkConditionGating(use.layerGating?.[layer.id], flags) && checkConditionGating(use.propGating?.[layer.id], flags) && layerOn(use, mapThingKey(PROP_THING, layer.id), flags)
     const state = states.get(layer.id)
     const children = childLayers(layer)
     const next = children ? withChildren(layer, children.map(shown)) : layer
@@ -629,6 +745,67 @@ export function placePath(places: Record<string, Record<string, unknown>>, key: 
   return out
 }
 
+export function regionPath(regions: Record<string, Record<string, unknown>>, key: string): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (let at: unknown = key; typeof at === 'string' && at in regions && !seen.has(at); at = regions[at]?.Parent) {
+    seen.add(at)
+    out.unshift(at)
+  }
+  return out
+}
+
+export function regionTree(regions: Record<string, Record<string, unknown>>, regionShapes: Record<string, ShapeForm>): PlaceNode[] {
+  const parentOf = (key: string): string | null => {
+    const p = regions[key]?.Parent
+    return typeof p === 'string' && p && p !== key && p in regions ? p : null
+  }
+  const rooted = (key: string): boolean => {
+    const seen = new Set<string>()
+    for (let at: string | null = key; at; at = parentOf(at)) {
+      if (seen.has(at)) return false
+      seen.add(at)
+    }
+    return true
+  }
+  const leaf = (key: string): PlaceNode => ({
+    key,
+    name: typeof regions[key]?.Name === 'string' && regions[key].Name ? String(regions[key].Name) : key,
+    shaped: key in regionShapes,
+    children: []
+  })
+  const node = (key: string): PlaceNode => ({
+    ...leaf(key),
+    children: Object.keys(regions)
+      .filter((k) => parentOf(k) === key)
+      .map(node)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  })
+  return Object.keys(regions)
+    .filter((k) => !parentOf(k) || !rooted(k))
+    .map((k) => (rooted(k) ? node(k) : leaf(k)))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function placeBreadcrumbNames(
+  places: Record<string, Record<string, unknown>>,
+  regions: Record<string, Record<string, unknown>>,
+  key: string
+): string[] {
+  const pPath = placePath(places, key)
+  let rKey = ''
+  for (let i = pPath.length - 1; i >= 0; i--) {
+    const candidate = places[pPath[i]]?.Region
+    if (typeof candidate === 'string' && candidate && candidate in regions) {
+      rKey = candidate
+      break
+    }
+  }
+  const rNames = rKey ? regionPath(regions, rKey).map((rk) => String(regions[rk]?.Name || rk)) : []
+  const pNames = pPath.map((pk) => String(places[pk]?.Name || pk))
+  return [...rNames, ...pNames]
+}
+
 export function localPlaceMermaid(places: Record<string, Record<string, unknown>>, currentKey: string): string | null {
   const cur = places[currentKey]
   if (!cur) return null
@@ -677,15 +854,23 @@ export function localPlaceMermaid(places: Record<string, Record<string, unknown>
   return lines.join('\n')
 }
 
+function worldPlaceKey(ref: string, world: string): string {
+  const part = worldPart(ref)
+  return part && part.world === world && part.segment === PLACE_TYPE_KEY ? part.id : ''
+}
+
+function placeLinkKey(ref: string, world: string): string {
+  const clean = ref.replace(/^"|"$/g, '')
+  const full = placeRef(clean)
+  return full.key && full.world === world ? full.key : recordKey(clean)
+}
+
 export function placesIn(where: string, world: string, places: Record<string, unknown>): string[] {
-  return refsIn(where)
-    .filter((r) => r.kind === 'place')
-    .map((r) => {
-      const ref = r.ref.replace(/^"|"$/g, '')
-      const full = placeRef(ref)
-      return full.key && full.world === world ? full.key : recordKey(ref)
-    })
-    .filter((key) => key in places)
+  const refs = refsIn(where)
+  return [
+    ...refs.filter((r) => r.kind === WORLD_LINK_KIND).map((r) => worldPlaceKey(r.ref, world)),
+    ...refs.filter((r) => r.kind === PLACE_TYPE_KEY).map((r) => placeLinkKey(r.ref, world))
+  ].filter((key) => key && key in places)
 }
 
 export function mapPictureIds(map: MapData): string[] {

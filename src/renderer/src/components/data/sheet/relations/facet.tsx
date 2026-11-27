@@ -1,7 +1,16 @@
-import { useContext } from 'react'
-import { InsideSlateContext } from '../../../entries/EntryCard'
-import { RelationshipsTable } from '../../../relationships/RelationshipsTable'
-import { sheetFacets } from '../facets'
+import { actorEntry } from '@shared/worldNpcs'
+import { useSheetHolds } from '../../../../lib/campaignHold'
+import { RelationsBoard } from '../../../relationships/RelationsBoard'
+import { sheetFacets, type FacetProps } from '../facets'
+import { campaignHolders, innateHolder } from '../holders'
+
+function RelationsTab({ sheet, draft, change, campaign }: FacetProps) {
+  const innate = innateHolder(draft, change)
+  const campaigns = campaignHolders(sheet.id, useSheetHolds(sheet.id, campaign))
+  const target = (campaign && campaigns.find((h) => h.key === campaign)) || innate
+  const entry = actorEntry(sheet.id)
+  return <RelationsBoard holders={[innate, ...campaigns]} target={target} owner={{ ref: `${entry.kind}/${entry.id}`, title: draft.title }} />
+}
 
 sheetFacets.add({
   name: 'Relations',
@@ -12,16 +21,5 @@ sheetFacets.add({
     return count > 0 ? `Relations (${count})` : 'Relations'
   },
   order: 25,
-  Tab: ({ draft, change }) => {
-    const compact = useContext(InsideSlateContext)
-    return (
-      <div className={compact ? 'flex flex-col gap-2' : 'mx-auto flex w-full max-w-[1040px] flex-col gap-4 p-5'}>
-        <RelationshipsTable
-          compact={compact}
-          items={draft.relationships ?? []}
-          onChange={(relationships) => change({ ...draft, relationships })}
-        />
-      </div>
-    )
-  }
+  Tab: RelationsTab
 })

@@ -22,9 +22,9 @@ function SkillsPanel({ comp, entity, catalog, changed }: PanelProps<Skills>) {
       action={
         <SearchBox value={filter} onChange={setFilter} placeholder="Filter…" className="w-32" />
       }
-      bodyClassName="p-3 [--tone:var(--color-accent)]"
+      bodyClassName="p-2.5 [--tone:var(--color-accent)]"
     >
-      <div className="grid max-h-[22rem] grid-cols-1 gap-x-4 gap-y-1 overflow-y-auto pr-1 sm:grid-cols-2">
+      <div className="grid max-h-[22rem] grid-cols-1 gap-x-4 gap-y-0.5 overflow-y-auto pr-1 sm:grid-cols-2">
         {shown.length === 0 ? (
           <span className="col-span-full text-[12px] text-faint">No matching skills.</span>
         ) : (
@@ -33,7 +33,7 @@ function SkillsPanel({ comp, entity, catalog, changed }: PanelProps<Skills>) {
             const total = checkBonus(entity, def)
             return (
               <div key={def.id} className="flex items-center gap-2 border-b border-line/20 py-0.5">
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-white/90" title={def.id}>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink/90" title={def.id}>
                   {def.label}
                 </span>
                 <EffectTokenButton
@@ -47,12 +47,12 @@ function SkillsPanel({ comp, entity, catalog, changed }: PanelProps<Skills>) {
                 />
                 <span
                   className={cn(
-                    'w-9 shrink-0 border px-1 py-0.5 text-center font-mono text-[11px] font-bold',
+                    'w-9 shrink-0 border px-1 py-0.5 text-center font-ui text-[11px] font-bold',
                     total > rank
                       ? 'border-ok/40 bg-ok/10 text-ok'
                       : total < rank
                         ? 'border-alert/40 bg-alert/10 text-alert'
-                        : 'border-line/40 bg-black/50 text-dim'
+                        : 'border-line/40 tone-panel-50 text-dim'
                   )}
                   title="Total check bonus"
                 >

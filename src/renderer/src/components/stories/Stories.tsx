@@ -11,7 +11,7 @@ import { failed } from '../../lib/notify'
 import { noteFailure } from '../../store/problems'
 
 const STATUS_STYLE: Record<StorySummary['status'], string> = {
-  active: 'text-teal',
+  active: 'text-secondary',
   paused: 'text-accent',
   completed: 'text-dim',
   abandoned: 'text-faint'
@@ -56,7 +56,7 @@ export function StoriesPanel({ initial = null }: { initial?: string | null }) {
         {list && !list.length && <div className="text-[12px] text-faint">No stories yet. An agent with Storyteller starts them.</div>}
         {list?.map((s) => (
           <ListRow key={s.id} active={selected === s.id} onClick={() => setSelected(s.id)} onMenu={rowMenu('story', s.id, s.id, () => setSelected(s.id))} title={s.id} subtitle={s.template}>
-            <span className="block font-mono text-[10px]">
+            <span className="block font-ui text-[10px]">
               <span className={STATUS_STYLE[s.status]}>{s.status}</span>
               <span className="text-faint"> · act {s.act} · turn {s.turn} · {formatRelative(s.at)}</span>
             </span>
@@ -67,7 +67,7 @@ export function StoriesPanel({ initial = null }: { initial?: string | null }) {
         {story ? (
           <>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className={cn('font-mono text-[11px] uppercase tracking-[0.14em]', STATUS_STYLE[story.status])}>{story.status}</span>
+              <span className={cn('font-label text-[11px] caps-14 ', STATUS_STYLE[story.status])}>{story.status}</span>
               <span className="ml-auto flex flex-wrap gap-1.5">
                 {story.status === 'active' && (
                   <Button size="sm" variant="ghost" icon={<Pause />} onClick={() => withNote('pause', 'Pause the story', 'Where things stand (optional)', 'Pause')}>
@@ -94,7 +94,7 @@ export function StoriesPanel({ initial = null }: { initial?: string | null }) {
                 </Button>
               </span>
             </div>
-            <div className="border border-line/40 bg-black/40 p-4">
+            <div className="border border-line/40 tone-panel-40 p-4">
               <Markdown text={text} />
             </div>
           </>

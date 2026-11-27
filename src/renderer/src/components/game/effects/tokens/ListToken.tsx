@@ -47,7 +47,7 @@ function Edit({ spec, value, onChange }: TokenEditProps) {
           </button>
         </span>
       ))}
-      <button type="button" onClick={() => onChange([...list, of.default])} className="inline-flex h-[26px] items-center gap-1 border border-dashed border-line px-2 font-mono text-[11px] text-dim hover:border-accent hover:text-accent">
+      <button type="button" onClick={() => onChange([...list, of.default])} className="inline-flex h-[26px] items-center gap-1 border border-dashed border-line px-2 font-ui text-[11px] text-dim hover:border-accent hover:text-accent">
         <Plus className="h-3 w-3" />
         Add
       </button>

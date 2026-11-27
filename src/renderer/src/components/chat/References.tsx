@@ -7,22 +7,45 @@ import { showName } from '@shared/ids'
 import { openSevenLink } from '../../lib/links'
 import { useIncludeText } from '../../lib/useIncludeText'
 import { copyText } from '../../lib/notify'
-import { FloatLayer, openMenu } from '../ui'
+import { FloatLayer, openMenu, type MenuItem } from '../ui'
 import { showInPanel } from '../data/showInPanel'
 import { EntryInspect } from '../entries/EntryInspect'
-import { useEntryPreview } from '../entries/entryPreview'
+import { useResolvedRef } from '../entries/useResolvedRef'
 import { pinToChatTable } from './tabletopStore'
+import { kindUi } from '../../registries/kinds'
 
-export function Chip({ kind, refText, action = null, part = null, onRemove, onOpen }: { kind: string; refText: string; action?: string | null; part?: string | null; onRemove?: () => void; onOpen?: () => void }) {
+function copyLinks(e: ClipboardEvent): void {
+  const sel = window.getSelection()
+  if (!sel || sel.isCollapsed || !e.clipboardData) return
+  const common = sel.getRangeAt(0).commonAncestorContainer
+  const within = (common instanceof Element ? common : common.parentElement)?.closest<HTMLElement>('[data-link]')
+  if (within?.dataset.link) {
+    e.clipboardData.setData('text/plain', within.dataset.link)
+    e.preventDefault()
+    return
+  }
+  const box = document.createElement('div')
+  for (let i = 0; i < sel.rangeCount; i++) box.append(sel.getRangeAt(i).cloneContents())
+  const chips = box.querySelectorAll<HTMLElement>('[data-link]')
+  if (!chips.length) return
+  chips.forEach((chip) => chip.replaceWith(chip.dataset.link ?? ''))
+  box.style.cssText = 'position:fixed;left:-99999px;top:0;white-space:pre-wrap'
+  document.body.append(box)
+  const text = box.innerText
+  box.remove()
+  e.clipboardData.setData('text/plain', text)
+  e.clipboardData.setData('text/html', box.innerHTML)
+  e.preventDefault()
+}
+
+if (typeof document !== 'undefined') document.addEventListener('copy', copyLinks)
+
+export function Chip({ kind, refText, action = null, part = null, onRemove, onOpen, menu = [] }: { kind: string; refText: string; action?: string | null; part?: string | null; onRemove?: () => void; onOpen?: () => void; menu?: MenuItem[] }) {
   const cleanRef = refText.replace(/^"|"$/g, '')
   const link = `@${kind}:${cleanRef}${action ? `:${action}` : ''}${part ? `#${part}` : ''}`
-  const preview = useEntryPreview(`@${kind}:${cleanRef}`)
-  const resolvedKind = preview && !('missing' in preview) ? preview.kind : kind
-  const resolvedId = preview && !('missing' in preview) ? preview.id : cleanRef
-  const displayTitle = preview && !('missing' in preview) ? preview.title : showName(cleanRef)
-  const displayKind = preview && !('missing' in preview) ? preview.label : kind.toUpperCase()
+  const { kind: resolvedKind, id: resolvedId, title: displayTitle, label: displayKind } = useResolvedRef(kind, cleanRef)
   const anchor = useRef<HTMLSpanElement>(null)
-  const [inspecting, setInspecting] = useState(false)
+  const [inspecting, setInspecting] = useState<string | null | false>(false)
 
   const included = useIncludeText(kind, refText, onRemove || action ? null : part)
   const openFull = () => (onOpen ? onOpen() : openSevenLink(referenceHref(resolvedKind, resolvedId)))
@@ -33,30 +56,32 @@ export function Chip({ kind, refText, action = null, part = null, onRemove, onOp
       openFull()
       return
     }
-    setInspecting((v) => !v)
+    setInspecting((v) => (v === false ? part : false))
   }
 
   const handleMenu = (e: React.MouseEvent) => {
     e.stopPropagation()
     openMenu(e, showName(displayTitle), [
-      { label: 'Inspect here', icon: <Eye />, onSelect: () => setInspecting(true) },
+      { label: 'Inspect here', icon: <Eye />, onSelect: () => setInspecting(part) },
+      ...(kindUi(resolvedKind).slateParts ?? []).map((p) => ({ label: `Inspect ${p.label} here`, icon: <Eye />, onSelect: () => setInspecting(p.part) })),
       { label: 'Pin to chat table', icon: <Pin />, onSelect: () => pinToChatTable(resolvedKind, resolvedId, displayTitle) },
       { label: 'Show in chat panel', icon: <PanelRight />, onSelect: () => void showInPanel(`${resolvedKind}/${resolvedId}`, part) },
       { label: 'Open in Data', icon: <FolderOpen />, onSelect: openFull },
       { label: '', separator: true },
-      { label: 'Copy link', icon: <Link />, onSelect: () => void copyText(link, 'Link copied', link) }
+      { label: 'Copy link', icon: <Link />, onSelect: () => void copyText(link, 'Link copied', link) },
+      ...(menu.length ? [{ label: '', separator: true }, ...menu] : [])
     ])
   }
 
   if (included !== null)
     return (
       <>
-        <span ref={anchor} role="link" title={`From ${link} · Click to inspect · Right-click for actions`} onClick={handleClick} onContextMenu={handleMenu} className="seven-include cursor-pointer">
+        <span ref={anchor} data-link={link} role="link" title={`From ${link} · Click to inspect · Right-click for actions`} onClick={handleClick} onContextMenu={handleMenu} className="seven-include cursor-pointer">
           {included}
         </span>
-        {inspecting && (
+        {inspecting !== false && (
           <FloatLayer anchor={anchor} onClose={() => setInspecting(false)} side="bottom" align="start">
-            <EntryInspect kind={kind} refText={refText} part={part} onClose={() => setInspecting(false)} />
+            <EntryInspect kind={kind} refText={refText} part={inspecting || null} onClose={() => setInspecting(false)} />
           </FloatLayer>
         )}
       </>
@@ -65,6 +90,7 @@ export function Chip({ kind, refText, action = null, part = null, onRemove, onOp
     <>
       <span
         ref={anchor}
+        data-link={link}
         onContextMenu={handleMenu}
         className="seven-chip"
       >
@@ -87,9 +113,9 @@ export function Chip({ kind, refText, action = null, part = null, onRemove, onOp
           </button>
         )}
       </span>
-      {inspecting && (
+      {inspecting !== false && (
         <FloatLayer anchor={anchor} onClose={() => setInspecting(false)} side="bottom" align="start">
-          <EntryInspect kind={kind} refText={refText} part={part} onClose={() => setInspecting(false)} />
+          <EntryInspect kind={kind} refText={refText} part={inspecting || null} onClose={() => setInspecting(false)} />
         </FloatLayer>
       )}
     </>
@@ -123,7 +149,7 @@ export function ComposerReferences() {
     aui.composer.setText((text.slice(0, start) + text.slice((m.index ?? 0) + m[0].length)).replace(/ {2,}/g, ' '))
   }
   return (
-    <div className="flex flex-wrap gap-1.5 border-t border-line/60 bg-black/40 px-3 pt-2">
+    <div className="flex flex-wrap gap-1.5 border-t border-line/60 tone-panel-40 px-3 pt-2">
       {found.map((m) => (
         <Chip key={m.index} kind={m[2]} refText={m[3]} action={m[4] ?? null} part={m[5] ?? null} onRemove={() => remove(m)} />
       ))}

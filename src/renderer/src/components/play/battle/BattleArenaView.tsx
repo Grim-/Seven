@@ -60,20 +60,20 @@ export function BattleArenaView({
   const attacks = activeActor?.attacks ?? []
 
   return (
-    <div className="relative flex h-full w-full flex-col bg-black/95 font-mono select-none overflow-hidden">
+    <div className="relative flex h-full w-full flex-col tone-panel-95 font-ui select-none overflow-hidden">
       {/* BACKGROUND ARENA ATMOSPHERE */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan/10 via-black to-black opacity-80" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-tint-cyan/10 via-scrim to-scrim opacity-80" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#00d8f608_1px,transparent_1px),linear-gradient(to_bottom,#00d8f608_1px,transparent_1px)] bg-[size:32px_32px]" />
 
       {/* TOP ARENA HEADER & INITIATIVE */}
-      <div className="relative z-10 flex h-12 shrink-0 items-center justify-between border-b border-line/60 bg-black/85 px-4">
+      <div className="relative z-10 flex h-12 shrink-0 items-center justify-between border-b border-line/60 tone-well-85 px-4">
         {/* ROUND & STATUS */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 border border-accent/60 bg-accent/15 px-2.5 py-1 text-[11px] font-extrabold text-accent">
             <Swords className="h-4 w-4 text-accent" />
             <span>ROUND {battle.round}</span>
           </div>
-          <span className="text-[12px] font-bold text-white tracking-widest uppercase">
+          <span className="text-[12px] font-bold text-ink caps-10">
             TACTICAL BATTLE ARENA
           </span>
         </div>
@@ -90,20 +90,20 @@ export function BattleArenaView({
                 className={cn(
                   'flex items-center gap-1.5 border px-2 py-1 text-[10px] transition-all cursor-pointer',
                   isDead
-                    ? 'border-line/20 bg-black/30 text-faint line-through opacity-40'
+                    ? 'border-line/20 tone-panel-30 text-faint line-through opacity-40'
                     : isActive
                     ? c.isPlayer
-                      ? 'border-cyan bg-cyan/20 text-white font-bold shadow-[0_0_12px_rgba(0,216,246,0.4)] scale-105'
-                      : 'border-alert bg-alert/20 text-alert font-bold shadow-[0_0_12px_rgba(255,77,77,0.4)] scale-105'
+                      ? 'border-tint-cyan bg-tint-cyan/20 text-ink font-bold shadow-[0_0_12px_color-mix(in_srgb,rgb(0,216,246)_calc(40%*var(--glow)),transparent)] scale-105'
+                      : 'border-alert bg-alert/20 text-alert font-bold shadow-[0_0_12px_color-mix(in_srgb,rgb(255,77,77)_calc(40%*var(--glow)),transparent)] scale-105'
                     : c.id === selectedTargetId
-                    ? 'border-alert/70 bg-alert/10 text-white'
-                    : 'border-line/40 bg-black/60 text-dim hover:text-white'
+                    ? 'border-alert/70 bg-alert/10 text-ink'
+                    : 'border-line/40 tone-well-60 text-dim hover:text-ink'
                 )}
               >
                 <span
                   className={cn(
                     'h-2 w-2',
-                    c.isPlayer ? 'bg-cyan' : 'bg-alert'
+                    c.isPlayer ? 'bg-tint-cyan' : 'bg-alert'
                   )}
                 />
                 <span className="max-w-[90px] truncate">{c.name}</span>
@@ -111,8 +111,8 @@ export function BattleArenaView({
                 {isActive && (
                   <span
                     className={cn(
-                      'px-1 text-[8px] font-bold uppercase',
-                      c.isPlayer ? 'bg-cyan text-black' : 'bg-alert text-black'
+                      'px-1 text-[8px] font-bold caps',
+                      c.isPlayer ? 'bg-tint-cyan text-on-accent' : 'bg-alert text-on-accent'
                     )}
                   >
                     ACT
@@ -141,9 +141,9 @@ export function BattleArenaView({
       <div className="relative z-10 flex min-h-0 flex-1 gap-3 p-4">
         {/* LEFT COLUMN: PLAYER PARTY CARDS */}
         <div className="flex w-[280px] shrink-0 flex-col gap-2.5 overflow-y-auto">
-          <div className="flex items-center justify-between border-b border-line/40 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-dim">
+          <div className="flex items-center justify-between border-b border-line/40 pb-1 text-[10.5px] font-bold caps-5 text-dim">
             <span>PARTY ALLIES ({playerCombatants.length})</span>
-            <span className="text-cyan">FACTION: PLAYER</span>
+            <span className="text-tint-cyan caps">Faction: player</span>
           </div>
 
           {playerCombatants.map((c) => {
@@ -155,26 +155,26 @@ export function BattleArenaView({
                 className={cn(
                   'flex flex-col gap-2 border p-3 transition-all',
                   isDead
-                    ? 'border-line/30 bg-black/40 opacity-40'
+                    ? 'border-line/30 tone-panel-40 opacity-40'
                     : isActive
-                    ? 'border-cyan bg-cyan/[0.07] shadow-[0_0_16px_rgba(0,216,246,0.25)]'
-                    : 'border-line/60 bg-black/70'
+                    ? 'border-tint-cyan bg-tint-cyan/[0.07] shadow-[0_0_16px_color-mix(in_srgb,rgb(0,216,246)_calc(25%*var(--glow)),transparent)]'
+                    : 'border-line/60 tone-panel-70'
                 )}
               >
                 {/* ACTOR ROW */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-9 w-9 items-center justify-center border border-cyan/70 bg-cyan/15 text-[11px] font-bold text-cyan">
+                    <div className="flex h-9 w-9 items-center justify-center border border-tint-cyan/70 bg-tint-cyan/15 text-[11px] font-bold text-tint-cyan">
                       {c.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[12px] font-bold text-white">{c.name}</span>
+                      <span className="text-[12px] font-bold text-ink">{c.name}</span>
                       <span className="text-[9.5px] text-dim">
                         INIT: {c.initiative} · SPEED: {c.speedMax} FT
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 border border-cyan/60 bg-cyan/15 px-2 py-0.5 text-[10px] font-bold text-cyan">
+                  <div className="flex items-center gap-1 border border-tint-cyan/60 bg-tint-cyan/15 px-2 py-0.5 text-[10px] font-bold text-tint-cyan">
                     <Shield className="h-3 w-3" />
                     <span>AC {c.ac}</span>
                   </div>
@@ -183,18 +183,18 @@ export function BattleArenaView({
                 {/* HP GAUGE */}
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-faint">HIT POINTS</span>
-                    <strong className={c.hp.cur <= c.hp.max * 0.25 ? 'text-alert' : 'text-white'}>
+                    <span className="text-faint caps">Hit points</span>
+                    <strong className={c.hp.cur <= c.hp.max * 0.25 ? 'text-alert' : 'text-ink'}>
                       {c.hp.cur} / {c.hp.max} HP
                     </strong>
                   </div>
-                  <div className="h-2 w-full border border-line/50 bg-black/80">
+                  <div className="h-2 w-full border border-line/50 tone-panel-80">
                     <div
                       className={cn(
                         'h-full transition-all duration-300',
                         c.hp.cur <= c.hp.max * 0.25
-                          ? 'bg-alert shadow-[0_0_8px_rgba(255,77,77,0.5)]'
-                          : 'bg-cyan shadow-[0_0_8px_rgba(0,216,246,0.5)]'
+                          ? 'bg-alert shadow-[0_0_8px_color-mix(in_srgb,rgb(255,77,77)_calc(50%*var(--glow)),transparent)]'
+                          : 'bg-tint-cyan shadow-[0_0_8px_color-mix(in_srgb,rgb(0,216,246)_calc(50%*var(--glow)),transparent)]'
                       )}
                       style={{
                         width: `${Math.max(0, Math.min(100, (c.hp.cur / c.hp.max) * 100))}%`
@@ -205,20 +205,20 @@ export function BattleArenaView({
 
                 {/* ATTACKS LIST */}
                 <div className="flex flex-col gap-1 border-t border-line/30 pt-1.5 text-[9.5px]">
-                  <span className="text-faint uppercase font-bold">ATTACK ARSENAL</span>
+                  <span className="text-faint caps font-bold">Attack arsenal</span>
                   {c.attacks?.map((att) => (
                     <div
                       key={att.name}
                       className="flex items-center justify-between text-dim"
                     >
-                      <span className="text-white">{att.name}</span>
+                      <span className="text-ink">{att.name}</span>
                       <span>{att.range} ft{att.damage ? ` (${att.damage})` : ''}</span>
                     </div>
                   ))}
                 </div>
 
                 {isActive && (
-                  <div className="border border-cyan/60 bg-cyan/20 px-2 py-0.5 text-center text-[9px] font-extrabold uppercase text-cyan">
+                  <div className="border border-tint-cyan/60 bg-tint-cyan/20 px-2 py-0.5 text-center text-[9px] font-extrabold caps text-tint-cyan">
                     ACTIVE COMBATANT
                   </div>
                 )}
@@ -230,12 +230,12 @@ export function BattleArenaView({
         {/* CENTER COLUMN: ARENA THEATER & COMBAT LOG */}
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           {/* COMBAT ARENA STAGE CARD */}
-          <div className="flex flex-col border border-line/70 bg-black/80 p-3 shadow-md">
+          <div className="flex flex-col border border-line/70 tone-panel-80 p-3 shadow-md">
             {/* CURRENT ENGAGEMENT SUMMARY */}
             <div className="flex items-center justify-between border-b border-line/40 pb-2 text-[11px]">
               <div className="flex items-center gap-2">
-                <span className="text-faint uppercase font-bold">CURRENT ENGAGEMENT:</span>
-                <span className="font-bold text-cyan">{activeActor?.name ?? 'Player'}</span>
+                <span className="text-faint caps font-bold">Current engagement:</span>
+                <span className="font-bold text-tint-cyan">{activeActor?.name ?? 'Player'}</span>
                 <span className="text-dim">VS</span>
                 <span className="font-bold text-alert">
                   {targetCombatant?.name ?? 'No Target'}
@@ -257,10 +257,10 @@ export function BattleArenaView({
             <div className="flex min-h-[90px] items-center justify-center p-2">
               {battle.logs.length > 0 ? (
                 <div className="flex flex-col items-center gap-1 text-center text-[11px]">
-                  <span className="text-[9.5px] uppercase tracking-wider text-cyan">
+                  <span className="text-[9.5px] caps-5 text-tint-cyan">
                     {battle.logs[battle.logs.length - 1].actorName}
                   </span>
-                  <span className="text-white/90">
+                  <span className="text-ink/90">
                     {battle.logs[battle.logs.length - 1].text}
                   </span>
                 </div>
@@ -274,8 +274,8 @@ export function BattleArenaView({
           </div>
 
           {/* REAL-TIME COMBAT LOG STREAM */}
-          <div className="flex min-h-0 flex-1 flex-col border border-line/60 bg-black/90">
-            <div className="flex items-center justify-between border-b border-line/40 bg-white/[0.02] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-dim">
+          <div className="flex min-h-0 flex-1 flex-col border border-line/60 tone-panel-90">
+            <div className="flex items-center justify-between border-b border-line/40 bg-ink/[0.02] px-3 py-1.5 text-[10px] font-bold caps-5 text-dim">
               <span>TACTICAL COMBAT LOG</span>
               <span className="text-faint">{battle.logs.length} ENTRIES</span>
             </div>
@@ -293,11 +293,11 @@ export function BattleArenaView({
                     className={cn(
                       'flex items-start gap-2 border-l-2 py-0.5 pl-2 leading-relaxed',
                       isParley
-                        ? 'border-purple text-purple'
+                        ? 'border-tint-purple text-tint-purple'
                         : isDmg
                         ? 'border-alert text-alert'
                         : isAttack
-                        ? 'border-cyan text-white/90'
+                        ? 'border-tint-cyan text-ink/90'
                         : isTurn
                         ? 'border-accent text-accent'
                         : 'border-line text-dim'
@@ -315,9 +315,9 @@ export function BattleArenaView({
 
         {/* RIGHT COLUMN: ENEMY HOSTILES */}
         <div className="flex w-[300px] shrink-0 flex-col gap-2.5 overflow-y-auto">
-          <div className="flex items-center justify-between border-b border-line/40 pb-1 text-[10.5px] font-bold uppercase tracking-wider text-dim">
+          <div className="flex items-center justify-between border-b border-line/40 pb-1 text-[10.5px] font-bold caps-5 text-dim">
             <span>HOSTILE THREATS ({enemyCombatants.length})</span>
-            <span className="text-alert">TARGET SELECTION</span>
+            <span className="text-alert caps">Target selection</span>
           </div>
 
           {enemyCombatants.map((c) => {
@@ -332,12 +332,12 @@ export function BattleArenaView({
                 className={cn(
                   'flex flex-col gap-2 border p-3 transition-all cursor-pointer',
                   isDead
-                    ? 'border-line/20 bg-black/40 opacity-40 line-through'
+                    ? 'border-line/20 tone-panel-40 opacity-40 line-through'
                     : isTarget
-                    ? 'border-alert bg-alert/[0.08] shadow-[0_0_16px_rgba(255,77,77,0.3)] ring-1 ring-alert'
+                    ? 'border-alert bg-alert/[0.08] shadow-[0_0_16px_color-mix(in_srgb,rgb(255,77,77)_calc(30%*var(--glow)),transparent)] ring-1 ring-alert'
                     : isActive
                     ? 'border-alert/80 bg-alert/[0.04]'
-                    : 'border-line/60 bg-black/70 hover:border-line'
+                    : 'border-line/60 tone-well-70 hover:border-line'
                 )}
               >
                 {/* ENEMY HEADER */}
@@ -347,8 +347,8 @@ export function BattleArenaView({
                       {c.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[12px] font-bold text-white">{c.name}</span>
-                      <span className="text-[9px] text-alert uppercase">
+                      <span className="text-[12px] font-bold text-ink">{c.name}</span>
+                      <span className="text-[9px] text-alert caps">
                         {c.faction ? `FACTION: ${c.faction}` : 'CREATURE'}
                       </span>
                     </div>
@@ -362,14 +362,14 @@ export function BattleArenaView({
                 {/* HP GAUGE */}
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-faint">HEALTH</span>
+                    <span className="text-faint caps">Health</span>
                     <strong className="text-alert">
                       {c.hp.cur} / {c.hp.max} HP
                     </strong>
                   </div>
-                  <div className="h-2 w-full border border-line/50 bg-black/80">
+                  <div className="h-2 w-full border border-line/50 tone-panel-80">
                     <div
-                      className="h-full bg-alert shadow-[0_0_8px_rgba(255,77,77,0.5)] transition-all duration-300"
+                      className="h-full bg-alert shadow-[0_0_8px_color-mix(in_srgb,rgb(255,77,77)_calc(50%*var(--glow)),transparent)] transition-all duration-300"
                       style={{
                         width: `${Math.max(0, Math.min(100, (c.hp.cur / c.hp.max) * 100))}%`
                       }}
@@ -390,10 +390,10 @@ export function BattleArenaView({
                         onAttack(c.id, selectedAttack)
                       }}
                       className={cn(
-                        'flex flex-1 items-center justify-center gap-1 border py-1 text-[10px] font-bold uppercase transition-all',
+                        'flex flex-1 items-center justify-center gap-1 border py-1 text-[10px] font-bold caps transition-all',
                         isPlayerTurn && !economy.actionUsed
-                          ? 'border-alert bg-alert/20 text-white hover:bg-alert hover:text-black cursor-pointer shadow-[0_0_12px_rgba(255,77,77,0.3)]'
-                          : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
+                          ? 'border-alert bg-alert/20 text-ink hover:bg-alert hover:text-on-accent cursor-pointer shadow-[0_0_12px_color-mix(in_srgb,rgb(255,77,77)_calc(30%*var(--glow)),transparent)]'
+                          : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed opacity-50'
                       )}
                     >
                       <Swords className="h-3 w-3" />
@@ -409,7 +409,7 @@ export function BattleArenaView({
                         useDialogue.getState().startDialogue(tree, c.name)
                       }}
                       title="Parley with agent playing this enemy (P)"
-                      className="flex items-center gap-1 border border-purple/60 bg-purple/15 px-2.5 py-1 text-[10px] font-bold uppercase text-purple hover:bg-purple hover:text-black transition-all cursor-pointer shadow-[0_0_12px_rgba(180,100,255,0.25)]"
+                      className="flex items-center gap-1 border border-tint-purple/60 bg-tint-purple/15 px-2.5 py-1 text-[10px] font-bold caps text-tint-purple hover:bg-tint-purple hover:text-on-accent transition-all cursor-pointer shadow-[0_0_12px_color-mix(in_srgb,rgb(180,100,255)_calc(25%*var(--glow)),transparent)]"
                     >
                       <MessageSquarePlus className="h-3 w-3" />
                       <span>PARLEY</span>
@@ -423,12 +423,12 @@ export function BattleArenaView({
       </div>
 
       {/* BOTTOM ARENA COMMAND DOCK */}
-      <div className="relative z-10 flex h-14 shrink-0 items-center justify-between border-t border-line/60 bg-black/90 px-4">
+      <div className="relative z-10 flex h-14 shrink-0 items-center justify-between border-t border-line/60 tone-panel-90 px-4">
         {/* ACTION ECONOMY BADGES */}
         <div className="flex items-center gap-2.5 text-[10px]">
           <span className="text-dim">
             ACTOR:{' '}
-            <strong className={isPlayerTurn ? 'text-cyan' : 'text-alert'}>
+            <strong className={isPlayerTurn ? 'text-tint-cyan' : 'text-alert'}>
               {activeActor?.name ?? 'None'}
             </strong>
           </span>
@@ -453,7 +453,7 @@ export function BattleArenaView({
             className={cn(
               'flex items-center gap-1 px-2 py-0.5 font-bold',
               !economy.bonusActionUsed
-                ? 'border border-cyan bg-cyan/20 text-cyan'
+                ? 'border border-tint-cyan bg-tint-cyan/20 text-tint-cyan'
                 : 'border border-line/30 text-faint line-through'
             )}
           >
@@ -482,10 +482,10 @@ export function BattleArenaView({
                 if (targetCombatant) onAttack(targetCombatant.id, att.name)
               }}
               className={cn(
-                'flex h-8 items-center gap-1.5 border px-3 text-[11px] font-bold uppercase transition-all',
+                'flex h-8 items-center gap-1.5 border px-3 text-[11px] font-bold caps transition-all',
                 isPlayerTurn && !economy.actionUsed && targetCombatant
-                  ? 'border-cyan bg-cyan text-black hover:bg-cyan/90 cursor-pointer shadow-[0_0_12px_rgba(0,216,246,0.35)]'
-                  : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
+                  ? 'border-tint-cyan bg-tint-cyan text-on-accent hover:bg-tint-cyan/90 cursor-pointer shadow-[0_0_12px_color-mix(in_srgb,rgb(0,216,246)_calc(35%*var(--glow)),transparent)]'
+                  : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed opacity-50'
               )}
             >
               <Swords className="h-3.5 w-3.5" />
@@ -499,10 +499,10 @@ export function BattleArenaView({
             disabled={!maneuvers.canDash}
             onClick={dashAction}
             className={cn(
-              'flex h-8 items-center gap-1.5 border px-3 text-[11px] font-bold uppercase transition-all',
+              'flex h-8 items-center gap-1.5 border px-3 text-[11px] font-bold caps transition-all',
               maneuvers.canDash
-                ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent cursor-pointer'
-                : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
+                ? 'border-line/60 tone-well-60 text-ink hover:border-accent hover:text-accent cursor-pointer'
+                : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed opacity-50'
             )}
           >
             <Footprints className="h-3.5 w-3.5 text-accent" />
@@ -515,12 +515,12 @@ export function BattleArenaView({
             disabled={!maneuvers.canDodge}
             onClick={dodgeAction}
             className={cn(
-              'flex h-8 items-center gap-1.5 border px-3 text-[11px] font-bold uppercase transition-all',
+              'flex h-8 items-center gap-1.5 border px-3 text-[11px] font-bold caps transition-all',
               economy.isDodging
                 ? 'border-accent bg-accent/20 text-accent cursor-default'
                 : maneuvers.canDodge
-                ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent cursor-pointer'
-                : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
+                ? 'border-line/60 tone-well-60 text-ink hover:border-accent hover:text-accent cursor-pointer'
+                : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed opacity-50'
             )}
           >
             <Shield className="h-3.5 w-3.5 text-accent" />
@@ -538,10 +538,10 @@ export function BattleArenaView({
               }
             }}
             className={cn(
-              'flex h-8 items-center gap-1.5 border px-3 text-[11px] font-bold uppercase transition-all',
+              'flex h-8 items-center gap-1.5 border px-3 text-[11px] font-bold caps transition-all',
               targetCombatant
-                ? 'border-purple bg-purple/20 text-purple hover:bg-purple hover:text-black cursor-pointer shadow-[0_0_12px_rgba(180,100,255,0.3)]'
-                : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
+                ? 'border-tint-purple bg-tint-purple/20 text-tint-purple hover:bg-tint-purple hover:text-on-accent cursor-pointer shadow-[0_0_12px_color-mix(in_srgb,rgb(180,100,255)_calc(30%*var(--glow)),transparent)]'
+                : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed opacity-50'
             )}
           >
             <MessageSquarePlus className="h-3.5 w-3.5" />
@@ -554,9 +554,9 @@ export function BattleArenaView({
             disabled={!isPlayerTurn}
             onClick={endTurn}
             className={cn(
-              'flex h-8 items-center gap-1 border px-3.5 text-[11px] font-bold uppercase tracking-wider transition-all ml-1',
+              'flex h-8 items-center gap-1 border px-3.5 text-[11px] font-bold caps-5 transition-all ml-1',
               isPlayerTurn
-                ? 'border-accent bg-accent text-black hover:bg-accent/90 cursor-pointer shadow-[0_0_16px_rgba(255,160,0,0.4)]'
+                ? 'border-accent bg-accent text-on-accent hover:bg-accent/90 cursor-pointer shadow-[0_0_16px_color-mix(in_srgb,rgb(255,160,0)_calc(40%*var(--glow)),transparent)]'
                 : 'border-line/40 bg-line/20 text-faint cursor-not-allowed opacity-50'
             )}
           >

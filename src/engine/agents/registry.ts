@@ -3,7 +3,6 @@ import { notFound } from '@shared/errors'
 import type { AgentPreset } from './presets'
 import { isAssetId } from '@shared/ids'
 import { CORE_MODULES } from '@shared/toolnames'
-import type { WorldBinding } from '@shared/world'
 import { cleanAvatarRef } from '@shared/avatars'
 import { cleanRelationships, type RelationshipEntry } from '@shared/relationships'
 import fs from 'node:fs'
@@ -46,9 +45,10 @@ function cleanIds(input: unknown): string[] {
   return Array.isArray(input) ? [...new Set(input.filter((id): id is string => typeof id === 'string' && /^[\w-]{1,64}$/.test(id)))] : []
 }
 
-function cleanMindAuto(input: unknown): { recall: boolean } {
-  const v = (input && typeof input === 'object' ? input : {}) as { recall?: unknown }
-  return { recall: v.recall !== false }
+function cleanMindAuto(input: unknown): { recall: boolean; recallCooldown: number } {
+  const v = (input && typeof input === 'object' ? input : {}) as { recall?: unknown; recallCooldown?: unknown }
+  const cd = typeof v.recallCooldown === 'number' && Number.isFinite(v.recallCooldown) ? Math.max(0, Math.min(50, Math.round(v.recallCooldown))) : 0
+  return { recall: v.recall !== false, recallCooldown: cd }
 }
 
 export const DEFAULT_REMIND_EVERY = 5
@@ -112,13 +112,6 @@ function cleanContext(input: unknown): ContextSettings {
     summaryAt: num(value.summaryAt, DEFAULT_CONTEXT.summaryAt, Math.min(0.98, trimAt + 0.02), 0.98),
     autoSummary: typeof value.autoSummary === 'boolean' ? value.autoSummary : DEFAULT_CONTEXT.autoSummary
   }
-}
-
-function cleanWorld(input: unknown): WorldBinding | null {
-  if (!input || typeof input !== 'object') return null
-  const v = input as Partial<WorldBinding>
-  const ok = (s: unknown) => typeof s === 'string' && s.trim() !== ''
-  return ok(v.worldId) && ok(v.type) && ok(v.id) ? { worldId: String(v.worldId), type: String(v.type), id: String(v.id).trim().toLowerCase() } : null
 }
 
 function cleanWorkspace(input: unknown): string | null {
@@ -315,7 +308,6 @@ export class AgentRegistry extends EventEmitter {
       permissionMode: cleanMode(draft.permissionMode),
       context: cleanContext({ ...existing?.context, ...draft.context }),
       look: cleanLook({ ...existing?.look, ...draft.look }),
-      world: cleanWorld(draft.world === undefined ? existing?.world : draft.world),
       toolsets: cleanIds(draft.toolsets === undefined ? existing?.toolsets : draft.toolsets),
       offTools: cleanTools(draft.offTools === undefined ? existing?.offTools : draft.offTools),
       private: (draft.private ?? existing?.private) === true,

@@ -15,7 +15,7 @@ function Record({ label, value, sub, gold = false }: { label: string; value: str
   return (
     <div className="flex flex-col border border-line/30 px-3 py-1.5">
       <Eyebrow className="text-[10px]">{label}</Eyebrow>
-      <span className={gold ? 'font-mono text-[18px] font-semibold text-accent' : 'font-mono text-[18px] font-semibold text-white'}>{value}</span>
+      <span className={gold ? 'font-ui text-[18px] font-semibold text-accent' : 'font-ui text-[18px] font-semibold text-ink'}>{value}</span>
       {sub && <span className="text-[11px] text-faint">{sub}</span>}
     </div>
   )
@@ -35,7 +35,7 @@ export function ExercisePanel({ history, id }: { history: WorkoutHistory; id: st
       meta={
         <span className="flex items-baseline gap-1.5">
           counted in
-          <InlineEdit value={ex.unit} placeholder="reps" title="What one number means" onSave={(unit) => void engine('workout.patchExercise', { id, unit }).catch(failed('Could not change it'))} className="text-white" />
+          <InlineEdit value={ex.unit} placeholder="reps" title="What one number means" onSave={(unit) => void engine('workout.patchExercise', { id, unit }).catch(failed('Could not change it'))} className="text-ink" />
         </span>
       }
       actions={

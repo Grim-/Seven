@@ -32,7 +32,7 @@ function EverythingPicker({ query, onPick }: { query: string; onPick: (kind: str
     }
   }, [query])
 
-  if (sections === null) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (sections === null) return <div className="font-ui text-[11px] text-dim">Loading…</div>
 
   const entries: { section: LibrarySection; hit: LibraryHit }[] = query
     ? sections.flatMap((section) => section.entries.filter((h) => !h.id.startsWith('all:')).map((hit) => ({ section, hit })))
@@ -119,7 +119,7 @@ export function KindExplorer({ id, onPick, tabs = [] }: { id: string; onPick: (k
         ) : section ? (
           <Picker key={section.kind} section={section} onPick={onPick} />
         ) : sections === null ? (
-          <div className="font-mono text-[11px] text-dim">Loading…</div>
+          <div className="font-ui text-[11px] text-dim">Loading…</div>
         ) : current === null ? (
           <EverythingPicker query={query.trim()} onPick={onPick} />
         ) : (

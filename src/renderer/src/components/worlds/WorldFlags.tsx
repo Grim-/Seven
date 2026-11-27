@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
-import { Bookmark, Flag, Plus, Search, Trash2, ToggleLeft, ToggleRight, Layers, Zap } from 'lucide-react'
+import { Bookmark, Flag, Plus, Trash2, ToggleLeft, ToggleRight, Layers, Zap } from 'lucide-react'
 import type { WorldMeta } from '@shared/world'
-import { Button, EmptyState, Input, Select, confirmDelete } from '../ui'
+import { Button, EmptyState, InlineNumber, Input, SearchBox, Select, confirmDelete } from '../ui'
+import { LinkInlineEdit } from '../data/LinkInlineEdit'
 import { engine } from '../../lib/ipc'
 import { useLive } from '../../lib/useLive'
 import { toast } from '../../store/toasts'
@@ -96,12 +97,12 @@ export function WorldFlags({ world }: Props) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 font-mono select-none">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 font-ui select-none">
       {/* HEADER BAR */}
       <div className="flex items-center justify-between border-b border-line pb-2.5">
         <div className="flex items-center gap-2">
-          <Bookmark className="h-4 w-4 text-cyan" />
-          <span className="text-[12px] font-bold uppercase tracking-wider text-white">
+          <Bookmark className="h-4 w-4 text-secondary-ink" />
+          <span className="text-[12px] font-bold caps-5 text-ink">
             WORLD INSTANCE FLAGS &amp; GATING STATE
           </span>
           <span className="text-[11px] text-dim">
@@ -109,27 +110,18 @@ export function WorldFlags({ world }: Props) {
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative w-56">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-dim" />
-            <input
-              type="text"
-              placeholder="Filter flags..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-7 w-full border border-line bg-black/50 pl-8 pr-2 text-[11px] text-white placeholder-dim focus:border-cyan focus:outline-none"
-            />
-          </div>
+        <div className="w-56">
+          <SearchBox value={search} onChange={setSearch} placeholder="Filter flags…" />
         </div>
       </div>
 
       {/* CREATE FLAG FORM */}
       <form
         onSubmit={handleAddFlag}
-        className="flex flex-wrap items-end gap-2.5 border border-line/60 bg-black/40 p-3"
+        className="flex flex-wrap items-end gap-2.5 border border-line/60 tone-panel-40 p-3"
       >
         <div className="flex-1 min-w-[200px]">
-          <span className="mb-1 block text-[10px] uppercase tracking-wider text-faint">
+          <span className="mb-1 block text-[10px] caps-5 text-faint">
             New Flag Key
           </span>
           <Input
@@ -141,7 +133,7 @@ export function WorldFlags({ world }: Props) {
         </div>
 
         <div className="w-32">
-          <span className="mb-1 block text-[10px] uppercase tracking-wider text-faint">
+          <span className="mb-1 block text-[10px] caps-5 text-faint">
             Type
           </span>
           <Select
@@ -162,7 +154,7 @@ export function WorldFlags({ world }: Props) {
         </div>
 
         <div className="w-36">
-          <span className="mb-1 block text-[10px] uppercase tracking-wider text-faint">
+          <span className="mb-1 block text-[10px] caps-5 text-faint">
             Initial Value
           </span>
           {newType === 'boolean' ? (
@@ -203,7 +195,7 @@ export function WorldFlags({ world }: Props) {
         </EmptyState>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
-          <div className="grid grid-cols-[1fr_180px_1fr_60px] gap-2 border-b border-line/60 pb-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-dim">
+          <div className="grid grid-cols-[1fr_180px_1fr_60px] gap-2 border-b border-line/60 pb-1.5 font-label text-[10px] font-bold caps-5 text-dim">
             <span>Flag Key</span>
             <span>Current Value</span>
             <span>Gating References</span>
@@ -220,14 +212,14 @@ export function WorldFlags({ world }: Props) {
               return (
                 <div
                   key={key}
-                  className="grid grid-cols-[1fr_180px_1fr_60px] items-center gap-2 py-2.5 transition-colors hover:bg-white/[0.02]"
+                  className="grid grid-cols-[1fr_180px_1fr_60px] items-center gap-2 py-2.5 transition-colors hover:bg-ink/[0.02]"
                 >
                   {/* FLAG KEY */}
                   <div className="flex items-center gap-2">
-                    <Flag className={cn('h-3.5 w-3.5', isSet && val ? 'text-cyan' : 'text-faint')} />
-                    <span className="font-bold text-white text-[12.5px]">{key}</span>
+                    <Flag className={cn('h-3.5 w-3.5', isSet && val ? 'text-secondary-ink' : 'text-faint')} />
+                    <span className="font-bold text-ink text-[12.5px]">{key}</span>
                     {!isSet && (
-                      <span className="border border-line/40 px-1 font-mono text-[9px] uppercase text-dim">
+                      <span className="border border-line/40 px-1 font-label text-[9px] caps text-dim">
                         Unset (Evaluates False)
                       </span>
                     )}
@@ -240,10 +232,10 @@ export function WorldFlags({ world }: Props) {
                         type="button"
                         onClick={() => handleSetFlag(key, !val)}
                         className={cn(
-                          'flex items-center gap-1.5 border px-2.5 py-0.5 text-[11px] font-bold uppercase transition-all',
+                          'flex items-center gap-1.5 border px-2.5 py-0.5 text-[11px] font-bold caps transition-all',
                           val
                             ? 'border-ok/40 bg-ok/10 text-ok'
-                            : 'border-line/40 bg-black/40 text-faint hover:text-white'
+                            : 'border-line/40 tone-well-40 text-faint hover:text-ink'
                         )}
                       >
                         {val ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
@@ -257,7 +249,7 @@ export function WorldFlags({ world }: Props) {
                           const v = typeof val === 'number' ? Number(e.target.value) || 0 : e.target.value
                           if (v !== val) handleSetFlag(key, v)
                         }}
-                        className="h-6 w-32 border border-line bg-black/60 px-2 font-mono text-[11px] text-white focus:border-cyan focus:outline-none"
+                        className="h-6 w-32 border border-line tone-well-60 px-2 font-ui text-[11px] text-ink focus:border-secondary-ink focus:outline-none"
                       />
                     )}
                   </div>
@@ -273,7 +265,7 @@ export function WorldFlags({ world }: Props) {
                             ? 'border-accent/40 bg-accent/10 text-accent'
                             : t.role === 'hides'
                               ? 'border-alert/40 bg-alert/10 text-alert'
-                              : 'border-cyan/40 bg-cyan/10 text-cyan'
+                              : 'border-secondary-ink/40 bg-secondary-ink/10 text-secondary-ink'
                         )}
                         title={`Map: ${t.map}`}
                       >
@@ -289,7 +281,7 @@ export function WorldFlags({ world }: Props) {
                           'flex items-center gap-1 border px-1.5 py-0.2',
                           l.role === 'hides'
                             ? 'border-alert/40 bg-alert/10 text-alert'
-                            : 'border-cyan/40 bg-cyan/10 text-cyan'
+                            : 'border-secondary-ink/40 bg-secondary-ink/10 text-secondary-ink'
                         )}
                         title={`Map: ${l.map}`}
                       >

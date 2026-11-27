@@ -45,7 +45,7 @@ export function CertificateCard({ network }: { network: NetworkStatus }) {
           </>
         }
       >
-        <p className="text-[13px] text-white/85">Every device that trusts the old certificate stops connecting until you give it the new one.</p>
+        <p className="text-[13px] text-ink/85">Every device that trusts the old certificate stops connecting until you give it the new one.</p>
       </Modal>
     </SettingCard>
   )

@@ -64,7 +64,7 @@ export function PictureBox({ layer, editing, selected, hit, onChange, onPress, o
       onClick={onClick}
       onContextMenu={onMenu}
       style={{ width: shown.size.w * shown.scale, height: shown.size.h * shown.scale, transform: `translate(${offset.x}px, ${offset.y}px) rotate(${shown.rotation}deg)`, transformOrigin: 'center' }}
-      className={cn('relative', hit ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none', editing && 'cursor-move', selected && 'outline-dashed outline-1 outline-cyan')}
+      className={cn('relative', hit ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none', editing && 'cursor-move', selected && 'outline-dashed outline-1 outline-secondary-ink')}
     >
       {isDataUri || asset ? <img src={isDataUri ? layer.image : assetUrl(asset!)} alt={layer.name} draggable={false} className="block h-full w-full max-w-none select-none" /> : <MissingFile className="h-full w-full" />}
       {selected && editing && (

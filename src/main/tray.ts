@@ -1,6 +1,6 @@
 import { noteMainFailure } from './problems'
 import { Menu, Tray, nativeImage } from 'electron'
-import icon from '../../resources/icon.png?asset'
+import icon from '../../build/icon.png?asset'
 
 interface TrayActions {
   showApp: () => void

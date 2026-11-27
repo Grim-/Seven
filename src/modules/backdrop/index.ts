@@ -3,6 +3,8 @@ import { ToolError, optStr, type ToolDef } from '../../engine/tools/types'
 import { backdrops } from '../../engine/backdrops'
 import { themes } from '../../engine/themes/store'
 import { SKY_MODES, isHex, type Ambience, type SkyMode, type Theme } from '@shared/theme'
+import type { SkinColour } from '@shared/themeLook'
+import { evenStops, glowStops, DEFAULT_ANGLE } from '@shared/gradient'
 import { BACKGROUND_MODULE, CORE_EFFECTS, backgroundInfo, backgroundList, reactionsText } from '@shared/backgrounds'
 import { linkFor } from '@shared/text'
 import { modules } from '../../engine/modules/registry'
@@ -117,9 +119,9 @@ const ambience: ToolDef = {
     const light = hexOrNone(params.light, 'light')
     if (light !== undefined || typeof params.light_strength === 'number') {
       const current = themes.ambience(ctx.sessionId).light
-      const color = light === undefined ? (current?.color ?? null) : light
-      if (light !== null && !color) throw new ToolError('There is no mood light yet, so light_strength alone does nothing. Set light to a hex colour like "#ff8a3d" too.')
-      patch.light = color ? { color, strength: typeof params.light_strength === 'number' ? params.light_strength : (current?.strength ?? 0.35) } : null
+      const stops = light === undefined ? (current?.stops ?? null) : light ? glowStops([light]) : null
+      if (light !== null && !stops) throw new ToolError('There is no mood light yet, so light_strength alone does nothing. Set light to a hex colour like "#ff8a3d" too.')
+      patch.light = stops ? { stops, strength: typeof params.light_strength === 'number' ? params.light_strength : (current?.strength ?? 0.35) } : null
       changed.push('light')
     }
     const animated = optStr(params, 'animated')?.trim()
@@ -190,7 +192,7 @@ const themeSave: ToolDef = {
       copy_of: { type: ['string', 'null'] },
       rename: { type: ['string', 'null'] },
       description: { type: ['string', 'null'] },
-      accent: { type: ['string', 'null'] },
+      accent: { type: ['string', 'null'], description: 'Hex, or "none" for Seven\'s. The same for accent_soft, secondary and base' },
       accent_soft: { type: ['string', 'null'] },
       secondary: { type: ['string', 'null'] },
       base: { type: ['string', 'null'], description: 'The darkest background colour' },
@@ -219,20 +221,31 @@ const themeSave: ToolDef = {
     if (rename) input.name = rename
     const text = optStr(params, 'description')
     if (text !== null) input.description = text
-    for (const [key, field] of [['accent', 'accent'], ['accent_soft', 'accentSoft'], ['secondary', 'secondary'], ['base', 'base']] as const) {
+    const colours: Partial<Record<SkinColour, string>> = { ...(existing ?? base)?.colours }
+    let recoloured = false
+    for (const [key, role] of [['accent', 'accent'], ['accent_soft', 'accent-soft'], ['secondary', 'secondary'], ['base', 'bg']] as const) {
       const v = optStr(params, key)?.trim()
       if (!v) continue
-      if (!isHex(v)) throw new ToolError(`Set ${key} to a 6-digit hex colour like "#ffc919". "${v}" is not one.`)
-      input[field] = v
+      recoloured = true
+      if (v.toLowerCase() === 'none') {
+        delete colours[role]
+        continue
+      }
+      if (!isHex(v)) throw new ToolError(`Set ${key} to a 6-digit hex colour like "#ffc919", or "none" for Seven's. "${v}" is not one.`)
+      colours[role] = v
     }
+    if (recoloured) input.colours = colours
     if (typeof params.sky === 'string') input.sky = params.sky as SkyMode
     const light = hexOrNone(params.light, 'light')
     if (light !== undefined || typeof params.light_strength === 'number') {
-      const color = light === undefined ? (existing?.light?.color ?? base?.light?.color ?? null) : light
-      input.light = color ? { color, strength: typeof params.light_strength === 'number' ? params.light_strength : (existing?.light?.strength ?? 0.35) } : null
+      const stops = light === undefined ? (existing?.light?.stops ?? base?.light?.stops ?? null) : light ? glowStops([light]) : null
+      input.light = stops ? { stops, strength: typeof params.light_strength === 'number' ? params.light_strength : (existing?.light?.strength ?? 0.35) } : null
     }
     const backdrop = backdropFrom(params, 'background_colors', 'background_image', 'background_dim')
-    if (backdrop !== undefined) input.backdrop = backdrop
+    if (backdrop !== undefined) {
+      input.backdrop = backdrop && { ...backdrop, colors: [] }
+      if (Array.isArray(params.background_colors)) input.gradient = backdrop?.colors.length ? { stops: evenStops(backdrop.colors), angle: existing?.gradient?.angle ?? DEFAULT_ANGLE } : null
+    }
     const effectRef = optStr(params, 'effect')?.trim()
     if (effectRef) input.effect = effect(effectRef)
     const music = list(params.music)

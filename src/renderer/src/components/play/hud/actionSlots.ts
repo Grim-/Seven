@@ -46,10 +46,10 @@ export function setCompactDragGhost(
   ghost.style.left = '-9999px'
   ghost.style.width = '46px'
   ghost.style.height = '46px'
-  ghost.style.background = '#06090e'
+  ghost.style.background = 'var(--color-surface)'
   ghost.style.border = `2px solid ${accentColor}`
   ghost.style.boxShadow = `0 0 16px ${accentColor}88`
-  ghost.style.color = '#f1f7f9'
+  ghost.style.color = 'var(--color-ink)'
   ghost.style.fontFamily = 'monospace'
   ghost.style.fontSize = '13px'
   ghost.style.fontWeight = 'bold'

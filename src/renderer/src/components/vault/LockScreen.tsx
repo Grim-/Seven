@@ -4,6 +4,8 @@ import { DecodeText } from '../ui'
 import { useApp } from '../../store/app'
 import { PassphraseForm, useLocked } from './Vault'
 import { cn } from '../../lib/cn'
+import { useRoleColours } from '../../lib/skins/useRoleColours'
+import { skinSurface } from '../skins/skinSurface'
 
 const GLYPHS = '0123456789<>{}[]/\\|@#$%&*+=?ABCDEF'
 const CELL = 16
@@ -11,6 +13,9 @@ const FPS = 12
 
 function GlyphField() {
   const canvas = useRef<HTMLCanvasElement>(null)
+  const { colours, fonts } = useRoleColours()
+  const accent = colours.accent
+  const mono = fonts.mono
   useEffect(() => {
     const el = canvas.current
     const ctx = el?.getContext('2d')
@@ -18,7 +23,6 @@ function GlyphField() {
     let cols = 0
     let rows = 0
     let grid: { ch: string; a: number }[] = []
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() || '#ffc919'
     const size = () => {
       const r = el.getBoundingClientRect()
       const dpr = Math.min(2, window.devicePixelRatio || 1)
@@ -41,7 +45,7 @@ function GlyphField() {
       const w = el.width
       const h = el.height
       ctx.clearRect(0, 0, w, h)
-      ctx.font = `12px ui-monospace, monospace`
+      ctx.font = `12px ${mono}`
       ctx.textBaseline = 'top'
       ctx.fillStyle = accent
       const changes = Math.ceil(grid.length * 0.02)
@@ -66,7 +70,7 @@ function GlyphField() {
       cancelAnimationFrame(raf)
       observer.disconnect()
     }
-  }, [])
+  }, [accent, mono])
   return <canvas ref={canvas} className="absolute inset-0 h-full w-full" />
 }
 
@@ -96,25 +100,25 @@ export function LockScreen() {
   if (stage === 'hidden' || (stage === 'shown' && view === 'settings')) return null
 
   return (
-    <div className={cn('fixed inset-x-0 bottom-0 top-10 z-[60] flex items-center justify-center overflow-hidden', stage === 'leaving' ? 'seven-decrypt pointer-events-none' : 'seven-encrypt')}>
-      <div className="absolute inset-0 bg-black/75 backdrop-blur-md" />
+    <div {...skinSurface('lock-screen')} className={cn('fixed inset-x-0 bottom-0 top-10 z-[60] flex items-center justify-center overflow-hidden', stage === 'leaving' ? 'seven-decrypt pointer-events-none' : 'seven-encrypt')}>
+      <div className="absolute inset-0 bg-scrim/75 backdrop-blur-[calc(var(--panel-blur)*1.5)]" />
       <GlyphField />
       <div className="scanlines pointer-events-none absolute inset-0 opacity-40" />
-      <div className="notch relative z-[2] flex w-[26rem] flex-col gap-3 border border-accent/40 border-l-2 border-l-accent bg-bg/90 p-5 shadow-[0_0_40px_rgba(0,0,0,0.8)]">
+      <div className="notch relative z-[2] flex w-[26rem] flex-col gap-3 border border-accent/40 border-l-2 border-l-accent tone-bg-90 p-5 shadow-[0_0_40px_color-mix(in_srgb,var(--color-shade)_80%,transparent)]">
         <div className="flex items-center gap-2.5">
           <Lock className="h-5 w-5 text-accent" />
           <DecodeText
-            className="font-mono text-[15px] font-semibold uppercase tracking-[0.24em] text-white"
+            className="font-label text-[15px] font-semibold caps-24 text-ink"
             text={stage === 'decrypting' ? 'Decrypting & loading' : stage === 'leaving' ? 'Unlocked' : 'Vault locked'}
           />
         </div>
         {stage === 'decrypting' ? (
-          <p className="font-mono text-[12px] text-cyan">Loading chats, pages, agents and workspace…</p>
+          <p className="font-ui text-[12px] text-secondary-ink">Loading chats, pages, agents and workspace…</p>
         ) : (
           <>
             <p className="text-[13px] text-dim">Your chats, pages and agent memory are encrypted. Enter your passphrase to open them until Seven closes or you lock it.</p>
             <PassphraseForm />
-            <button onClick={() => setView('settings')} className="flex items-center gap-1.5 self-start font-mono text-[10.5px] uppercase tracking-[0.14em] text-dim hover:text-accent">
+            <button onClick={() => setView('settings')} className="flex items-center gap-1.5 self-start font-label text-[10.5px] caps-14 text-dim hover:text-accent">
               <SettingsIcon className="h-3.5 w-3.5" /> Vault settings
             </button>
           </>

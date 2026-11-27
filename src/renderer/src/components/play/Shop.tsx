@@ -29,11 +29,11 @@ function Row({ item, price, label, disabled, title, onClick }: { item: Item; pri
   const tip = itemTip(item)
   return (
     <div className="flex items-center gap-2 text-[13px]" onMouseEnter={(e) => showTip(e.currentTarget, tip.title, tip.body, 'top')} onMouseLeave={() => hideTip('component')}>
-      <span className="min-w-0 flex-1 truncate text-white/90">
+      <span className="min-w-0 flex-1 truncate text-ink/90">
         {itemName(item)}
-        {item.count > 1 && <span className="ml-1.5 font-mono text-[11.5px] text-dim">×{item.count}</span>}
+        {item.count > 1 && <span className="ml-1.5 font-ui text-[11.5px] text-dim">×{item.count}</span>}
       </span>
-      <span className="w-16 text-right font-mono text-[12px] font-bold text-accent">{price} g</span>
+      <span className="w-16 text-right font-ui text-[12px] font-bold text-accent">{price} g</span>
       <Button size="sm" variant="secondary" disabled={disabled} title={title} onClick={onClick} className="w-16 justify-center">
         {label}
       </Button>
@@ -63,7 +63,7 @@ function Counter({ visitor, catalog, stock: ids, buyRate, sellRate }: { visitor:
           <span className="text-[12.5px] text-faint">Nothing for sale.</span>
         )}
       </GamePanel>
-      <GamePanel title="Your bag" action={<span className="flex items-center gap-1.5 font-mono text-[12.5px] font-bold text-accent"><Coins className="h-3.5 w-3.5" />{bag.gold} gold</span>}>
+      <GamePanel title="Your bag" action={<span className="flex items-center gap-1.5 font-ui text-[12.5px] font-bold text-accent"><Coins className="h-3.5 w-3.5" />{bag.gold} gold</span>}>
         {bag.items.length ? (
           bag.items.map((item) => {
             const uid = item.uid

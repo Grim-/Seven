@@ -38,13 +38,13 @@ export function effectLogElement(data: EffectLogData): ChatElement {
 export function EffectLinesList({ lines }: { lines: string[] }) {
   if (!lines.length) return null
   return (
-    <div className="flex flex-col gap-1 border-t border-line/40 pt-1.5 font-mono text-[11.5px]">
+    <div className="flex flex-col gap-1 border-t border-line/40 pt-1.5 font-ui text-[11.5px]">
       {lines.map((line, i) => (
         <div
           key={i}
-          className="flex items-start gap-2 border-l-2 border-l-cyan/60 bg-cyan/[0.04] px-2.5 py-1 text-white/90"
+          className="flex items-start gap-2 border-l-2 border-l-secondary-ink/60 bg-secondary-ink/[0.04] px-2.5 py-1 text-ink/90"
         >
-          <Swords className="mt-1 h-3 w-3 shrink-0 text-cyan/80" />
+          <Swords className="mt-1 h-3 w-3 shrink-0 text-secondary-ink/80" />
           <div className="min-w-0 flex-1 leading-relaxed">
             <Markdown text={line} />
           </div>
@@ -72,11 +72,11 @@ export function EffectLogRecord({ data }: ChatElementProps) {
   ].filter((x): x is string => Boolean(x))
 
   return (
-    <div className="notch-sm flex flex-col gap-2 border border-line/70 bg-[#070a0f]/95 p-3 font-mono shadow-[0_6px_24px_rgba(0,0,0,0.5)]">
+    <div className="notch-sm flex flex-col gap-2 border border-line/70 tone-surface-95 p-3 font-ui shadow-[0_6px_24px_color-mix(in_srgb,var(--color-shade)_50%,transparent)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/50 pb-1.5">
         <div className="flex items-center gap-2">
-          <ScrollText className="h-3.5 w-3.5 text-cyan" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan">{title}</span>
+          <ScrollText className="h-3.5 w-3.5 text-secondary-ink" />
+          <span className="text-[10px] font-bold caps-18 text-secondary-ink">{title}</span>
           {contextChips.length > 0 && (
             <div className="flex flex-wrap items-center gap-1 text-[11px]">
               <Markdown text={contextChips.join(' › ')} />
@@ -86,12 +86,12 @@ export function EffectLogRecord({ data }: ChatElementProps) {
         {outcome && <PlayStamp outcome={outcome} className="play-stamp-inline" />}
       </div>
       {attempt && (
-        <div className="text-[13px] font-semibold text-white/95">
+        <div className="text-[13px] font-semibold text-ink/95">
           <Markdown text={attempt} />
         </div>
       )}
       {said && (
-        <div className="border-l-2 border-l-accent/60 bg-accent/[0.05] px-2.5 py-1.5 text-[13px] italic text-white/90">
+        <div className="border-l-2 border-l-accent/60 bg-accent/[0.05] px-2.5 py-1.5 text-[13px] italic text-ink/90">
           <Markdown text={said} />
         </div>
       )}

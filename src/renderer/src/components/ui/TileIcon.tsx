@@ -15,7 +15,7 @@ export function TileIcon({ shape, label, glyph }: { shape: keyof typeof OUTLINE;
         <path d={OUTLINE[shape]} />
         {shape === 'page' && !glyph && <path d={LINES} />}
         {label && (
-          <text x="24" y="33" textAnchor="middle" fill="currentColor" stroke="none" className="font-mono" fontSize="7.5" letterSpacing="0.5">
+          <text x="24" y="33" textAnchor="middle" fill="currentColor" stroke="none" className="font-ui" fontSize="7.5" letterSpacing="0.5">
             {label}
           </text>
         )}

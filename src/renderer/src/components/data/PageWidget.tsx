@@ -13,7 +13,7 @@ const pageIdOf = (source: WidgetSource) => String(source.pageId ?? '')
 
 function PageWidgetBody({ widget, compact }: WidgetBodyProps) {
   const page = usePage(pageIdOf(widget.source))
-  if (page === undefined) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (page === undefined) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   if (!page) return <MissingWidget what="page" />
   if (widget.view === 'addon') {
     const addonKind = pageKindOf(page.type)

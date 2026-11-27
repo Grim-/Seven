@@ -40,7 +40,7 @@ export function SessionHead({
                 type="button"
                 onClick={() => onChange({ phase: p })}
                 className={cn(
-                  'border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider',
+                  'border px-1.5 py-0.5 font-label text-[10px] caps-5 ',
                   phase === p ? 'border-accent/60 bg-accent/10 text-accent' : 'border-line/40 text-faint hover:text-dim'
                 )}
               >
@@ -56,8 +56,8 @@ export function SessionHead({
                   type="button"
                   onClick={() => onChange({ kind: k })}
                   className={cn(
-                    'border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider',
-                    entryKind === k ? 'border-cyan/60 bg-cyan/10 text-cyan' : 'border-line/40 text-faint hover:text-dim'
+                    'border px-1.5 py-0.5 font-label text-[10px] caps-5 ',
+                    entryKind === k ? 'border-secondary-ink/60 bg-secondary-ink/10 text-secondary-ink' : 'border-line/40 text-faint hover:text-dim'
                   )}
                 >
                   {ENTRY_KIND_LABEL[k]}
@@ -82,10 +82,10 @@ export function SessionHead({
           placeholder="date / era"
           title="Date or timeframe"
           onSave={(date) => onChange({ date })}
-          className="font-mono text-[12px] text-faint"
+          className="font-ui text-[12px] text-faint"
         />
       ) : (
-        session.date && <span className="font-mono text-[11.5px] text-faint">{session.date}</span>
+        session.date && <span className="font-ui text-[11.5px] text-faint">{session.date}</span>
       )}
 
       {onChange ? (
@@ -94,10 +94,10 @@ export function SessionHead({
           placeholder="Title (optional)"
           title="Title"
           onSave={(title) => onChange({ title })}
-          className="text-[15px] font-semibold text-white"
+          className="text-[15px] font-semibold text-ink"
         />
       ) : (
-        session.title && <span className="text-[15px] font-semibold text-white">{session.title}</span>
+        session.title && <span className="text-[15px] font-semibold text-ink">{session.title}</span>
       )}
 
       {actions && <span className="ml-auto flex items-center gap-2">{actions}</span>}

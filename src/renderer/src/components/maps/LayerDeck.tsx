@@ -46,6 +46,8 @@ interface LayerDeckProps {
   onAddObject?: () => void
   onAddSpawner?: () => void
   onAddGroup: () => void
+  /** Render inline inside a CanvasEditorShell left drawer instead of a floating popup. */
+  embedded?: boolean
 }
 
 function getLayerBadge(layer: MapLayer) {
@@ -53,7 +55,7 @@ function getLayerBadge(layer: MapLayer) {
     const isCollision = layer.name.toLowerCase().includes('collision')
     return isCollision
       ? { label: 'COLLISION', color: 'border-alert/50 text-alert bg-alert/10' }
-      : { label: 'TILES', color: 'border-cyan/50 text-cyan bg-cyan/10' }
+      : { label: 'TILES', color: 'border-secondary-ink/50 text-secondary-ink bg-secondary-ink/10' }
   }
   if (layer.kind === 'image') return { label: 'IMAGE', color: 'border-accent/50 text-accent bg-accent/10' }
   if (layer.kind === 'object') return { label: 'OBJECT', color: 'border-accent/50 text-accent bg-accent/10' }
@@ -294,13 +296,13 @@ function DeckRows({
               className={cn(
                 'group relative flex items-center gap-1.5 border-b border-line/30 py-1.5 pr-2 cursor-pointer transition-colors select-none',
                 isSelected
-                  ? 'border-l-2 border-l-cyan bg-cyan/15 text-white'
+                  ? 'border-l-2 border-l-secondary-ink bg-secondary-ink/15 text-ink'
                   : isTarget
-                  ? 'border-l-2 border-l-cyan/60 bg-cyan-950/20'
-                  : 'bg-black/30 hover:bg-white/[0.04]',
-                isDragOver && dragTarget?.position === 'into' && 'border-2 border-cyan bg-cyan/20',
-                isDragOver && dragTarget?.position === 'before' && 'border-t-2 border-t-cyan',
-                isDragOver && dragTarget?.position === 'after' && 'border-b-2 border-b-cyan'
+                  ? 'border-l-2 border-l-secondary-ink/60 bg-secondary/10'
+                  : 'tone-well-30 hover:bg-ink/[0.04]',
+                isDragOver && dragTarget?.position === 'into' && 'border-2 border-secondary-ink bg-secondary-ink/20',
+                isDragOver && dragTarget?.position === 'before' && 'border-t-2 border-t-secondary-ink',
+                isDragOver && dragTarget?.position === 'after' && 'border-b-2 border-b-secondary-ink'
               )}
             >
               {/* Group Expand / Collapse Toggle */}
@@ -311,7 +313,7 @@ function DeckRows({
                     e.stopPropagation()
                     onToggleGroup(layer.id)
                   }}
-                  className="p-0.5 text-dim hover:text-white"
+                  className="p-0.5 text-dim hover:text-ink"
                   title={isCollapsed ? 'Expand group' : 'Collapse group'}
                 >
                   {isCollapsed ? (
@@ -333,7 +335,7 @@ function DeckRows({
                 }}
                 className={cn(
                   'p-0.5 transition-colors',
-                  layer.visible ? 'text-cyan hover:text-white' : 'text-dim/40 hover:text-dim'
+                  layer.visible ? 'text-secondary-ink hover:text-ink' : 'text-dim/40 hover:text-dim'
                 )}
                 title={layer.visible ? 'Hide layer' : 'Show layer'}
               >
@@ -341,7 +343,7 @@ function DeckRows({
               </button>
 
               {/* Layer Type Badge */}
-              <span className={cn('px-1 py-0.5 border text-[9px] font-mono tracking-wider shrink-0', badge.color)}>
+              <span className={cn('px-1 py-0.5 border text-[9px] font-ui tracking-wider shrink-0', badge.color)}>
                 {isGroup ? (
                   <span className="flex items-center gap-1">
                     {isCollapsed ? <Folder className="h-2.5 w-2.5" /> : <FolderOpen className="h-2.5 w-2.5" />}
@@ -354,11 +356,11 @@ function DeckRows({
 
               {/* Layer Name */}
               <div className="flex flex-col min-w-0 flex-1">
-                <span className="truncate font-mono text-[11px] font-medium text-white group-hover:text-cyan transition-colors">
+                <span className="truncate font-ui text-[11px] font-medium text-ink group-hover:text-secondary-ink transition-colors">
                   {layer.name}
                 </span>
                 {isTarget && (
-                  <span className="font-mono text-[8.5px] uppercase tracking-wider text-cyan">
+                  <span className="font-label text-[8.5px] caps-5 text-secondary-ink">
                     ACTIVE TARGET
                   </span>
                 )}
@@ -388,7 +390,7 @@ function DeckRows({
                     e.stopPropagation()
                     handleMoveSibling(index, -1)
                   }}
-                  className="p-0.5 text-dim hover:text-white disabled:opacity-20"
+                  className="p-0.5 text-dim hover:text-ink disabled:opacity-20"
                   title="Move up"
                 >
                   <ArrowUp className="h-3 w-3" />
@@ -400,7 +402,7 @@ function DeckRows({
                     e.stopPropagation()
                     handleMoveSibling(index, 1)
                   }}
-                  className="p-0.5 text-dim hover:text-white disabled:opacity-20"
+                  className="p-0.5 text-dim hover:text-ink disabled:opacity-20"
                   title="Move down"
                 >
                   <ArrowDown className="h-3 w-3" />
@@ -408,7 +410,7 @@ function DeckRows({
                 <button
                   type="button"
                   onClick={(e) => openLayerMenu(e, layer)}
-                  className="p-0.5 text-dim hover:text-cyan"
+                  className="p-0.5 text-dim hover:text-secondary-ink"
                   title="Layer options"
                 >
                   <MoreVertical className="h-3 w-3" />
@@ -454,7 +456,8 @@ export function LayerDeck({
   onAddImageLayer,
   onAddObject,
   onAddSpawner,
-  onAddGroup
+  onAddGroup,
+  embedded = false
 }: LayerDeckProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
@@ -565,71 +568,79 @@ export function LayerDeck({
 
   const isMulti = selectedIds.size > 1
 
+  const isCollapsed = embedded ? false : collapsed
+
   return (
     <div
       className={cn(
-        'absolute left-3 top-3 z-30 flex flex-col border border-line bg-black/95 shadow-[0_16px_40px_rgba(0,0,0,0.9)] backdrop-blur-md transition-all',
-        collapsed ? 'w-[200px]' : 'w-[320px] max-h-[calc(100%-24px)]'
+        embedded
+          ? 'flex h-full min-h-0 flex-col'
+          : cn(
+              'absolute left-3 top-3 z-30 flex flex-col border border-line tone-panel-95 shadow-[0_16px_40px_color-mix(in_srgb,var(--color-shade)_90%,transparent)] backdrop-blur-[calc(var(--panel-blur)*1.5)] transition-all',
+              isCollapsed ? 'w-[200px]' : 'w-[320px] max-h-[calc(100%-24px)]'
+            )
       )}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-line bg-black/90 px-3 py-2 shrink-0">
-        <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-cyan">
-          <Layers className="h-3.5 w-3.5" />
-          <span>Layer Stack</span>
+      {/* Header (floating mode only) */}
+      {!embedded && (
+        <div className="flex items-center justify-between border-b border-line tone-panel-90 px-3 py-2 shrink-0">
+          <div className="flex items-center gap-1.5 font-label text-[11px] font-semibold caps-5 text-secondary-ink">
+            <Layers className="h-3.5 w-3.5" />
+            <span>Layer Stack</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setCollapsed(!collapsed)}
+              className="h-6 w-6 p-0"
+              title={collapsed ? 'Expand deck' : 'Collapse deck'}
+            >
+              {collapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onClose}
+              className="h-6 w-6 p-0 hover:text-alert"
+              title="Close deck"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setCollapsed(!collapsed)}
-            className="h-6 w-6 p-0"
-            title={collapsed ? 'Expand deck' : 'Collapse deck'}
-          >
-            {collapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onClose}
-            className="h-6 w-6 p-0 hover:text-alert"
-            title="Close deck"
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
+      )}
 
       {/* Multi-Select Action Bar (Shows when multiple layers are picked) */}
-      {!collapsed && isMulti && (
-        <div className="flex items-center justify-between border-b border-cyan/40 bg-cyan/10 px-2.5 py-1.5 shrink-0 font-mono text-[10px]">
-          <span className="font-bold text-cyan">{selectedIds.size} SELECTED</span>
+      {!isCollapsed && isMulti && (
+        <div className="flex items-center justify-between border-b border-secondary-ink/40 bg-secondary-ink/10 px-2.5 py-1.5 shrink-0 font-ui text-[10px]">
+          <span className="font-bold text-secondary-ink">{selectedIds.size} SELECTED</span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => handleBatchVisibility(true)}
-              className="border border-line/60 bg-black/40 px-1.5 py-0.5 text-white hover:border-cyan hover:text-cyan"
+              className="border border-line/60 tone-well-40 px-1.5 py-0.5 text-ink hover:border-secondary-ink hover:text-secondary-ink"
             >
               Show
             </button>
             <button
               type="button"
               onClick={() => handleBatchVisibility(false)}
-              className="border border-line/60 bg-black/40 px-1.5 py-0.5 text-white hover:border-cyan hover:text-cyan"
+              className="border border-line/60 tone-well-40 px-1.5 py-0.5 text-ink hover:border-secondary-ink hover:text-secondary-ink"
             >
               Hide
             </button>
             <button
               type="button"
               onClick={handleBatchDelete}
-              className="border border-alert/40 bg-alert/10 px-1.5 py-0.5 text-alert hover:bg-alert hover:text-black"
+              className="border border-alert/40 bg-alert/10 px-1.5 py-0.5 text-alert hover:bg-alert hover:text-on-accent"
             >
               Delete
             </button>
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="ml-1 p-0.5 text-dim hover:text-white"
+              className="ml-1 p-0.5 text-dim hover:text-ink"
               title="Clear selection"
             >
               <X className="h-3 w-3" />
@@ -639,13 +650,13 @@ export function LayerDeck({
       )}
 
       {/* Action Add Buttons Bar */}
-      {!collapsed && (
-        <div className="flex items-center gap-1.5 border-b border-line/40 bg-black/60 p-2 shrink-0">
+      {!isCollapsed && (
+        <div className="flex flex-wrap items-center gap-1 border-b border-line/40 tone-panel-60 p-2 shrink-0">
           <Button
             size="sm"
             variant="secondary"
             onClick={onAddTileLayer}
-            className="flex-1 font-mono text-[10px] tracking-wider"
+            className="flex-1 font-ui text-[10px] tracking-wider"
             icon={<Grid className="h-3 w-3" />}
             title="Add a new blank tile layer"
           >
@@ -655,7 +666,7 @@ export function LayerDeck({
             size="sm"
             variant="secondary"
             onClick={onAddImageLayer}
-            className="flex-1 font-mono text-[10px] tracking-wider"
+            className="flex-1 font-ui text-[10px] tracking-wider"
             icon={<ImagePlus className="h-3 w-3" />}
             title="Add a picture overlay layer"
           >
@@ -666,11 +677,11 @@ export function LayerDeck({
               size="sm"
               variant="secondary"
               onClick={onAddObject}
-              className="flex-1 font-mono text-[10px] tracking-wider text-cyan border-cyan/40 hover:bg-cyan/15"
-              icon={<Box className="h-3 w-3 text-cyan" />}
-              title="Place a predefined or custom map object"
+              className="flex-1 font-ui text-[10px] tracking-wider text-secondary-ink border-secondary-ink/40 hover:bg-secondary-ink/15"
+              icon={<Box className="h-3 w-3 text-secondary-ink" />}
+              title="Place a predefined or custom prop template"
             >
-              +Object
+              +Prop
             </Button>
           )}
           {onAddSpawner && (
@@ -678,18 +689,18 @@ export function LayerDeck({
               size="sm"
               variant="secondary"
               onClick={onAddSpawner}
-              className="flex-1 font-mono text-[10px] tracking-wider text-alert border-alert/40 hover:bg-alert/15"
+              className="flex-1 font-ui text-[10px] tracking-wider text-alert border-alert/40 hover:bg-alert/15"
               icon={<Skull className="h-3 w-3 text-alert" />}
-              title="Place a creature spawner template"
+              title="Place a spawner marker template"
             >
-              +Spawner
+              +Marker
             </Button>
           )}
           <Button
             size="sm"
             variant="secondary"
             onClick={onAddGroup}
-            className="flex-1 font-mono text-[10px] tracking-wider"
+            className="flex-1 font-ui text-[10px] tracking-wider"
             icon={<FolderPlus className="h-3 w-3" />}
             title="Create a new layer group"
           >
@@ -699,7 +710,7 @@ export function LayerDeck({
       )}
 
       {/* Hierarchical Layer List & Root Drop Zone */}
-      {!collapsed && (
+      {!isCollapsed && (
         <div
           onDragOver={(e) => {
             e.preventDefault()
@@ -727,7 +738,7 @@ export function LayerDeck({
               onExecuteDrop={handleExecuteDrop}
             />
           ) : (
-            <div className="p-4 text-center font-mono text-[11px] text-dim">
+            <div className="p-4 text-center font-ui text-[11px] text-dim">
               No layers yet
             </div>
           )}
@@ -735,8 +746,8 @@ export function LayerDeck({
       )}
 
       {/* Footer Info & Root Drop Hint */}
-      {!collapsed && (
-        <div className="flex items-center justify-between border-t border-line/40 bg-black/90 px-3 py-1.5 font-mono text-[10px] text-dim shrink-0">
+      {!isCollapsed && (
+        <div className="flex items-center justify-between border-t border-line/40 tone-panel-90 px-3 py-1.5 font-ui text-[10px] text-dim shrink-0">
           <span>{isMulti ? `${selectedIds.size} layers selected` : 'Shift/Ctrl to multi-select'}</span>
           <span>{layers.length} root items</span>
         </div>

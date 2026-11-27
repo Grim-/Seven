@@ -6,7 +6,7 @@ import { kindItem } from '../../lib/kindItem'
 export function KindPicker({ section, onPick }: KindPickerProps) {
   const list = useKindEntries(section.kind)
   const { Thumb } = presentOf(section.kind)
-  if (list === null) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (list === null) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   return (
     <KindShell
       id={`pick-${section.kind}`}

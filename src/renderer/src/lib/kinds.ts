@@ -25,11 +25,18 @@ export function useKindInfos(enabled = true): KindInfoList {
   useEffect(() => {
     if (!enabled) return
     let live = true
-    void loadKindInfos()
-      .then((l) => live && setList(l))
-      .catch(() => undefined)
+    const load = () =>
+      void loadKindInfos()
+        .then((l) => live && setList(l))
+        .catch(() => undefined)
+    load()
+    const off = on('tools.changed', () => {
+      cache = null
+      load()
+    })
     return () => {
       live = false
+      off()
     }
   }, [enabled])
   return list

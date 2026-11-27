@@ -61,8 +61,8 @@ function BrowseToken({
       className="notch-sm w-[min(26rem,94vw)] gap-3 p-3"
       triggerClassName={
         value
-          ? 'inline-flex h-[26px] items-center gap-1.5 border border-[color-mix(in_srgb,var(--tone)_45%,transparent)] bg-[color-mix(in_srgb,var(--tone)_10%,transparent)] px-2 font-mono text-[13px] font-semibold text-white hover:border-[var(--tone)]'
-          : 'inline-flex h-[26px] items-center gap-1.5 border border-dashed border-line px-2 font-mono text-[13px] text-dim hover:border-dim hover:text-white'
+          ? 'inline-flex h-[26px] items-center gap-1.5 border border-[color-mix(in_srgb,var(--tone)_45%,transparent)] bg-[color-mix(in_srgb,var(--tone)_10%,transparent)] px-2 font-ui text-[13px] font-semibold text-ink hover:border-[var(--tone)]'
+          : 'inline-flex h-[26px] items-center gap-1.5 border border-dashed border-line px-2 font-ui text-[13px] text-dim hover:border-dim hover:text-ink'
       }
       trigger={display}
     >
@@ -370,7 +370,7 @@ export function ConditionsListEditor({
         const nested = cond.type === 'all' || cond.type === 'any' || cond.type === 'not'
         return (
           <div key={i} className="flex flex-col gap-1.5">
-            <div className="notch-sm group flex items-start gap-2 border border-l-[3px] border-[#1c1f28] border-l-accent/80 bg-[linear-gradient(90deg,color-mix(in_srgb,var(--color-accent)_7%,#12151c),#12151c_60%)] px-2.5 py-1.5 text-[14px] leading-[28px] text-white/90 hover:border-[#2c3140]">
+            <div className="notch-sm group flex items-start gap-2 border border-l-[3px] border-card-hover border-l-accent/80 bg-[linear-gradient(90deg,color-mix(in_srgb,var(--color-accent)_7%,var(--color-card)),var(--color-card)_60%)] px-2.5 py-1.5 text-[14px] leading-[28px] text-ink/90 hover:border-ink/15">
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-1">
                 <EffectTokenButton
                   name="type"
@@ -426,7 +426,7 @@ export function ConditionsListEditor({
 
 export function ConditionsSummary({ value }: { value: ConditionDef[] }) {
   if (!value.length) return null
-  return <span className="font-mono text-[11px] text-dim">{value.map(explainOne).join(' · ')}</span>
+  return <span className="font-ui text-[11px] text-dim">{value.map(explainOne).join(' · ')}</span>
 }
 
 function ConditionsParam({ value, onChange }: ParamEditorProps) {

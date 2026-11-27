@@ -4,18 +4,17 @@ import { storedFactionText } from '@shared/game/factions'
 import { storedLootTableText } from '@shared/game/lootTables'
 import { storedMapObjectText } from '@shared/game/mapObjects'
 import { storedTriggerActionText } from '@shared/game/triggerActions'
-import { stripRef } from '@shared/ids'
-import { layerNames, localPlaceMermaid, mapObjects, placePath, placeRef, placeTree, type MapData, type ObjectLayerData, type PlaceNode } from '@shared/maps'
+import { stripRef, toId } from '@shared/ids'
+import { layerNames, localPlaceMermaid, mapObjects, placeBreadcrumbNames, placeRef, placeTree, type MapData, type ObjectLayerData, type PlaceNode } from '@shared/maps'
 import { smallestAt } from '@shared/shapes'
 import { linkFor, splitLink } from '@shared/text'
 import { pageKindOf } from '@shared/types'
-import { PLACE_TYPE, PLACE_TYPE_KEY, plainValue, type WorldChange, type WorldType } from '@shared/world'
+import { PLACE_TYPE, PLACE_TYPE_KEY, REGION_TYPE_KEY, plainValue, type WorldChange, type WorldType } from '@shared/world'
+import { actorEntry, actorLink, splitNpcRef } from '@shared/worldNpcs'
 import { agentAccess } from '../../agents/access'
 import { almanacs } from '../../almanac/store'
 import { data } from '../../data/hub'
 import { factions } from '../../factions/store'
-import { worldEvents } from '../../worlds/events'
-import { worldEventMetaMarkdown, worldEventPublicMarkdown } from '@shared/game/worldEvents'
 import { lootTablesStore } from '../../lootTables/store'
 import { mapObjectsStore } from '../../mapObjects/store'
 import { maps } from '../../maps/store'
@@ -28,11 +27,14 @@ import { secure } from '../../util/secure'
 import { recall } from '../../worlds/ops'
 import { whoIsHere } from '../../worlds/presence'
 import { worlds } from '../../worlds/store'
+import { hasWorldPart, resolveWorldPart, worldPartCategoryChildren, worldPartChildrenForSegment, worldPartHits, worldPartInside, worldPartOf } from '../../worlds/parts'
+import { knowledge } from '../../worlds/knowledge'
+import { knowledgeRef, knowledgeText, splitKnowledgeRef, type WorldKnowledge } from '@shared/worldKnowledge'
 import type { Exported } from '../exporters'
 import { storePacking } from '../packing'
 import { scoreDoc } from '../query'
-import { getSheet } from '../sheets'
-import { registerKind, registerKindSource } from '../kindRegistry'
+import { getSheet, setSheetRelationships } from '../sheets'
+import { registerModuleKind } from '../moduleKinds'
 import { ENTRY_WIDGET, kindRt } from './runtime'
 import { accessOf, has, rollLinkActions, USER, withJson, type Kind, type KindChildInput, type KindField, type KindHit } from './types'
 
@@ -40,10 +42,8 @@ function worldHits(query: string, limit: number): KindHit[] {
   const trimmed = query.trim()
   const out: (KindHit & { _score: number })[] = []
   for (const w of worlds.list()) {
-    const schema = worlds.schema(w.id)
-    for (const tk of Object.keys(schema.types)) {
-      const noun = schema.types[tk]?.noun ?? tk
-      const plural = schema.types[tk]?.plural ?? tk
+    for (const tk of [REGION_TYPE_KEY, PLACE_TYPE_KEY, ...Object.keys(worlds.schema(w.id).types)]) {
+      const { noun, plural } = worlds.type(w.id, tk)
       for (const [key, e] of Object.entries(worlds.entities(w.id, tk, false))) {
         const id = `${w.id}/${tk}/${key}`
         if (!trimmed) {
@@ -109,11 +109,12 @@ function placeChild(world: string, key: string, places: Record<string, Record<st
 }
 
 function sheetChild(sheet: string): KindChildInput {
+  const entry = actorEntry(sheet)
   try {
-    return { kind: 'sheet', id: sheet, title: getSheet(sheet).title }
+    return { kind: entry.kind, id: entry.id, title: getSheet(sheet).title }
   } catch (err) {
     noteFailure(err, 'library', 'Could not read a character')
-    return { kind: 'sheet', id: sheet, title: sheet }
+    return { kind: entry.kind, id: entry.id, title: sheet }
   }
 }
 
@@ -139,8 +140,8 @@ function placeSummary(places: Record<string, Record<string, unknown>>, key: stri
   return inside ? `${inside} inside` : 'nothing happening'
 }
 
-function placeLines(nodes: PlaceNode[], places: Record<string, Record<string, unknown>>, depth = 0): string[] {
-  return nodes.flatMap((n) => [`${'  '.repeat(depth)}- ${n.name} (@place:${n.key}) — ${n.shaped ? placeSummary(places, n.key) : `${placeSummary(places, n.key)} (no shape on this map)`}`, ...placeLines(n.children, places, depth + 1)])
+function placeLines(world: string, nodes: PlaceNode[], places: Record<string, Record<string, unknown>>, depth = 0): string[] {
+  return nodes.flatMap((n) => [`${'  '.repeat(depth)}- ${n.name} (@world:${world}/place/${n.key}) — ${n.shaped ? placeSummary(places, n.key) : `${placeSummary(places, n.key)} (no shape on this map)`}`, ...placeLines(world, n.children, places, depth + 1)])
 }
 
 function changedText(c: WorldChange | undefined): string {
@@ -151,9 +152,10 @@ function changedText(c: WorldChange | undefined): string {
 function placeCard(id: string): string {
   const { world, key } = placeRef(id)
   const places = worldPlaces(world)
+  const regions = worlds.exists(world) ? worlds.entities(world, REGION_TYPE_KEY, false) : {}
   const p = places[key]
   if (!p) throw new ToolError(`No place ${key} in world ${world}. find with kind place lists them.`)
-  const path = placePath(places, key).map((k) => String(places[k]?.Name || k))
+  const path = placeBreadcrumbNames(places, regions, key)
   const changes = worlds.changes(world, PLACE_TYPE_KEY)[key] ?? {}
   const inside = Object.keys(places).filter((k) => places[k]?.Inside === key)
   const extra = Object.entries(p).filter(([k, v]) => !(k in PLACE_TYPE.fields) && v !== '' && v !== null && !(Array.isArray(v) && !v.length))
@@ -162,7 +164,7 @@ function placeCard(id: string): string {
   const mermaid = localPlaceMermaid(places, key)
   const here = (whoIsHere(world)[key] ?? []).map((v) => {
     const agent = v.agent ? agentAccess.get(v.agent) : null
-    return `- ${linkFor('sheet', v.sheet)} (${v.name}) — ${v.line}${agent ? ` (played by ${linkFor('agent', agent.name)})` : ''}`
+    return `- ${actorLink(v.sheet)} (${v.name}) — ${v.line}${agent ? ` (played by ${linkFor('agent', agent.name)})` : ''}`
   })
   return [
     `path: ${path.join(' › ')}`,
@@ -175,7 +177,7 @@ function placeCard(id: string): string {
     ...(mermaid ? [`local exits (1-hop topology only):\n\`\`\`mermaid\n${mermaid}\n\`\`\``] : []),
     String(p.Actions || '').trim() ? `actions (attempts; roll one with action_check):\n${String(p.Actions).trim()}` : '',
     String(p.Decisions || '').trim() ? `decisions (choices, never rolled; when the user decides, ask them with ask_user):\n${String(p.Decisions).trim()}` : '',
-    inside.length ? `inside it: ${inside.map((k) => `@place:${k}`).join(' ')}` : '',
+    inside.length ? `inside it: ${inside.map((k) => `@world:${world}/place/${k}`).join(' ')}` : '',
     drawn.length ? `on maps: ${drawn.map((u) => `@map:${u.map}`).join(' ')}` : ''
   ]
     .filter(Boolean)
@@ -201,12 +203,14 @@ export const worldKind: Kind = {
       }
     ]
   },
-  ...worldPacking,
-  label: 'World Editor',
+  ...worldPacking(),
+  label: 'World',
   textParts: ['record'],
-  plural: 'World Editor',
+  plural: 'Worlds',
   exportable: true,
   export(id) {
+    const p = worldPartOf(id)
+    if (p) return withJson(this, id, p.part.data(p.world, p.key))
     if (id.includes('/')) return exportRecord(this, id)
     const meta = worlds.meta(id)
     return withJson(this, id, { world: meta.name, schema: worlds.schema(id), types: meta.types })
@@ -214,36 +218,77 @@ export const worldKind: Kind = {
   icon: 'orbit',
   description: 'story worlds: each has its own kinds of records (characters, places, factions…) and a message board',
   parts: ['record'],
-  title: (id) => (id.includes('/') ? (id.split('/')[2] ?? id) : (worlds.list().find((w) => w.id === id)?.name ?? id)),
+  relations: {
+    list: (id) => (splitNpcRef(id) ? (getSheet(id).relationships ?? []) : []),
+    save: (id, next) => {
+      if (!splitNpcRef(id)) throw new ToolError(`"${id}" cannot hold character relationships.`)
+      setSheetRelationships(id, next)
+    }
+  },
+  title: (id) => {
+    const p = worldPartOf(id)
+    if (p) return p.part.title(p.world, p.key)
+    return id.includes('/') ? (id.split('/')[2] ?? id) : (worlds.list().find((w) => w.id === id)?.name ?? id)
+  },
   actions: ['world_recall', 'world_remember', 'world_search', 'world_post', 'world_board', 'world_create', 'world_set', 'world_entries', 'world_delete'],
   available: () => true,
   search(query, limit) {
     const q = query.toLowerCase()
-    return worlds
-      .list()
-      .filter((w) => !q || has(w.name, q))
+    const allWorlds = worlds.list()
+    const worldMatches = allWorlds
+      .filter((w) => !q || has(w.name, q) || has(w.id, q))
       .slice(0, limit)
       .map((w) => ({ kind: 'world', id: w.id, title: w.name, at: w.updatedAt }))
+    const remaining = limit - worldMatches.length
+    if (remaining <= 0) return worldMatches
+    return [
+      ...worldMatches,
+      ...worldPartHits(
+        allWorlds.map((w) => w.id),
+        query,
+        remaining
+      )
+    ]
   },
-  line: (id) => (id.includes('/') ? recordLine(id) : worldLine(worlds.meta(id))),
-  fields: (id) => (id.includes('/') ? recordFields(id) : []),
+  line: (id) => {
+    const p = worldPartOf(id)
+    if (p) return p.part.line(p.world, p.key)
+    return id.includes('/') ? recordLine(id) : worldLine(worlds.meta(id))
+  },
+  fields: (id) => {
+    const p = worldPartOf(id)
+    if (p) return p.part.fields(p.world, p.key)
+    return id.includes('/') ? recordFields(id) : []
+  },
   card(id, ctx) {
+    const p = worldPartOf(id)
+    if (p) return p.part.card(p.world, p.key)
     return this.export!(id, ctx).markdown
   },
   resolve(ref) {
+    const part = resolveWorldPart(ref, worldIdOf)
+    if (part) return part
+    if (worldPartOf(ref)) return null
     const parts = ref.split('/')
-    if (parts.length === 3 && worlds.exists(parts[0]) && worlds.schema(parts[0]).types[parts[1]] && worlds.entities(parts[0], parts[1], false)[parts[2]]) return ref
+    if (parts.length === 2 && worlds.exists(parts[0]) && (hasWorldPart(parts[1]) || Boolean(worlds.schema(parts[0]).types[parts[1]]))) {
+      return ref
+    }
+    if (parts.length === 3 && worlds.exists(parts[0]) && (parts[1] === PLACE_TYPE_KEY || parts[1] === REGION_TYPE_KEY || worlds.schema(parts[0]).types[parts[1]]) && worlds.entities(parts[0], parts[1], false)[parts[2]]) return ref
     const w = worlds.list().find((x) => x.id === ref || x.name.toLowerCase() === ref.toLowerCase())
     if (w) return w.id
     return worldHits(ref, 50).find((h) => h.title.toLowerCase() === ref.toLowerCase())?.id ?? null
   },
   full(id) {
+    const p = worldPartOf(id)
+    if (p) return p.part.card(p.world, p.key)
     if (id.includes('/')) return readRecord(id)
     const meta = worlds.meta(id)
     return `World ${meta.name}: ${meta.types.map((t) => `${t.count} ${t.plural}`).join(', ')}. ${meta.posts} board posts.`
   },
   remove(id) {
-    if (id.includes('/')) removeRecord(id)
+    const p = worldPartOf(id)
+    if (p) p.part.remove(p.world, p.key)
+    else if (id.includes('/')) removeRecord(id)
     else worlds.delete(id)
   },
   rename(id, name) {
@@ -251,9 +296,38 @@ export const worldKind: Kind = {
     worlds.rename(id, name)
   },
   children(id) {
-    if (id.includes('/')) return []
-    return worlds.mapUses(id).map((u) => ({ kind: 'map', id: u.map, title: mapTitle(u.map) }))
+    if (id.includes('/')) {
+      const [world, segment, ...rest] = id.split('/')
+      if (!world || !segment || !worlds.exists(world)) return []
+      if (rest.length > 0) return worldPartInside(id)
+      if (hasWorldPart(segment)) return worldPartChildrenForSegment(world, segment)
+      if (worlds.schema(world).types[segment]) {
+        return Object.keys(worlds.entities(world, segment, false)).map((key) => ({
+          kind: 'world',
+          id: `${world}/${segment}/${key}`,
+          title: key
+        }))
+      }
+      return []
+    }
+    const schemaChildren = Object.keys(worlds.schema(id).types).map((tk) => ({
+      kind: 'world',
+      id: `${id}/${tk}`,
+      title: tk
+    }))
+    return [
+      ...worldPartCategoryChildren(id),
+      ...schemaChildren,
+      ...worlds.mapUses(id).map((u) => ({ kind: 'map', id: u.map, title: mapTitle(u.map) }))
+    ]
   }
+}
+
+function worldIdOf(name: string): string | null {
+  if (worlds.exists(name)) return name
+  const id = toId(name)
+  const lower = name.toLowerCase()
+  return worlds.list().find((w) => w.id.toLowerCase() === lower || toId(w.name) === id || w.name.toLowerCase() === lower)?.id ?? null
 }
 
 export const placeKind: Kind = {
@@ -296,7 +370,8 @@ export const placeKind: Kind = {
   line(id) {
     const { world, key } = placeRef(id)
     const places = worldPlaces(world)
-    return `${placePath(places, key).map((k) => String(places[k]?.Name || k)).join(' › ')}: ${placeSummary(places, key)}`
+    const regions = worlds.exists(world) ? worlds.entities(world, REGION_TYPE_KEY, false) : {}
+    return `${placeBreadcrumbNames(places, regions, key).join(' › ')}: ${placeSummary(places, key)}`
   },
   card: placeCard,
   full: placeCard,
@@ -324,7 +399,8 @@ export const placeKind: Kind = {
     for (const v of whoIsHere(world)[key] ?? [])
       if (!seen.has(v.sheet)) {
         seen.add(v.sheet)
-        out.push({ kind: 'sheet', id: v.sheet, title: v.name })
+        const entry = actorEntry(v.sheet)
+        out.push({ kind: entry.kind, id: entry.id, title: v.name })
       }
     return out
   }
@@ -334,7 +410,7 @@ export const mapKind: Kind = {
   presents: { chat: true, widget: ENTRY_WIDGET },
   group: 'Worlds',
   kind: 'map',
-  ...mapPacking,
+  ...mapPacking(),
   label: 'Map Editor',
   plural: 'Map Editor',
   icon: 'map',
@@ -374,7 +450,7 @@ export const mapKind: Kind = {
     const places = worlds.usingMap(id).map((w) => {
       const all = worldPlaces(w.id)
       const shapes = worlds.mapUses(w.id).find((u) => u.map === id)?.shapes ?? {}
-      return `Places of ${w.name} on it:\n${placeLines(placeTree(all, shapes), all).join('\n') || '(none yet)'}`
+      return `Places of ${w.name} on it:\n${placeLines(w.id, placeTree(all, shapes), all).join('\n') || '(none yet)'}`
     })
     const objects = mapObjects(m.layers).map((o) =>
       [`- ${o.name}${o.entry ? ` (opens ${o.entry})` : ''}`, (o.actions ?? '').trim() ? `  actions (attempts; roll with action_check):\n${(o.actions ?? '').trim().replace(/^/gm, '    ')}` : '', (o.decisions ?? '').trim() ? `  decisions (choices, never rolled):\n${(o.decisions ?? '').trim().replace(/^/gm, '    ')}` : ''].filter(Boolean).join('\n')
@@ -535,9 +611,9 @@ export const factionKind: Kind = {
   group: 'Worlds',
   kind: 'faction',
   ...storePacking({
-    find: (id) => factions.list().find((f) => f.id === id) ?? null,
+    find: (id) => factions.find(id),
     names: () => factions.list().map((f) => f.name),
-    save: ({ id, ...rest }) => factions.save(rest, typeof id === 'string' ? id : null)
+    save: ({ id, ...rest }) => factions.save(rest, null, typeof id === 'string' ? id : null)
   }),
   label: 'Faction',
   plural: 'Factions',
@@ -557,10 +633,11 @@ export const factionKind: Kind = {
       .list()
       .filter((f) => !q || f.name.toLowerCase().includes(q) || f.id.toLowerCase().includes(q) || f.tags.some((tg) => tg.toLowerCase().includes(q)))
       .slice(0, limit)
-      .map((f) => ({ kind: 'faction', id: f.id, title: f.name, at: f.updatedAt }))
+      .map((f) => ({ kind: 'faction', id: f.worldId ? `${f.worldId}/${f.id}` : f.id, title: f.name, at: f.updatedAt }))
   },
   resolve(ref) {
-    return factions.find(ref)?.id ?? null
+    const hit = factions.find(ref)
+    return hit ? (hit.worldId ? `${hit.worldId}/${hit.id}` : hit.id) : null
   },
   line(id) {
     const f = factions.get(id)
@@ -584,7 +661,75 @@ export const factionKind: Kind = {
     factions.remove(id)
   },
   rename(id, name) {
-    void factions.save({ ...factions.get(id), name })
+    const cur = factions.get(id)
+    void factions.save({ ...cur, name }, cur.worldId ?? null, cur.id)
+  }
+}
+
+function knowledgeOf(ref: string): { world: string; entry: WorldKnowledge } {
+  const parts = splitKnowledgeRef(ref)
+  if (!parts) throw notFound(new ToolError(`No knowledge "${ref}". Knowledge ids are world/entry.`))
+  return { world: parts.world, entry: knowledge.get(parts.world, parts.id) }
+}
+
+export const knowledgeKind: Kind = {
+  presents: { chat: true, widget: ENTRY_WIDGET },
+  group: 'Worlds',
+  kind: 'knowledge',
+  label: 'Knowledge',
+  plural: 'Knowledge',
+  icon: 'book-open',
+  description: 'world knowledge: lore, magic systems, beliefs, customs and secrets of a world, known by every character there (global) or only by the characters that hold it (local)',
+  parts: [],
+  actions: [],
+  exportable: true,
+  export(id) {
+    const { world, entry } = knowledgeOf(id)
+    return { title: entry.name, markdown: knowledgeText(entry, world), json: entry }
+  },
+  available: () => true,
+  search(query, limit) {
+    const q = query.trim().toLowerCase()
+    return worlds
+      .list()
+      .flatMap((w) => knowledge.list(w.id).map((k) => ({ world: w.id, k })))
+      .filter(({ k }) => !q || k.name.toLowerCase().includes(q) || k.id.includes(q) || k.tags.some((t) => t.includes(q)))
+      .slice(0, limit)
+      .map(({ world, k }) => ({ kind: 'knowledge', id: knowledgeRef(world, k.id), title: k.name, at: k.updatedAt }))
+  },
+  resolve(ref) {
+    const parts = splitKnowledgeRef(ref)
+    if (!parts || !worlds.exists(parts.world)) return null
+    const hit = knowledge.find(parts.world, parts.id)
+    return hit ? knowledgeRef(parts.world, hit.id) : null
+  },
+  line(id) {
+    const { entry } = knowledgeOf(id)
+    return `${entry.name} · ${entry.scope}${entry.tags.length ? ` · #${entry.tags.join(' #')}` : ''}`
+  },
+  card(id) {
+    const { world, entry } = knowledgeOf(id)
+    return knowledgeText(entry, world)
+  },
+  full(id) {
+    const { world, entry } = knowledgeOf(id)
+    return knowledgeText(entry, world)
+  },
+  title(id) {
+    try {
+      return knowledgeOf(id).entry.name
+    } catch (err) {
+      noteFailure(err, 'library', 'Could not read knowledge')
+      return id
+    }
+  },
+  remove(id) {
+    const { world, entry } = knowledgeOf(id)
+    knowledge.remove(world, entry.id)
+  },
+  rename(id, name) {
+    const { world, entry } = knowledgeOf(id)
+    knowledge.save(world, { ...entry, name }, entry.id)
   }
 }
 
@@ -883,79 +1028,9 @@ export function nexusKinds(taken: Set<string>, claimed: Set<string>): Kind[] {
   })
 }
 
-export const worldEventKind: Kind = {
-  kind: 'world_event',
-  family: 'world',
-  group: 'Worlds',
-  label: 'World Event',
-  plural: 'World Events',
-  icon: 'flame',
-  description: 'Scoped world events (global, map, area, or place) with faction figureheads, diegetic rumours, and scored or player-picked TriggerAction outcomes.',
-  parts: ['public', 'meta'],
-  textParts: ['public', 'meta'],
-  exportable: true,
-  actions: [],
-  available: () => true,
-  search(query, limit) {
-    const q = query.trim().toLowerCase()
-    return worldEvents
-      .list()
-      .filter((e) => !q || e.title.toLowerCase().includes(q) || e.id.includes(q) || e.tags.some((t) => t.includes(q)) || e.worldId.toLowerCase().includes(q))
-      .slice(0, limit)
-      .map((e) => ({
-        kind: 'world_event',
-        id: e.id,
-        title: e.title,
-        line: `${e.status} · ${e.scope.level}${e.scope.refId ? `: ${e.scope.refId}` : ''}${e.worldId ? ` · ${e.worldId}` : ''}`,
-        tags: e.tags
-      }))
-  },
-  resolve(ref) {
-    return worldEvents.find(stripRef(ref))?.id ?? null
-  },
-  line(id) {
-    const e = worldEvents.find(id)
-    if (!e) return id
-    return `${e.status} · ${e.scope.level}${e.scope.refId ? `: ${e.scope.refId}` : ''}${e.worldId ? ` · ${e.worldId}` : ''}`
-  },
-  card(id) {
-    return worldEventPublicMarkdown(worldEvents.get(id))
-  },
-  full(id, options) {
-    const ev = worldEvents.get(id)
-    return options?.part === 'meta' ? worldEventMetaMarkdown(ev) : worldEventPublicMarkdown(ev)
-  },
-  fields(id) {
-    const ev = worldEvents.get(id)
-    return [
-      { name: 'public', text: worldEventPublicMarkdown(ev) },
-      { name: 'meta', text: worldEventMetaMarkdown(ev) }
-    ]
-  },
-  title(id) {
-    return worldEvents.find(id)?.title ?? id
-  },
-  remove(id) {
-    worldEvents.remove(id)
-  },
-  rename(id, title) {
-    const ev = worldEvents.get(id)
-    worldEvents.save({ ...ev, title }, ev.id)
-  }
-}
-
-registerKind(110, worldKind, 'world')
-registerKind(112, almanacKind, 'world')
-registerKindSource(
-  'world-types',
-  115,
-  (others) => nexusKinds(new Set(others.map((k) => k.kind)), new Set(others.flatMap((k) => (k.worldType ? [k.worldType] : [])))).map((kind) => ({ kind, module: 'world' })),
-  true
-)
-registerKind(120, mapKind, 'world')
-registerKind(130, placeKind, 'world')
-registerKind(140, objectKind, 'world')
-registerKind(150, factionKind, 'world')
-registerKind(160, triggerActionKind, 'game')
-registerKind(165, worldEventKind, 'world')
-registerKind(170, lootTableKind, 'world')
+registerModuleKind('world', worldKind, 110)
+registerModuleKind('world', almanacKind, 112)
+registerModuleKind('world', mapKind, 120)
+registerModuleKind('world', objectKind, 140)
+registerModuleKind('game', triggerActionKind, 160)
+registerModuleKind('world', lootTableKind, 170)

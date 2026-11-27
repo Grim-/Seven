@@ -57,10 +57,10 @@ function TraitsPanel({ comp, catalog, changed }: PanelProps<Traits>) {
           />
         ) : undefined
       }
-      bodyClassName="p-3"
+      bodyClassName="p-2.5"
     >
       {comp.held.length === 0 ? (
-        <span className="font-mono text-[11.5px] text-faint">No innate traits or reactive passives yet.</span>
+        <span className="font-ui text-[11.5px] text-faint">No innate traits or reactive passives yet.</span>
       ) : (
         <div className="flex flex-col border-y border-line/40">
           {comp.held.map((t) => {

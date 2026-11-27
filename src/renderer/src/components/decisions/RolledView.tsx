@@ -25,7 +25,7 @@ export function RolledView({ p, done, open, status, onAnswer, onClose }: { p: Ro
         <OptionRow key={i} mark={i + 1} text={o} picked={done?.roll === i + 1} />
       ))}
       <div className="flex items-center gap-3 border-t border-line/60 pt-2.5">
-        {done && <span className="font-mono text-[12px] text-dim">d{p.die} rolled {done.roll}</span>}
+        {done && <span className="font-ui text-[12px] text-dim">d{p.die} rolled {done.roll}</span>}
         <span className="flex-1" />
         {open && (
           <Button size="sm" variant="primary" icon={<Dices />} disabled={sending} onClick={() => void roll()}>

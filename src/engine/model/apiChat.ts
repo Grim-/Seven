@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ChatHistoryItem, FunctionCallItem as ChatModelFunctionCall, ModelItem as ChatModelResponse, SegmentItem as ChatModelSegment } from '../chat/items'
 import type { RemoteApi, RemoteSpec, ServerTimings, ToolChoiceMode } from '@shared/types'
-import { classifyRemoteModel, normalizeGoogleBase, remoteApiMeta, sortRemoteModels, type RemoteModelInfo } from '@shared/remoteModels'
+import { classifyRemoteModel, isImageModel, normalizeGoogleBase, remoteApiMeta, sortRemoteModels, type RemoteModelInfo } from '@shared/remoteModels'
 import { noteFailure } from '../util/report'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -599,9 +599,13 @@ async function listGoogleModels(baseUrl: string | null, key: string | null): Pro
     if (!res.ok) throw await readHttpError(res)
     const body = (await res.json()) as { models?: RawGoogleModel[]; nextPageToken?: string }
     for (const m of body.models ?? []) {
-      if (m.supportedGenerationMethods && !m.supportedGenerationMethods.includes('generateContent')) continue
+      const methods = m.supportedGenerationMethods
+      const supportsChat = !methods || methods.includes('generateContent')
+      const supportsPredict = Boolean(methods?.includes('predict') || methods?.includes('generateImages'))
+      if (!supportsChat && !supportsPredict) continue
       const id = (m.name ?? '').replace(/^models\//, '').trim()
       if (!id) continue
+      const category = !supportsChat && supportsPredict ? ('image' as const) : classifyRemoteModel(id, m.thinking)
       collected.push({
         id,
         ...(m.displayName ? { label: m.displayName } : {}),
@@ -609,7 +613,7 @@ async function listGoogleModels(baseUrl: string | null, key: string | null): Pro
         ...(typeof m.inputTokenLimit === 'number' && m.inputTokenLimit > 0 ? { context: m.inputTokenLimit } : {}),
         ...(typeof m.outputTokenLimit === 'number' && m.outputTokenLimit > 0 ? { outputLimit: m.outputTokenLimit } : {}),
         ...(typeof m.thinking === 'boolean' ? { thinking: m.thinking } : {}),
-        category: classifyRemoteModel(id, m.thinking)
+        category
       })
     }
     pageToken = body.nextPageToken
@@ -649,12 +653,16 @@ async function listOpenAiModels(baseUrl: string | null, key: string | null): Pro
         const label = typeof extra.name === 'string' && extra.name !== m.id ? extra.name : undefined
         const description = typeof extra.description === 'string' ? extra.description : undefined
         const ctx = num(extra.context_length) ?? num(extra.max_context_length) ?? undefined
+        const arch = extra.architecture && typeof extra.architecture === 'object' ? (extra.architecture as Record<string, unknown>) : null
+        const outModalities = Array.isArray(arch?.output_modalities) ? arch.output_modalities : []
+        const modalityStr = typeof arch?.modality === 'string' ? arch.modality : ''
+        const outputsImage = outModalities.some((x) => x === 'image') || /->.*image/i.test(modalityStr)
         return {
           id: m.id,
           ...(label ? { label } : {}),
           ...(description ? { description } : {}),
           ...(ctx ? { context: ctx } : {}),
-          category: classifyRemoteModel(m.id)
+          category: outputsImage ? ('image' as const) : classifyRemoteModel(m.id)
         }
       })
   )
@@ -805,11 +813,43 @@ export async function apiTest(target: ApiTarget): Promise<string> {
   return text.trim() || '(an empty reply, but it answered)'
 }
 
+function isDedicatedImageOnlyModel(model: string): boolean {
+  return /(^|\/)(gpt-image|dall-e|imagen|flux|stable[-_]?diffusion|sdxl|sd3|ideogram|recraft|seedream|midjourney|riverflow|black-forest-labs)/i.test(model)
+}
+
 export async function apiProbe(target: ApiTarget): Promise<{ ok: boolean; reply?: string; error?: string; models: RemoteModelInfo[] }> {
+  const imageTarget = isImageModel({ remote: target.spec })
+  if (imageTarget && isDedicatedImageOnlyModel(target.spec.model)) {
+    try {
+      const models = await listRemoteModels(target)
+      const norm = target.spec.model.replace(/^models\//i, '').trim().toLowerCase()
+      const found = models.some((m) => m.id.toLowerCase() === norm)
+      return {
+        ok: true,
+        reply: found
+          ? `Authenticated — "${target.spec.model}" is listed on this endpoint. Ready for Image Generator and generate_image.`
+          : `API key authenticated (${models.length} models listed). Image-only models do not answer chat probes — test rendering in Image Generator or via generate_image.`,
+        models
+      }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err), models: [] }
+    }
+  }
   const [testRes, listRes] = await Promise.allSettled([apiTest(target), listRemoteModels(target)])
   const models = listRes.status === 'fulfilled' ? listRes.value : []
   if (listRes.status === 'rejected') noteFailure(listRes.reason, 'models', 'Could not list remote models while probing')
   if (testRes.status === 'fulfilled') return { ok: true, reply: testRes.value, models }
+  if (imageTarget && listRes.status === 'fulfilled') {
+    const norm = target.spec.model.replace(/^models\//i, '').trim().toLowerCase()
+    const found = models.some((m) => m.id.toLowerCase() === norm)
+    return {
+      ok: true,
+      reply: found
+        ? `Authenticated — image model "${target.spec.model}" is listed on this endpoint. Ready for Image Generator and generate_image.`
+        : `API key authenticated (${models.length} models listed). This image model does not answer text chat probes — try rendering in Image Generator or via generate_image.`,
+      models
+    }
+  }
   const err = testRes.reason
   return { ok: false, error: err instanceof Error ? err.message : String(err), models }
 }

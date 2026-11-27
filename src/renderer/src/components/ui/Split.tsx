@@ -140,7 +140,7 @@ export function ListPane({
         <div
           aria-hidden
           onClick={onClose}
-          className="hidden phone:block absolute inset-0 z-20 bg-black/60 backdrop-blur-[1px]"
+          className="hidden phone:block absolute inset-0 z-20 bg-scrim/60 backdrop-blur-[1px]"
         />
       )}
       <SidePane
@@ -150,7 +150,7 @@ export function ListPane({
         max={max}
         reset={reset}
         onWidth={onWidth}
-        className="phone:absolute phone:inset-y-0 phone:left-0 phone:z-30 phone:w-[min(22rem,85%)]! phone:max-w-[85%]! phone:bg-bg phone:shadow-[8px_0_24px_rgba(0,0,0,0.7)]"
+        className="phone:absolute phone:inset-y-0 phone:left-0 phone:z-30 phone:w-[min(22rem,85%)]! phone:max-w-[85%]! phone:bg-bg phone:shadow-[8px_0_24px_color-mix(in_srgb,var(--color-shade)_70%,transparent)]"
       >
         <div className="flex h-full min-h-0 w-full">
           <div className="h-full min-w-0 flex-1">{children}</div>
@@ -181,15 +181,15 @@ export function ListToggle({
       className={cn(
         'bracket-left group relative w-3.5 touch:w-5 shrink-0 self-stretch min-h-[48px] cursor-pointer select-none border-y border-r transition-all outline-none',
         open
-          ? 'border-accent/80 bg-accent/15 text-accent shadow-[0_0_10px_color-mix(in_srgb,var(--color-accent)_25%,transparent)]'
-          : 'border-line bg-black/60 text-dim hover:border-accent hover:bg-accent/10',
+          ? 'border-accent/80 bg-accent/15 text-accent shadow-[0_0_10px_color-mix(in_srgb,var(--color-accent)_calc(25%*var(--glow)),transparent)]'
+          : 'border-line tone-well-60 text-dim hover:border-accent hover:bg-accent/10',
         className
       )}
     >
       <span
         className={cn(
           'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[1.5px] h-5 transition-all',
-          open ? 'bg-accent shadow-[0_0_8px_var(--color-accent)]' : 'bg-dim/70 group-hover:bg-accent'
+          open ? 'bg-accent shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_calc(100%*var(--glow)),transparent)]' : 'bg-dim/70 group-hover:bg-accent'
         )}
       />
     </button>

@@ -556,8 +556,8 @@ export class ExploreScene implements Scene {
         const pxRadius = ((this.data.aimRange ?? 0) / Math.max(1, tileFeet)) * tileW
         this.battleRadius
           .circle(casterView.at.x, casterView.at.y, pxRadius)
-          .fill({ color: 0x00d8f6, alpha: 0.04 })
-          .stroke({ width: 1.5, color: 0x00d8f6, alpha: 0.55 })
+          .fill({ color: this.engine.theme.secondary, alpha: 0.04 })
+          .stroke({ width: 1.5, color: this.engine.theme.secondary, alpha: 0.55 })
       }
     }
 
@@ -611,7 +611,7 @@ export class ExploreScene implements Scene {
     }
 
     const isPlayer = Boolean(activeActor.isPlayer)
-    const tileColor = isPlayer ? 0x00d8f6 : 0xff4d4d
+    const tileColor = isPlayer ? this.engine.theme.secondary : this.engine.theme.alert
 
     // 1. Highlight active actor's origin tile with 2px sharp border
     const originX = startCell[0] * tileW

@@ -9,6 +9,12 @@ let listening = false
 
 function onKey(e: KeyboardEvent): void {
   if (e.key !== 'Escape' || e.defaultPrevented) return
+  const active = document.activeElement as HTMLElement | null
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
+    e.preventDefault()
+    active.blur()
+    return
+  }
   const top = layers[layers.length - 1]
   if (!top) return
   e.preventDefault()

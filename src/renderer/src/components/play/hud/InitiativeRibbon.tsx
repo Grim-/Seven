@@ -22,7 +22,7 @@ export function InitiativeRibbon({
   return (
     <div
       className={cn(
-        'pointer-events-auto flex items-center h-8 gap-1.5 border border-line/60 bg-black/95 px-2.5 font-mono select-none shadow-xl backdrop-blur-md',
+        'pointer-events-auto flex items-center h-8 gap-1.5 border border-line/60 tone-well-95 px-2.5 font-ui select-none shadow-xl backdrop-blur-[calc(var(--panel-blur)*1.5)]',
         className
       )}
     >
@@ -46,21 +46,21 @@ export function InitiativeRibbon({
               className={cn(
                 'group flex items-center gap-1.5 border px-1.5 py-0.5 text-[9.5px] transition-all cursor-pointer',
                 isDead
-                  ? 'border-line/20 bg-black/40 text-faint line-through opacity-40'
+                  ? 'border-line/20 tone-panel-40 text-faint line-through opacity-40'
                   : isActive
                   ? c.isPlayer
-                    ? 'border-cyan bg-cyan/20 text-white font-bold shadow-[0_0_10px_rgba(0,216,246,0.3)]'
-                    : 'border-alert bg-alert/20 text-alert font-bold shadow-[0_0_10px_rgba(255,77,77,0.3)]'
+                    ? 'border-tint-cyan bg-tint-cyan/20 text-ink font-bold shadow-[0_0_10px_color-mix(in_srgb,rgb(0,216,246)_calc(30%*var(--glow)),transparent)]'
+                    : 'border-alert bg-alert/20 text-alert font-bold shadow-[0_0_10px_color-mix(in_srgb,rgb(255,77,77)_calc(30%*var(--glow)),transparent)]'
                   : isSelected
                   ? 'border-accent bg-accent/15 text-accent'
-                  : 'border-line/40 bg-black/60 text-dim hover:border-line hover:text-white'
+                  : 'border-line/40 tone-well-60 text-dim hover:border-line hover:text-ink'
               )}
             >
               {/* FACTION DOT */}
               <span
                 className={cn(
                   'h-1.5 w-1.5 shrink-0',
-                  c.isPlayer ? 'bg-cyan' : 'bg-alert'
+                  c.isPlayer ? 'bg-tint-cyan' : 'bg-alert'
                 )}
               />
 
@@ -74,8 +74,8 @@ export function InitiativeRibbon({
               {isActive && (
                 <span
                   className={cn(
-                    'px-0.5 text-[7.5px] font-extrabold uppercase',
-                    c.isPlayer ? 'bg-cyan text-black' : 'bg-alert text-white'
+                    'px-0.5 text-[7.5px] font-extrabold caps',
+                    c.isPlayer ? 'bg-tint-cyan text-on-accent' : 'bg-alert text-ink'
                   )}
                 >
                   TURN

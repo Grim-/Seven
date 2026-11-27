@@ -14,8 +14,8 @@ export const NEW_DEF = '__new'
 function Header({ type, title, children }: { type: DefType; title: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <h2 className="text-[18px] font-semibold text-white">{title}</h2>
-      <span className="border border-line/50 px-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-dim">{type.label}</span>
+      <h2 className="text-[18px] font-semibold text-ink">{title}</h2>
+      <span className="border border-line/50 px-1.5 font-label text-[10px] caps-12 text-dim">{type.label}</span>
       <span className="flex-1" />
       {children}
     </div>
@@ -30,7 +30,7 @@ function NewDef({ type, select }: { type: DefType; select: KindScreenProps['sele
   const make = () =>
     void run(async () => {
       const saved = await engine('game.save', { type: type.type, def: shown, previousId: null })
-      select({ kind: type.type, id: saved.id })
+      select({ kind: type.kind ?? type.type, id: saved.id })
     }, `Could not make the ${label}`)
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
@@ -47,7 +47,7 @@ function NewDef({ type, select }: { type: DefType; select: KindScreenProps['sele
 function EditDef({ type, start, select }: { type: DefType; start: GameDef; select: KindScreenProps['select'] }) {
   const state = useAutosavedState<GameDef>(start, (def) => engine('game.save', { type: type.type, def, previousId: def.id }), { when: (d) => Boolean(d.name.trim()) })
   const def = state.value
-  const remove = () => confirmDelete(`Delete ${def.name}?`, `Anything that uses the id ${def.id} stops finding it.`, () => engine('game.remove', { type: type.type, id: def.id }), () => select({ kind: type.type, id: 'all' }))
+  const remove = () => confirmDelete(`Delete ${def.name}?`, `Anything that uses the id ${def.id} stops finding it.`, () => engine('game.remove', { type: type.type, id: def.id }), () => select({ kind: type.kind ?? type.type, id: 'all' }))
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
       <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4">
@@ -56,7 +56,7 @@ function EditDef({ type, start, select }: { type: DefType; start: GameDef; selec
           <Button size="sm" variant="ghost" icon={<Trash2 />} onClick={remove}>
             Delete
           </Button>
-          <Button size="sm" variant="ghost" icon={<Plus />} onClick={() => select({ kind: type.type, id: NEW_DEF })} title={`New ${type.label.toLowerCase()}`} />
+          <Button size="sm" variant="ghost" icon={<Plus />} onClick={() => select({ kind: type.kind ?? type.type, id: NEW_DEF })} title={`New ${type.label.toLowerCase()}`} />
         </Header>
         <GameDefEditor type={type} def={def} made onChange={state.set} />
       </div>

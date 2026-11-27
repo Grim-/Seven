@@ -48,18 +48,18 @@ const ICONS_BY_NAME: Record<string, LucideIcon> = {
 }
 
 const GROUP_STYLES: Record<string, Omit<SlotTheme, 'Icon'>> = {
-  [HARM.id]: { color: 'text-red-400', border: 'border-red-500/70', bg: 'bg-red-500/15', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.35)]' },
-  [HELP.id]: { color: 'text-emerald-400', border: 'border-emerald-500/70', bg: 'bg-emerald-500/15', glow: 'shadow-[0_0_12px_rgba(52,211,153,0.35)]' },
-  [CONDITIONS.id]: { color: 'text-purple-400', border: 'border-purple-500/70', bg: 'bg-purple-500/15', glow: 'shadow-[0_0_12px_rgba(192,132,252,0.35)]' },
-  [ITEMS.id]: { color: 'text-amber-400', border: 'border-amber-500/70', bg: 'bg-amber-500/15', glow: 'shadow-[0_0_12px_rgba(245,158,11,0.35)]' },
-  [LUCK.id]: { color: 'text-cyan', border: 'border-cyan/70', bg: 'bg-cyan/15', glow: 'shadow-[0_0_12px_rgba(102,252,241,0.35)]' }
+  [HARM.id]: { color: 'text-tint-red-ink', border: 'border-tint-red/70', bg: 'bg-tint-red/15', glow: 'shadow-[0_0_12px_color-mix(in_srgb,var(--color-alert)_calc(35%*var(--glow)),transparent)]' },
+  [HELP.id]: { color: 'text-tint-green-ink', border: 'border-tint-green/70', bg: 'bg-tint-green/15', glow: 'shadow-[0_0_12px_color-mix(in_srgb,var(--color-ok)_calc(35%*var(--glow)),transparent)]' },
+  [CONDITIONS.id]: { color: 'text-tint-purple-ink', border: 'border-tint-purple/70', bg: 'bg-tint-purple/15', glow: 'shadow-[0_0_12px_color-mix(in_srgb,var(--color-tint-purple-ink)_calc(35%*var(--glow)),transparent)]' },
+  [ITEMS.id]: { color: 'text-tint-amber-ink', border: 'border-tint-amber/70', bg: 'bg-tint-amber/15', glow: 'shadow-[0_0_12px_color-mix(in_srgb,var(--color-tint-amber)_calc(35%*var(--glow)),transparent)]' },
+  [LUCK.id]: { color: 'text-tint-cyan', border: 'border-tint-cyan/70', bg: 'bg-tint-cyan/15', glow: 'shadow-[0_0_12px_color-mix(in_srgb,var(--color-tint-cyan)_calc(35%*var(--glow)),transparent)]' }
 }
 
 const DEFAULT_SLOT_STYLE: Omit<SlotTheme, 'Icon'> = {
-  color: 'text-cyan',
-  border: 'border-cyan/70',
-  bg: 'bg-cyan/15',
-  glow: 'shadow-[0_0_12px_rgba(102,252,241,0.3)]'
+  color: 'text-tint-cyan',
+  border: 'border-tint-cyan/70',
+  bg: 'bg-tint-cyan/15',
+  glow: 'shadow-[0_0_12px_color-mix(in_srgb,var(--color-tint-cyan)_calc(30%*var(--glow)),transparent)]'
 }
 
 /** Derives slot icon and accent styling from component `EffectGroup` and `Component.ICON` metadata rather than label text. */

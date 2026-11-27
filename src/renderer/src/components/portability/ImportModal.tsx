@@ -9,11 +9,14 @@ import { errorText } from '../../lib/format'
 import { failed } from '../../lib/notify'
 import { importToLibrary } from '../../lib/importFiles'
 import { openEntry, showInData, useLibrary } from '../../lib/library'
-import { placePictures } from '../../lib/dropFiles'
+import { pictureFolder, placePictures } from '../../lib/dropFiles'
 import { useObjectUrl } from '../../lib/useObjectUrl'
 import { toast } from '../../store/toasts'
 import { useVault } from '../../store/vault'
 import { nextPortableArrival, updatePortableArrival, type PortableArrival } from './portabilityStore'
+import { IMPORT_TARGET } from '@shared/saveFolders'
+import { SaveLocationFields, type SaveLocation } from '../files/SaveLocationFields'
+import { rememberPlace } from '../../lib/savePlace'
 
 function sourceFileName(arrival: PortableArrival): string {
   const src = arrival.peek.source
@@ -66,6 +69,13 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
   const [chosenTargetKind, setChosenTargetKind] = useState<string>(targetKind ?? '')
   const [busy, setBusy] = useState(false)
   const [shownText, setShownText] = useState<string | null>(null)
+  const [where, setWhere] = useState<SaveLocation | null>(null)
+
+  useEffect(() => {
+    void engine('saveFolders.answer', { target: IMPORT_TARGET })
+      .then((answer) => setWhere({ folder: answer.folder, remember: false, tags: [] }))
+      .catch(failed('Could not read where imports go'))
+  }, [])
 
   useEffect(() => {
     setResolutions(buildInitialResolutions(peek.items))
@@ -156,7 +166,8 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
     try {
       const res = await engine('portability.import', {
         source: peek.source,
-        keepPictureOnly: true
+        keepPictureOnly: true,
+        pictureFolder: pictureFolder()
       })
       if (res.pictureAssetId) {
         const assetId = res.pictureAssetId
@@ -200,8 +211,10 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
         password: unlockedPassword ?? undefined,
         resolutions: resolutionList,
         keepPicture: canKeepPicture && !dropped ? keepPicture : false,
-        keepPictureOnly: false
+        keepPictureOnly: false,
+        ...(where ? { folder: where.folder.trim(), tags: where.tags } : {})
       })
+      if (where?.remember) void rememberPlace(IMPORT_TARGET, where.folder).catch(failed('Could not remember the folder'))
       if (dropped && canKeepPicture && keepPicture) {
         placePictures([dropped], ask)
       }
@@ -218,11 +231,11 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
           onSelect: () => openEntry(one.kind, one.id)
         })
       } else if (result.imported.length > 1) {
-        const first = result.imported[0]
+        const open = result.folder ?? result.imported[0]
         toast.success(
           `Imported ${result.imported.length} entries`,
           `${result.imported.slice(0, 3).map((e) => showName(e.title)).join(', ')}${result.imported.length > 3 ? ` +${result.imported.length - 3}` : ''}${result.skipped.length ? ` · ${result.skipped.length} skipped` : ''}`,
-          { label: 'Open first', onSelect: () => openEntry(first.kind, first.id) }
+          { label: result.folder ? 'Open folder' : 'Open first', onSelect: () => openEntry(open.kind, open.id) }
         )
       } else {
         toast.info('Nothing imported', result.skipped.length ? `${result.skipped.length} items skipped.` : undefined)
@@ -270,7 +283,7 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
               Show the data
             </Button>
           ) : (
-            <Button variant="primary" icon={busy ? <Loader2 className="animate-spin" /> : <PackageOpen />} disabled={busy || selectedImportCount === 0} onClick={() => void runImport()}>
+            <Button variant="primary" icon={busy ? <Loader2 className="animate-spin" /> : <PackageOpen />} disabled={busy || selectedImportCount === 0 || Boolean(peek.missingFiles?.length)} onClick={() => void runImport()}>
               {selectedImportCount === 0 ? 'Nothing selected' : `Import ${selectedImportCount} ${selectedImportCount === 1 ? 'item' : 'items'}`}
             </Button>
           )}
@@ -278,8 +291,8 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
       }
     >
       <div className="flex flex-col gap-3.5">
-        <div className="flex gap-3 border border-line/60 bg-black/40 p-3">
-          <div className="flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden border border-line/60 bg-black">
+        <div className="flex gap-3 border border-line/60 tone-panel-40 p-3">
+          <div className="flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden border border-line/60 bg-panel">
             {peek.hasPicture && dropped ? (
               previewUrl ? <img src={previewUrl} alt={sourceFileName(arrival)} draggable={false} className="h-full w-full object-cover" /> : <ImageIcon className="h-6 w-6 text-dim" />
             ) : peek.hasPicture && 'asset' in peek.source ? (
@@ -287,15 +300,15 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
             ) : peek.container === 'bundle' ? (
               <Archive className="h-7 w-7 text-accent" />
             ) : (
-              <FileCode2 className="h-7 w-7 text-teal" />
+              <FileCode2 className="h-7 w-7 text-secondary" />
             )}
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge tone={peek.error ? 'error' : peek.locked ? 'warn' : 'ok'}>{containerBadge(peek.container)}</StatusBadge>
-              <span className="truncate font-mono text-[11px] text-dim">{sourceFileName(arrival)}</span>
+              <span className="truncate font-ui text-[11px] text-dim">{sourceFileName(arrival)}</span>
             </div>
-            <div className="truncate text-[14.5px] font-semibold text-white">
+            <div className="truncate text-[14.5px] font-semibold text-ink">
               {peek.about ? `${peek.about.label}: ${showName(peek.about.title)}` : peek.protection === 'password' ? 'Password-protected export' : peek.protection === 'vault' ? 'Locked with a vault key' : 'Export package'}
             </div>
             <div className="text-[12px] text-dim">
@@ -307,10 +320,11 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
         </div>
 
         {peek.error && <AlertBox>{peek.error}</AlertBox>}
+        {Boolean(peek.missingFiles?.length) && <AlertBox>{`These files aren't in the export or in its folder: ${peek.missingFiles?.join(', ')}`}</AlertBox>}
 
         {hasRawJsonFallback && (
-          <div className="flex flex-col gap-2 border border-line/60 bg-black/40 p-3">
-            <div className="font-mono text-[10.5px] font-bold uppercase tracking-[0.18em] text-accent-soft">Pick a kind for raw JSON</div>
+          <div className="flex flex-col gap-2 border border-line/60 tone-panel-40 p-3">
+            <div className="font-label text-[10.5px] font-bold caps-18 text-accent-soft">Pick a kind for raw JSON</div>
             <Select
               value={chosenTargetKind}
               onChange={(v) => void handleTargetKindPick(v)}
@@ -321,13 +335,13 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
 
         {peek.locked && peek.protection === 'password' && (
           <form
-            className="flex flex-col gap-2.5 border border-line/60 bg-black/40 p-3"
+            className="flex flex-col gap-2.5 border border-line/60 tone-panel-40 p-3"
             onSubmit={(e) => {
               e.preventDefault()
               void handlePasswordUnlock()
             }}
           >
-            <div className="flex items-center gap-2 font-mono text-[10.5px] font-bold uppercase tracking-[0.18em] text-accent-soft">
+            <div className="flex items-center gap-2 font-label text-[10.5px] font-bold caps-18 text-accent-soft">
               <KeyRound className="h-3.5 w-3.5" />
               Enter password to inspect and import
             </div>
@@ -345,7 +359,7 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
                   type="button"
                   title={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dim hover:text-white"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dim hover:text-ink"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -359,7 +373,7 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
         )}
 
         {peek.locked && peek.protection === 'vault' && (
-          <div className="flex flex-col gap-2.5 border border-line/60 bg-black/40 p-3">
+          <div className="flex flex-col gap-2.5 border border-line/60 tone-panel-40 p-3">
             {peek.wrongVaultKey ? (
               <AlertBox className="flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -375,7 +389,7 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
                   void handleVaultUnlock()
                 }}
               >
-                <div className="flex items-center gap-2 font-mono text-[10.5px] font-bold uppercase tracking-[0.18em] text-accent-soft">
+                <div className="flex items-center gap-2 font-label text-[10.5px] font-bold caps-18 text-accent-soft">
                   <Lock className="h-3.5 w-3.5" />
                   Unlock your vault to inspect and import
                 </div>
@@ -400,7 +414,7 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
         {!peek.locked && !peek.error && peek.items.length > 0 && (
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.18em] text-accent-soft">
+              <span className="font-label text-[10.5px] font-bold caps-18 text-accent-soft">
                 Contents ({peek.items.length} {peek.items.length === 1 ? 'item' : 'items'})
               </span>
               {conflicts.length > 1 && (
@@ -419,7 +433,7 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
               )}
             </div>
 
-            <div className="max-h-72 overflow-y-auto border border-line/60 bg-black/30 divide-y divide-line/30">
+            <div className="max-h-72 overflow-y-auto border border-line/60 tone-panel-30 divide-y divide-line/30">
               {peek.items.map((item) => {
                 const blocked = !item.importable || item.missingModule
                 const currentMode = resolutions[item.index] ?? item.resolution
@@ -452,6 +466,10 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
               })}
             </div>
           </div>
+        )}
+
+        {where && !peek.locked && shownText === null && peek.items.length > 0 && (
+          <SaveLocationFields value={where} onChange={setWhere} rememberLabel="Put imports here from now on" hint="Each import gets its own folder inside this one. Change it in Settings." />
         )}
 
         {canKeepPicture && !peek.locked && shownText === null && (

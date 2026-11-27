@@ -21,16 +21,16 @@ export function PartCard({ def, index, size, onChange, handlers }: { def: Compon
         openMenu(e, label, items)
       }}
       style={{ ['--tone' as string]: partTone(Class) }}
-      className="notch-sm group flex flex-col gap-3 border border-l-[3px] border-[#1c1f28] border-l-[var(--tone)] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--tone)_7%,#12151c),#12151c_60%)] p-3 outline-none transition-colors hover:border-[#2c3140] hover:border-l-[var(--tone)] focus-visible:border-[color-mix(in_srgb,var(--tone)_70%,transparent)]"
+      className="notch-sm group flex flex-col gap-3 border border-l-[3px] border-card-hover border-l-[var(--tone)] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--tone)_7%,var(--color-card)),var(--color-card)_60%)] p-3 outline-none transition-colors hover:border-ink/15 hover:border-l-[var(--tone)] focus-visible:border-[color-mix(in_srgb,var(--tone)_70%,transparent)]"
     >
       <div className="flex items-center gap-2.5">
         <NamedIcon name={partIcon(Class)} className="h-[18px] w-[18px] shrink-0 text-[var(--tone)]" />
-        <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold text-white" title={Class?.DESCRIPTION}>
+        <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold text-ink" title={Class?.DESCRIPTION}>
           {label}
         </span>
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 touch:opacity-100">
           {items.map((item) => (
-            <button key={item.label} type="button" title={`${item.label} (${item.hint})`} disabled={item.disabled} onClick={item.onSelect} className="grid h-[26px] w-[26px] place-items-center text-faint hover:bg-white/5 hover:text-white disabled:opacity-30">
+            <button key={item.label} type="button" title={`${item.label} (${item.hint})`} disabled={item.disabled} onClick={item.onSelect} className="grid h-[26px] w-[26px] place-items-center text-faint hover:bg-ink/5 hover:text-ink disabled:opacity-30">
               {item.icon}
             </button>
           ))}

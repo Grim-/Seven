@@ -31,14 +31,14 @@ function IconPicker({ value, onChange }: { value: string; onChange: (v: string) 
             onClick={() => onChange(name)}
             className={cn(
               'flex h-8 w-8 items-center justify-center border transition-colors',
-              value === name ? 'border-accent bg-accent/15 text-accent' : 'border-line/60 text-dim hover:border-accent hover:text-white'
+              value === name ? 'border-accent bg-accent/15 text-accent' : 'border-line/60 text-dim hover:border-accent hover:text-ink'
             )}
           >
             <DashboardIcon name={name} className="h-4 w-4" />
           </button>
         ))}
       </div>
-      <Input value={value} onChange={(e) => onChange(e.target.value.trim().toLowerCase())} placeholder="Any Lucide icon name, e.g. dumbbell" className="h-8 font-mono text-[12px]" />
+      <Input value={value} onChange={(e) => onChange(e.target.value.trim().toLowerCase())} placeholder="Any Lucide icon name, e.g. dumbbell" className="h-8 font-ui text-[12px]" />
     </div>
   )
 }
@@ -203,13 +203,13 @@ function DashboardsViewBody() {
         >
           {active && (
             <>
-              <div className="flex items-center border border-line/60 bg-bg-1 p-0.5">
+              <div className="flex items-center border border-line/60 bg-card p-0.5">
                 <button
                   type="button"
                   onClick={() => setLayoutMode('grid')}
                   className={cn(
-                    'flex items-center gap-1 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider transition-colors',
-                    layoutMode === 'grid' ? 'bg-accent/15 text-accent' : 'text-dim hover:text-white'
+                    'flex items-center gap-1 px-2 py-0.5 font-label text-[10px] caps-5 transition-colors',
+                    layoutMode === 'grid' ? 'bg-accent/15 text-accent' : 'text-dim hover:text-ink'
                   )}
                   title="12-column resizable widget grid"
                 >
@@ -220,8 +220,8 @@ function DashboardsViewBody() {
                   type="button"
                   onClick={() => setLayoutMode('tabletop')}
                   className={cn(
-                    'flex items-center gap-1 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider transition-colors',
-                    layoutMode === 'tabletop' ? 'bg-accent/15 text-accent' : 'text-dim hover:text-white'
+                    'flex items-center gap-1 px-2 py-0.5 font-label text-[10px] caps-5 transition-colors',
+                    layoutMode === 'tabletop' ? 'bg-accent/15 text-accent' : 'text-dim hover:text-ink'
                   )}
                   title="Freeform tabletop tokens that unfold in-place"
                 >
@@ -237,7 +237,7 @@ function DashboardsViewBody() {
                     label: `${s.index}: ${s.label}`
                   }))}
                   onChange={setActiveSurface}
-                  className="h-7 w-36 font-mono text-[11px]"
+                  className="h-7 w-36 font-ui text-[11px]"
                 />
                 <Button size="sm" variant="ghost" icon={<Layers />} onClick={toggleSwitcher} title={`SurfaceTop Overview (${switcherKey})`}>
                   Surfaces
@@ -260,7 +260,7 @@ function DashboardsViewBody() {
         {!active ? (
           <EmptyState title="No dashboards">Create one here, or give an agent the Dashboards tools and ask it to build one.</EmptyState>
         ) : (
-          <div className="relative h-full min-h-[520px] border border-line/40 bg-[#05070c]">
+          <div className="relative h-full min-h-[520px] border border-line/40 bg-surface">
             <BoardTabletop key={active.id} dashboard={active} layoutMode={layoutMode} />
             {active.widgets.length === 0 && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">

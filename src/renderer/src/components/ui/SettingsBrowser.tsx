@@ -3,6 +3,16 @@ import { ListRow } from './ListRow'
 import { cn } from '../../lib/cn'
 import { isTypingTarget, matchesKeybind } from '../../store/keybinds'
 
+export function flashSetting(root: HTMLElement | null, query: string): void {
+  const q = query.trim().toLowerCase()
+  if (!root || !q) return
+  const row = [...root.querySelectorAll<HTMLElement>('[data-setting]')].find((el) => el.dataset.setting?.toLowerCase().includes(q))
+  if (!row) return
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  row.dataset.flash = 'true'
+  setTimeout(() => (row.dataset.flash = 'false'), 900)
+}
+
 export interface BrowserSection {
   id: string
   label: string
@@ -50,7 +60,7 @@ export function SettingsBrowser({
   const groups = [...new Set(sections.map((s) => s.group ?? ''))]
   return (
     <div className="flex min-h-0 flex-1 gap-3">
-      <nav className="flex w-64 shrink-0 flex-col gap-0.5 overflow-y-auto border border-line/60 bg-black/70 p-2">
+      <nav className="flex w-64 shrink-0 flex-col gap-0.5 overflow-y-auto border border-line/60 tone-panel-70 p-2">
         <div className="mb-1 flex items-center border border-line/50 focus-within:border-accent/60">
           <input
             ref={search}
@@ -62,13 +72,13 @@ export function SettingsBrowser({
             }}
             placeholder={placeholder}
             spellCheck={false}
-            className="h-8 min-w-0 flex-1 bg-transparent px-2.5 font-mono text-[11.5px] text-white outline-none placeholder:text-faint"
+            className="h-8 min-w-0 flex-1 bg-transparent px-2.5 font-ui text-[11.5px] text-ink outline-none placeholder:text-faint"
           />
-          <kbd className="mr-2 border border-white/10 px-1 font-mono text-[9.5px] text-faint">/</kbd>
+          <kbd className="mr-2 border border-ink/10 px-1 font-mono text-[9.5px] text-faint">/</kbd>
         </div>
         {groups.map((g) => (
           <div key={g || '_'} className="flex flex-col gap-0.5">
-            {g && <div className="px-1.5 pb-1 pt-3 font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-faint">{g}</div>}
+            {g && <div className="px-1.5 pb-1 pt-3 font-label text-[9.5px] font-bold caps-20 text-faint">{g}</div>}
             {sections
               .filter((s) => (s.group ?? '') === g)
               .map((s) => (

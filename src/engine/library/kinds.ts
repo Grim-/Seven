@@ -53,6 +53,11 @@ export {
 export {
   entryId,
   referenceText,
+  claimLink,
+  inlineLinks,
+  hydrateForAgent,
+  hydrateAllForAgent,
+  linkedBlock,
   rollEntry,
   drawEntry,
   drawableEntries,
@@ -65,6 +70,7 @@ export {
   entriesTagged,
   clearKind,
   removeEntry,
+  duplicateEntry,
   renameEntry,
   setTags,
   overview,
@@ -83,5 +89,6 @@ export {
   linkView,
   kindOf,
   kindOfPageType,
+  entryExists,
   isPageBacked
 } from './defs/ops'

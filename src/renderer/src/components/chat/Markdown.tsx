@@ -96,7 +96,7 @@ function keepSeven(url: string): string {
 }
 
 export const Markdown = memo(function Markdown({ text, onPage, onEntry, onLines, className }: { text: string; onPage?: (ref: string) => void; onEntry?: (kind: string, ref: string) => boolean; onLines?: LineEdit; className?: string }) {
-  const source = useMemo(() => text.replace(referencePattern(), (_m, lead: string, kind: string, ref: string, part: string | undefined) => `${lead}[${showName(ref.replace(/^"|"$/g, '')).replace(/[[\]]/g, '')}](${referenceHref(kind, ref)} "@${kind}${part ? `#${part}` : ''}")`), [text])
+  const source = useMemo(() => text.replace(referencePattern(), (_m, lead: string, kind: string, ref: string, _action: string | undefined, part: string | undefined) => `${lead}[${showName(ref.replace(/^"|"$/g, '')).replace(/[[\]]/g, '')}](${referenceHref(kind, ref)} "@${kind}${part ? `#${part}` : ''}")`), [text])
   return (
     <div className={cn('prose-seven', className)}>
       <ReactMarkdown
@@ -144,7 +144,7 @@ export const Markdown = memo(function Markdown({ text, onPage, onEntry, onLines,
             ) : href?.startsWith('seven:') ? (
               <button
                 type="button"
-                className="text-accent underline decoration-accent/40 underline-offset-2 hover:text-white"
+                className="text-accent underline decoration-accent/40 underline-offset-2 hover:text-ink"
                 onClick={() => (onPage && href.startsWith('seven:page/') ? onPage(decodeURIComponent(href.slice('seven:page/'.length))) : openSevenLink(href))}
               >
                 {children}

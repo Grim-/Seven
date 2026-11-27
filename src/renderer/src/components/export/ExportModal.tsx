@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { ClipboardCopy, Download, MessageSquare, MessageSquarePlus } from 'lucide-react'
+import { toId } from '@shared/ids'
 import type { ExportFormat, ExportInfo } from '@shared/exporting'
 import { AlertBox, Button, Eyebrow, Modal, Segmented, Toggle, openMenu } from '../ui'
 import { MarkdownEditor } from '../data/MarkdownEditor'
 import { engine, main } from '../../lib/ipc'
+import { useViewPlace } from '../../lib/viewPlace'
 import { errorText } from '../../lib/format'
 import { copyText, failed } from '../../lib/notify'
 import { toast } from '../../store/toasts'
@@ -41,6 +43,7 @@ function ExportModal({ source, args }: { source: string; args: Record<string, st
   const [brief, setBrief] = useState('')
   const [preset, setPreset] = useState<string | null>(null)
   const [format, setFormat] = useState<ExportFormat>('markdown')
+  const [prefixKind, setPrefixKind] = useViewPlace('export.prefixKind', false)
   const [preview, setPreview] = useState<{ title: string; text: string } | null>(null)
 
   useEffect(() => {
@@ -84,7 +87,8 @@ function ExportModal({ source, args }: { source: string; args: Record<string, st
   const save = () =>
     void build()
       .then(async ({ title, text }) => {
-        const path = await main('dialog.saveText', { name: `${title}.${EXT[format]}`, text })
+        const base = prefixKind && args.kind ? `${args.kind}_${toId(title) || title}` : title
+        const path = await main('dialog.saveText', { name: `${base}.${EXT[format]}`, text })
         if (path) toast.success('Saved', path)
       })
       .catch(failed('Could not save'))
@@ -191,10 +195,10 @@ function ExportModal({ source, args }: { source: string; args: Record<string, st
                   onChange={(on) => toggle(s.id, on)}
                 />
                 <span className="min-w-0">
-                  <span className="block text-[13px] font-semibold text-white">{s.label}</span>
+                  <span className="block text-[13px] font-semibold text-ink">{s.label}</span>
                   <span className="block text-[11.5px] text-faint">{s.hint}</span>
                 </span>
-                <span className="whitespace-nowrap font-mono text-[11px] text-dim">{s.size}</span>
+                <span className="whitespace-nowrap font-ui text-[11px] text-dim">{s.size}</span>
               </div>
             ))}
           </div>
@@ -202,8 +206,9 @@ function ExportModal({ source, args }: { source: string; args: Record<string, st
         <div className="flex min-h-0 min-w-0 flex-col">
           <div className="flex flex-wrap items-center gap-3 border-b border-line/40 px-4 py-2">
             <Segmented value={format} options={FORMATS} onChange={setFormat} />
+            {args.kind && <Toggle checked={prefixKind} onChange={setPrefixKind} label="Prefix filename with kind" />}
             {info && <span className="text-[12px] text-faint">{info.subtitle}</span>}
-            <span className="ml-auto font-mono text-[11.5px] text-dim">
+            <span className="ml-auto font-ui text-[11.5px] text-dim">
               {text.length.toLocaleString()} characters ·{' '}
               {text ? text.split('\n').length.toLocaleString() : 0} lines
             </span>
@@ -211,7 +216,7 @@ function ExportModal({ source, args }: { source: string; args: Record<string, st
           {error && <AlertBox className="m-3">{error}</AlertBox>}
           <pre
             className={cn(
-              'min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap px-4 py-3 font-mono text-[12px] leading-relaxed text-white/85',
+              'min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap px-4 py-3 font-ui text-[12px] leading-relaxed text-ink/85',
               !preview && 'text-faint'
             )}
           >

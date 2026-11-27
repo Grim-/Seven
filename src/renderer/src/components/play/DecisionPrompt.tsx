@@ -34,12 +34,12 @@ export function DecisionPrompt({ decision, where }: { decision: Decision; where:
   const ownOption: DecisionOption = { text: own, cards: NO_SWAP, action: null, effects: [] }
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="text-[15px] font-semibold leading-snug text-white">{decision.question}</div>
+      <div className="text-[15px] font-semibold leading-snug text-ink">{decision.question}</div>
       {chosen === null ? (
         <>
           {decision.options.map((o, i) => (
-            <button key={i} type="button" onClick={() => void choose(o).catch(failed('Could not choose'))} className="flex items-center gap-2.5 border border-purple/40 bg-purple/[0.05] px-3 py-2 text-left text-[13px] text-white hover:bg-purple/[0.12]">
-              <span className="w-4 font-mono text-[10.5px] font-bold text-purple">{i + 1}</span>
+            <button key={i} type="button" onClick={() => void choose(o).catch(failed('Could not choose'))} className="flex items-center gap-2.5 border border-tint-purple/40 bg-tint-purple/[0.05] px-3 py-2 text-left text-[13px] text-ink hover:bg-tint-purple/[0.12]">
+              <span className="w-4 font-ui text-[10.5px] font-bold text-tint-purple">{i + 1}</span>
               <span className="flex-1">{o.text}</span>
               <CardSwapLine swap={o.cards} />
             </button>
@@ -55,9 +55,9 @@ export function DecisionPrompt({ decision, where }: { decision: Decision; where:
         </>
       ) : (
         <>
-          <div className="border border-purple/40 bg-purple/[0.06] px-2.5 py-2">
-            <div className="mb-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-purple">You chose</div>
-            <div className="text-[13px] text-white/90">{chosen.text}</div>
+          <div className="border border-tint-purple/40 bg-tint-purple/[0.06] px-2.5 py-2">
+            <div className="mb-0.5 font-label text-[10px] font-semibold caps-16 text-tint-purple">You chose</div>
+            <div className="text-[13px] text-ink/90">{chosen.text}</div>
             <CardSwapLine swap={chosen.cards} />
           </div>
           <ActionBar items={[playOutItem(decisionMade(decision, chosen.text, chosen.cards, [...targetLines(where), ...effects]), where), { label: 'Close', icon: <X />, onSelect: surface.close }]} />

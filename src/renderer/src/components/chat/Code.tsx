@@ -124,7 +124,7 @@ export function Diagram({ source }: { source: string }) {
       {(!drawn || failed) && (
         <pre>
           <code>{text}</code>
-          {failed && <div className="mt-2 font-sans text-[11px] text-alert">{failed}</div>}
+          {failed && <div className="mt-2 font-body text-[11px] text-alert">{failed}</div>}
         </pre>
       )}
     </div>

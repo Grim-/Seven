@@ -36,7 +36,9 @@ import { SummaryCard } from './ContextMeter'
 import { ActiveCommand, CommandOutputCard, ComposerHints, handleComposerCommandTab, useCommandBar, useComposerHints } from './Commands'
 import { useCommands } from '../../store/commands'
 import { matchesKeybind, useKeybindLabel } from '../../store/keybinds'
-import { ComposerReferences, UserTextPart } from './References'
+import { ComposerReferences, UserTextPart, withReferences } from './References'
+import { referencesIn } from '@shared/text'
+import { Pressable } from '../ui/Pressable'
 import { AlertBox, Button, EmptyState, Modal, VirtualList, openMenu, DropOverlay } from '../ui'
 import { engine, main } from '../../lib/ipc'
 import { IN_APP } from '../../lib/mode'
@@ -73,10 +75,11 @@ import { ComposerTool } from './ComposerTool'
 import { ChatComposer, ChatPad } from '../composer/ChatComposer'
 import { AreaAction } from '../pictures/areaAction'
 import { errorText, formatClock } from '../../lib/format'
+import { skinSurface } from '../skins/skinSurface'
 
 const BIG_AVATAR: Record<string, number> = { small: 0, medium: 56, large: 96, xl: 144 }
 
-const AgentLabel = createContext('SEVEN')
+const AgentLabel = createContext('Seven')
 const RewindRequest = createContext<((messageId: string) => void) | null>(null)
 const EditRequest = createContext<((messageId: string) => void) | null>(null)
 const ForkRequest = createContext<((messageId: string) => void) | null>(null)
@@ -130,21 +133,21 @@ function ThoughtPart({ text, status }: ReasoningMessagePartProps) {
     return (
       <>
         <Trace tone="mind" label={streaming ? 'thinking' : 'thought'} aside={`${text.length.toLocaleString()} chars`} open={open} onToggle={() => setOpen(!open)} />
-        {open && <div className="mb-2 max-h-72 overflow-y-auto whitespace-pre-wrap border-l border-l-purple/50 pl-3 font-mono text-[12px] leading-relaxed text-dim">{text}</div>}
+        {open && <div className="mb-2 max-h-72 overflow-y-auto whitespace-pre-wrap border-l border-l-tint-purple/50 pl-3 font-ui text-[12px] leading-relaxed text-dim">{text}</div>}
       </>
     )
   return (
-    <div className="mb-3 border border-line/50 border-l-2 border-l-purple/70 bg-purple/5">
+    <div className="mb-3 border border-line/50 border-l-2 border-l-tint-purple/70 bg-tint-purple/5">
       <button
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-purple hover:text-white"
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 font-label text-[10.5px] font-semibold caps-14 text-tint-purple hover:text-ink"
         onClick={() => setOpen(!open)}
       >
         <ChevronRight className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-90')} />
         {streaming ? 'Thinking' : 'Thought'}
         <span className="text-faint">// {text.length.toLocaleString()} chars</span>
-        {streaming && <span className="ml-1 h-1.5 w-1.5 animate-pulse bg-purple" />}
+        {streaming && <span className="ml-1 h-1.5 w-1.5 animate-pulse bg-tint-purple" />}
       </button>
-      {open && <div className="max-h-72 overflow-y-auto whitespace-pre-wrap px-3 pb-2.5 font-mono text-[12px] leading-relaxed text-dim">{text}</div>}
+      {open && <div className="max-h-72 overflow-y-auto whitespace-pre-wrap px-3 pb-2.5 font-ui text-[12px] leading-relaxed text-dim">{text}</div>}
     </div>
   )
 }
@@ -166,9 +169,9 @@ function SummaryMarker({ messageId }: { messageId: string }) {
   const [open, setOpen] = useState(false)
   if (!summary) return null
   return (
-    <div className="mb-5 border border-line/50 border-l-2 border-l-purple/70 bg-purple/5">
+    <div className="mb-5 border border-line/50 border-l-2 border-l-tint-purple/70 bg-tint-purple/5">
       <button
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-purple hover:text-white"
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left font-label text-[10.5px] font-semibold caps-14 text-tint-purple hover:text-ink"
         onClick={() => setOpen(!open)}
       >
         <ChevronRight className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-90')} />
@@ -177,16 +180,16 @@ function SummaryMarker({ messageId }: { messageId: string }) {
           // the {summary.turns} turn{summary.turns > 1 ? 's' : ''} above reach the model only as this summary
         </span>
       </button>
-      {open && <div className="max-h-80 overflow-y-auto whitespace-pre-wrap px-3 pb-2.5 font-mono text-[12px] leading-relaxed text-dim">{summary.text}</div>}
+      {open && <div className="max-h-80 overflow-y-auto whitespace-pre-wrap px-3 pb-2.5 font-ui text-[12px] leading-relaxed text-dim">{summary.text}</div>}
     </div>
   )
 }
 
 function FileChip({ name, kind, onRemove, onOpen }: { name: string; kind: string; onRemove?: () => void; onOpen?: () => void }) {
   return (
-    <span className="flex max-w-60 items-center gap-1.5 border border-line/60 bg-black/50 px-2 py-0.5 font-mono text-[11px] text-white/85">
+    <span className="flex max-w-60 items-center gap-1.5 border border-line/60 tone-panel-50 px-2 py-0.5 font-ui text-[11px] text-ink/85">
       <FileIcon className="h-3 w-3 shrink-0 text-accent" />
-      <button onClick={onOpen} disabled={!onOpen} className="min-w-0 truncate text-left hover:text-accent disabled:hover:text-white/85" title={name}>
+      <button onClick={onOpen} disabled={!onOpen} className="min-w-0 truncate text-left hover:text-accent disabled:hover:text-ink/85" title={name}>
         {name}
       </button>
       <span className="shrink-0 text-faint">{kind}</span>
@@ -240,7 +243,7 @@ function DraftFiles() {
   const detach = (id: string) => useSessions.getState().detach(key, id)
   if (!files.length) return null
   return (
-    <div className="flex flex-wrap gap-1.5 border-t border-line/60 bg-black/40 px-3 pt-2">
+    <div className="flex flex-wrap gap-1.5 border-t border-line/60 tone-panel-40 px-3 pt-2">
       {files.map((f) => (
         <FileChip key={f.id} name={f.name} kind={f.kind} onRemove={() => detach(f.id)} />
       ))}
@@ -319,7 +322,7 @@ function UserMessage({ messageId }: { messageId: string }) {
   return (
     <>
     <SummaryMarker messageId={messageId} />
-    <MessagePrimitive.Root
+    <MessagePrimitive.Root {...skinSurface('message-user')}
       onContextMenu={(e) => {
         const text = messageText(conv.sessionId, messageId)
         openMenu(e, 'Your message', [
@@ -344,10 +347,10 @@ function UserMessage({ messageId }: { messageId: string }) {
             </button>
           )}
           <MessageTime />
-          <span className="inline-flex items-center gap-1.5 font-mono">
+          <span className="inline-flex items-center gap-1.5 font-ui">
             {playerName ? (
               <>
-                <span className="font-semibold text-white">{playerName}</span>
+                <span className="font-semibold text-ink">{playerName}</span>
                 <span className="text-[10px] text-faint">(You)</span>
               </>
             ) : (
@@ -434,218 +437,230 @@ function AssistantMessage({
   const isRoleplayScene = Boolean(agent?.roleplay) || cover === 'hide'
 
   return (
-    <MessagePrimitive.Root
+    <MessagePrimitive.Root {...skinSurface('message-agent')}
       onContextMenu={(e) => {
         if (!messageId) return
         const text = messageText(conv.sessionId, messageId)
         openMenu(e, `${(speakerName ?? label).toLowerCase()} reply`, [
           { label: 'Copy reply', icon: <Copy />, disabled: !text, onSelect: () => void copyText(text, 'Copied', 'The reply, as markdown') },
           { label: 'Copy as plain text', icon: <Copy />, disabled: !text, onSelect: () => void copyText(text.replace(/[*_`#>]/g, ''), 'Copied', 'The reply, as plain text') },
-          { label: 'Edit reply…', icon: <Pencil />, disabled: !edit || statusType === 'running', onSelect: () => edit?.(messageId) },
-          { label: 'Fork from here', icon: <GitFork />, disabled: !fork || statusType === 'running' || messageId.startsWith('__'), onSelect: () => fork?.(messageId) },
-          useSpeech.getState().speaking === messageId
-            ? { label: 'Stop reading', icon: <Square />, onSelect: stopSpeaking }
-            : { label: 'Read aloud', icon: <Volume2 />, disabled: !text, onSelect: () => void speak(text, agent?.voice ?? null, messageId) },
-          { label: '', separator: true },
-          ...portraitSizeMenuItems(avatarSize)
-        ])
-      }}
-    >
-      <motion.div className="flex" initial={entrance} animate={{ opacity: 1, y: 0 }} transition={ENTER}>
-      {!isRoleplayScene && speakerSheet && big > 0 ? (
-        <div className="mr-3 shrink-0 pt-0.5">
-          <CharacterAvatar sheetId={speakerSheet} size={big} openOnClick />
-        </div>
-      ) : !isRoleplayScene && agent && big > 0 ? (
-        <div className="mr-3 shrink-0 pt-0.5">
-          <AgentAvatar agent={agent} size={big} sessionId={liveSession} />
-        </div>
-      ) : null}
-      <div className={cn('w-full min-w-0', isRoleplayScene ? 'max-w-full' : look.agent.width)}>
-        {!isRoleplayScene && (
-          <div className={cn('mb-1 flex items-center gap-1.5', look.agent.label)}>
-            {speakerSheet && big === 0 && look.agent.avatar > 0 ? (
-              <CharacterAvatar sheetId={speakerSheet} size={look.agent.avatar} openOnClick />
-            ) : agent && big === 0 && look.agent.avatar > 0 ? (
-              <AgentAvatar agent={agent} size={look.agent.avatar} sessionId={liveSession} />
-            ) : null}
-            {speakerSheet && speakerName ? (
-              <span className="inline-flex items-center gap-1">
-                <span className="font-semibold text-accent">{speakerName}</span>
-                <span className="text-[10px] text-faint">({label})</span>
-              </span>
-            ) : (
-              label
-            )}
-            <MessageTime />
-          </div>
-        )}
-        <div className={isRoleplayScene ? 'w-full' : look.agent.body}>
-          {cover !== 'hide' && (
-            <MessagePrimitive.Parts components={{ Text: AssistantTextPart, Reasoning: ThoughtPart, Empty: EmptyPart, tools: { Fallback: ToolCard } }} />
-          )}
-          {messageId && <MessageElements messageId={messageId} />}
-          {messageId && <DraftPart messageId={messageId} />}
-          {messageId && statusType === 'running' && <StatusLine messageId={messageId} />}
-          {statusType === 'incomplete' && reason === 'cancelled' && (
-            <div className="mt-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-faint">[Stopped]</div>
-          )}
-          {statusType === 'incomplete' && reason === 'error' && (
-            <AlertBox className="mt-2">{error ?? 'Generation failed'}</AlertBox>
-          )}
-          {notice && <div className="mt-2 border border-accent/40 bg-accent/5 px-3 py-2 font-mono text-[12px] text-accent">{notice}</div>}
-        </div>
-      </div>
-      </motion.div>
-    </MessagePrimitive.Root>
-  )
+ { label: 'Edit reply…', icon: <Pencil />, disabled: !edit || statusType === 'running', onSelect: () => edit?.(messageId) },
+ { label: 'Fork from here', icon: <GitFork />, disabled: !fork || statusType === 'running' || messageId.startsWith('__'), onSelect: () => fork?.(messageId) },
+ useSpeech.getState().speaking === messageId
+ ? { label: 'Stop reading', icon: <Square />, onSelect: stopSpeaking }
+ : { label: 'Read aloud', icon: <Volume2 />, disabled: !text, onSelect: () => void speak(text, agent?.voice ?? null, messageId) },
+ { label: '', separator: true },
+ ...portraitSizeMenuItems(avatarSize)
+ ])
+ }}
+ >
+ <motion.div className="flex" initial={entrance} animate={{ opacity: 1, y: 0 }} transition={ENTER}>
+ {!isRoleplayScene && speakerSheet && big > 0 ? (
+ <div className="mr-3 shrink-0 pt-0.5">
+ <CharacterAvatar sheetId={speakerSheet} size={big} openOnClick />
+ </div>
+ ) : !isRoleplayScene && agent && big > 0 ? (
+ <div className="mr-3 shrink-0 pt-0.5">
+ <AgentAvatar agent={agent} size={big} sessionId={liveSession} />
+ </div>
+ ) : null}
+ <div className={cn('w-full min-w-0', isRoleplayScene ? 'max-w-full' : look.agent.width)}>
+ {!isRoleplayScene && (
+ <div className={cn('mb-1 flex items-center gap-1.5', look.agent.label)}>
+ {speakerSheet && big === 0 && look.agent.avatar > 0 ? (
+ <CharacterAvatar sheetId={speakerSheet} size={look.agent.avatar} openOnClick />
+ ) : agent && big === 0 && look.agent.avatar > 0 ? (
+ <AgentAvatar agent={agent} size={look.agent.avatar} sessionId={liveSession} />
+ ) : null}
+ {speakerSheet && speakerName ? (
+ <span className="inline-flex items-center gap-1">
+ <span className="font-semibold text-accent">{speakerName}</span>
+ <span className="text-[10px] text-faint">({label})</span>
+ </span>
+ ) : (
+ label
+ )}
+ <MessageTime />
+ </div>
+ )}
+ <div className={isRoleplayScene ? 'w-full' : look.agent.body}>
+ {cover !== 'hide' && (
+ <MessagePrimitive.Parts components={{ Text: AssistantTextPart, Reasoning: ThoughtPart, Empty: EmptyPart, tools: { Fallback: ToolCard } }} />
+ )}
+ {messageId && <MessageElements messageId={messageId} />}
+ {messageId && <DraftPart messageId={messageId} />}
+ {messageId && statusType === 'running' && <StatusLine messageId={messageId} />}
+ {statusType === 'incomplete' && reason === 'cancelled' && (
+ <div className="mt-2 font-label text-[10.5px] caps-18 text-faint">[Stopped]</div>
+ )}
+ {statusType === 'incomplete' && reason === 'error' && (
+ <AlertBox className="mt-2">{error ?? 'Generation failed'}</AlertBox>
+ )}
+ {notice && <div className="mt-2 border border-accent/40 bg-accent/5 px-3 py-2 font-ui text-[12px] text-accent">{notice}</div>}
+ </div>
+ </div>
+ </motion.div>
+ </MessagePrimitive.Root>
+ )
 }
 
 function Composer({ running, placeholder }: { running: boolean; placeholder: string }) {
-  const [tool, setTool] = useState<'draw' | 'play' | null>(null)
-  const aui = useAui()
-  const current = useAuiState((s) => s.composer.text)
-  const conv = useConversation()
-  const look = useThreadLook().composer
-  const owns = useThreadLook().ownsComposer
-  const stopping = useSessions((s) => (conv.sessionId ? s.stopping[conv.sessionId] === true : false))
-  const all = useComposerHints()
-  const commandList = useCommands((s) => s.list)
-  const stopShortcut = useKeybindLabel('chat.stop')
-  const composerInputRef = useRef<HTMLTextAreaElement>(null)
-  const typed = useAuiState((s) => (s.composer.isEditing ? s.composer.text : ''))
-  useEffect(() => {
-    const focusFn = () => {
-      const el = composerInputRef.current
-      if (!el) return
-      el.focus()
-      const end = el.value.length
-      el.setSelectionRange(end, end)
-    }
-    useCommandBar.getState().setFocusComposer(focusFn)
-    return () => useCommandBar.getState().setFocusComposer(null)
-  }, [])
-  const keys = all.map((h) => h.key).join('|')
-  const [hidden, setHidden] = useState<string | null>(null)
-  const [selected, setSelected] = useState(0)
-  useEffect(() => {
-    setSelected(0)
-    if (hidden !== null && hidden !== keys) setHidden(null)
-  }, [keys])
-  const hints = hidden === keys ? [] : all
-  const pick = Math.min(selected, Math.max(0, hints.length - 1))
-  const agent = useContext(AgentRef)
-  const worldPlayer = useWorldPlayer(agent?.world?.worldId ?? null)
-  const player = worldPlayer || agent?.player || null
-  const append = (text: string) => aui.composer.setText(current.trim() ? `${current.trimEnd()} ${text}` : text)
-  const request = usePlayRequests((s) => s.byChat[conv.key])
-  useEffect(() => {
-    if (!owns || !running || !conv.sessionId) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (matchesKeybind('chat.stop', e)) {
-        e.preventDefault()
-        e.stopPropagation()
-        void useSessions.getState().abort(conv.sessionId!)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [owns, running, conv.sessionId])
-  return (
-    <ComposerPrimitive.Root className={cn('relative z-40 flex items-end gap-2', look.root)}>
-      {hints.length ? <ComposerHints hints={hints} selected={pick} onSelect={setSelected} /> : <ActiveCommand />}
-      {tool === 'draw' && (
-        <DrawPanel
-          className="absolute inset-x-2 bottom-full z-30 mb-2"
-          onClose={() => setTool(null)}
-          onUse={(picked) => {
-            append(picked.map((p) => p.value).join('\n'))
-            setTool(null)
-          }}
-        />
-      )}
-      {request ? (
-        <div className="absolute inset-x-2 bottom-full z-30 mb-2 max-h-[75vh] overflow-y-auto border border-accent/60 bg-black/95 p-4 shadow-[0_-12px_30px_rgba(0,0,0,0.6)]">
-          <UiRequestCard ui={request} place="panel" />
-        </div>
-      ) : tool === 'play' && (
-        <div className="absolute inset-x-2 bottom-full z-30 mb-2 h-[min(760px,75vh)]">
-          <PlayPanel character={player} where={{ link: null, agents: [], onText: append }} onClose={() => setTool(null)} />
-        </div>
-      )}
-      {look.avatar > 0 && (
-        <PlayerCharacterDock agent={agent} size={look.avatar} className="mr-1" />
-      )}
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        {owns && <UserBoardBar />}
-        <div className="flex items-end gap-2">
-          <ComposerTool title="Attach files" onClick={() => void main('dialog.openFiles').then((paths) => attachPaths(conv.key, paths), failed('Could not open the file picker'))}>
-            <Paperclip />
-          </ComposerTool>
-          <ComposerTool title="Draw from a repo or deck" active={tool === 'draw'} onClick={() => setTool(tool === 'draw' ? null : 'draw')}>
-            <Shuffle />
-          </ComposerTool>
-          <ChatComposer conv={conv} running={running} />
-          <ComposerTool title="An action or a decision" active={tool === 'play'} onClick={() => setTool(tool === 'play' ? null : 'play')}>
-            <Dices />
-          </ComposerTool>
-          <ComposerPrimitive.Input
-            ref={composerInputRef}
-            data-seven-composer={owns ? '' : undefined}
-            autoFocus
-            rows={1}
-            maxRows={10}
-            submitMode="enter"
-            placeholder={placeholder}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' && !e.shiftKey) {
-                if (hints.length) {
-                  e.preventDefault()
-                  setHidden(keys)
-                }
-                e.stopPropagation()
-                return
-              }
-              if (!hints.length) {
-                if (
-                  e.key === 'Tab' &&
-                  handleComposerCommandTab(
-                    e,
-                    current,
-                    (next) => {
-                      aui.composer.setText(next)
-                      requestAnimationFrame(() => {
-                        const el = composerInputRef.current
-                        if (el) el.setSelectionRange(next.length, next.length)
-                      })
-                    },
-                    commandList
-                  )
-                ) {
-                  return
-                }
-                return
-              }
-              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                e.preventDefault()
-                setSelected((pick + (e.key === 'ArrowDown' ? 1 : hints.length - 1)) % hints.length)
-              } else if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey && hints[pick].key !== typed.trim())) {
-                e.preventDefault()
-                hints[pick].apply()
-              }
-            }}
-            className={cn('min-h-10 flex-1 resize-none', look.field)}
-          />
-          {running && stopping ? (
-            <div title="Stopping" className={cn('flex h-10 items-center justify-center gap-2 border border-alert/30 font-mono text-[11px] font-semibold uppercase tracking-wider text-alert/70', look.round ? 'w-10' : 'px-3.5')}>
-              <Square className="h-3.5 w-3.5 animate-pulse" /> {!look.round && 'Stopping…'}
-            </div>
-          ) : running ? (
-            <ComposerPrimitive.Cancel title={`Stop (${stopShortcut})`} className={cn('notch-sm flex h-10 items-center justify-center gap-2 border border-alert/60 bg-alert/5 font-mono text-[11px] font-semibold uppercase tracking-wider text-alert hover:bg-alert/15', look.round ? 'w-10' : 'px-3.5')}>
+ const [tool, setTool] = useState<'draw' | 'play' | null>(null)
+ const aui = useAui()
+ const current = useAuiState((s) => s.composer.text)
+ const conv = useConversation()
+ const look = useThreadLook().composer
+ const owns = useThreadLook().ownsComposer
+ const stopping = useSessions((s) => (conv.sessionId ? s.stopping[conv.sessionId] === true : false))
+ const all = useComposerHints()
+ const commandList = useCommands((s) => s.list)
+ const stopShortcut = useKeybindLabel('chat.stop')
+ const composerInputRef = useRef<HTMLTextAreaElement>(null)
+ const [editing, setEditing] = useState(true)
+ const chips = !editing && referencesIn(current).length > 0
+ const typed = useAuiState((s) => (s.composer.isEditing ? s.composer.text : ''))
+ useEffect(() => {
+ const focusFn = () => {
+ const el = composerInputRef.current
+ if (!el) return
+ el.focus()
+ const end = el.value.length
+ el.setSelectionRange(end, end)
+ }
+ useCommandBar.getState().setFocusComposer(focusFn)
+ return () => useCommandBar.getState().setFocusComposer(null)
+ }, [])
+ const keys = all.map((h) => h.key).join('|')
+ const [hidden, setHidden] = useState<string | null>(null)
+ const [selected, setSelected] = useState(0)
+ useEffect(() => {
+ setSelected(0)
+ if (hidden !== null && hidden !== keys) setHidden(null)
+ }, [keys])
+ const hints = hidden === keys ? [] : all
+ const pick = Math.min(selected, Math.max(0, hints.length - 1))
+ const agent = useContext(AgentRef)
+ const worldPlayer = useWorldPlayer(agent?.world?.worldId ?? null)
+ const player = worldPlayer || agent?.player || null
+ const append = (text: string) => aui.composer.setText(current.trim() ? `${current.trimEnd()} ${text}` : text)
+ const request = usePlayRequests((s) => s.byChat[conv.key])
+ useEffect(() => {
+ if (!owns || !running || !conv.sessionId) return
+ const onKeyDown = (e: KeyboardEvent) => {
+ if (matchesKeybind('chat.stop', e)) {
+ e.preventDefault()
+ e.stopPropagation()
+ void useSessions.getState().abort(conv.sessionId!)
+ }
+ }
+ window.addEventListener('keydown', onKeyDown, true)
+ return () => window.removeEventListener('keydown', onKeyDown, true)
+ }, [owns, running, conv.sessionId])
+ return (
+ <ComposerPrimitive.Root {...skinSurface('chat-input')} className={cn('relative z-40 flex items-end gap-2', look.root)}>
+ {hints.length ? <ComposerHints hints={hints} selected={pick} onSelect={setSelected} /> : <ActiveCommand />}
+ {tool === 'draw' && (
+ <div {...skinSurface('chat-popover')} className="absolute inset-x-2 bottom-full z-30 mb-2">
+ <DrawPanel
+ onClose={() => setTool(null)}
+ onUse={(picked) => {
+ append(picked.map((p) => p.value).join('\n'))
+ setTool(null)
+ }}
+ />
+ </div>
+ )}
+ {request ? (
+ <div {...skinSurface('chat-popover')} className="absolute inset-x-2 bottom-full z-30 mb-2 max-h-[75vh] overflow-y-auto border border-accent/60 tone-panel-95 p-4 shadow-[0_-12px_30px_color-mix(in_srgb,var(--color-shade)_60%,transparent)]">
+ <UiRequestCard ui={request} place="panel" />
+ </div>
+ ) : tool === 'play' && (
+ <div {...skinSurface('chat-popover')} className="absolute inset-x-2 bottom-full z-30 mb-2 h-[min(760px,75vh)]">
+ <PlayPanel character={player} where={{ link: null, agents: [], onText: append }} onClose={() => setTool(null)} />
+ </div>
+ )}
+ {look.avatar > 0 && (
+ <PlayerCharacterDock agent={agent} size={look.avatar} className="mr-1" />
+ )}
+ <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+ {owns && <UserBoardBar />}
+ <div className="flex items-end gap-2">
+ <ComposerTool title="Attach files" onClick={() => void main('dialog.openFiles').then((paths) => attachPaths(conv.key, paths), failed('Could not open the file picker'))}>
+ <Paperclip />
+ </ComposerTool>
+ <ComposerTool title="Draw from a repo or deck" active={tool === 'draw'} onClick={() => setTool(tool === 'draw' ? null : 'draw')}>
+ <Shuffle />
+ </ComposerTool>
+ <ChatComposer conv={conv} running={running} />
+ <ComposerTool title="An action or a decision" active={tool === 'play'} onClick={() => setTool(tool === 'play' ? null : 'play')}>
+ <Dices />
+ </ComposerTool>
+ <div className="relative flex min-w-0 flex-1">
+ <ComposerPrimitive.Input
+ ref={composerInputRef}
+ data-seven-composer={owns ? '' : undefined}
+ autoFocus
+ rows={1}
+ maxRows={10}
+ submitMode="enter"
+ placeholder={placeholder}
+ onFocus={() => setEditing(true)}
+ onBlur={() => setEditing(false)}
+ onKeyDown={(e) => {
+ if (e.key === 'Escape' && !e.shiftKey) {
+ if (hints.length) {
+ e.preventDefault()
+ setHidden(keys)
+ }
+ e.stopPropagation()
+ return
+ }
+ if (!hints.length) {
+ if (
+ e.key === 'Tab' &&
+ handleComposerCommandTab(
+ e,
+ current,
+ (next) => {
+ aui.composer.setText(next)
+ requestAnimationFrame(() => {
+ const el = composerInputRef.current
+ if (el) el.setSelectionRange(next.length, next.length)
+ })
+ },
+ commandList
+ )
+ ) {
+ return
+ }
+ return
+ }
+ if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+ e.preventDefault()
+ setSelected((pick + (e.key === 'ArrowDown' ? 1 : hints.length - 1)) % hints.length)
+ } else if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey && hints[pick].key !== typed.trim())) {
+ e.preventDefault()
+ hints[pick].apply()
+ }
+ }}
+ className={cn('min-h-10 w-full flex-1 resize-none', look.field, chips && 'opacity-0')}
+ />
+ {chips && (
+ <Pressable onClick={() => composerInputRef.current?.focus()} className={cn('absolute inset-0 cursor-text overflow-y-auto whitespace-pre-wrap', look.field)}>
+ {withReferences(current)}
+ </Pressable>
+ )}
+ </div>
+ {running && stopping ? (
+ <div title="Stopping" className={cn('flex h-10 items-center justify-center gap-2 border border-alert/30 font-label text-[11px] font-semibold caps-5 text-alert/70', look.round ? 'w-10' : 'px-3.5')}>
+ <Square className="h-3.5 w-3.5 animate-pulse" /> {!look.round && 'Stopping…'}
+ </div>
+ ) : running ? (
+ <ComposerPrimitive.Cancel title={`Stop (${stopShortcut})`} className={cn('notch-sm flex h-10 items-center justify-center gap-2 border border-alert/60 bg-alert/5 font-label text-[11px] font-semibold caps tracking-wider text-alert hover:bg-alert/15', look.round ? 'w-10' : 'px-3.5')}>
               <Square className="h-3.5 w-3.5" /> {!look.round && 'Stop'}
             </ComposerPrimitive.Cancel>
           ) : (
-            <ComposerPrimitive.Send title="Send" className={cn('notch-sm flex h-10 items-center justify-center gap-2 border border-accent bg-gradient-to-b from-accent/20 to-accent/5 font-mono text-[11px] font-semibold uppercase tracking-wider text-accent shadow-[0_0_14px_color-mix(in_srgb,var(--color-accent)_20%,transparent)] hover:text-white disabled:opacity-40', look.round ? 'w-10' : 'px-4')}>
+            <ComposerPrimitive.Send title="Send" className={cn('notch-sm flex h-10 items-center justify-center gap-2 border border-accent bg-gradient-to-b from-accent/20 to-accent/5 font-label text-[11px] font-semibold caps tracking-wider text-accent shadow-[0_0_14px_color-mix(in_srgb,var(--color-accent)_calc(20%*var(--glow)),transparent)] hover:text-ink disabled:opacity-40', look.round ? 'w-10' : 'px-4')}>
               {!look.round && 'Send'} <CornerDownLeft className="h-3.5 w-3.5" />
             </ComposerPrimitive.Send>
           )}
@@ -712,11 +727,11 @@ function EditReplyModal({ messageId, onClose }: { messageId: string; onClose: ()
         {message.parts.map((p, i) =>
           i in texts ? (
             <div key={i} className="flex flex-col gap-1">
-              <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-soft">{p.type === 'tool' ? `${p.name} result` : 'Text'}</span>
+              <span className="font-label text-[10.5px] caps-14 text-accent-soft">{p.type === 'tool' ? `${p.name} result` : 'Text'}</span>
               {p.type === 'tool' ? <LinkTextarea mono rows={Math.min(12, Math.max(3, (texts[i] ?? '').split('\n').length + 1))} value={texts[i]} onValue={(text) => setTexts({ ...texts, [i]: text })} /> : <MarkdownEditor compact rolls value={texts[i]} onValue={(text) => setTexts({ ...texts, [i]: text })} />}
             </div>
           ) : p.type === 'tool' ? (
-            <div key={i} className="font-mono text-[11px] text-faint">{p.name} ({p.status}, can't be edited)</div>
+            <div key={i} className="font-ui text-[11px] text-faint">{p.name} ({p.status}, can't be edited)</div>
           ) : null
         )}
       </div>
@@ -754,113 +769,113 @@ function RewindModal({ messageId, onClose, onDone }: { messageId: string; onClos
       const result = await engine('sessions.rewind', { id: sessionId, messageId })
       await useSessions.getState().load(sessionId)
       toast.success('Rewound', result.restored.length ? `${result.restored.length} file(s) restored` : 'No files needed restoring')
-      onDone(result.text)
-    } catch (err) {
-      toast.error('Rewind failed', errorText(err))
-    }
-    setBusy(false)
-    onClose()
-  }
+ onDone(result.text)
+ } catch (err) {
+ toast.error('Rewind failed', errorText(err))
+ }
+ setBusy(false)
+ onClose()
+ }
 
-  return (
-    <Modal
-      open
-      title="Rewind chat"
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="danger" disabled={!preview || busy} onClick={() => void confirm()}>
-            Rewind
-          </Button>
-        </>
-      }
-    >
-      {!preview ? (
-        <span className="text-dim">Checking what would change…</span>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <p>
-            Removes this message and the {preview.messagesRemoved - 1} after it, and puts your message back in the box so you can edit it.
-          </p>
-          {preview.files.length > 0 ? (
-            <div>
-              <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.14em] text-accent-soft">Files restored to how they were</div>
-              <ul className="max-h-40 overflow-auto font-mono text-[12px] text-white/90">
-                {preview.files.map((f) => (
-                  <li key={f}>{f}</li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <p className="text-dim">No files were changed by tools after this point.</p>
-          )}
-          {preview.commands > 0 && (
-            <p className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3 py-2 text-[12.5px] text-alert">
-              {preview.commands} command{preview.commands > 1 ? 's' : ''} ran after this point. Whatever they changed (files they wrote, packages they installed,
-              anything outside the workspace) is not undone.
-            </p>
-          )}
-        </div>
-      )}
-    </Modal>
-  )
+ return (
+ <Modal
+ open
+ title="Rewind chat"
+ onClose={onClose}
+ footer={
+ <>
+ <Button variant="ghost" onClick={onClose}>
+ Cancel
+ </Button>
+ <Button variant="danger" disabled={!preview || busy} onClick={() => void confirm()}>
+ Rewind
+ </Button>
+ </>
+ }
+ >
+ {!preview ? (
+ <span className="text-dim">Checking what would change…</span>
+ ) : (
+ <div className="flex flex-col gap-3">
+ <p>
+ Removes this message and the {preview.messagesRemoved - 1} after it, and puts your message back in the box so you can edit it.
+ </p>
+ {preview.files.length > 0 ? (
+ <div>
+ <div className="mb-1 font-label text-[11px] caps-14 text-accent-soft">Files restored to how they were</div>
+ <ul className="max-h-40 overflow-auto font-ui text-[12px] text-ink/90">
+ {preview.files.map((f) => (
+ <li key={f}>{f}</li>
+ ))}
+ </ul>
+ </div>
+ ) : (
+ <p className="text-dim">No files were changed by tools after this point.</p>
+ )}
+ {preview.commands > 0 && (
+ <p className="border border-alert/50 border-l-2 border-l-alert bg-alert/5 px-3 py-2 text-[12.5px] text-alert">
+ {preview.commands} command{preview.commands > 1 ? 's' : ''} ran after this point. Whatever they changed (files they wrote, packages they installed,
+ anything outside the workspace) is not undone.
+ </p>
+ )}
+ </div>
+ )}
+ </Modal>
+ )
 }
 
 export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody, placeholder, look: lookId = 'panel' }: ThreadProps) {
-  const look = THREAD_LOOKS[lookId]
-  const [tabletopMode] = useTabletopMode()
-  const isTabletop = lookId === 'tabletop'
-  const [chatHovered, setChatHovered] = useState(false)
-  const [chatFocused, setChatFocused] = useState(false)
-  const chatForeground =
-    !isTabletop ||
-    tabletopMode.layoutMode === 'creator' ||
-    (!tabletopMode.peekTable && (tabletopMode.pinnedChat || chatFocused || chatHovered))
-  const { theme } = useActiveTheme()
-  const chatFadeOpacity = theme.chatFadeOpacity ?? 0.55
-  const runtime = useSevenRuntime()
-  const [rewindTarget, setRewindTarget] = useState<string | null>(null)
-  const [editTarget, setEditTarget] = useState<string | null>(null)
-  const conv = useConversation()
-  const fileDrop = useFileDrop((paths) => attachPaths(conv.key, paths))
-  const activeId = conv.sessionId
-  const since = useMemo(() => ({ at: performance.now(), seen: new Set<string>() }), [activeId])
-  const pictureHeight = useApp((s) => s.settings?.chatPictureHeight ?? 480)
-  const pictures = useMemo(() => ({ height: pictureHeight }), [pictureHeight])
-  const viewport = useRef<HTMLDivElement>(null)
-  const bottomBarRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!isTabletop) {
-      useTabletopInsets.getState().setBottom(0)
-      return
-    }
-    const el = bottomBarRef.current
-    if (!el) return
-    let raf = 0
-    const apply = () => {
-      raf = 0
-      const next = el.offsetHeight
-      if (useTabletopInsets.getState().bottom !== next) {
-        useTabletopInsets.getState().setBottom(next)
-      }
-    }
-    const schedule = () => {
-      if (!raf) raf = requestAnimationFrame(apply)
-    }
-    apply()
-    const observer = new ResizeObserver(schedule)
-    observer.observe(el)
-    return () => {
-      if (raf) cancelAnimationFrame(raf)
-      observer.disconnect()
-      useTabletopInsets.getState().setBottom(0)
-    }
-  }, [isTabletop])
-  const queued = useQueuedComposer(conv.key)
-  const lookAt = useMemo(() => (area: PictureArea) => queueComposer(conv.key, `I look at the ${area.name}`), [conv.key])
+ const look = THREAD_LOOKS[lookId]
+ const [tabletopMode] = useTabletopMode()
+ const isTabletop = lookId === 'tabletop'
+ const [chatHovered, setChatHovered] = useState(false)
+ const [chatFocused, setChatFocused] = useState(false)
+ const chatForeground =
+ !isTabletop ||
+ tabletopMode.layoutMode === 'creator' ||
+ (!tabletopMode.peekTable && (tabletopMode.pinnedChat || chatFocused || chatHovered))
+ const { theme } = useActiveTheme()
+ const chatFadeOpacity = theme.chatFadeOpacity ?? 0.55
+ const runtime = useSevenRuntime()
+ const [rewindTarget, setRewindTarget] = useState<string | null>(null)
+ const [editTarget, setEditTarget] = useState<string | null>(null)
+ const conv = useConversation()
+ const fileDrop = useFileDrop((paths) => attachPaths(conv.key, paths))
+ const activeId = conv.sessionId
+ const since = useMemo(() => ({ at: performance.now(), seen: new Set<string>() }), [activeId])
+ const pictureHeight = useApp((s) => s.settings?.chatPictureHeight ?? 480)
+ const pictures = useMemo(() => ({ height: pictureHeight }), [pictureHeight])
+ const viewport = useRef<HTMLDivElement>(null)
+ const bottomBarRef = useRef<HTMLDivElement>(null)
+ useEffect(() => {
+ if (!isTabletop) {
+ useTabletopInsets.getState().setBottom(0)
+ return
+ }
+ const el = bottomBarRef.current
+ if (!el) return
+ let raf = 0
+ const apply = () => {
+ raf = 0
+ const next = el.offsetHeight
+ if (useTabletopInsets.getState().bottom !== next) {
+ useTabletopInsets.getState().setBottom(next)
+ }
+ }
+ const schedule = () => {
+ if (!raf) raf = requestAnimationFrame(apply)
+ }
+ apply()
+ const observer = new ResizeObserver(schedule)
+ observer.observe(el)
+ return () => {
+ if (raf) cancelAnimationFrame(raf)
+ observer.disconnect()
+ useTabletopInsets.getState().setBottom(0)
+ }
+ }, [isTabletop])
+ const queued = useQueuedComposer(conv.key)
+ const lookAt = useMemo(() => (area: PictureArea) => queueComposer(conv.key, `I look at the ${area.name}`), [conv.key])
   useEffect(() => {
     if (!queued) return
     takeQueuedComposer(conv.key)
@@ -895,7 +910,7 @@ export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody
       <AreaAction.Provider value={lookAt}>
       <AgentRef.Provider value={agent}>
       <AgentLabel.Provider value={agentName.toUpperCase()}>
-        <ThreadPrimitive.Root
+        <ThreadPrimitive.Root {...skinSurface('chat-log')}
           className="relative flex min-h-0 flex-1 flex-col"
           {...fileDrop.props}
         >
@@ -903,6 +918,7 @@ export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody
           <DropOverlay show={fileDrop.over} label="Drop files to attach" />
           <PlayVeil />
           <ThreadPrimitive.Viewport
+            {...skinSurface('chat-messages')}
             ref={viewport}
             style={
               isTabletop
@@ -914,7 +930,7 @@ export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody
             className={cn(
               'relative min-h-0 flex-1 overflow-y-auto transition-opacity duration-300',
               look.viewport,
-              isTabletop && 'z-20 pointer-events-none'
+              isTabletop && (tabletopMode.peekTable ? 'z-20 pointer-events-none' : 'z-20 pointer-events-auto')
             )}
           >
             <ThreadPrimitive.Empty>
@@ -927,7 +943,7 @@ export function Thread({ agent = null, agentName, running, emptyTitle, emptyBody
             >
               <VirtualMessages viewport={viewport} />
             </div>
-            <ThreadPrimitive.ScrollToBottom className="pointer-events-auto sticky bottom-2 left-full flex h-8 w-8 items-center justify-center border border-line bg-black/80 text-accent hover:border-accent disabled:invisible">
+            <ThreadPrimitive.ScrollToBottom className="pointer-events-auto sticky bottom-2 left-full flex h-8 w-8 items-center justify-center border border-line tone-well-80 text-accent hover:border-accent disabled:invisible">
               <ArrowDown className="h-4 w-4" />
             </ThreadPrimitive.ScrollToBottom>
           </ThreadPrimitive.Viewport>

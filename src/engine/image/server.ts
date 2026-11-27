@@ -33,7 +33,11 @@ export interface ImageServerOptions {
 }
 
 /** Build CLI arguments for spawning stable-diffusion.cpp `sd-server`. */
-export function buildSdServerArgs(pipeline: ImagePipelineSpec, buildFlags: string[] | null = null): string[] {
+export function buildSdServerArgs(
+  pipeline: ImagePipelineSpec,
+  buildFlags: string[] | null = null,
+  overrideLoraDir: string | null = null
+): string[] {
   const args: string[] = [pipeline.mode === 'diffusion' ? '--diffusion-model' : '--model', pipeline.modelPath]
   if (pipeline.vae) args.push('--vae', pipeline.vae)
   if (pipeline.tae) args.push('--taesd', pipeline.tae)
@@ -42,7 +46,8 @@ export function buildSdServerArgs(pipeline: ImagePipelineSpec, buildFlags: strin
   if (pipeline.t5xxl) args.push('--t5xxl', pipeline.t5xxl)
   if (pipeline.llm) args.push('--llm', pipeline.llm)
   if (pipeline.llmVision) args.push('--llm_vision', pipeline.llmVision)
-  if (pipeline.loraDir) args.push('--lora-model-dir', pipeline.loraDir)
+  const effectiveLoraDir = pipeline.loraDir ?? overrideLoraDir
+  if (effectiveLoraDir) args.push('--lora-model-dir', effectiveLoraDir)
   if (pipeline.config.clipOnCpu) args.push('--clip-on-cpu')
   if (pipeline.config.vaeTiling) args.push('--vae-tiling')
   if (pipeline.config.offloadToCpu) args.push('--offload-to-cpu')

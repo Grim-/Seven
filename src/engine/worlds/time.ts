@@ -23,9 +23,13 @@ export function syncAlmanacs(save: GameSave): void {
   }
 }
 
-export function clockOf(save: GameSave): TimeDef {
+export function findClock(save: GameSave): TimeDef | null {
   const cat = catalogFrom(gameDefs.catalog())
-  const def = cat.time(save.clockId) ?? cat.times()[0]
+  return cat.time(save.clockId) ?? cat.times()[0] ?? null
+}
+
+export function clockOf(save: GameSave): TimeDef {
+  const def = findClock(save)
   if (!def) throw new WorldError('There is no clock to move on.')
   return def
 }

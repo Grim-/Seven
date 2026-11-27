@@ -12,6 +12,9 @@ import { parseFeed } from '@rowanmanning/feed-parser'
 import { linkedText, pageText, privateHost, readBody } from '../../engine/web/page'
 import { documentKind, documentText } from '../../engine/util/documents'
 import { shouldRunCustomGate } from '../../engine/permissions/gate'
+import { registerPlaceTarget } from '../../engine/data/placeTargets'
+
+registerPlaceTarget({ target: 'web', label: 'Web downloads', home: 'Files/Downloads', asks: false })
 
 const PAGE_CHARS = 12_000
 const QUERY = '{query}'

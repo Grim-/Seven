@@ -8,11 +8,22 @@ import { secure } from '../../engine/util/secure'
 import { bindingFor, bindingOrNull, createRecord, editEntries, postBoard, readBoard, recall, remember, search, writeField } from '../../engine/worlds/ops'
 import { resolveIncludes } from '../../engine/library/includes'
 import { factions } from '../../engine/factions/store'
+import { grantKnowledge, knowledge } from '../../engine/worlds/knowledge'
+import { campaignOf } from '../../engine/library/holds'
+import { findSheet, getSheet } from '../../engine/library/sheets'
+import { knowledgeRef, splitKnowledgeRef } from '@shared/worldKnowledge'
 import { lootTablesStore } from '../../engine/lootTables/store'
 import { triggerActionsStore } from '../../engine/triggerActions/store'
 import { almanacs } from '../../engine/almanac/store'
+import { npcs } from '../../engine/worlds/npcs'
+import { stampNpcs } from '../../engine/worlds/npcStamp'
+import { worldEvents } from '../../engine/worlds/events'
+import { saves } from '../../engine/worlds/saves'
+import { advanceWorldTime, clockOf } from '../../engine/worlds/time'
 import { sessionAccess } from '../../engine/sessions/access'
+import { sessionWorld } from '../../engine/worlds/chatWorld'
 import { formatAlmanacClock, formatAlmanacTime } from '@shared/almanac'
+import { npcActorId } from '@shared/worldNpcs'
 import type { Action, ActionCheck, ActionNeeds } from '@shared/actions'
 import { cleanSwap } from '@shared/cardDecks'
 import { cleanDecision } from '@shared/decisions'
@@ -472,13 +483,70 @@ const tools: ToolDef[] = [
     }
   },
   {
-    name: 'set_faction',
+    name: 'record_world_knowledge',
     group: 'world',
     needsWorkspace: false,
-    description: 'Create or update a world faction (@faction:id), its default stance, inter-faction relations, and tags.',
+    description: 'Write a new piece of world knowledge (@knowledge): lore, a magic system, a belief, a custom or a secret that is true in this world. Global knowledge is known by every character in the world; local knowledge only by the characters that are given it. Link places, people and pages in the text with @ links. Existing knowledge is only changed by the user.',
     params: {
       type: 'object',
       properties: {
+        name: { type: 'string', description: 'Short name, e.g. "The Veil"' },
+        text: { type: 'string', description: 'What is true, written to stand on its own' },
+        scope: { enum: ['global', 'local'], description: "'global': every character in the world knows it; 'local': only characters given it" },
+        tags: { type: ['array', 'null'], items: { type: 'string' }, description: 'Topic keywords that bring it to mind' },
+        world: { type: ['string', 'null'], description: 'World id; defaults to the world this chat is in' }
+      },
+      required: ['name', 'text', 'scope']
+    },
+    async execute(p, ctx) {
+      const world = optStr(p, 'world') ?? bindingOrNull(ctx.agentId)?.worldId
+      if (!world) throw new ToolError('This chat is not in a world. Pass world with the world id.')
+      const name = str(p, 'name').trim()
+      if (knowledge.find(world, name)) throw new ToolError(`${name} is already known in ${world}. Only the user changes existing knowledge.`)
+      const saved = guard(() => knowledge.save(world, { name, text: str(p, 'text'), scope: str(p, 'scope'), tags: strings(p.tags) ?? [] }))
+      return `Recorded @world:${world}/knowledge/${saved.id} (${saved.scope}).`
+    }
+  },
+  {
+    name: 'grant_knowledge',
+    group: 'world',
+    needsWorkspace: false,
+    description: "Give a character a piece of local world knowledge (@knowledge) they have just come to know, by being told, reading, or finding out for themselves. In a campaign it is kept with that campaign. Global knowledge is already known by everyone in the world.",
+    params: {
+      type: 'object',
+      properties: {
+        sheet: { type: 'string', description: 'The character who now knows it' },
+        knowledge: { type: 'string', description: 'The knowledge: @knowledge:world/entry, or its name in this chat\'s world' },
+        source: { type: ['string', 'null'], description: 'Who or what they learned it from, if anyone or anything (a person, a book); null when they found it out themselves' }
+      },
+      required: ['sheet', 'knowledge']
+    },
+    async execute(p, ctx) {
+      const raw = str(p, 'knowledge')
+      const parts = splitKnowledgeRef(raw)
+      const world = parts?.world ?? bindingOrNull(ctx.agentId)?.worldId ?? sessionWorld(ctx.sessionId, ctx.agentId)
+      const sheet = findSheet(str(p, 'sheet'), world)
+      if (!sheet) throw new ToolError(`No character or world NPC "${str(p, 'sheet')}". find with kind sheet or world lists them.`)
+      if (!world) throw new ToolError('Pass the knowledge as @knowledge:world/entry; this chat is not in a world.')
+      const entry = guard(() => knowledge.find(world, parts?.id ?? raw))
+      if (!entry) throw new ToolError(`No knowledge ${raw} in ${world}. find with kind knowledge lists it.`)
+      if (entry.scope === 'global') return `${entry.name} is global: everyone in ${world} already knows it.`
+      const ref = knowledgeRef(world, entry.id)
+      const campaign = campaignOf(ctx.sessionId)
+      const title = getSheet(sheet).title
+      if (!grantKnowledge(sheet, campaign, ref, { source: optStr(p, 'source'), where: sessionAccess.get(ctx.sessionId)?.scene?.where ?? '' })) return `${title} already knows ${entry.name}.`
+      return `${title} now knows @world:${world}/knowledge/${entry.id}${campaign ? ' in this campaign' : ''}.`
+    }
+  },
+  {
+    name: 'set_faction',
+    group: 'world',
+    needsWorkspace: false,
+    description: 'Create or update a world faction (@faction:world/id), its default stance, inter-faction relations, and tags.',
+    params: {
+      type: 'object',
+      properties: {
+        world: { type: ['string', 'null'], description: 'Target world id (defaults to the current scene world)' },
         name: { type: 'string', description: 'Faction name' },
         id: { type: ['string', 'null'], description: 'Optional explicit faction id' },
         description: { type: ['string', 'null'], description: 'Faction goals, tenets, and behavior' },
@@ -487,14 +555,20 @@ const tools: ToolDef[] = [
           oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { enum: [...FACTION_STANCES] } }],
           description: 'Map of other faction ids to stance'
         },
+        relationNotes: {
+          oneOf: [{ type: 'null' }, { type: 'object', properties: {}, additionalProperties: { type: 'string' } }],
+          description: 'Map of other faction ids to a short reason or history behind the stance; an empty string removes one'
+        },
         tags: { type: ['array', 'null'], items: { type: 'string' } }
       },
       required: ['name']
     },
-    async execute(p) {
+    async execute(p, ctx) {
+      const world = optStr(p, 'world') ?? bindingOrNull(ctx.agentId)?.worldId ?? sessionWorld(ctx.sessionId, ctx.agentId) ?? worlds.list()[0]?.id ?? null
+      if (!world) throw new ToolError('Pass a world id for this faction.')
       const name = str(p, 'name').trim()
       const ref = optStr(p, 'id') ?? name
-      const prev = factions.find(ref)
+      const prev = factions.find(ref, world)
       const rawStance = optStr(p, 'defaultStance')
       const defaultStance: FactionStance =
         rawStance && (FACTION_STANCES as readonly string[]).includes(rawStance) ? (rawStance as FactionStance) : (prev?.defaultStance ?? 'neutral')
@@ -507,19 +581,31 @@ const tools: ToolDef[] = [
           }
         }
       }
+      const notePatch = object(p.relationNotes)
+      const relationNotes: Record<string, string> = { ...(prev?.relationNotes ?? {}) }
+      if (notePatch) {
+        for (const [k, v] of Object.entries(notePatch)) {
+          if (typeof v !== 'string') continue
+          if (v.trim()) relationNotes[toId(k)] = v.trim()
+          else delete relationNotes[toId(k)]
+        }
+      }
       const saved = factions.save(
         {
+          ...prev,
           id: prev?.id ?? (optStr(p, 'id') ? toId(optStr(p, 'id')!) : toId(name)),
           name,
           description: optStr(p, 'description') ?? prev?.description ?? '',
           defaultStance,
           relations,
+          relationNotes,
           tags: strings(p.tags) ?? prev?.tags ?? [],
           updatedAt: Date.now()
         },
+        world,
         prev?.id ?? null
       )
-      return `${prev ? 'Updated' : 'Created'} ${linkFor('faction', saved.id)} (default: ${saved.defaultStance}).`
+      return `${prev ? 'Updated' : 'Created'} @world:${world}/faction/${saved.id} (default: ${saved.defaultStance}).`
     }
   },
   {
@@ -598,7 +684,7 @@ const tools: ToolDef[] = [
         summary: { type: ['string', 'null'], description: 'Concise summary of what happened' },
         outcome: { type: ['string', 'null'], description: 'Mechanical or narrative outcome' },
         secret: { type: ['string', 'null'], description: 'Optional hidden/GM note (omitted from #public reads and newspapers)' },
-        where: { type: ['string', 'null'], description: 'Location ref, e.g. @place:rust_anchorage' },
+        where: { type: ['string', 'null'], description: 'Location ref, e.g. @world:<world>/place/<key>' },
         who: { type: ['array', 'null'], items: { type: 'string' }, description: 'Participants, e.g. ["@sheet:kaelen"]' },
         advanceMinutes: { type: ['integer', 'number', 'null'], description: 'Minutes to advance the Almanac world clock before logging' }
       },
@@ -630,6 +716,215 @@ const tools: ToolDef[] = [
         who
       })
       return `Logged "${entry.title}" on ${linkFor('almanac', saved.id)} at ${formatAlmanacTime(entry.when)} (#${entry.when.seq}, clock now ${formatAlmanacClock(saved.currentTime)}).`
+    }
+  },
+  {
+    name: 'resolve_world_event',
+    group: 'world',
+    needsWorkspace: false,
+    description:
+      'Resolves an active world event in the current save (either picking a specific outcomeId or letting its scored factors decide), executing its world-mutation pieces and logging to the Almanac.',
+    params: {
+      type: 'object',
+      properties: {
+        event: { type: 'string', description: 'World event id or @world:<world>/event/<id> link' },
+        outcomeId: { type: ['string', 'null'], description: 'Optional specific outcome id; omit/null to score by current save flags and participant power' },
+        summary: { type: ['string', 'null'], description: 'Optional secret aftermath summary recorded in the Almanac' },
+        world: { type: ['string', 'null'], description: 'World id; defaults to the current scene world' }
+      },
+      required: ['event']
+    },
+    async execute(p, ctx) {
+      const raw = str(p, 'event').trim()
+      const world =
+        optStr(p, 'world') ??
+        (raw.includes('/') ? raw.replace(/^@?world:/i, '').split('/')[0] : null) ??
+        bindingOrNull(ctx.agentId)?.worldId ??
+        sessionWorld(ctx.sessionId, ctx.agentId) ??
+        null
+      const resolved = worldEvents.resolve(raw, {
+        worldId: world,
+        outcomeId: optStr(p, 'outcomeId') ?? null,
+        transcriptSummary: optStr(p, 'summary') ?? null
+      })
+      return `Resolved "${resolved.title}" → ${resolved.resolution?.outcomeLabel ?? 'done'}.`
+    }
+  },
+  {
+    name: 'advance_world_time',
+    group: 'world',
+    needsWorkspace: false,
+    description:
+      'Advances the world clock forward in narrative leaps (rounds, minutes, hours, or days) for the active save and syncs bound Almanacs. Use only when meaningful story time passes (travel, waiting, nightfall, time skips)—do not call every turn.',
+    params: {
+      type: 'object',
+      properties: {
+        amount: { type: 'number', description: 'Positive amount of time to advance.' },
+        unit: {
+          type: 'string',
+          enum: ['rounds', 'minutes', 'hours', 'days'],
+          description: 'Time unit for the leap (defaults to minutes).'
+        },
+        reason: { type: ['string', 'null'], description: 'Optional short reason (e.g. "travel to harbor", "nightfall").' },
+        world: { type: ['string', 'null'], description: 'World id; defaults to the current scene world.' }
+      },
+      required: ['amount']
+    },
+    async execute(p, ctx) {
+      const amount = Number(p.amount)
+      if (!Number.isFinite(amount) || amount <= 0) throw new ToolError('amount must be a positive number.')
+      const unit = optStr(p, 'unit')?.toLowerCase() ?? 'minutes'
+      const scene = sessionAccess.get(ctx.sessionId)?.scene
+      const worldId =
+        optStr(p, 'world') ??
+        sessionWorld(ctx.sessionId, ctx.agentId) ??
+        null
+      const save =
+        (scene?.saveId ? saves.read(scene.saveId) : null) ??
+        (worldId ? saves.current(worldId) : null)
+      if (!save) throw new ToolError('No active world save found to advance time on.')
+      const def = clockOf(save)
+      const unitSeconds: Record<string, number> = {
+        rounds: def.roundSeconds,
+        minutes: 60,
+        hours: def.clock.hourSeconds,
+        days: def.clock.hourSeconds * def.clock.hoursPerDay
+      }
+      const mult = unitSeconds[unit]
+      if (!mult) throw new ToolError(`Unknown time unit "${unit}". Use rounds, minutes, hours, or days.`)
+      const seconds = Math.max(1, Math.round(amount * mult))
+      const reason = optStr(p, 'reason') ?? `narrative_${unit}`
+      const activeNpcIds = npcs
+        .list(save.world, 'play')
+        .filter((n) => !n.archetype && Boolean(n.game))
+        .map((n) => npcActorId(save.world, n.id))
+      const saved = guard(() => advanceWorldTime(save.id, seconds, reason, [...Object.keys(save.characters), ...activeNpcIds]))
+      return `Advanced world time by ${amount} ${unit}${optStr(p, 'reason') ? ` (${optStr(p, 'reason')})` : ''}. Clock is now ${formatAlmanacClock(saved.clock.time)}.`
+    }
+  },
+  {
+    name: 'world_upsert_npc',
+    group: 'world',
+    needsWorkspace: false,
+    description:
+      'Creates or updates a world-bound NPC or Archetype inside the world (`@world:<world>/npc/<id>`), keeping the user\'s global Characters library clean. Supports `@repo:...:roll` and `#random` tokens on Archetypes and `@repo:...:value` dynamic fields.',
+    params: {
+      type: 'object',
+      properties: {
+        world: { type: ['string', 'null'], description: 'World id; defaults to the bound or active scene world.' },
+        id: { type: ['string', 'null'], description: 'Optional NPC id (slug) to update; omit/null to create.' },
+        name: { type: 'string', description: 'NPC or Archetype name (may include @repo:...:roll on archetypes).' },
+        archetype: { type: ['boolean', 'null'], description: 'True to store as a reusable Archetype template rather than a unique individual.' },
+        place: { type: ['string', 'null'], description: 'Optional place key in this world where a unique NPC is stationed.' },
+        faction: { type: ['string', 'null'], description: 'Optional faction id.' },
+        disposition: { type: ['string', 'null'], enum: ['hostile', 'neutral', 'friendly', null] },
+        values: { type: ['object', 'null'], additionalProperties: { type: 'string' }, description: 'Sheet card fields to set (e.g. Identity, Appearance, Speech, Demeanor).' },
+        doing: { type: ['string', 'null'], description: 'What they are doing right now.' },
+        goal: { type: ['string', 'null'], description: 'Immediate goal or motive.' },
+        mood: { type: ['string', 'null'], description: 'Current mood or emotional state.' },
+        howItThinks: { type: ['string', 'null'], description: 'Mindset and decision-making heuristics.' },
+        voiceConstraints: { type: ['string', 'null'], description: 'Speech style and voice constraints.' }
+      },
+      required: ['name']
+    },
+    async execute(p, ctx) {
+      const worldId =
+        optStr(p, 'world') ??
+        bindingOrNull(ctx.agentId)?.worldId ??
+        sessionWorld(ctx.sessionId, ctx.agentId) ??
+        null
+      if (!worldId) throw new ToolError('Specify `world` or run inside a world-bound session.')
+      const rawId = optStr(p, 'id')
+      const existing = rawId ? npcs.find(rawId, worldId, 'template') : null
+      const valuesPatch = object(p.values)
+      const nextValues: Record<string, string> = { ...(existing?.values ?? {}) }
+      const nextFields = [...(existing?.fields ?? [])]
+      if (valuesPatch) {
+        for (const [k, v] of Object.entries(valuesPatch)) {
+          const key = k.trim()
+          if (!key) continue
+          nextValues[key] = String(v ?? '')
+          if (!nextFields.includes(key)) nextFields.push(key)
+        }
+      }
+      const placeKey = optStr(p, 'place')?.replace(/^@world:[^/]+\/place\//i, '').trim() || null
+      const where =
+        placeKey !== null
+          ? `@world:${worldId}/place/${placeKey}`
+          : (existing?.story.where ?? '')
+      const saved = guard(() =>
+        npcs.saveTemplate(
+          worldId,
+          {
+            ...(existing ?? {}),
+            ...(rawId ? { id: rawId } : {}),
+            title: str(p, 'name'),
+            ...(optBool(p, 'archetype') !== null ? { archetype: optBool(p, 'archetype')! } : {}),
+            ...(p.faction !== undefined ? { faction: optStr(p, 'faction') } : {}),
+            ...(optStr(p, 'disposition') ? { disposition: optStr(p, 'disposition') } : {}),
+            ...(nextFields.length ? { fields: nextFields } : {}),
+            values: nextValues,
+            story: {
+              ...(existing?.story ?? { where: '', threads: [], sessions: [] }),
+              where,
+              ...(optStr(p, 'doing') !== null ? { doing: optStr(p, 'doing')! } : {}),
+              ...(optStr(p, 'goal') !== null ? { goal: optStr(p, 'goal')! } : {}),
+              ...(optStr(p, 'mood') !== null ? { mood: optStr(p, 'mood')! } : {})
+            },
+            mind: {
+              ...(existing?.mind ?? {}),
+              ...(optStr(p, 'howItThinks') !== null ? { howItThinks: optStr(p, 'howItThinks')! } : {}),
+              ...(optStr(p, 'voiceConstraints') !== null ? { voiceConstraints: optStr(p, 'voiceConstraints')! } : {})
+            }
+          },
+          existing?.id ?? null
+        )
+      )
+      return `Saved ${saved.archetype ? 'World Archetype' : 'World NPC'} "${saved.title}" (@world:${worldId}/npc/${saved.id}).`
+    }
+  },
+  {
+    name: 'world_stamp_npc',
+    group: 'world',
+    needsWorkspace: false,
+    description:
+      'Stamps 1..N individual NPC instances from a World Archetype (`@world:<world>/npc/<id>`) or Bestiary creature into the active Save, rolling `:roll` and `#random` fields once per individual.',
+    params: {
+      type: 'object',
+      properties: {
+        world: { type: ['string', 'null'], description: 'World id; defaults to the active scene world.' },
+        target: { type: 'string', description: 'Archetype id/link (`@world:<w>/npc/<id>`) or Bestiary creature id.' },
+        count: { type: ['integer', 'null'], description: 'Number of individuals to stamp (1..25, default 1).' },
+        name: { type: ['string', 'null'], description: 'Optional name override (supports `@repo:...:roll`).' },
+        place: { type: ['string', 'null'], description: 'Optional place key in this world to station them at.' },
+        map: { type: ['string', 'null'], description: 'Optional map id.' },
+        faction: { type: ['string', 'null'], description: 'Optional faction id override.' },
+        disposition: { type: ['string', 'null'], enum: ['hostile', 'neutral', 'friendly', null] }
+      },
+      required: ['target']
+    },
+    async execute(p, ctx) {
+      const worldId =
+        optStr(p, 'world') ??
+        bindingOrNull(ctx.agentId)?.worldId ??
+        sessionWorld(ctx.sessionId, ctx.agentId) ??
+        null
+      if (!worldId) throw new ToolError('Specify `world` or run inside a world-bound session.')
+      const placeKey = optStr(p, 'place')?.replace(/^@world:[^/]+\/place\//i, '').trim() || null
+      const disp = optStr(p, 'disposition')
+      const res = guard(() =>
+        stampNpcs({
+          world: worldId,
+          target: str(p, 'target'),
+          count: optInt(p, 'count') ?? 1,
+          name: optStr(p, 'name'),
+          place: placeKey,
+          map: optStr(p, 'map'),
+          faction: p.faction !== undefined ? optStr(p, 'faction') : undefined,
+          disposition: disp === 'hostile' || disp === 'neutral' || disp === 'friendly' ? disp : undefined
+        })
+      )
+      return `Stamped ${res.actorIds.length} NPC(s): ${res.actorIds.map((id) => `@world:${id}`).join(', ')}.`
     }
   }
 ]

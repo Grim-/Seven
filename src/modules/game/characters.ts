@@ -25,13 +25,14 @@ import { DND_POOL_STATS } from '@shared/dnd'
 import type { Point } from '@shared/shapes'
 import type { EffectTargetRef } from '@shared/effects'
 import type { StoryMemory } from '@shared/story'
+import { npcActorId, splitNpcRef } from '@shared/worldNpcs'
 import { GameEntity, createComponent, spawn, type Catalog, type EntityRecord } from '@shared/game/core'
-import { getSheet, registerSheetSection, setDnd, setGame, setMind } from '../../engine/library/sheets'
+import { campaignOfActor, findSheet, getSheet, registerSheetSection, setDnd, setGame, setMind } from '../../engine/library/sheets'
+import { editHold } from '../../engine/library/holds'
 import { ToolError } from '../../engine/tools/types'
 import { noteFailure } from '../../engine/util/report'
 import { gameDefs } from './store'
 import { setEffectCatalog } from '../../engine/effects/catalog'
-import { saveInPlay } from '../../engine/worlds/playLayer'
 import { saves } from '../../engine/worlds/saves'
 import { assertOutOfCombat } from '../../engine/worlds/battleGate'
 
@@ -65,8 +66,9 @@ function appendStoryEntries(sheetId: string, events: ProgressionEventEntry[]): v
       createdAt,
       updatedAt: createdAt
     }))
-    const prev = s.mind?.memories ?? []
-    setMind(s.id, { ...(s.mind ?? {}), memories: [...prev, ...added] })
+    const campaign = campaignOfActor(s.id) ?? (s.save ? saves.read(s.save)?.almanacId || null : null)
+    if (campaign) editHold(s.id, campaign, (h) => ({ ...h, memories: [...h.memories, ...added] }))
+    else setMind(s.id, { ...(s.mind ?? {}), memories: [...(s.mind?.memories ?? []), ...added] })
   } catch (err) {
     noteFailure(err, 'game', 'Could not write progression event to Story Sheet')
   }
@@ -315,17 +317,10 @@ export function changeHealth(sheet: string, delta: number): { from: number; to: 
 }
 
 export function changeCreatureHealth(world: string, uid: string, delta: number): { from: number; to: number } {
-  const save = saveInPlay(world, true)
-  const creature = save?.creatures.find((c) => c.uid === uid)
-  if (!save || !creature) throw new ToolError('That creature is not in this save.')
-  const entity = GameEntity.fromRecord(creature, catalog())
-  const health = entity.comp(Health)
-  if (!health) throw new ToolError(`${creature.name} has no health.`)
-  const from = health.get()
-  health.set(from + delta)
-  const record = entity.toRecord()
-  saves.write({ ...save, creatures: save.creatures.map((c) => (c.uid === uid ? { ...record, faction: c.faction } : c)) })
-  return { from, to: health.get() }
+  const candidate = splitNpcRef(uid) ? uid : npcActorId(world, uid)
+  const resolved = findSheet(candidate, world)
+  if (!resolved) throw new ToolError('That NPC is not in this save.')
+  return changeHealth(resolved, delta)
 }
 
 export function takeItem(sheet: string, item: string, count: number): number {
@@ -402,20 +397,10 @@ export function sheetTarget(id: string, cat: Catalog): AbilityTarget {
 }
 
 export function creatureTarget(uid: string, world: string | null, cat: Catalog): AbilityTarget {
-  const save = world ? saveInPlay(world, true) : null
-  const creature = save?.creatures.find((c) => c.uid === uid)
-  if (!world || !creature) throw new ToolError('That creature is not in this save.')
-  const entity = GameEntity.fromRecord(creature, cat)
-  return {
-    entity,
-    title: creature.name,
-    persist: () => {
-      const now = saveInPlay(world, true)
-      if (!now) return
-      const next = entity.toRecord()
-      saves.write({ ...now, creatures: now.creatures.map((c) => (c.uid === uid ? { ...c, ...next } : c)) })
-    }
-  }
+  const candidate = splitNpcRef(uid) ? uid : world ? npcActorId(world, uid) : uid
+  const resolved = findSheet(candidate, world)
+  if (!resolved) throw new ToolError('That NPC is not in this save.')
+  return sheetTarget(resolved, cat)
 }
 
 export function useAbility(sheet: string, ability: string, target: EffectTargetRef | null, world: string | null, at: Point | null, distance: number): string {
@@ -650,19 +635,10 @@ export function onEntityMoved(opts: { sheet?: string; world?: string; token?: st
     return { triggered }
   }
   if (opts.world && opts.token) {
-    const save = saveInPlay(opts.world, true)
-    const creature = save?.creatures.find((c) => c.uid === opts.token)
-    if (!save || !creature) return { triggered }
-    const entity = GameEntity.fromRecord(creature, cat)
-    entity.start()
-    try {
-      entity.signals.on('OnBuffApplied', (p) => triggered.push(String(p.buff ?? 'buff')))
-      entity.emit('OnMove', { distance })
-      const record = entity.toRecord()
-      saves.write({ ...save, creatures: save.creatures.map((c) => (c.uid === opts.token ? { ...record, faction: c.faction } : c)) })
-    } finally {
-      entity.stop()
-    }
+    const candidate = splitNpcRef(opts.token) ? opts.token : (findSheet(opts.token, opts.world) ?? npcActorId(opts.world, opts.token))
+    const resolved = findSheet(candidate, opts.world)
+    if (!resolved) return { triggered }
+    return onEntityMoved({ sheet: resolved, distance })
   }
   return { triggered }
 }

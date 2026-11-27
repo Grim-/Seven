@@ -49,7 +49,7 @@ export function EffectsEditor({ host, value, onChange, lanes, aside = true }: { 
   const tries = hostTries(host)
   return (
     <EffectsContext.Provider value={scope}>
-      <div onKeyDown={keys} className="flex min-w-0 flex-wrap gap-x-5 gap-y-4 border border-line/50 bg-black/40">
+      <div onKeyDown={keys} className="flex min-w-0 flex-wrap gap-x-5 gap-y-4 border border-line/50 tone-panel-40">
         <div className="flex min-w-0 flex-[1_1_28rem] flex-col gap-5 p-4">
           {editing.tree.map((l, i) => (
             <section key={l.lane.event} className="flex flex-col gap-2.5">
@@ -63,7 +63,7 @@ export function EffectsEditor({ host, value, onChange, lanes, aside = true }: { 
             <Popover
               align="end"
               className="notch-sm w-[min(22rem,94vw)] p-4"
-              triggerClassName="inline-flex items-center gap-2 border border-dashed border-[#2f3340] px-2.5 py-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-dim hover:border-accent hover:text-accent"
+              triggerClassName="inline-flex items-center gap-2 border border-dashed border-ink/15 px-2.5 py-1.5 font-label text-[10.5px] font-bold caps-12 text-dim hover:border-accent hover:text-accent"
               trigger={
                 <>
                   <Play className="h-3 w-3" />
@@ -76,7 +76,7 @@ export function EffectsEditor({ host, value, onChange, lanes, aside = true }: { 
           </div>
         )}
         {aside && (
-          <aside className="flex min-w-0 flex-[1_1_16rem] flex-col gap-5 border-l border-line/50 bg-black/30 p-4">
+          <aside className="flex min-w-0 flex-[1_1_16rem] flex-col gap-5 border-l border-line/50 tone-panel-30 p-4">
             <EffectsInWords tree={editing.tree} />
             {tries && <EffectsTry defs={value} lanes={using} />}
           </aside>

@@ -25,7 +25,7 @@ export function pickFolder(onPicked: (path: string) => void): void {
 export function FileField({ value, onChange, filters = [], folder = false, placeholder = folder ? 'No folder' : 'No file' }: { value: string; onChange: (path: string) => void; filters?: FileFilter[]; folder?: boolean; placeholder?: string }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
-      <span title={value || undefined} className={cn('min-w-0 truncate font-mono text-[12px]', folder ? 'flex-1' : 'max-w-72', value ? 'text-white' : 'text-faint')}>
+      <span title={value || undefined} className={cn('min-w-0 truncate font-mono text-[12px]', folder ? 'flex-1' : 'max-w-72', value ? 'text-ink' : 'text-faint')}>
         {value ? (folder ? value : fileName(value)) : placeholder}
       </span>
       <Button size="sm" variant="ghost" icon={<FolderOpen />} onClick={() => (folder ? pickFolder(onChange) : pickFile(filters, onChange))}>

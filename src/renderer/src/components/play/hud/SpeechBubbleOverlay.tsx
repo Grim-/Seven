@@ -28,7 +28,7 @@ function BubbleItem({
         top: `${screenY - 24}px`,
         transform: 'translate(-50%, -100%)'
       }}
-      className={`pointer-events-auto absolute z-40 flex flex-col border-2 border-accent bg-black/95 p-2.5 font-mono text-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.9)] backdrop-blur transition-all duration-150 ${
+      className={`pointer-events-auto absolute z-40 flex flex-col border-2 border-accent tone-panel-95 p-2.5 font-ui text-[12px] shadow-[0_8px_32px_color-mix(in_srgb,var(--color-shade)_90%,transparent)] backdrop-blur-[var(--panel-blur)] transition-all duration-150 ${
         wide ? 'max-h-[360px] w-[min(540px,90vw)]' : 'max-h-[220px] w-[min(340px,80vw)]'
       }`}
     >
@@ -38,20 +38,20 @@ function BubbleItem({
       />
 
       {/* HEADER */}
-      <div className="flex items-center justify-between border-b border-line pb-1 text-[9px] font-bold uppercase tracking-wider text-faint">
+      <div className="flex items-center justify-between border-b border-line pb-1 text-[9px] font-bold caps-5 text-faint">
         <span className="text-accent">{bubble.speakerName}</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setWide(!wide)}
-            className="text-cyan hover:underline"
+            className="text-tint-cyan hover:underline"
           >
             [{wide ? 'COMPACT' : 'WIDE'}]
           </button>
           <button
             type="button"
             onClick={() => dismiss(bubble.sheet)}
-            className="text-faint hover:text-white"
+            className="text-faint hover:text-ink"
           >
             ✕
           </button>
@@ -59,7 +59,7 @@ function BubbleItem({
       </div>
 
       {/* BODY CONTENT - FLUID AUTO-EXPANDING */}
-      <div className="mt-1.5 overflow-y-auto leading-relaxed text-white">
+      <div className="mt-1.5 overflow-y-auto leading-relaxed text-ink">
         {bubble.text}
       </div>
     </div>

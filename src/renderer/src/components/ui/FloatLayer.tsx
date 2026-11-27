@@ -60,7 +60,7 @@ export function FloatLayer({
       ref={box}
       data-layer
       style={{ position: 'fixed', left: 0, top: 0, visibility: 'hidden' }}
-      className={cn('z-[500] flex max-h-[calc(100vh-8px)] tablet:max-h-[calc(100%-12px)] tablet:max-w-[calc(100%-8px)] flex-col overflow-y-auto border border-line bg-[#0b0b0b] shadow-xl', className)}
+      className={cn('z-[500] flex max-h-[calc(100vh-8px)] tablet:max-h-[calc(100%-12px)] tablet:max-w-[calc(100%-8px)] flex-col overflow-y-auto border border-line bg-surface shadow-xl', className)}
     >
       {children}
     </div>,

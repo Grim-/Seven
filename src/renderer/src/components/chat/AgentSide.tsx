@@ -64,14 +64,14 @@ function BarAgentHand({
   return (
     <div
       style={{ height }}
-      className="relative flex items-center gap-2 border border-line/50 bg-black/60 px-2"
+      className="relative flex items-center gap-2 border border-line/50 tone-panel-60 px-2"
     >
       {sheet ? (
         <CharacterAvatar sheetId={sheet} size={avatarPx} openOnClick />
       ) : (
         <AgentAvatar agent={agent} size={avatarPx} />
       )}
-      <span className="max-w-28 truncate font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-white/90">
+      <span className="max-w-28 truncate font-label text-[10px] font-semibold caps-10 text-ink/90">
         {name}
       </span>
       {status && <StatusChip status={status} />}
@@ -92,7 +92,7 @@ function BarAgentHand({
                   onClick={() => fronts && void showInPanel(`card/${h.id}`)}
                   style={{ left: i * step, height: cardH, width: cardW, zIndex: isHovered ? held.length + 1 : i + 1 }}
                   className={cn(
-                    'absolute top-0 cursor-pointer overflow-hidden border bg-black/80 shadow-md transition-colors',
+                    'absolute top-0 cursor-pointer overflow-hidden border tone-well-80 shadow-md transition-colors',
                     isHovered ? 'border-accent ring-1 ring-accent/60' : 'border-accent/50 hover:border-accent'
                   )}
                 >
@@ -107,14 +107,14 @@ function BarAgentHand({
               )
             })}
           </div>
-          <span className="font-mono text-[10px] font-semibold text-accent">
+          <span className="font-ui text-[10px] font-semibold text-accent">
             {held.reduce((n, c) => n + c.count, 0)}
           </span>
           <button
             type="button"
             onClick={() => setFronts((v) => !v)}
             title={fronts ? `Hide ${name}'s card fronts` : `Show ${name}'s card fronts`}
-            className="flex h-5 w-5 items-center justify-center text-dim hover:text-white cursor-pointer"
+            className="flex h-5 w-5 items-center justify-center text-dim hover:text-ink cursor-pointer"
           >
             {fronts ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
           </button>
@@ -125,7 +125,7 @@ function BarAgentHand({
         createPortal(
           <div
             style={{ top: hovered.top, left: hovered.left, width: PREVIEW_W }}
-            className="pointer-events-none fixed z-[90] drop-shadow-[0_14px_36px_rgba(0,0,0,0.9)]"
+            className="pointer-events-none fixed z-[90] drop-shadow-[0_14px_36px_color-mix(in_srgb,var(--color-shade)_90%,transparent)]"
           >
             <div className="relative w-full">
               {fronts ? <LiveCard id={hoveredCard.id} /> : <CardBack className="w-full" />}

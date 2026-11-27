@@ -4,7 +4,6 @@ import { Button, ListPane, ListToggle, MainPane, ReadingPane, SearchBox, Split }
 import { useListPrefs } from '../../lib/listPrefs'
 import { useCompactLayout } from '../../lib/form'
 import { useLibrary } from '../../lib/library'
-import { useData } from '../../store/data'
 import { Everything } from './Everything'
 import { KindHeader } from './KindHeader'
 import { KindPane } from './KindPane'
@@ -15,7 +14,6 @@ import { recordOpenedEntry, useRecentEntries } from '../../lib/recentData'
 import { useRememberedLocation } from '../../lib/window'
 import type { DataSelection } from '../../store/data'
 import { useDataHistory } from '../../store/dataHistory'
-import { noteFailure } from '../../store/problems'
 
 function useQuery(): [string, string, (q: string) => void] {
   const [query, setQuery] = useState('')
@@ -41,19 +39,13 @@ export function DataWindow() {
   const canBack = useDataHistory((s) => s.past.length > 0 && !s.checking)
   const back = () => void useDataHistory.getState().goBack(sections)
   const recentEntries = useRecentEntries()
-  const { sections: found } = useLibrary(q, 20, skip)
+  const { sections: found } = useLibrary(q, 20, skip, null, Boolean(q))
   useEffect(() => {
     if (sections) rememberSections(sections)
   }, [sections])
   useEffect(() => {
     if (selected && selected.id && selected.id !== 'all') recordOpenedEntry(selected.kind, selected.id)
   }, [selected?.kind, selected?.id])
-  useEffect(() => {
-    void useData
-      .getState()
-      .refresh()
-      .catch(noteFailure('library', 'Could not refresh the library'))
-  }, [])
 
   const kind = selected ? (kindUi(selected.kind).showsAs ?? selected.kind) : null
   const Browser = kind ? kindUi(kind).browser : undefined
@@ -131,7 +123,7 @@ export function DataWindow() {
         <MainPane id="data-main">
           <section className="flex h-full min-w-0 flex-1 flex-col gap-3">
             {sections === null ? (
-              <div className="font-mono text-[11px] text-dim">Loading…</div>
+              <div className="font-ui text-[11px] text-dim">Loading…</div>
             ) : selected && section ? (
               <>
                 <KindHeader section={section} selected={selected} select={select} lead={toggle} canBack={canBack} onBack={back} />

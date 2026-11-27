@@ -34,11 +34,11 @@ export function TilePaletteBar({
   activeLayerName = 'Ground'
 }: TilePaletteBarProps) {
   return (
-    <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 border border-line bg-black/95 px-3 py-2 shadow-[0_12px_32px_rgba(0,0,0,0.9)] backdrop-blur-md">
+    <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 border border-line tone-panel-95 px-3 py-2 shadow-[0_12px_32px_color-mix(in_srgb,var(--color-shade)_90%,transparent)] backdrop-blur-[calc(var(--panel-blur)*1.5)]">
       {/* Target Layer Indicator */}
       <div className="flex flex-col border-r border-line/40 pr-3">
-        <span className="font-mono text-[9px] uppercase tracking-wider text-dim">Painting On</span>
-        <span className="font-mono text-[11px] font-semibold text-cyan truncate max-w-[120px]">
+        <span className="font-label text-[9px] caps-5 text-dim">Painting On</span>
+        <span className="font-ui text-[11px] font-semibold text-secondary-ink truncate max-w-[120px]">
           {activeLayerName}
         </span>
       </div>
@@ -54,13 +54,13 @@ export function TilePaletteBar({
               onClick={() => onSelectGid(t.gid)}
               className={`group relative h-7 w-7 border transition-all ${
                 isSelected
-                  ? 'scale-110 border-cyan shadow-[0_0_8px_var(--color-cyan)]'
-                  : 'border-line hover:border-white'
+                  ? 'scale-110 border-secondary-ink shadow-[0_0_8px_color-mix(in_srgb,var(--color-cyan)_calc(100%*var(--glow)),transparent)]'
+                  : 'border-line hover:border-ink'
               }`}
               style={{ backgroundColor: t.color }}
               title={`${t.label} (Tile GID ${t.gid})`}
             >
-              <span className="pointer-events-none absolute -bottom-6 left-1/2 hidden -translate-x-1/2 whitespace-nowrap border border-line bg-black px-1.5 py-0.5 font-mono text-[9px] uppercase text-dim group-hover:block z-40">
+              <span className="pointer-events-none absolute -bottom-6 left-1/2 hidden -translate-x-1/2 whitespace-nowrap border border-line bg-well px-1.5 py-0.5 font-label text-[9px] caps text-dim group-hover:block z-40">
                 {t.label}
               </span>
             </button>
@@ -76,7 +76,7 @@ export function TilePaletteBar({
             size="sm"
             variant={brushSize === size ? 'primary' : 'secondary'}
             onClick={() => onSetBrushSize(size)}
-            className="h-7 w-7 p-0 font-mono text-[11px]"
+            className="h-7 w-7 p-0 font-ui text-[11px]"
             title={`Brush size ${size}×${size} tiles`}
           >
             {size}x

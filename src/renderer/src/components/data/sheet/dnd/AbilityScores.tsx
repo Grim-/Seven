@@ -17,10 +17,10 @@ export function AbilityScores({
         {DND_STATS.map((k) => (
           <div key={k} className="flex flex-col border-t border-line/25 pt-1.5 first:border-t-0">
             <div className="flex items-baseline gap-2" title={DND_STAT_NAMES[k]}>
-              <span className="w-9 font-mono text-[11px] font-bold tracking-[0.1em] text-accent-soft">
+              <span className="w-9 font-ui text-[11px] font-bold tracking-[0.1em] text-accent-soft">
                 {k.toUpperCase()}
               </span>
-              <span className="w-10 font-mono text-[17px] font-bold text-cyan">
+              <span className="w-10 font-ui text-[17px] font-bold text-secondary-ink">
                 {modifier(dnd.stats[k])}
               </span>
               <InlineNumber

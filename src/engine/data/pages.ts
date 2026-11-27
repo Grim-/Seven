@@ -10,7 +10,6 @@ import { copyPath, readJson, readText, removePath, renamePath, writeJson } from 
 import { DirIndex } from '../util/dirIndex'
 import { LIMITS } from '../limits'
 import { DataError, cleanFields, coerce, compare, matches, slug, validateValues } from './validate'
-import { kindFolders } from './kindFolders'
 import { scoreDoc } from '../library/query'
 
 export interface WriteContext {
@@ -141,9 +140,14 @@ export class PageStore {
 
   private removed: (id: string, up: string | null) => void = () => undefined
   private defaultParent: () => string | null = () => null
+  private placer: (type: string | null) => string | null = () => this.defaultParent()
 
   setDefaultParent(fn: () => string | null): void {
     this.defaultParent = fn
+  }
+
+  setPlacer(fn: (type: string | null) => string | null): void {
+    this.placer = fn
   }
 
   setOnRemove(fn: (id: string, up: string | null) => void): void {
@@ -382,8 +386,8 @@ export class PageStore {
       return chain.join('/')
     }
     const relink = (text: string): string =>
-      text.replace(referencePattern(), (whole, lead: string, kind: string, ref: string, part: string | undefined) => {
-        const tail = part ? `#${part}` : ''
+      text.replace(referencePattern(), (whole, lead: string, kind: string, ref: string, action: string | undefined, part: string | undefined) => {
+        const tail = `${action ? `:${action}` : ''}${part ? `#${part}` : ''}`
         if (kind.toLowerCase() === 'page') {
           const target = oldFind(ref)
           if (!target) return whole
@@ -442,7 +446,8 @@ export class PageStore {
   }
 
   private pageIndex: DirIndex<{ page: StoredPage; meta: PageMeta }> | null = null
-  private metaMemo: { items: unknown; list: PageMeta[] } | null = null
+  private metaMemo: { items: unknown; all: PageMeta[]; shown: PageMeta[] } | null = null
+  private withheld = new Set<string>()
 
   private get index(): DirIndex<{ page: StoredPage; meta: PageMeta }> {
     this.pageIndex ??= new DirIndex(
@@ -530,17 +535,32 @@ export class PageStore {
     return out
   }
 
-  list(): PageMeta[] {
+  withhold(types: string[]): void {
+    const next = new Set(types)
+    if (next.size === this.withheld.size && types.every((t) => this.withheld.has(t))) return
+    this.withheld = next
+    if (this.metaMemo) this.metaMemo = { ...this.metaMemo, shown: this.shownOf(this.metaMemo.all) }
+  }
+
+  private shownOf(all: PageMeta[]): PageMeta[] {
+    return this.withheld.size ? all.filter((p) => !p.type || !this.withheld.has(p.type)) : all
+  }
+
+  private metas(): { all: PageMeta[]; shown: PageMeta[] } {
     this.all()
     const items = this.index.values()
     if (this.metaMemo?.items !== items) {
       const ids = new Set(items.map((v) => v.value.page.id))
-      const list = items
+      const all = items
         .map(({ value: { page, meta } }) => ({ ...meta, parent: page.parent && page.parent !== page.id && ids.has(page.parent) ? page.parent : null }))
         .sort((a, b) => a.title.localeCompare(b.title))
-      this.metaMemo = { items, list }
+      this.metaMemo = { items, all, shown: this.shownOf(all) }
     }
-    return [...this.metaMemo.list]
+    return this.metaMemo
+  }
+
+  list(): PageMeta[] {
+    return [...this.metas().shown]
   }
 
   tree(): PageTree {
@@ -569,12 +589,15 @@ export class PageStore {
     if (!raw) return null
     const rawLower = raw.toLowerCase()
     const list = this.list()
+    // Exact ID match (including case-insensitive) must come before path lookup so a nested item whose ID matches a top-level name never resolves to the top-level item.
+    const exact =
+      list.find((p) => p.id === raw && accept(p)) ??
+      list.find((p) => p.id.toLowerCase() === rawLower && accept(p))
+    if (exact) return exact
     const id = toId(raw)
     const byPath = id ? new PageTree(list).at(id) : null
     if (byPath && accept(byPath)) return byPath
-    const byId =
-      list.find((p) => p.id === raw && accept(p)) ??
-      list.find((p) => (p.id.toLowerCase() === rawLower || (id !== '' && (p.id === id || toId(p.id) === id))) && accept(p))
+    const byId = id !== '' ? list.find((p) => (p.id === id || toId(p.id) === id) && accept(p)) : undefined
     if (byId) return byId
     const aliases = this.aliases()
     const alias = aliases[raw] ?? aliases[rawLower] ?? aliases[id]
@@ -607,7 +630,7 @@ export class PageStore {
   }
 
   private checkName(title: string, parent: string | null, except: string | null): void {
-    const tree = this.tree()
+    const tree = new PageTree([...this.metas().all])
     const clash = tree.taken(title, parent, except)
     if (clash) throw new DataError(`${pageKindOf(clash.type)} ${tree.pathOf(clash.id)} already exists. Pick another id.`)
   }
@@ -702,7 +725,7 @@ export class PageStore {
     return parent
   }
 
-  create(input: { title: string; body?: string | null; fields?: unknown; type?: string | null; data?: unknown; parent?: string | null }, ctx: WriteContext = {}): Page {
+  create(input: { title: string; body?: string | null; fields?: unknown; type?: string | null; data?: unknown; parent?: string | null; fixedParent?: boolean }, ctx: WriteContext = {}): Page {
     const path = (input.title ?? '').split('/').map(idSegment).filter(Boolean)
     if (path.length > 1) {
       const folder = this.makeFolders(path.slice(0, -1).join('/'), ctx, input.parent === undefined ? null : this.folderOf(input.parent))
@@ -711,16 +734,8 @@ export class PageStore {
     const title = path[0] ?? ''
     if (!title) throw new DataError('An id needs letters or numbers.')
     if (input.type === FOLDER_TYPE && input.body?.trim()) throw new DataError('A folder holds no text. Put the text in a page inside it.')
-    let resolvedParent: string | null
-    if (input.parent !== undefined && input.parent !== null) {
-      resolvedParent = this.folderOf(input.parent)
-    } else if (input.type && input.type !== FOLDER_TYPE) {
-      const configured = kindFolders.forKind(pageKindOf(input.type))
-      resolvedParent = configured ? this.makeFolders(configured, ctx) : this.folderOf(input.parent === undefined ? this.defaultParent() : null)
-    } else {
-      resolvedParent = this.folderOf(input.parent === undefined ? this.defaultParent() : input.parent)
-    }
-    const parent = resolvedParent
+    const placed = input.type !== FOLDER_TYPE && !input.fixedParent && (input.type ? !input.parent : input.parent === undefined)
+    const parent = input.parent ? this.folderOf(input.parent) : placed ? this.placer(input.type ?? null) : this.folderOf(input.parent === undefined && !input.fixedParent ? this.defaultParent() : null)
     this.checkName(title, parent, null)
     const now = Date.now()
     const id = slug(title) || 'page'
@@ -1057,8 +1072,9 @@ export class PageStore {
     const pages = filter ? this.all().filter(filter) : this.all()
     if (!trimmed) return pages.slice(0, limit).map((p) => ({ id: p.id, title: p.title, snippet: summaryOf(p.body) }))
     const hits: (PageHit & { score: number })[] = []
+    const tree = this.tree()
     for (const p of pages) {
-      const pathStr = this.pathOf(p.id)
+      const pathStr = tree.pathOf(p.id)
       const fields = [
         ...(pathStr && pathStr !== p.title ? [{ name: 'Path', value: pathStr }] : []),
         { name: 'Id', value: p.id },

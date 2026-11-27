@@ -42,7 +42,7 @@ function AvatarStage({ id }: EntrySurfaceProps) {
   return (
     <div className="flex h-[70vh] flex-col gap-3">
       <LiveAvatar avatar={avatar} className="min-h-0 w-full flex-1" />
-      <div className="font-mono text-[13px] uppercase tracking-[0.2em] text-accent">{avatar.name}</div>
+      <div className="font-label text-[13px] caps-20 text-accent">{avatar.name}</div>
     </div>
   )
 }

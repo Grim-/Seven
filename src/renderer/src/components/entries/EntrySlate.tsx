@@ -366,11 +366,11 @@ export function SlateContainer({
     >
       <div
         className={cn(
-          'notch-sm relative flex min-h-0 flex-1 flex-col border border-l-2 border-l-accent bg-[#060b10]/78 backdrop-blur-md',
+          'notch-sm relative flex min-h-0 flex-1 flex-col border border-l-2 border-l-accent tone-surface-78 backdrop-blur-[calc(var(--panel-blur)*1.5)]',
           !interacting && 'transition-[border-color,box-shadow]',
           justUpdated
-            ? 'border-accent shadow-[0_0_28px_color-mix(in_srgb,var(--color-accent)_35%,transparent)]'
-            : 'border-line shadow-[0_14px_38px_rgba(0,0,0,0.85)] hover:border-line/90'
+            ? 'border-accent shadow-[0_0_28px_color-mix(in_srgb,var(--color-accent)_calc(35%*var(--glow)),transparent)]'
+            : 'border-line shadow-[0_14px_38px_color-mix(in_srgb,var(--color-shade)_85%,transparent)] hover:border-line/90'
         )}
       >
         {/* Header: single smooth compact line; click anywhere on header to expand/collapse (or restore when maximized), drag to move */}
@@ -389,7 +389,7 @@ export function SlateContainer({
           className={cn(
             '@container slate-drag-handle flex h-7 shrink-0 items-center gap-1.5 overflow-hidden px-2 whitespace-nowrap select-none @[160px]:px-2.5',
             showBody && 'border-b border-line/40',
-            (onToggleExpand || onHeaderPointerDown || fillCell || maximized) && 'cursor-pointer hover:bg-white/[0.03]'
+            (onToggleExpand || onHeaderPointerDown || fillCell || maximized) && 'cursor-pointer hover:bg-ink/[0.03]'
           )}
         >
         {onToggleExpand && !maximized && !fillCell && (
@@ -400,17 +400,17 @@ export function SlateContainer({
         {thumb && !showBody && <div className="h-4 w-4 shrink-0 overflow-hidden border border-line/60">{thumb}</div>}
         <span
           title={typeof subtitle === 'string' ? subtitle : undefined}
-          className="min-w-0 flex-1 truncate text-[11.5px] font-semibold uppercase tracking-[0.06em] text-white"
+          className="min-w-0 flex-1 truncate text-[11.5px] font-semibold caps-6 text-ink"
         >
           {title}
         </span>
         {justUpdated && (
-          <span className="hidden shrink-0 items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-mono text-[8.5px] font-bold uppercase leading-none tracking-[0.14em] text-accent animate-pulse @[180px]:flex">
+          <span className="hidden shrink-0 items-center gap-1 border border-accent bg-accent/20 px-1.5 py-px font-label text-[8.5px] font-bold caps-14 leading-none text-accent animate-pulse @[180px]:flex">
             <Sparkles className="h-2.5 w-2.5" />
             UPDATED
           </span>
         )}
-        <span className="hidden shrink-0 border border-teal/35 px-1 py-px font-mono text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-teal @[220px]:inline-flex">
+        <span className="hidden shrink-0 border border-secondary/35 px-1 py-px font-label text-[9px] font-semibold caps-12 leading-none text-secondary @[220px]:inline-flex">
           {tag}
         </span>
         <div
@@ -440,7 +440,7 @@ export function SlateContainer({
                 type="button"
                 onClick={onShowInPanel}
                 title="Show in chat panel"
-                className="p-0.5 text-dim transition-colors hover:text-white cursor-pointer"
+                className="p-0.5 text-dim transition-colors hover:text-ink cursor-pointer"
               >
                 <PanelRight className="h-3 w-3" />
               </button>
@@ -450,7 +450,7 @@ export function SlateContainer({
                 type="button"
                 onClick={onOpenData}
                 title="Open in Data"
-                className="p-0.5 text-dim transition-colors hover:text-white cursor-pointer"
+                className="p-0.5 text-dim transition-colors hover:text-ink cursor-pointer"
               >
                 <ExternalLink className="h-3 w-3" />
               </button>
@@ -472,7 +472,7 @@ export function SlateContainer({
             title={maximized ? `Restore slate (${focusKey} / Esc)` : `Maximize slate (${focusKey})`}
             className={cn(
               'p-0.5 transition-colors cursor-pointer',
-              maximized ? 'text-accent hover:text-white' : 'text-dim hover:text-white'
+              maximized ? 'text-accent hover:text-ink' : 'text-dim hover:text-ink'
             )}
           >
             {maximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
@@ -534,7 +534,7 @@ export function SlateContainer({
         onClick={(e) => {
           if (e.target === e.currentTarget) toggleMaximize()
         }}
-        className="pointer-events-auto fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-3 backdrop-blur-md"
+        className="pointer-events-auto fixed inset-0 z-[200] flex items-center justify-center bg-scrim/90 p-3 backdrop-blur-[calc(var(--panel-blur)*1.5)]"
       >
         <div className="relative h-full w-full">
           {slateBody}
@@ -568,7 +568,7 @@ export function SlateContainer({
             initial={{ opacity: 0.45, x: 0, y: 0, scaleX: 1, scaleY: 1 }}
             animate={{ opacity: 0, ...focusFlipFromRect(returnEcho) }}
             transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
-            className="pointer-events-none fixed inset-3 z-[200] border border-accent/60 bg-accent/5 shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_22%,transparent)]"
+            className="pointer-events-none fixed inset-3 z-[200] border border-accent/60 bg-accent/5 shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_calc(22%*var(--glow)),transparent)]"
           />,
           document.body
         )}
@@ -619,11 +619,11 @@ export function EntrySlate({
     ) : (
       <>
         {preview && !('missing' in preview) && preview.image && (
-          <div className="max-h-64 overflow-hidden border border-line/50 bg-black/50">
+          <div className="max-h-64 overflow-hidden border border-line/50 tone-panel-50">
             <AssetMedia id={preview.image} className="h-full w-full object-cover" />
           </div>
         )}
-        {subtitle && <div className="font-mono text-[11px] text-dim">{subtitle}</div>}
+        {subtitle && <div className="font-ui text-[11px] text-dim">{subtitle}</div>}
         {fields.length > 0 && (
           <Facts
             rows={fields.map((f): [string, ReactNode] => [
@@ -633,14 +633,14 @@ export function EntrySlate({
           />
         )}
         {cardBody && fields.length === 0 && (
-          <div className="text-[12.5px] leading-relaxed text-white/90">
+          <div className="text-[12.5px] leading-relaxed text-ink/90">
             <Markdown text={cardBody} />
           </div>
         )}
         {preview && 'missing' in preview && (
-          <div className="font-mono text-[11px] text-dim">{preview.missing}</div>
+          <div className="font-ui text-[11px] text-dim">{preview.missing}</div>
         )}
-        {!preview && <div className="font-mono text-[11px] text-dim">Loading…</div>}
+        {!preview && <div className="font-ui text-[11px] text-dim">Loading…</div>}
       </>
     )
 

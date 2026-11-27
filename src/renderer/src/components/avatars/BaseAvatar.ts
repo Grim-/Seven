@@ -1,8 +1,10 @@
 import { avatarRendererInfo, avatarSizeOf, type Avatar, type AvatarRendererInfo } from '@shared/avatars'
 import { NEUTRAL_MOOD, isMood, isReactionPose, moodDef, nearestMood } from '@shared/moods'
-import { isThemeColor, type FrameEntry, type SettingValue, type SettingValues } from '@shared/settingSpec'
+import type { FrameEntry, SettingValue, SettingValues } from '@shared/settingSpec'
 import { Animated } from '../animated/Animated'
 import { MediaLayer } from './mediaLayer'
+import { asFlag, asNumber, asText, posedValue, themedColor } from './posedValues'
+import { TreatmentStack } from './treatments/TreatmentStack'
 import type { AvatarSignals, SignalSource } from './signals'
 
 const REACTION_MS = 1600
@@ -16,6 +18,8 @@ export abstract class BaseAvatar extends Animated<SettingValues> {
   protected readonly media = new MediaLayer(() => this.refresh())
   private moodKeys: string[] = []
   private activeReaction: { key: string; until: number; restart: boolean } | null = null
+  private readonly stack = new TreatmentStack()
+  private output: HTMLCanvasElement | null = null
 
   constructor(avatar: Avatar, source: SignalSource) {
     super({ accent: '', secondary: '', base: '' }, avatar.settings)
@@ -23,13 +27,22 @@ export abstract class BaseAvatar extends Animated<SettingValues> {
     this.info = avatarRendererInfo(avatar.renderer)
     this.source = source
     this.noteKeys()
+    this.stack.set(avatar.treatments ?? [])
   }
 
   setAvatar(avatar: Avatar): void {
     this.avatar = avatar
     this.info = avatarRendererInfo(avatar.renderer)
     this.noteKeys()
+    this.stack.set(avatar.treatments ?? [])
+    this.reschedule()
     this.setSettings(avatar.settings)
+  }
+
+  setOutput(canvas: HTMLCanvasElement | null): void {
+    this.output = canvas
+    this.reschedule()
+    this.refresh()
   }
 
   protected override onMount(): void {
@@ -43,6 +56,7 @@ export abstract class BaseAvatar extends Animated<SettingValues> {
     this.source.activityChanged = null
     this.source.reactionTriggered = null
     this.media.dispose()
+    this.stack.dispose()
   }
 
   protected override pixelRatio(): number {
@@ -51,7 +65,10 @@ export abstract class BaseAvatar extends Animated<SettingValues> {
 
   protected override still(): boolean {
     if (this.activeReaction && performance.now() < this.activeReaction.until) return false
-    return super.still() || Boolean(this.info?.stillAt.includes(avatarSizeOf(Math.min(this.width, this.height))))
+    if (super.still()) return true
+    const size = avatarSizeOf(Math.min(this.width, this.height))
+    if (this.output && this.stack.animatesAt(size)) return false
+    return Boolean(this.info?.stillAt.includes(size))
   }
 
   protected override onReaction(name: string, detail?: Record<string, unknown>): void {
@@ -76,6 +93,7 @@ export abstract class BaseAvatar extends Animated<SettingValues> {
       this.reschedule()
     }
     this.draw(dt, time, this.signals)
+    if (this.output && this.canvas) this.stack.run(this.output, this.canvas, { width: this.width, height: this.height, ratio: this.pixelRatio(), dt, time, still: this.still(), signals: this.signals })
   }
 
   protected paintMediaClip(clip: string, time: number, key: string | null, opts?: { clear?: boolean; scale?: number; ox?: number; oy?: number }): boolean {
@@ -123,22 +141,19 @@ export abstract class BaseAvatar extends Animated<SettingValues> {
   }
 
   protected value(name: string, key: string | null): SettingValue | undefined {
-    const posed = key ? this.avatar.poses[key]?.[name] : undefined
-    return posed !== undefined ? posed : this.settings[name]
+    return posedValue(this.settings, this.avatar.poses, name, key)
   }
 
   protected num(name: string, key: string | null): number {
-    const v = this.value(name, key)
-    return typeof v === 'number' ? v : 0
+    return asNumber(this.value(name, key))
   }
 
   protected text(name: string, key: string | null): string {
-    const v = this.value(name, key)
-    return typeof v === 'string' ? v : ''
+    return asText(this.value(name, key))
   }
 
   protected flag(name: string, key: string | null): boolean {
-    return this.value(name, key) === true
+    return asFlag(this.value(name, key))
   }
 
   protected frames(name: string, key: string | null, fallbackEmpty = true): FrameEntry[] {
@@ -148,8 +163,7 @@ export abstract class BaseAvatar extends Animated<SettingValues> {
   }
 
   protected color(name: string, key: string | null): string {
-    const v = this.text(name, key)
-    return isThemeColor(v) ? this.signals.colors[v as 'accent' | 'secondary'] : v || this.signals.colors.accent
+    return themedColor(this.text(name, key), this.signals.colors)
   }
 
   private noteKeys(): void {

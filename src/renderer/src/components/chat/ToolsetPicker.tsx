@@ -18,7 +18,7 @@ export function ToolsetPicker({ agent }: { agent: AgentProfile }) {
             <button key={t.id || '_none'} onClick={() => void changeAgent(agent, { toolsets: t.id ? [t.id] : [] }, 'toolset')} className={cn('flex items-start gap-2 px-3 py-1.5 text-left hover:bg-accent/10', on && 'bg-accent/5')}>
               <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', on ? 'text-accent' : 'invisible')} />
               <span className="min-w-0">
-                <span className="block truncate text-[12.5px] text-white/90">{t.name}</span>
+                <span className="block truncate text-[12.5px] text-ink/90">{t.name}</span>
                 {t.description && <span className="block truncate text-[11px] text-faint">{t.description}</span>}
               </span>
             </button>

@@ -59,7 +59,7 @@ export function ComposerView() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-center gap-3">
             <Segmented value={mode} options={MODES} onChange={setMode} />
-            <span className="font-mono text-[11px] text-dim">{draft.page ? `page · ${showName(draft.title)}` : 'draft · not saved'}</span>
+            <span className="font-ui text-[11px] text-dim">{draft.page ? `page · ${showName(draft.title)}` : 'draft · not saved'}</span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {mode === 'paper' && <Paper pad={pad} onMenu={() => setPicking(true)} />}

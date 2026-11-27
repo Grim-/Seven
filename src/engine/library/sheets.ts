@@ -5,13 +5,28 @@ import type { CharacterMind, CharacterSheet } from '@shared/types'
 import type { EntityRecord } from '@shared/game/core/GameEntity'
 import { cleanDnd, dndLine, dndRoleplay, dndText, type DndStats } from '@shared/dnd'
 import { cleanRelationships, formatRelationshipsMarkdown, type RelationshipEntry } from '@shared/relationships'
-import { cleanMemories, cleanStory, mindMemoriesText, storyHasContent, storyText, type Story } from '@shared/story'
+import { cleanStory, mindMemoriesText, storyHasContent, storyText, type Story } from '@shared/story'
+import {
+  cleanCharacterMind,
+  cleanEntityRecord,
+  SHEET_DEFAULT_FIELDS,
+  splitNpcRef,
+  stripSheetPrefix
+} from '@shared/worldNpcs'
+import {
+  actorSheetOwner,
+  findActorSheet,
+  notifyActorWhereChange,
+  onActorWhereChange,
+  registerActorSheetSource,
+  type SaveSheetInput
+} from '../actors/sheets'
 import { data } from '../data/hub'
 import { dataRoot } from '../util/paths'
 import { copyPath } from '../util/fs'
 
 export const SHEET_TYPE = 'sheet'
-export const SHEET_FIELDS = ['Identity', 'Appearance', 'Relations', 'Motivations & goals', 'Speech', 'Core beliefs']
+export const SHEET_FIELDS = SHEET_DEFAULT_FIELDS
 const OLD_DND_TYPE = 'dnd:character'
 
 interface SheetData {
@@ -27,42 +42,40 @@ interface SheetData {
   relationships?: RelationshipEntry[]
 }
 
-function gameRecord(raw: unknown): EntityRecord | null {
-  if (!raw || typeof raw !== 'object') return null
-  const r = raw as Partial<EntityRecord>
-  return typeof r.uid === 'string' && r.template && typeof r.template === 'object' && Array.isArray(r.comps) ? (r as EntityRecord) : null
-}
-
-function cleanMind(raw: unknown, legacyStory?: unknown): CharacterMind | null {
-  const m = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-  const reasoningStyle = typeof m.reasoningStyle === 'string' && m.reasoningStyle.trim() ? m.reasoningStyle.trim() : null
-  const howItThinks = typeof m.howItThinks === 'string' ? m.howItThinks.trim() : ''
-  const voiceConstraints = typeof m.voiceConstraints === 'string' ? m.voiceConstraints.trim() : ''
-  const forceReason = m.forceReason === true
-  const rawMemories = Array.isArray(m.memories)
-    ? m.memories
-    : legacyStory && typeof legacyStory === 'object' && Array.isArray((legacyStory as Record<string, unknown>).memories)
-      ? (legacyStory as Record<string, unknown>).memories
-      : []
-  const memories = cleanMemories(rawMemories)
-  if (!reasoningStyle && !howItThinks && !voiceConstraints && !forceReason && !memories.length) return null
-  return {
-    ...(reasoningStyle ? { reasoningStyle } : {}),
-    ...(howItThinks ? { howItThinks } : {}),
-    ...(voiceConstraints ? { voiceConstraints } : {}),
-    ...(forceReason ? { forceReason: true } : {}),
-    ...(memories.length ? { memories } : {})
-  }
-}
-
 function clean(raw: unknown): SheetData {
-  const d = (raw && typeof raw === 'object' ? raw : {}) as { fields?: unknown; values?: unknown; dnd?: unknown; game?: unknown; gameRules?: unknown; faction?: unknown; save?: unknown; story?: unknown; mind?: unknown; relationships?: unknown }
+  const d = (raw && typeof raw === 'object' ? raw : {}) as {
+    fields?: unknown
+    values?: unknown
+    dnd?: unknown
+    game?: unknown
+    gameRules?: unknown
+    faction?: unknown
+    save?: unknown
+    story?: unknown
+    mind?: unknown
+    relationships?: unknown
+  }
   const fields = Array.isArray(d.fields) ? [...new Set(d.fields.map((f) => String(f).trim()).filter(Boolean))] : [...SHEET_FIELDS]
   const values: Record<string, string> = {}
-  if (d.values && typeof d.values === 'object') for (const [k, v] of Object.entries(d.values as Record<string, unknown>)) if (typeof v === 'string') values[k] = v
+  if (d.values && typeof d.values === 'object') {
+    for (const [k, v] of Object.entries(d.values as Record<string, unknown>)) {
+      if (typeof v === 'string') values[k] = v
+    }
+  }
   const faction = typeof d.faction === 'string' ? d.faction.trim() || null : null
   const relationships = cleanRelationships(d.relationships)
-  return { fields, values, dnd: d.dnd ? cleanDnd(d.dnd) : null, game: gameRecord(d.game), gameRules: typeof d.gameRules === 'string' ? d.gameRules : '', faction, save: typeof d.save === 'string' ? d.save : '', story: cleanStory(d.story, d.dnd), mind: cleanMind(d.mind, d.story), ...(relationships.length ? { relationships } : {}) }
+  return {
+    fields,
+    values,
+    dnd: d.dnd ? cleanDnd(d.dnd) : null,
+    game: cleanEntityRecord(d.game),
+    gameRules: typeof d.gameRules === 'string' ? d.gameRules : '',
+    faction,
+    save: typeof d.save === 'string' ? d.save : '',
+    story: cleanStory(d.story, d.dnd),
+    mind: cleanCharacterMind(d.mind, d.story),
+    ...(relationships.length ? { relationships } : {})
+  }
 }
 
 function adoptDnd(): void {
@@ -92,6 +105,8 @@ export interface SheetInSave {
   game: EntityRecord | null
   gameRules: string
   where: string
+  world?: string
+  almanacId?: string | null
 }
 
 export interface SheetLayer {
@@ -106,9 +121,9 @@ export function setSheetLayer(next: SheetLayer): void {
   layer = next
 }
 
-function stored(ref: string): { page: ReturnType<typeof data.pages.get>; value: SheetData } {
+function storedPageSheet(ref: string): { page: ReturnType<typeof data.pages.get>; value: SheetData } {
   adoptDnd()
-  const page = data.pages.get(ref)
+  const page = data.pages.get(stripSheetPrefix(ref))
   if (page.type !== SHEET_TYPE) throw notFound(new Error(`${page.title} is not a character. find('sheet', null) lists characters.`))
   return { page, value: clean(page.data) }
 }
@@ -117,46 +132,27 @@ function inSave(id: string, value: SheetData): SheetInSave | null {
   return value.save && layer ? layer.read(id, value.save) : null
 }
 
-export function getSheet(ref: string): CharacterSheet {
-  const { page, value } = stored(ref)
+function getPageSheet(ref: string): CharacterSheet {
+  const { page, value } = storedPageSheet(ref)
   const live = inSave(page.id, value)
   const shown = live ? { ...value, game: live.game, gameRules: live.gameRules, story: { ...value.story, where: live.where } } : { ...value, save: '' }
   return { id: page.id, title: page.title, ...shown, image: page.image ?? null, updatedAt: page.updatedAt }
 }
 
-export function setSheetSave(ref: string, save: string, carried?: { game: EntityRecord | null; gameRules: string }): void {
-  const { page, value } = stored(ref)
-  data.pages.setData(page.id, { ...value, save, ...(carried ?? {}) })
-}
-
-export function storedGame(ref: string): { game: EntityRecord | null; gameRules: string; where: string } {
-  const { value } = stored(ref)
-  return { game: value.game, gameRules: value.gameRules, where: value.story.where }
-}
-
-export function findSheet(ref: string): string | null {
-  adoptDnd()
-  return data.pages.find(ref, (p) => p.type === SHEET_TYPE)?.id ?? null
-}
-
-const whereWatchers: ((sheet: string, where: string) => void)[] = []
-
-export function onWhereChange(fn: (sheet: string, where: string) => void): void {
-  whereWatchers.push(fn)
-}
-
-export function saveSheet(input: { id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story; mind?: CharacterMind | null; relationships?: RelationshipEntry[] }): CharacterSheet {
+function savePageSheet(input: SaveSheetInput): CharacterSheet {
   const title = input.title.trim()
   if (!title) throw new Error('Give the character a name, e.g. Mira.')
   if (input.id) {
-    const { page, value: current } = stored(input.id)
+    const { page, value: current } = storedPageSheet(input.id)
     const live = inSave(page.id, current)
     if (live && layer) {
-      if (input.game !== undefined && JSON.stringify(input.game) !== JSON.stringify(live.game)) layer.writeGame(page.id, current.save, input.game)
+      if (input.game !== undefined && JSON.stringify(input.game) !== JSON.stringify(live.game)) {
+        layer.writeGame(page.id, current.save, input.game)
+      }
       const where = input.story?.where
       if (where !== undefined && where !== live.where) {
         layer.writeWhere(page.id, current.save, where)
-        for (const fn of whereWatchers) fn(page.id, where)
+        notifyActorWhereChange(page.id, where)
       }
     }
     const story = input.story ? (live ? { ...input.story, where: current.story.where } : input.story) : current.story
@@ -174,8 +170,8 @@ export function saveSheet(input: { id: string | null; title: string; fields: str
     })
     if (title !== page.title) data.pages.write({ ref: page.id, title })
     data.pages.setData(page.id, value)
-    if (!live && value.story.where !== current.story.where) for (const fn of whereWatchers) fn(page.id, value.story.where)
-    return getSheet(page.id)
+    if (!live && value.story.where !== current.story.where) notifyActorWhereChange(page.id, value.story.where)
+    return getPageSheet(page.id)
   }
   const value = clean({
     fields: input.fields.length ? input.fields : SHEET_FIELDS,
@@ -189,7 +185,94 @@ export function saveSheet(input: { id: string | null; title: string; fields: str
     relationships: input.relationships
   })
   const page = data.pages.create({ title, type: SHEET_TYPE, data: value })
-  return getSheet(page.id)
+  return getPageSheet(page.id)
+}
+
+function findPageSheet(ref: string): string | null {
+  adoptDnd()
+  const cleanRef = stripSheetPrefix(ref)
+  if (!cleanRef || splitNpcRef(ref)) return null
+  return data.pages.find(cleanRef, (p) => p.type === SHEET_TYPE)?.id ?? null
+}
+
+registerActorSheetSource({
+  id: 'sheet',
+  priority: 10,
+  owns: (ref) => {
+    if (splitNpcRef(ref)) return false
+    const trimmed = ref.trim()
+    if (/^@?sheet:/i.test(trimmed)) return true
+    return data.pages.metaFor(stripSheetPrefix(trimmed))?.type === SHEET_TYPE
+  },
+  find: (ref) => findPageSheet(ref),
+  get: (id) => getPageSheet(id),
+  save: (input) => savePageSheet(input),
+  setImage: (id, image) => {
+    const { page } = storedPageSheet(id)
+    data.pages.setImage(page.id, image)
+  },
+  worldsOf: (id) => {
+    const { page, value } = storedPageSheet(id)
+    const live = inSave(page.id, value)
+    return live?.world ? [live.world] : []
+  },
+  campaignOf: (id) => {
+    const { page, value } = storedPageSheet(id)
+    return inSave(page.id, value)?.almanacId ?? null
+  }
+})
+
+export const onWhereChange = onActorWhereChange
+
+export function getSheet(ref: string): CharacterSheet {
+  const owner = actorSheetOwner(ref)
+  if (owner) return owner.get(ref)
+  const hit = findActorSheet(ref)
+  if (hit) return hit.source.get(hit.id)
+  return getPageSheet(ref)
+}
+
+export function setSheetSave(ref: string, save: string, carried?: { game: EntityRecord | null; gameRules: string }): void {
+  if (splitNpcRef(ref)) return
+  const { page, value } = storedPageSheet(ref)
+  data.pages.setData(page.id, { ...value, save, ...(carried ?? {}) })
+}
+
+export function storedGame(ref: string): { game: EntityRecord | null; gameRules: string; where: string } {
+  if (splitNpcRef(ref)) {
+    const s = getSheet(ref)
+    return { game: s.game ?? null, gameRules: s.gameRules ?? '', where: s.story.where }
+  }
+  const { value } = storedPageSheet(ref)
+  return { game: value.game, gameRules: value.gameRules, where: value.story.where }
+}
+
+export function findSheet(ref: string, worldHint?: string | null): string | null {
+  return findActorSheet(ref, worldHint)?.id ?? null
+}
+
+export function saveSheet(input: SaveSheetInput): CharacterSheet {
+  if (input.id) {
+    const owner = actorSheetOwner(input.id)
+    if (owner) return owner.save(input)
+  }
+  return savePageSheet(input)
+}
+
+export function setSheetImage(ref: string, image: string | null): CharacterSheet {
+  const owner = actorSheetOwner(ref) ?? findActorSheet(ref)?.source
+  if (owner) {
+    owner.setImage(ref, image)
+    return owner.get(ref)
+  }
+  const { page } = storedPageSheet(ref)
+  data.pages.setImage(page.id, image)
+  return getPageSheet(page.id)
+}
+
+export function campaignOfActor(ref: string): string | null {
+  const hit = findActorSheet(ref)
+  return hit ? hit.source.campaignOf(hit.id) : null
 }
 
 export function setDnd(ref: string, dnd: DndStats | null): CharacterSheet {
@@ -228,13 +311,13 @@ export function registerSheetSection(section: (sheet: CharacterSheet) => string 
   sections.push(section)
 }
 
-export function characterMindFor(refs: string[]): CharacterMind | null {
+export function characterMindFor(refs: string[], worldHint?: string | null): CharacterMind | null {
   let reasoningStyle: string | null = null
   const thinks: string[] = []
   const constraints: string[] = []
   let forceReason = false
   for (const ref of refs) {
-    const id = findSheet(ref)
+    const id = findSheet(ref, worldHint)
     if (!id) continue
     const m = getSheet(id).mind
     if (!m) continue
@@ -253,7 +336,10 @@ export function characterMindFor(refs: string[]): CharacterMind | null {
 }
 
 export function sheetMarkdown(ref: string, roleplay = false): string {
-  const s = getSheet(ref)
+  return sheetMarkdownOf(getSheet(ref), roleplay)
+}
+
+export function sheetMarkdownOf(s: CharacterSheet, roleplay = false): string {
   const parts = [`# ${s.title}`]
   if (s.faction) parts.push(`## Faction\nAllegiance: @faction:${s.faction}`)
   if (s.dnd) parts.push(roleplay ? `## Who\n${dndRoleplay(s.dnd)}` : `## D&D\n${dndText(s.dnd)}`)
@@ -266,7 +352,7 @@ export function sheetMarkdown(ref: string, roleplay = false): string {
     if (text) parts.push(text)
   }
   if (s.relationships?.length) {
-    const relText = formatRelationshipsMarkdown(s.relationships, { pinnedOnly: true, recallTool: 'story_recall' })
+    const relText = formatRelationshipsMarkdown(s.relationships, { pinnedOnly: true, recallTool: 'character_recall_relation' })
     if (relText) parts.push(`## Relationships\n${relText}`)
   }
   if (s.mind?.memories?.length) {

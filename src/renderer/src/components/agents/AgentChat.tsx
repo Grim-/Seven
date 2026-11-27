@@ -36,7 +36,7 @@ export function AgentChat({ id }: EntrySurfaceProps) {
         <div className="flex min-w-0 flex-col gap-1.5">
           {agent.description && <Markdown text={agent.description} className="text-[12.5px] text-dim" />}
           {(agent.relationships?.length ?? 0) > 0 && (
-            <span className="font-mono text-[10.5px] text-teal/85">
+            <span className="font-ui text-[10.5px] text-secondary/85">
               {agent.relationships!.length} relationship{agent.relationships!.length === 1 ? '' : 's'}
               {agent.relationships!.some((r) => r.pinned)
                 ? ` · ${agent.relationships!
@@ -48,7 +48,7 @@ export function AgentChat({ id }: EntrySurfaceProps) {
             </span>
           )}
           <TraitChips traits={modules} />
-          <span className="font-mono text-[11px] text-faint">{model}</span>
+          <span className="font-ui text-[11px] text-faint">{model}</span>
         </div>
       </div>
     </EntryCard>
@@ -62,7 +62,7 @@ function Profile({ id, large }: { id: string; large: boolean }) {
     <div className={cn('flex items-center', large ? 'h-[60vh] gap-8 px-6' : 'h-full flex-col justify-center gap-2.5')}>
       <AgentAvatar agent={agent} size={large ? 180 : 64} />
       <div className={cn('flex flex-col gap-3', !large && 'items-center')}>
-        {large && <span className="text-[40px] font-semibold text-white">{agent.name}</span>}
+        {large && <span className="text-[40px] font-semibold text-ink">{agent.name}</span>}
         {large && agent.description && <Markdown text={agent.description} className="max-w-xl text-[16px] text-dim" />}
         {large && <TraitChips traits={modules} />}
         <span className={cn(large && 'self-start')}>

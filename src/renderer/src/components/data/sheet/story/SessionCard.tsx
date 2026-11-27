@@ -29,7 +29,7 @@ export function SessionCard({
   const [expanded, setExpanded] = useState(defaultExpanded || !session.summary?.trim())
   if (editing) {
     return (
-      <div className="border border-accent/50 bg-black/55 p-3.5">
+      <div className="border border-accent/50 tone-panel-55 p-3.5">
         <SessionEditor
           session={session}
           number={number}
@@ -50,7 +50,7 @@ export function SessionCard({
   return (
     <article
       className={cn(
-        'group flex flex-col gap-2 border bg-black/45 p-3.5 transition-colors',
+        'group flex flex-col gap-2 border tone-panel-45 p-3.5 transition-colors',
         session.pinned ? 'border-accent/45 shadow-[inset_2px_0_0_var(--color-accent)]' : 'border-line/40 hover:border-line/65'
       )}
     >
@@ -77,14 +77,14 @@ export function SessionCard({
 
       {(session.where || session.who?.length || session.tags?.length) && (
         <div className="flex flex-wrap items-center gap-1.5">
-          {session.where && <span className="border border-cyan/30 bg-cyan/5 px-1.5 py-0.5 font-mono text-[10.5px] text-cyan">@ {session.where}</span>}
+          {session.where && <span className="border border-secondary-ink/30 bg-secondary-ink/5 px-1.5 py-0.5 font-ui text-[10.5px] text-secondary-ink">@ {session.where}</span>}
           {session.who?.map((person) => (
-            <span key={person} className="border border-line/45 bg-black/60 px-1.5 py-0.5 font-mono text-[10.5px] text-white/80">
+            <span key={person} className="border border-line/45 tone-panel-60 px-1.5 py-0.5 font-ui text-[10.5px] text-ink/80">
               {person}
             </span>
           ))}
           {session.tags?.map((tag) => (
-            <span key={tag} className="font-mono text-[10.5px] text-faint">
+            <span key={tag} className="font-ui text-[10.5px] text-faint">
               #{tag}
             </span>
           ))}
@@ -92,13 +92,13 @@ export function SessionCard({
       )}
 
       {session.summary?.trim() && (
-        <div className="flex items-baseline gap-2 border-l-2 border-cyan/40 pl-2.5 text-[13.5px] font-medium text-white">
+        <div className="flex items-baseline gap-2 border-l-2 border-secondary-ink/40 pl-2.5 text-[13.5px] font-medium text-ink">
           <span className="min-w-0 flex-1">{session.summary}</span>
           {hasNotes && (
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-accent hover:text-white"
+              className="flex shrink-0 items-center gap-1 font-ui text-[11px] text-accent hover:text-ink"
             >
               {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               {expanded ? 'Collapse' : 'Read full notes'}
@@ -108,18 +108,18 @@ export function SessionCard({
       )}
 
       {session.outcome?.trim() && (
-        <div className="border border-ok/30 bg-ok/[0.06] px-2.5 py-1.5 text-[12.5px] text-white/90">
-          <span className="mr-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-ok">Outcome:</span>
+        <div className="border border-ok/30 bg-ok/[0.06] px-2.5 py-1.5 text-[12.5px] text-ink/90">
+          <span className="mr-1.5 font-label text-[10px] font-bold caps-5 text-ok">Outcome:</span>
           {session.outcome}
         </div>
       )}
 
       {expanded && (
-        <div className="max-w-[74ch] text-[13.5px] leading-relaxed text-white/85">
+        <div className="max-w-[74ch] text-[13.5px] leading-relaxed text-ink/85">
           {hasNotes ? (
             <Markdown text={session.notes} onEntry={(k, ref) => (openEntry(k, ref), true)} />
           ) : (
-            <span className="font-mono text-[12px] text-faint">No full prose notes written yet.</span>
+            <span className="font-ui text-[12px] text-faint">No full prose notes written yet.</span>
           )}
         </div>
       )}

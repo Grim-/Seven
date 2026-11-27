@@ -74,11 +74,11 @@ export function TargetHud({
   }, [onClear, onTalk, onApproach, onInspect, onAttack, onEngageCombat, inCombat])
 
   return (
-    <div className={cn('pointer-events-auto flex flex-col items-start gap-1.5 select-none font-mono', className)}>
+    <div className={cn('pointer-events-auto flex flex-col items-start gap-1.5 select-none font-ui', className)}>
       {/* TARGET UNIT FRAME - REUSABLE GamePortrait IN MATCHING w-64 CONTAINER */}
       <div
         className={cn(
-          'flex w-64 flex-col border bg-black/90 shadow-lg transition-colors',
+          'flex w-64 flex-col border tone-panel-90 shadow-lg transition-colors',
           stance === 'hostile'
             ? 'border-alert/70'
             : stance === 'allied' || stance === 'friendly'
@@ -87,11 +87,11 @@ export function TargetHud({
         )}
       >
         {/* FACTION & STANCE HEADER */}
-        <div className="flex items-center justify-between border-b border-line/40 bg-white/[0.04] px-2 py-0.5 text-[9px]">
-          <span className={cn('font-bold uppercase tracking-wider', badge.cls.split(' ')[0])}>
+        <div className="flex items-center justify-between border-b border-line/40 bg-ink/[0.04] px-2 py-0.5 text-[9px]">
+          <span className={cn('font-bold caps-5 ', badge.cls.split(' ')[0])}>
             [{badge.label}]
           </span>
-          <span className="truncate text-dim uppercase max-w-[130px]">
+          <span className="truncate text-dim caps max-w-[130px]">
             {target.visitor.faction ? `FACTION: ${target.visitor.faction}` : 'CREATURE'}
           </span>
           <button

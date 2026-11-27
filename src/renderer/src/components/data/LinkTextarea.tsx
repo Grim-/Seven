@@ -1,8 +1,12 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent, type TextareaHTMLAttributes } from 'react'
+import { referencesIn } from '@shared/text'
 import { Textarea } from '../ui'
+import { textareaClass } from '../ui/inputs'
+import { Pressable } from '../ui/Pressable'
+import { cn } from '../../lib/cn'
 import { useRolls } from './useRolls'
-import { ComposerHints, useReferenceHints } from '../chat/Commands'
-
+import { FloatingHints, useReferenceHints } from '../chat/Commands'
+import { withReferences } from '../chat/References'
 
 type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'> & {
   value: string
@@ -11,9 +15,11 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChan
   rolls?: boolean
 }
 
-export const LinkTextarea = forwardRef<HTMLTextAreaElement | null, Props>(function LinkTextarea({ value, onValue, onKeyDown, onSelect, mono, rolls = true, ...rest }, ref) {
+export const LinkTextarea = forwardRef<HTMLTextAreaElement | null, Props>(function LinkTextarea({ value, onValue, onKeyDown, onSelect, onBlur, mono, rolls = true, ...rest }, ref) {
   const box = useRef<HTMLTextAreaElement>(null)
+  const area = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => box.current as HTMLTextAreaElement)
+  const [editing, setEditing] = useState(Boolean(rest.autoFocus))
   const [caret, setCaret] = useState(0)
   const [pick, setPick] = useState(0)
   const [hiddenAt, setHiddenAt] = useState<string | null>(null)
@@ -31,6 +37,16 @@ export const LinkTextarea = forwardRef<HTMLTextAreaElement | null, Props>(functi
   const current = Math.min(pick, Math.max(0, hints.length - 1))
 
   const roll = useRolls(rolls, value, onValue)
+  const showChips = !editing && referencesIn(value).length > 0
+
+  const edit = () => {
+    if (rest.disabled || rest.readOnly) return
+    setEditing(true)
+    requestAnimationFrame(() => {
+      box.current?.focus()
+      box.current?.setSelectionRange(value.length, value.length)
+    })
+  }
 
   const keys2 = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (hints.length) {
@@ -54,9 +70,15 @@ export const LinkTextarea = forwardRef<HTMLTextAreaElement | null, Props>(functi
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-1">
-      <ComposerHints hints={hints} selected={current} onSelect={setPick} inline />
+    <div ref={area} className="flex min-h-0 flex-1 flex-col gap-1">
+      {showChips && (
+        <Pressable onClick={edit} title={rest.title} className={textareaClass(mono, cn('cursor-text overflow-y-auto whitespace-pre-wrap', rest.className))}>
+          {withReferences(value)}
+        </Pressable>
+      )}
+      {!showChips && <FloatingHints anchor={area} hints={hints} selected={current} onSelect={setPick} onClose={() => setHiddenAt(`${caret}:${keys}`)} />}
       <Textarea
+        {...rest}
         ref={box}
         mono={mono}
         value={value}
@@ -69,8 +91,16 @@ export const LinkTextarea = forwardRef<HTMLTextAreaElement | null, Props>(functi
           setCaret(e.currentTarget.selectionStart ?? 0)
           onSelect?.(e)
         }}
+        onFocus={(e) => {
+          setEditing(true)
+          rest.onFocus?.(e)
+        }}
+        onBlur={(e) => {
+          setEditing(false)
+          onBlur?.(e)
+        }}
         onKeyDown={keys2}
-        {...rest}
+        className={cn(rest.className, showChips && 'hidden')}
       />
     </div>
   )

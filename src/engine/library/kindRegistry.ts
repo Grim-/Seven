@@ -17,6 +17,14 @@ export function registerKind(order: number, kind: Kind, module: string | null = 
   sources.set(`kind:${kind.kind}`, { order, afterOthers: false, list: () => [{ kind, module }] })
 }
 
+export function unregisterKind(name: string): void {
+  sources.delete(`kind:${name}`)
+}
+
+export function unregisterKindSource(id: string): void {
+  sources.delete(`source:${id}`)
+}
+
 export function registerKindSource(id: string, order: number, list: (others: Kind[]) => OwnedKind[], afterOthers = false): void {
   sources.set(`source:${id}`, { order, afterOthers, list })
 }

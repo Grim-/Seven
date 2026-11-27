@@ -4,7 +4,7 @@ import type { FieldValue } from '@shared/types'
 import { compare } from '@shared/records'
 import type { BodyProps } from './CollectionView'
 
-const AXIS = { stroke: 'rgba(245,158,11,0.35)', tick: { fill: '#a1a1aa', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' } }
+const AXIS = { stroke: 'var(--color-line)', tick: { fill: 'var(--color-dim)', fontSize: 11, fontFamily: 'var(--font-data)' } }
 
 function label(value: FieldValue | undefined): string {
   if (value === null || value === undefined) return '—'
@@ -61,15 +61,15 @@ export function ChartBody({ page, records, options, compact }: BodyProps) {
   if (!points.length) return <div className="p-2 text-[12.5px] text-dim">No records to chart yet.</div>
   const name = y && aggregate !== 'count' ? `${aggregate} of ${y.name}` : 'count'
   const common = { data: points, margin: { top: 8, right: 12, bottom: 0, left: -12 } }
-  const grid = <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+  const grid = <CartesianGrid stroke="color-mix(in srgb, var(--color-ink) 6%, transparent)" vertical={false} />
   const xAxis = <XAxis dataKey="x" {...AXIS} tickLine={false} minTickGap={12} />
   const yAxis = <YAxis {...AXIS} tickLine={false} allowDecimals width={44} />
   const tip = (
     <Tooltip
-      contentStyle={{ background: '#11141c', border: '1px solid rgba(245,158,11,0.6)', borderRadius: 0, fontSize: 12 }}
-      labelStyle={{ color: '#fff' }}
-      itemStyle={{ color: '#ffc919' }}
-      cursor={{ fill: 'rgba(255,201,25,0.06)', stroke: 'rgba(255,201,25,0.3)' }}
+      contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-line-strong)', borderRadius: 0, fontSize: 12 }}
+      labelStyle={{ color: 'var(--color-ink)' }}
+      itemStyle={{ color: 'var(--color-accent)' }}
+      cursor={{ fill: 'color-mix(in srgb, var(--color-accent) 6%, transparent)', stroke: 'color-mix(in srgb, var(--color-accent) 30%, transparent)' }}
     />
   )
 
@@ -82,7 +82,7 @@ export function ChartBody({ page, records, options, compact }: BodyProps) {
             {xAxis}
             {yAxis}
             {tip}
-            <Bar dataKey="value" name={name} fill="#ffc919" fillOpacity={0.85} maxBarSize={48} isAnimationActive={false} />
+            <Bar dataKey="value" name={name} fill="var(--color-accent)" fillOpacity={0.85} maxBarSize={48} isAnimationActive={false} />
           </BarChart>
         ) : kind === 'area' ? (
           <AreaChart {...common}>
@@ -90,7 +90,7 @@ export function ChartBody({ page, records, options, compact }: BodyProps) {
             {xAxis}
             {yAxis}
             {tip}
-            <Area dataKey="value" name={name} stroke="#ffc919" strokeWidth={2} fill="#ffc919" fillOpacity={0.15} isAnimationActive={false} />
+            <Area dataKey="value" name={name} stroke="var(--color-accent)" strokeWidth={2} fill="var(--color-accent)" fillOpacity={0.15} isAnimationActive={false} />
           </AreaChart>
         ) : (
           <LineChart {...common}>
@@ -98,7 +98,7 @@ export function ChartBody({ page, records, options, compact }: BodyProps) {
             {xAxis}
             {yAxis}
             {tip}
-            <Line dataKey="value" name={name} stroke="#ffc919" strokeWidth={2} dot={{ r: 3, fill: '#ffc919' }} isAnimationActive={false} />
+            <Line dataKey="value" name={name} stroke="var(--color-accent)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-accent)' }} isAnimationActive={false} />
           </LineChart>
         )}
       </ResponsiveContainer>

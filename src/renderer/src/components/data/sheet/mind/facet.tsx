@@ -7,7 +7,5 @@ sheetFacets.add({
   id: 'mind',
   label: () => 'Mind',
   order: 20,
-  Tab: ({ sheet, draft, change }) => (
-    <MindTab sheet={sheet} mind={draft.mind ?? null} onChange={(mind) => change({ ...draft, mind })} />
-  )
+  Tab: ({ sheet, draft, change }) => <MindTab sheet={sheet} mind={draft.mind ?? null} onChange={(mind) => change({ ...draft, mind })} />
 })

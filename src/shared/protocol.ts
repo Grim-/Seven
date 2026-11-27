@@ -1,3 +1,5 @@
+import type { SaveFolder, SaveFolderAnswer, SaveFolderRow } from './saveFolders'
+import type { ConversionBackupResult, ConversionChoices, ConversionRunResult, PendingConversion } from './conversions'
 import type { CarryAbout, CarryMode, CarryOpened, CarrySource, CarrySummary } from './carry'
 import type {
   PortabilityEstimate,
@@ -19,7 +21,7 @@ import type { Routine, RoutineDraft } from './routines'
 import type { TimelineRow } from './timeline'
 import type { WorldChanges, WorldEntity, WorldLaunch, WorldMeta, WorldPost, WorldSchema } from './world'
 import type { ResolvedWorldEvent, WorldEvent, WorldEventStatus } from './game/worldEvents'
-import type { JourneyEntry, JourneyKind, MapData, MapListing, PlaceVisitor, TokenVisitor, WorldMapUse } from './maps'
+import type { CreatureDisposition, JourneyEntry, JourneyKind, MapData, MapListing, PlaceVisitor, TokenVisitor, WorldMapUse } from './maps'
 import type { Action, ActionResult } from './actions'
 import type { ChatElement } from './chatElements'
 import type { EffectOutcome, EffectRun, EffectTargetRef, ViewEvent } from './effects'
@@ -28,7 +30,11 @@ import type { CardSwap, DeckOwner, DeckRef } from './cardDecks'
 import type { Ambience, AmbienceCue, Theme } from './theme'
 import type { Avatar, AvatarInput } from './avatars'
 import type { StoredFaction } from './game/factions'
-import type { BundledTileset, ResolvedAttribution } from './types'
+import type { WorldKnowledge } from './worldKnowledge'
+import type { WorldNpc } from './worldNpcs'
+import type { Destination, Whereabouts } from './whereabouts'
+import type { CharacterHold } from './characterHold'
+import type { BundledTileset, ChatWorld, ImageModelInstalledEvent, ResolvedAttribution } from './types'
 import type { StoredMapObject } from './game/mapObjects'
 import type { StoredTriggerAction } from './game/triggerActions'
 import type { StoredLootTable, ResolvedLootDrop } from './game/lootTables'
@@ -193,6 +199,7 @@ export interface EngineRequests {
       files?: import('./types').DownloadBundleFile[]
       imageConfig?: Partial<ImageModelConfig>
       targetModelId?: string
+      expectedKind?: ModelKind
     },
     DownloadItem[]
   >
@@ -201,9 +208,9 @@ export interface EngineRequests {
   'downloads.cancel': Req<{ id: string }, DownloadItem[]>
   'downloads.clear': Req<void, DownloadItem[]>
   'models.add': Req<{ path: string }, ModelEntry>
-  'models.remote.save': Req<{ id: string | null; name: string; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null }, ModelEntry>
+  'models.remote.save': Req<{ id: string | null; name: string; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null; category?: RemoteModelInfo['category'] | null }, ModelEntry>
   'models.remote.test': Req<{ id: string }, string>
-  'models.remote.probe': Req<{ id?: string | null; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null }, { ok: boolean; reply?: string; error?: string; models: RemoteModelInfo[] }>
+  'models.remote.probe': Req<{ id?: string | null; api: RemoteApi; baseUrl: string | null; model: string; key: string | null; contextSize: number | null; category?: RemoteModelInfo['category'] | null }, { ok: boolean; reply?: string; error?: string; models: RemoteModelInfo[] }>
   'models.remote.models': Req<{ id?: string | null; api: RemoteApi; baseUrl: string | null; key: string | null }, RemoteModelInfo[]>
   'models.remove': Req<{ id: string }, boolean>
   'models.state': Req<void, ModelHostState>
@@ -225,6 +232,8 @@ export interface EngineRequests {
   'models.imageConfig.reset': Req<{ id: string }, ImageModelConfig>
   'models.imageConfig.autoMatch': Req<{ id: string }, ImageModelConfig>
   'models.imageCompanions': Req<void, ImageCompanions>
+  'models.defaultImage.get': Req<void, string | null>
+  'models.defaultImage.set': Req<{ id: string | null }, string | null>
   'image.status': Req<void, ImageHostState>
   'image.load': Req<{ id: string }, ImageHostState>
   'image.unload': Req<void, ImageHostState>
@@ -232,7 +241,7 @@ export interface EngineRequests {
   'image.edit': Req<ImageEditRequest, GeneratedImageResult>
   'image.cancel': Req<void, boolean>
   'image.history.list': Req<void, ImageHistoryEntry[]>
-  'image.history.remove': Req<{ id: string }, ImageHistoryEntry[]>
+  'image.history.remove': Req<{ id: string; deleteAsset?: boolean }, ImageHistoryEntry[]>
   'image.history.clear': Req<void, ImageHistoryEntry[]>
   'models.template.get': Req<{ id: string }, ChatTemplate>
   'models.template.set': Req<{ id: string; choice: ChatTemplate }, ChatTemplate>
@@ -272,6 +281,7 @@ export interface EngineRequests {
   'styles.save': Req<{ id: string | null; name: string; instruction: string; voices: { label: string; line: string }[]; constraints?: string }, ReasoningStyle>
   'styles.delete': Req<{ id: string }, boolean>
   'sessions.refreshInstructions': Req<{ id: string }, boolean>
+  'sessions.saveCache': Req<{ id: string }, boolean>
   'sessions.context': Req<{ id: string }, { usage: ContextUsage | null; instructionsChanged: boolean }>
   'agents.contextUsage': Req<{ agentId: string }, ContextUsage | null>
   'sessions.prompt': Req<{ id: string | null; agentId: string }, PromptView>
@@ -297,14 +307,24 @@ export interface EngineRequests {
   'worlds.changes': Req<{ id: string; type: string; layer?: 'template' | 'play' }, Record<string, WorldChanges>>
   'maps.list': Req<void, MapListing[]>
   'worlds.setPlayer': Req<{ id: string; sheet: string | null }, WorldMeta>
+  'worlds.addCharacter': Req<{ id: string; sheet: string; map: string | null }, void>
+  'worlds.removeCharacter': Req<{ sheet: string }, void>
+  'worlds.ofSheet': Req<{ sheet: string }, string | null>
+  'worlds.whereabouts': Req<{ sheet: string }, Whereabouts | null>
+  'worlds.destinations': Req<void, Destination[]>
+  'worlds.moveCharacter': Req<{ sheet: string; world: string; map: string; place: string }, Whereabouts | null>
   'worldEvents.list': Req<{ worldId?: string | null } | void, ResolvedWorldEvent[]>
   'worldEvents.get': Req<{ id: string; worldId?: string | null }, ResolvedWorldEvent>
   'worldEvents.save': Req<{ event: WorldEvent; previousId?: string | null }, WorldEvent>
-  'worldEvents.delete': Req<{ id: string }, boolean>
+  'worldEvents.delete': Req<{ id: string; worldId?: string | null }, boolean>
   'worldEvents.setStatus': Req<{ id: string; status: WorldEventStatus; worldId?: string | null }, ResolvedWorldEvent>
   'worldEvents.resolve': Req<{ id: string; worldId?: string | null; outcomeId?: string | null; transcriptSummary?: string | null }, ResolvedWorldEvent>
+  'conversions.pending': Req<{ domain?: string | null } | void, PendingConversion[]>
+  'conversions.backup': Req<{ ids: string[]; target: string }, { files: number; bytes: number }>
+  'conversions.run': Req<{ ids: string[]; choices?: ConversionChoices }, ConversionRunResult>
   'worlds.setTags': Req<{ id: string; tags: string[] }, WorldMeta>
   'worlds.setLaunch': Req<{ id: string; launch: Partial<WorldLaunch> }, WorldMeta>
+  'worlds.setKnowledgeCues': Req<{ id: string; on: boolean }, WorldMeta>
   'actions.roll': Req<{ action: Action; character: string | null; pick?: number | null; world?: string | null; deck?: DeckRef | null }, ActionResult>
   'decisions.roll': Req<{ decision: Decision }, Decision>
   'decks.find': Req<{ ref: DeckRef; make?: boolean }, { deck: string | null }>
@@ -336,10 +356,18 @@ export interface EngineRequests {
   'worlds.editPost': Req<{ id: string; index: number; message: string | null }, WorldPost[]>
   'worlds.flags': Req<{ id: string }, Record<string, string | number | boolean>>
   'worlds.setFlag': Req<{ id: string; key: string; value: string | number | boolean | null }, Record<string, string | number | boolean>>
-  'factions.list': Req<void, StoredFaction[]>
-  'factions.get': Req<{ id: string }, StoredFaction | null>
-  'factions.save': Req<{ faction: StoredFaction; previousId?: string | null }, StoredFaction>
-  'factions.delete': Req<{ id: string }, boolean>
+  'factions.list': Req<{ world?: string | null; layer?: 'template' | 'play' } | void, StoredFaction[]>
+  'factions.get': Req<{ id: string; world?: string | null; layer?: 'template' | 'play' }, StoredFaction | null>
+  'factions.save': Req<{ faction: StoredFaction; world?: string | null; previousId?: string | null }, StoredFaction>
+  'factions.delete': Req<{ id: string; world?: string | null }, boolean>
+  'factions.seedStarters': Req<{ world: string }, StoredFaction[]>
+  'knowledge.list': Req<{ world: string }, WorldKnowledge[]>
+  'knowledge.get': Req<{ ref: string }, WorldKnowledge | null>
+  'knowledge.save': Req<{ world: string; entry: WorldKnowledge; previousId?: string | null }, WorldKnowledge>
+  'knowledge.forSheet': Req<{ sheet: string }, { worlds: { id: string; name: string; entries: WorldKnowledge[] }[] }>
+  'knowledge.grant': Req<{ sheet: string; campaign: string | null; ref: string }, boolean>
+  'holds.ofSheet': Req<{ sheet: string; campaign: string | null }, { id: string; title: string; hold: CharacterHold }[]>
+  'holds.save': Req<{ sheet: string; campaign: string; hold: CharacterHold }, boolean>
   'mapObjects.list': Req<void, StoredMapObject[]>
   'mapObjects.get': Req<{ id: string }, StoredMapObject | null>
   'mapObjects.save': Req<{ object: StoredMapObject; previousId?: string | null }, StoredMapObject>
@@ -390,6 +418,7 @@ export interface EngineRequests {
   >
   'sessions.detachGameplay': Req<{ id: string }, SessionMeta>
   'sessions.rolloverGameplay': Req<{ id: string }, SessionMeta>
+  'sessions.world': Req<{ id: string }, ChatWorld>
   'sessions.startMetaScene': Req<{ worldId: string; eventId: string; agentId?: string }, SessionMeta>
   'sessions.activeForWorld': Req<{ worldId: string; saveId?: string | null }, SessionMeta | null>
   'lootTables.save': Req<{ table: StoredLootTable; previousId?: string | null }, StoredLootTable>
@@ -508,6 +537,10 @@ export interface EngineRequests {
   'saves.remove': Req<{ id: string }, boolean>
   'saves.bring': Req<{ id: string; sheet: string }, GameSave>
   'saves.takeOut': Req<{ sheet: string }, GameSave | null>
+  'saves.setParty': Req<{ id: string; members: string[] }, GameSave>
+  'saves.addPartyMember': Req<{ id: string; sheet: string; place?: string | null; map?: string | null }, GameSave>
+  'saves.removePartyMember': Req<{ id: string; sheet: string }, GameSave>
+  'saves.travelParty': Req<{ id: string; map: string; place: string }, GameSave>
   'saves.adopt': Req<{ world: string }, GameSave>
   'saves.travel': Req<{ sheet: string; id: string; map: string; place: string }, GameSave>
   'saves.spawnCreature': Req<{ world: string; map: string; creature: EntityRecord; faction: string; at: Point }, GameSave>
@@ -569,7 +602,7 @@ export interface EngineRequests {
   'python.delete': Req<{ id: string }, boolean>
   'python.run': Req<{ id: string }, PythonScript>
   'library.read': Req<{ entry: string }, string>
-  'library.find': Req<{ query: string; kind: string | null }, LibraryHit[]>
+  'library.find': Req<{ query: string; kind: string | null; limit?: number }, LibraryHit[]>
   'library.overview': Req<{ query: string; perKind: number; kind?: string | null; kinds?: string[]; skip?: string[] }, LibrarySection[]>
   'timeline.recent': Req<{ limit: number }, TimelineRow[]>
   'routines.list': Req<void, Routine[]>
@@ -581,6 +614,7 @@ export interface EngineRequests {
   'library.reindex': Req<void, boolean>
   'library.guides': Req<void, { id: string; title: string; summary: string }[]>
   'library.rename': Req<{ entry: string; name: string }, string>
+  'library.duplicate': Req<{ entry: string }, { kind: string; id: string }>
   'slideshows.save': Req<{ id: string | null; title: string; data: SlideshowData }, Slideshow>
   'carry.save': Req<{ entry: string | null; text: string | null; picture: string; lock: boolean; path: string; framed?: string | null }, void>
   'carry.describe': Req<{ entry: string }, CarryAbout>
@@ -614,6 +648,48 @@ export interface EngineRequests {
   'repos.save': Req<{ id: string | null; title: string; tags: string[]; scope: 'use' | 'run'; values: string[] }, RepoEntry>
   'sheets.save': Req<{ id: string | null; title: string; fields: string[]; values: Record<string, string>; dnd?: DndStats | null; game?: EntityRecord | null; gameRules?: string; faction?: string | null; story?: Story; mind?: CharacterMind | null; relationships?: RelationshipEntry[] }, CharacterSheet>
   'sheets.setFaction': Req<{ id: string; faction: string | null }, CharacterSheet>
+  'sheets.setImage': Req<{ id: string; image: string | null }, CharacterSheet>
+  'npcs.list': Req<{ world?: string | null; layer?: 'template' | 'play' } | void, WorldNpc[]>
+  'npcs.get': Req<{ id: string; world?: string | null; layer?: 'template' | 'play' }, WorldNpc>
+  'npcs.save': Req<{ world: string; npc: Record<string, unknown>; previousId?: string | null }, WorldNpc>
+  'npcs.delete': Req<{ world: string; id: string; saveOnly?: boolean }, boolean>
+  'npcs.hasOverrides': Req<{ world: string; id: string }, boolean>
+  'npcs.stamp': Req<
+    {
+      world: string
+      target: string
+      source?: string | null
+      count?: number
+      name?: string | null
+      faction?: string | null
+      disposition?: CreatureDisposition
+      lootTableId?: string | null
+      map?: string | null
+      at?: Point | null
+      place?: string | null
+      actions?: string
+      decisions?: string
+    },
+    { save: GameSave; actorIds: string[]; npcIds: string[] }
+  >
+  'npcs.writeToTemplate': Req<{ world: string; id: string; asArchetype?: boolean }, WorldNpc>
+  'npcs.resetInSave': Req<{ world: string; id: string }, WorldNpc>
+  'npcs.copyToSheet': Req<{ world: string; id: string; layer?: 'play' | 'template' }, CharacterSheet>
+  'npcs.promoteToSheet': Req<{ world: string; id: string }, CharacterSheet>
+  'npcs.copyFromSheet': Req<
+    {
+      world: string
+      sheet: string
+      archetype?: boolean
+      place?: string | null
+      map?: string | null
+      faction?: string | null
+      customTitle?: string | null
+    },
+    WorldNpc
+  >
+  'relations.backs': Req<{ owner: string; refs: string[] }, Record<string, RelationshipEntry | null>>
+  'relations.put': Req<{ holder: string; entry: RelationshipEntry }, RelationshipEntry[]>
   'library.rollText': Req<{ text: string }, { text: string; rolled: { token: string; value: string; error?: string }[] }>
   'library.remove': Req<{ entry: string }, boolean>
   'library.clearKind': Req<{ kind: string }, { removed: number; failed: number }>
@@ -621,10 +697,11 @@ export interface EngineRequests {
   'tags.of': Req<{ entry: string }, string[]>
   'tags.list': Req<{ kind: string | null }, { tag: string; count: number }[]>
   'tags.map': Req<void, Record<string, string[]>>
+  'library.has': Req<{ kind: string; id: string | null }, boolean>
   'library.resolve': Req<{ entry: string }, { kind: string; id: string }>
   'library.preview': Req<{ entry: string }, EntryPreview>
   'library.fields': Req<{ entry: string }, string[]>
-  'library.inside': Req<{ entry: string }, { segment: string; kind: string; title: string }[]>
+  'library.inside': Req<{ entry: string }, { segment: string; kind: string; title: string; path?: string }[]>
   'library.field': Req<{ entry: string; field: string }, string | null>
   'library.drawable': Req<Record<string, never>, LibraryHit[]>
   'library.draw': Req<{ entry: string; count: number }, string[]>
@@ -632,11 +709,12 @@ export interface EngineRequests {
   'export.build': Req<ExportChoice, { title: string; text: string }>
   'library.exportFolder': Req<{ entries: string[]; kind: string | null; tag: string | null; target: 'obsidian' | 'markdown'; dir: string }, { folder: string; files: number; attachments: number; skipped: string[] }>
   'data.pages.list': Req<void, PageMeta[]>
-  'data.kindFolders.list': Req<void, { kind: string; label: string; plural: string; folder: string }[]>
-  'data.kindFolders.set': Req<{ kind: string; folder: string }, Record<string, string>>
+  'saveFolders.list': Req<void, SaveFolderRow[]>
+  'saveFolders.answer': Req<{ target?: string; type?: string | null }, SaveFolderAnswer>
+  'saveFolders.set': Req<{ target: string; place: SaveFolder | null }, SaveFolder | null>
   'data.pages.get': Req<{ id: string }, Page>
   'data.pages.find': Req<{ id: string }, Page | null>
-  'data.pages.create': Req<{ title: string; body: string; fields: FieldDef[]; type: string | null; parent?: string | null }, Page>
+  'data.pages.create': Req<{ title: string; body: string; fields: FieldDef[]; type: string | null; parent?: string | null; folder?: string; tags?: string[] }, Page>
   'data.pages.write': Req<{ id: string; title: string | null; body: string | null }, Page>
   'data.pages.append': Req<{ ref: string; text: string }, Page>
   'data.pages.view': Req<{ id: string; view: CollectionViewKind | null }, Page>
@@ -740,6 +818,7 @@ export interface MainRequests {
   'asset.saveAs': Req<{ id: string; name: string }, string | null>
   'dialog.saveText': Req<{ name: string; text: string }, string | null>
   'dialog.savePath': Req<{ name: string }, string | null>
+  'conversions.saveBackup': Req<{ ids: string[]; name: string }, ConversionBackupResult | null>
   'data.backup': Req<void, { path: string; files: number; bytes: number } | null>
   'data.pickBackup': Req<void, { path: string; createdAt: number; encrypted: boolean } | null>
   'vaults.list': Req<void, VaultList>
@@ -831,6 +910,7 @@ export interface Events {
   'message.element': { sessionId: string; messageId: string; element: ChatElement }
   'view.events': { sessionId: string; world: string | null; title: string; events: ViewEvent[] }
   'turn.phase': { sessionId: string; messageId: string; phase: TurnPhase }
+  'cache.state': { sessionId: string; state: 'building' | 'saving' | 'restoring' | 'idle' }
   'tool.draft': { sessionId: string; messageId: string; callIndex: number; name: string; chunk: string; done: boolean }
   'tool.output': { sessionId: string; messageId: string; partId: string; chunk: string }
   'ui.notify': { sessionId: string; title: string; message: string }
@@ -850,12 +930,17 @@ export interface Events {
   'decisions.changed': Record<string, never>
   'storyActions.changed': Record<string, never>
   'factions.changed': Record<string, never>
+  'npcs.changed': { world: string }
+  'knowledge.changed': { world: string }
   'worldEvents.changed': Record<string, never>
   'mapObjects.changed': Record<string, never>
   'triggerActions.changed': Record<string, never>
   'lootTables.changed': Record<string, never>
   'almanacs.changed': Record<string, never>
   'themes.changed': Theme[]
+  'themes.deleted': { id: string }
+  'entry.removed': { kind: string; id: string }
+  'kind.removed': { kind: string }
   'avatars.changed': Avatar[]
   'ambience.changed': { sessionId: string; ambience: Ambience }
   'ambience.cue': AmbienceCue
@@ -870,6 +955,7 @@ export interface Events {
   'context.compacted': { sessionId: string; trimmed: number; summarised: number }
   'image.changed': ImageHostState
   'image.history.changed': ImageHistoryEntry[]
+  'image.modelInstalled': ImageModelInstalledEvent
   'credits.changed': Record<string, never>
 }
 

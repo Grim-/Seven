@@ -81,7 +81,7 @@ function Arrived({ arrival }: { arrival: Arrival }) {
           {dropped ? preview && <img src={preview} alt={dropped.file.name} draggable={false} className="h-full w-full object-cover" /> : 'asset' in found.source && <AssetMedia id={found.source.asset} className="h-full w-full" />}
         </div>
         <div className="flex min-w-0 flex-col gap-0.5">
-          <div className="font-semibold text-white">{about ? `${about.label}: ${about.title}` : 'Locked with a vault key'}</div>
+          <div className="font-semibold text-ink">{about ? `${about.label}: ${about.title}` : 'Locked with a vault key'}</div>
           <div className="text-[12px] text-dim">
             {found.locked ? 'locked with a vault key' : 'not locked'} · saved {saved}
           </div>

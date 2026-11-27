@@ -40,6 +40,11 @@ function recentBucket(placeKey: string, limit = MAX_RECENT_ENTRIES) {
       const current = cleanRecent(usePlaces.getState().places[placeKey], limit)
       const next: RecentEntry[] = [{ kind, id, at: Date.now() }, ...current.filter((e) => !(e.kind === kind && e.id === id))].slice(0, limit)
       usePlaces.getState().save(placeKey, next)
+    },
+    drop(gone: (entry: RecentEntry) => boolean): void {
+      const current = cleanRecent(usePlaces.getState().places[placeKey], limit)
+      const kept = current.filter((e) => !gone(e))
+      if (kept.length !== current.length) usePlaces.getState().save(placeKey, kept)
     }
   }
 }
@@ -51,3 +56,8 @@ export const useRecentEntries = dataBucket.use
 export const recordOpenedEntry = dataBucket.record
 export const useRecentFiles = filesBucket.use
 export const recordOpenedFile = filesBucket.record
+
+export function dropRecent(gone: (entry: RecentEntry) => boolean): void {
+  dataBucket.drop(gone)
+  filesBucket.drop(gone)
+}

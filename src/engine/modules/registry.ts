@@ -971,6 +971,10 @@ export class ModuleRegistry extends EventEmitter {
     return [...this.entries.values()].filter((e) => e.state === 'on').flatMap((e) => e.manifest.pages.map((spec) => ({ module: e.manifest.id, spec })))
   }
 
+  pageTypesOff(): string[] {
+    return [...this.entries.values()].filter((e) => e.state !== 'on').flatMap((e) => e.manifest.pages.map((spec) => `${e.manifest.id}:${spec.type}`))
+  }
+
   singlePages(): SinglePage[] {
     return this.pageTypes()
       .filter((t) => t.spec.single)

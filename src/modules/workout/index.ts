@@ -12,6 +12,9 @@ import { dayOf } from '../../engine/util/when'
 import { canShowPaths, registerShownFile } from '../../engine/tools/shown'
 import { pathExists } from '../read/tools'
 import { registerGlance } from '../../engine/data/glances'
+import { registerPlaceTarget } from '../../engine/data/placeTargets'
+
+registerPlaceTarget({ target: 'add_exercise', label: 'Exercise pictures', home: 'Pictures/Exercises', asks: false })
 
 registerGlance({ id: 'workout', label: 'Workout', module: 'workout' })
 

@@ -1,5 +1,6 @@
 import { checkDefence, checkTargets } from '@shared/actions'
 import type { CharacterSheet } from '@shared/types'
+import { actorLink } from '@shared/worldNpcs'
 import { engine } from '../lib/ipc'
 import { changeHealth } from './health'
 import type { PlayTarget } from './targets'
@@ -14,7 +15,7 @@ export function sheetTarget(id: string, name: string, note = '', image: string |
     image,
     group: 'Characters',
     note,
-    link: `@sheet:${id}`,
+    link: actorLink(id),
     ref: { sheet: id },
     health: (delta) => changeHealth(id, delta),
     give: (item, count, gold) =>

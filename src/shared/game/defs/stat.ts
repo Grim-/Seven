@@ -52,8 +52,15 @@ registerDefType({
   ],
   line: (def) => {
     const v = def.values
-    const on = refillRule(v).on
-    return `${String(v.domain)}: ${String(v.default)} (${String(v.min)} to ${String(v.max)})${on.length ? `, refills on ${on.join(', ')}` : ''}`
+    return `${String(v.domain)}: ${String(v.default)} (${String(v.min)} to ${String(v.max)}`
+  },
+  brief: (def, holder) => {
+    const v = def.values
+    const current = holder ? holder.value(def.id) : Number(v.default)
+    return {
+      title: `${def.name} · Domain : ${String(v.domain)}`,
+      text: [`${current}/${String(v.max)}`, def.notes ? `How this stat works: ${def.notes}` : ''].filter(Boolean).join('\n')
+    }
   },
   addTo: (data, def) => {
     const v = def.values

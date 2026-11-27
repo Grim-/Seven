@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { SuggestList, useSuggest } from './Suggest'
+import { Pressable } from './Pressable'
 
 export function InlineEdit({
   value,
@@ -12,10 +13,11 @@ export function InlineEdit({
   numeric = false,
   title,
   trailing,
-  className
+  className,
+  edit
 }: {
   value: string
-  shown?: string
+  shown?: ReactNode
   onSave: (next: string) => void
   placeholder?: string
   suggestions?: string[]
@@ -24,6 +26,7 @@ export function InlineEdit({
   title?: string
   trailing?: ReactNode
   className?: string
+  edit?: (p: { draft: string; setDraft: (next: string) => void; commit: (text: string) => void; cancel: () => void }) => ReactNode
 }) {
   const [editing, setEditing] = useState(false)
   const open = useRef(false)
@@ -42,13 +45,19 @@ export function InlineEdit({
     if ((next || !required) && next !== value) onSave(next)
     setDraft(value)
   }
+  const cancel = () => {
+    open.current = false
+    setDraft(value)
+    setEditing(false)
+  }
   if (!editing)
     return (
-      <button onClick={start} title={title} className={cn('group inline-flex min-w-0 max-w-full items-baseline gap-1.5 border-b border-dashed border-transparent text-left hover:border-faint', className)}>
+      <Pressable inline onClick={start} title={title} className={cn('group inline-flex min-w-0 max-w-full cursor-pointer items-baseline gap-1.5 border-b border-dashed border-transparent text-left hover:border-faint', className)}>
         <span className={cn('truncate', !value && 'text-faint')}>{shown ?? (value || placeholder)}</span>
         {trailing}
-      </button>
+      </Pressable>
     )
+  if (edit) return <span className="relative flex min-w-0 max-w-full flex-1">{edit({ draft, setDraft, commit, cancel })}</span>
   return (
     <span className="relative inline-flex min-w-0 max-w-full">
       <input
@@ -63,11 +72,7 @@ export function InlineEdit({
         onKeyDown={(e) => {
           if (move(e)) return
           if (e.key === 'Enter') commit(current && options.length ? current : draft)
-          if (e.key === 'Escape') {
-            open.current = false
-            setDraft(value)
-            setEditing(false)
-          }
+          if (e.key === 'Escape') cancel()
         }}
         className={cn('min-w-0 max-w-full border-b border-accent bg-transparent outline-none placeholder:text-faint', className)}
       />

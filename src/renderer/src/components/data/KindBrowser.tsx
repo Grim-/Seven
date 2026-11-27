@@ -39,7 +39,7 @@ export function KindBrowser({ kind, title, empty, initial = null }: { kind: stri
       </div>
       <div className="min-w-0 flex-1 overflow-y-auto">
         {selected ? (
-          <div className="border border-line/40 bg-black/40 p-4">
+          <div className="border border-line/40 tone-panel-40 p-4">
             <Markdown text={text} />
           </div>
         ) : (

@@ -126,7 +126,7 @@ function matching(actions: Action[], query: string): Action[] {
 
 const GROUPS: Group[] = ['Go to', 'Do', 'Slash commands']
 
-const groupClass = '[&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:items-center [&_[cmdk-group-heading]]:gap-1.5 [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pb-0.5 [&_[cmdk-group-heading]]:pt-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.16em] [&_[cmdk-group-heading]]:text-accent-soft'
+const groupClass = '[&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:items-center [&_[cmdk-group-heading]]:gap-1.5 [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pb-0.5 [&_[cmdk-group-heading]]:pt-1.5 [&_[cmdk-group-heading]]:font-label [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.16em] [&_[cmdk-group-heading]]:text-accent-soft'
 const itemClass = 'flex cursor-pointer items-center gap-2 border-l-2 border-l-transparent px-2.5 py-1 text-left data-[selected=true]:border-l-accent data-[selected=true]:bg-accent/[0.07] touch:py-2.5'
 
 function useSearch(open: boolean) {
@@ -151,14 +151,14 @@ function SearchList({ search, onDone, className }: { search: SearchState; onDone
             {items.map((a) => (
               <Command.Item key={a.id} value={`action:${a.id}`} onSelect={() => onDone(a.run)} className={itemClass}>
                 <span className="flex h-3.5 w-3.5 shrink-0 items-center text-dim [&>svg]:h-3.5 [&>svg]:w-3.5">{a.icon}</span>
-                <span className="shrink-0 text-[13px] text-white/90">{a.label}</span>
+                <span className="shrink-0 text-[13px] text-ink/90">{a.label}</span>
                 {a.detail && <span className="min-w-0 truncate text-[11.5px] text-dim">{a.detail}</span>}
               </Command.Item>
             ))}
           </Command.Group>
         )
       })}
-      {searching && sections === null && <div className="px-2.5 py-2 font-mono text-[11px] text-dim">Searching…</div>}
+      {searching && sections === null && <div className="px-2.5 py-2 font-ui text-[11px] text-dim">Searching…</div>}
       {searching && sections !== null && !sections.length && !shown.length && <div className="px-2.5 py-2 text-[12.5px] text-dim">Nothing matches "{query.trim()}".</div>}
       {(sections ?? []).map((section) => (
         <Command.Group
@@ -174,7 +174,7 @@ function SearchList({ search, onDone, className }: { search: SearchState; onDone
         >
           {section.entries.map((hit) => (
             <Command.Item key={hit.id} value={`hit:${section.kind}/${hit.id}`} onSelect={() => onDone(() => openEntry(hit.kind, hit.id))} className={cn(itemClass, 'flex-col items-stretch gap-0')}>
-              <span className="truncate text-[13px] text-white/90">{hit.title}</span>
+              <span className="truncate text-[13px] text-ink/90">{hit.title}</span>
               {hitDetail(hit) && <span className="truncate text-[11.5px] text-dim">{hitDetail(hit)}</span>}
             </Command.Item>
           ))}
@@ -262,7 +262,7 @@ function DesktopSearch() {
             }}
             placeholder={wide ? 'Search or type a command' : 'Search'}
             spellCheck={false}
-            className="min-w-0 flex-1 bg-transparent font-sans text-[12.5px] text-white outline-none placeholder:text-faint"
+            className="min-w-0 flex-1 bg-transparent font-body text-[12.5px] text-ink outline-none placeholder:text-faint"
           />
           {wide && !open && <span className="shrink-0 font-mono text-[9.5px] tracking-widest text-faint">CTRL K</span>}
         </div>
@@ -270,7 +270,7 @@ function DesktopSearch() {
           <SearchList
             search={search}
             onDone={done}
-            className="absolute bottom-full left-2 z-50 mb-2 max-h-[60vh] w-[34rem] overflow-y-auto border border-line bg-bg/95 p-1 shadow-[0_0_24px_rgba(0,0,0,0.6)] backdrop-blur-sm"
+            className="absolute bottom-full left-2 z-50 mb-2 max-h-[60vh] w-[34rem] overflow-y-auto border border-line tone-bg-95 p-1 shadow-[0_0_24px_color-mix(in_srgb,var(--color-shade)_60%,transparent)] backdrop-blur-[var(--panel-blur)]"
           />
         )}
       </div>
@@ -309,10 +309,10 @@ function SheetSearch() {
               onValueChange={setQuery}
               placeholder="Search or type a command"
               spellCheck={false}
-              className="min-w-0 flex-1 bg-transparent font-sans text-[15px] text-white outline-none placeholder:text-faint"
+              className="min-w-0 flex-1 bg-transparent font-body text-[15px] text-ink outline-none placeholder:text-faint"
             />
             {query && (
-              <button type="button" aria-label="Clear" onClick={() => setQuery('')} className="flex h-10 w-10 shrink-0 items-center justify-center text-dim hover:text-white">
+              <button type="button" aria-label="Clear" onClick={() => setQuery('')} className="flex h-10 w-10 shrink-0 items-center justify-center text-dim hover:text-ink">
                 <X className="h-4 w-4" />
               </button>
             )}

@@ -4,12 +4,12 @@ export function ColorRow({ value, onChange, allowNone = false }: { value: string
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {allowNone && (
-        <button onClick={() => onChange(null)} title="Default" className={`h-6 border px-1.5 font-mono text-[10px] uppercase ${value === null ? 'border-white text-white' : 'border-line text-dim'}`}>
+        <button onClick={() => onChange(null)} title="Default" className={`h-6 border px-1.5 font-label text-[10px] caps ${value === null ? 'border-ink text-ink' : 'border-line text-dim'}`}>
           Default
         </button>
       )}
       {PRESETS.map((c) => (
-        <button key={c} onClick={() => onChange(c)} title={c} className={`h-6 w-6 border ${value === c ? 'border-white' : 'border-black'}`} style={{ background: c }} />
+        <button key={c} onClick={() => onChange(c)} title={c} className={`h-6 w-6 border ${value === c ? 'border-ink' : 'border-shade'}`} style={{ background: c }} />
       ))}
       <input type="color" value={value ?? '#ffc919'} onChange={(e) => onChange(e.target.value)} className="h-6 w-8 cursor-pointer border border-line bg-transparent" title="Pick any colour" />
     </div>

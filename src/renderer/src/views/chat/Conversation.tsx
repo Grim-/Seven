@@ -6,6 +6,7 @@ import { AgentSide } from '../../components/chat/AgentSide'
 import { ContextMeter, InstructionsBanner } from '../../components/chat/ContextMeter'
 import { PromptPeek } from '../../components/chat/PromptPeek'
 import { SceneBadgeButton, SceneStrip } from '../../components/chat/SceneStrip'
+import { MetaSceneStage } from '../../components/worldEvents/RoundTable'
 import { ChatSettings } from '../../components/chat/ChatSettings'
 import { ChatTabletop } from '../../components/chat/ChatTabletop'
 import { useBoardSurfaces, useChatDashboard, useTabletopMode } from '../../components/chat/tabletopStore'
@@ -65,12 +66,12 @@ export function Conversation({ lead }: { lead?: ReactNode }) {
           tail={<SidePanelToggle />}
           title={
             <span className="flex items-center gap-2.5 tablet:min-w-0">
-              <span className="font-semibold text-white tablet:truncate">
+              <span className="font-semibold text-ink tablet:truncate">
                 {active ? active.title : 'New chat'}
               </span>
               <span className="contents tablet:hidden">{extras}</span>
               <span className="hidden tablet:flex">
-                <Popover title="More" side="bottom" align="start" className="flex flex-col items-start gap-2 p-2" triggerClassName="h-7 w-7 justify-center border border-line/60 text-dim hover:border-accent hover:text-white" trigger={<MoreHorizontal className="h-4 w-4" />}>
+                <Popover title="More" side="bottom" align="start" className="flex flex-col items-start gap-2 p-2" triggerClassName="h-7 w-7 justify-center border border-line/60 text-dim hover:border-accent hover:text-ink" trigger={<MoreHorizontal className="h-4 w-4" />}>
                   {extras}
                 </Popover>
               </span>
@@ -118,7 +119,11 @@ export function Conversation({ lead }: { lead?: ReactNode }) {
           )}
           <VaultVeil agentId={agentId ?? null} />
           <ChatTabletop sessionId={activeId} agent={agent ?? null}>
-            <SceneStrip session={active ?? null} />
+            {active?.scene?.mode === 'meta' && active.scene.eventId ? (
+              <MetaSceneStage session={active} />
+            ) : (
+              <SceneStrip session={active ?? null} />
+            )}
             <InstructionsBanner />
             <Thread
               key={activeId ?? 'new'}

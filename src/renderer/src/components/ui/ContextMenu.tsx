@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ArrowLeft, ChevronRight } from 'lucide-react'
 import { create } from 'zustand'
 import { Button } from './Button'
+import { BrowseList, type BrowseOption } from './BrowsePick'
 import { Input } from './inputs'
 import { Modal } from './Modal'
 import { cn } from '../../lib/cn'
@@ -23,6 +25,9 @@ export interface MenuItem {
   children?: MenuItem[]
   submenu?: (close: () => void) => ReactNode
   submenuTitle?: string
+  /** Drills into an inline view inside the same menu box (expanding to fit) instead of opening a separate modal/submenu. */
+  inlinePanel?: (close: () => void) => ReactNode
+  inlineTitle?: string
   needs?: TransportNeed
   calls?: { kind: 'engine'; name: EngineRequestName } | { kind: 'main'; name: MainRequestName }
 }
@@ -51,18 +56,33 @@ interface ConfirmSpec {
   onConfirm: () => void | Promise<void>
 }
 
+interface PickSpec {
+  title: string
+  options: BrowseOption[]
+  placeholder?: string
+  onPick: (value: string) => void | Promise<void>
+}
+
 interface MenuState {
   menu: MenuSpec | null
   prompt: PromptSpec | null
   confirm: ConfirmSpec | null
+  pick: PickSpec | null
   close: () => void
+  closePrompt: () => void
+  closeConfirm: () => void
+  closePick: () => void
 }
 
 export const useMenu = create<MenuState>((set) => ({
   menu: null,
   prompt: null,
   confirm: null,
-  close: () => set({ menu: null })
+  pick: null,
+  close: () => set({ menu: null }),
+  closePrompt: () => set({ prompt: null }),
+  closeConfirm: () => set({ confirm: null }),
+  closePick: () => set({ pick: null })
 }))
 
 let menus = 0
@@ -87,6 +107,10 @@ export function askText(title: string, label: string, value: string, onSubmit: P
 
 export function askConfirm(title: string, message: string, confirmLabel: string, onConfirm: ConfirmSpec['onConfirm']): void {
   useMenu.setState({ confirm: { title, message, confirmLabel, onConfirm } })
+}
+
+export function askPick(title: string, options: BrowseOption[], onPick: PickSpec['onPick'], placeholder = 'Filter…'): void {
+  useMenu.setState({ pick: { title, options, placeholder, onPick } })
 }
 
 export function confirmDelete(title: string, message: string, work: () => Promise<unknown>, after?: () => void, verb = 'Delete'): void {
@@ -147,10 +171,25 @@ function place(el: HTMLElement, x: number, y: number, flipTo: number | null): { 
   return { left, top }
 }
 
-function Row({ item, index, onDone, onHover, open }: { item: MenuItem; index: number; onDone: () => void; onHover: (el: HTMLElement | null) => void; open: boolean }) {
+function Row({
+  item,
+  index,
+  onDone,
+  onHover,
+  onDrillIn,
+  open
+}: {
+  item: MenuItem
+  index: number
+  onDone: () => void
+  onHover: (el: HTMLElement | null) => void
+  onDrillIn?: (item: MenuItem) => void
+  open: boolean
+}) {
   const label = useDecrypt(item.label, index * 40)
   const [hovered, setHovered] = useState(false)
   const hasSub = Boolean(item.children || item.submenu)
+  const hasInline = Boolean(item.inlinePanel)
   if (item.separator) return <div className="my-1 h-px bg-line/50" />
   return (
     <button
@@ -162,6 +201,10 @@ function Row({ item, index, onDone, onHover, open }: { item: MenuItem; index: nu
       }}
       onMouseLeave={() => setHovered(false)}
       onClick={(e) => {
+        if (hasInline) {
+          onDrillIn?.(item)
+          return
+        }
         if (hasSub) {
           onHover(e.currentTarget)
           return
@@ -171,16 +214,16 @@ function Row({ item, index, onDone, onHover, open }: { item: MenuItem; index: nu
       }}
       style={{ animation: `seven-menu-row 170ms ease-out ${index * 40}ms both` }}
       className={cn(
-        'relative flex w-full items-center gap-2 overflow-hidden px-3 py-1.5 text-left font-mono text-[12px] transition-colors disabled:opacity-40 touch:py-2.5 touch:text-[13px]',
-        item.danger ? 'text-alert hover:text-white' : 'text-accent hover:text-white',
-        open && 'text-white'
+        'relative flex w-full items-center gap-2 overflow-hidden px-3 py-1.5 text-left font-ui text-[12px] transition-colors disabled:opacity-40 touch:py-2.5 touch:text-[13px] cursor-pointer',
+        item.danger ? 'text-alert hover:text-ink' : 'text-accent hover:text-ink',
+        open && 'text-ink'
       )}
     >
       {(hovered || open) && <span className="pointer-events-none absolute inset-0 bg-accent/15" style={{ animation: 'seven-menu-scan 450ms linear' }} />}
       <span className="relative w-3 text-[10px] opacity-70">{hovered || open ? '›' : '·'}</span>
       {item.icon && <span className="relative flex h-3.5 w-3.5 items-center [&>svg]:h-3.5 [&>svg]:w-3.5">{item.icon}</span>}
       <span className="relative min-w-0 flex-1 truncate">{label}</span>
-      {hasSub && <ChevronRight className="relative h-3.5 w-3.5 opacity-70" />}
+      {(hasSub || hasInline) && <ChevronRight className="relative h-3.5 w-3.5 opacity-70" />}
     </button>
   )
 }
@@ -216,18 +259,28 @@ function Panel({
   const [rows, setRows] = useState<number | null | undefined>(undefined)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const [sub, setSub] = useState<{ index: number; x: number; y: number; flipTo: number } | null>(null)
-  const heading = useDecrypt(title ?? '', 0, 220)
+  const [drilled, setDrilled] = useState<MenuItem | null>(null)
+  const effectiveContent = drilled?.inlinePanel ? drilled.inlinePanel(onDone) : customContent
+  const effectiveTitle = drilled ? (drilled.inlineTitle ?? drilled.label) : title
+  const heading = useDecrypt(effectiveTitle ?? '', 0, 220)
   const compact = useHasForm()
   useLayoutEffect(() => {
-    if (customContent) {
+    if (effectiveContent) {
       setRows(null)
       return
     }
     if (ref.current && body.current) setRows(compact ? null : columnRows(ref.current, body.current))
-  }, [items, compact, customContent])
+  }, [items, compact, effectiveContent])
   useLayoutEffect(() => {
-    if (ref.current && rows !== undefined) setPos(place(ref.current, x, y, flipTo))
-  }, [x, y, flipTo, rows, customContent])
+    const el = ref.current
+    if (!el || rows === undefined) return
+    const reposition = () => setPos(place(el, x, y, flipTo))
+    reposition()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(reposition)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [x, y, flipTo, rows, effectiveContent, drilled])
   const subItem = sub ? items[sub.index] : undefined
   return (
     <>
@@ -235,20 +288,34 @@ function Panel({
         ref={ref}
         data-seven-menu
         onMouseDown={(e) => e.stopPropagation()}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+        }}
         style={{ left: pos?.left ?? x, top: pos?.top ?? y, visibility: pos ? 'visible' : 'hidden', zIndex: 10000 + depth, animation: 'seven-menu-in 150ms ease-out' }}
         className={cn(
-          'fixed flex min-w-52 flex-col border border-line border-l-2 border-l-accent bg-sidebar/95 py-1 shadow-[0_12px_30px_rgba(0,0,0,0.85)] backdrop-blur-sm tablet:max-h-[calc(100%-1rem)] tablet:max-w-[calc(100%-1rem)] tablet:overflow-y-auto',
-          !rows && !customContent && 'max-w-80'
+          'fixed flex min-w-52 flex-col border border-line border-l-2 border-l-accent tone-sidebar-95 py-1 shadow-[0_12px_30px_color-mix(in_srgb,var(--color-shade)_85%,transparent)] backdrop-blur-[var(--panel-blur)] transition-[width] duration-150 tablet:max-h-[calc(100%-1rem)] tablet:max-w-[calc(100%-1rem)] tablet:overflow-y-auto',
+          !rows && !effectiveContent && 'max-w-80'
         )}
       >
-        {title && (
-          <div className="mb-1 flex items-center border-b border-line/60 px-3 py-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-accent-soft">
+        {effectiveTitle && (
+          <div className="mb-1 flex items-center gap-1.5 border-b border-line/60 px-3 py-1.5 font-label text-[10.5px] font-bold caps-14 text-accent-soft">
+            {drilled && (
+              <button
+                type="button"
+                title="Back to menu"
+                onClick={() => setDrilled(null)}
+                className="mr-0.5 text-dim hover:text-ink cursor-pointer"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </button>
+            )}
             <span className="truncate">{heading}</span>
             <span className="ml-0.5 inline-block h-[11px] w-[6px] bg-accent-soft" style={{ animation: 'seven-menu-cursor 1s steps(1) infinite' }} />
           </div>
         )}
-        {customContent ? (
-          <div ref={body}>{customContent}</div>
+        {effectiveContent ? (
+          <div ref={body}>{effectiveContent}</div>
         ) : (
           <div ref={body} className={rows ? 'grid' : 'flex flex-col'} style={rows ? { gridTemplateRows: `repeat(${rows}, auto)`, gridAutoFlow: 'column', gridAutoColumns: 'minmax(13rem, max-content)' } : undefined}>
             {items.map((item, i) => (
@@ -258,6 +325,10 @@ function Panel({
                 index={i}
                 open={sub?.index === i}
                 onDone={onDone}
+                onDrillIn={(next) => {
+                  setSub(null)
+                  setDrilled(next)
+                }}
                 onHover={(el) => {
                   if (!el || !pos) return setSub(null)
                   if (compact) return setSub({ index: i, x: pos.left + 16, y: el.getBoundingClientRect().bottom, flipTo: pos.left + 16 })
@@ -268,7 +339,7 @@ function Panel({
           </div>
         )}
       </div>
-      {sub && (subItem?.children || subItem?.submenu) && (
+      {!drilled && sub && (subItem?.children || subItem?.submenu) && (
         <Panel
           key={sub.index}
           title={subItem.submenuTitle}
@@ -313,7 +384,7 @@ function PromptDialog() {
       }
     >
       <label className="flex flex-col gap-1.5">
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-accent-soft">{prompt.label}</span>
+        <span className="font-label text-[10.5px] caps-14 text-accent-soft">{prompt.label}</span>
         <Input autoFocus value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void submit()} />
       </label>
     </Modal>
@@ -346,9 +417,46 @@ function ConfirmDialog() {
         </>
       }
     >
-      <p className="text-[13px] text-white/90">{confirm.message}</p>
+      <p className="text-[13px] text-ink/90">{confirm.message}</p>
     </Modal>
   )
+}
+
+function PickDialog() {
+  const pick = useMenu((s) => s.pick)
+  const close = useMenu((s) => s.closePick)
+  if (!pick) return null
+  return (
+    <Modal open title={pick.title} onClose={close}>
+      <BrowseList
+        options={pick.options}
+        value={null}
+        placeholder={pick.placeholder ?? 'Filter…'}
+        onPick={(v) => {
+          close()
+          void pick.onPick(v)
+        }}
+      />
+    </Modal>
+  )
+}
+
+function swallowNextContextMenu() {
+  let done = false
+  const swallow = (ev: MouseEvent) => {
+    if (done) return
+    done = true
+    ev.preventDefault()
+    ev.stopPropagation()
+    ev.stopImmediatePropagation()
+    window.removeEventListener('contextmenu', swallow, true)
+  }
+  window.addEventListener('contextmenu', swallow, true)
+  window.setTimeout(() => {
+    if (done) return
+    done = true
+    window.removeEventListener('contextmenu', swallow, true)
+  }, 400)
 }
 
 export function ContextMenuHost() {
@@ -357,14 +465,29 @@ export function ContextMenuHost() {
   useEffect(() => {
     if (!menu) return
     const down = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement | null)?.closest('[data-seven-menu]')) {
+        if (e.button === 2) {
+          e.preventDefault()
+          e.stopPropagation()
+          swallowNextContextMenu()
+        }
+        close()
+      }
+    }
+    const onCtx = (e: MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
       if (!(e.target as HTMLElement | null)?.closest('[data-seven-menu]')) close()
     }
     const blur = () => close()
-    document.addEventListener('mousedown', down)
+    document.addEventListener('mousedown', down, true)
+    window.addEventListener('contextmenu', onCtx, true)
     window.addEventListener('blur', blur)
     window.addEventListener('resize', blur)
     return () => {
-      document.removeEventListener('mousedown', down)
+      document.removeEventListener('mousedown', down, true)
+      window.removeEventListener('contextmenu', onCtx, true)
       window.removeEventListener('blur', blur)
       window.removeEventListener('resize', blur)
     }
@@ -379,9 +502,14 @@ export function ContextMenuHost() {
         @keyframes seven-menu-cursor { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
         @media (prefers-reduced-motion: reduce) { [data-seven-menu], [data-seven-menu] * { animation: none !important } }
       `}</style>
-      {menu && <Panel key={menu.id} title={menu.title} items={menu.items} x={menu.x} y={menu.y} onDone={close} depth={0} />}
+      {menu &&
+        createPortal(
+          <Panel key={menu.id} title={menu.title} items={menu.items} x={menu.x} y={menu.y} onDone={close} depth={0} />,
+          document.body
+        )}
       <PromptDialog />
       <ConfirmDialog />
+      <PickDialog />
     </>
   )
 }

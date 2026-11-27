@@ -19,13 +19,13 @@ function ExtraRow({ id, def, value, onValue, onRemove }: { id: string; def: Game
   return (
     <div className="flex flex-col gap-1 border-t border-line/25 pt-1.5 first:border-t-0">
       <div className="flex items-baseline gap-2">
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] font-bold tracking-[0.1em] text-accent-soft" title={def?.notes}>
+        <span className="min-w-0 flex-1 truncate font-ui text-[11px] font-bold tracking-[0.1em] text-accent-soft" title={def?.notes}>
           {def?.name ?? id}
         </span>
         {typeof value === 'number' ? (
-          <InlineNumber value={value} min={min} max={max} title="Value" onSave={onValue} className="font-mono text-[15px] font-bold text-cyan" />
+          <InlineNumber value={value} min={min} max={max} title="Value" onSave={onValue} className="font-ui text-[15px] font-bold text-secondary-ink" />
         ) : (
-          <span className="flex items-baseline gap-1 font-mono text-[13px] text-cyan">
+          <span className="flex items-baseline gap-1 font-ui text-[13px] text-secondary-ink">
             <InlineNumber value={value.cur} min={0} max={value.max} title="Current" onSave={(cur) => onValue({ ...value, cur })} />
             <span className="text-faint">/</span>
             <InlineNumber value={value.max} min={min} max={max} title="Maximum" onSave={(m) => onValue({ cur: Math.min(value.cur, m), max: m })} />

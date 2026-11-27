@@ -11,7 +11,7 @@ function TagsPanel({ comp, entity, changed }: PanelProps<Tags>) {
   const total = direct.length + derived.length
 
   return (
-    <GamePanel title="Tags" aside={total ? `${total} active` : 'none'} bodyClassName="gap-2 p-3">
+    <GamePanel title="Tags" aside={total ? `${total} active` : 'none'} bodyClassName="gap-1.5 p-2.5">
       <ChipInput
         value={direct}
         suggestions={knownTags}
@@ -23,7 +23,7 @@ function TagsPanel({ comp, entity, changed }: PanelProps<Tags>) {
       />
       {derived.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-line/25 pt-1.5">
-          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-dim">Inherited</span>
+          <span className="font-label text-[10px] caps-12 text-dim">Inherited</span>
           <TraitChips traits={derived.map((t) => ({ key: t, label: t, tone: 'busy' as const }))} />
         </div>
       )}

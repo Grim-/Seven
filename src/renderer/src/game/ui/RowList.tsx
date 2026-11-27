@@ -8,7 +8,7 @@ export function RowList({ rows, className }: { rows: TooltipRow[]; className?: s
       {rows.map((r, i) => (
         <div key={`${r.label}.${i}`} className="flex gap-3 text-[12px]">
           <span className="flex-1 text-dim">{r.label}</span>
-          <span className="font-mono text-white/90">{r.value}</span>
+          <span className="font-ui text-ink/90">{r.value}</span>
         </div>
       ))}
     </div>

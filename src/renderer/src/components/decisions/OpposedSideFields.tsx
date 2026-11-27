@@ -8,10 +8,10 @@ import { SkillSelect } from './SkillSelect'
 
 export function OpposedSideFields({ title, side, targets, onChange, editable = false, who = true }: { title: string; side: OpposedSide; targets: CheckTarget[]; onChange: (next: OpposedSide) => void; editable?: boolean; who?: boolean }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2 border border-line/60 bg-white/[0.02] p-3">
-      <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-dim">{title}</span>
+    <div className="flex min-w-0 flex-col gap-2 border border-line/60 bg-ink/[0.02] p-3">
+      <span className="text-[12px] font-semibold caps-8 text-dim">{title}</span>
       {!editable && (
-        <span className="text-[13.5px] font-semibold text-white">
+        <span className="text-[13.5px] font-semibold text-ink">
           {side.name} <span className="font-normal text-dim">{side.does}</span>
         </span>
       )}

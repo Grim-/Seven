@@ -9,5 +9,5 @@ export function AssetMedia({ id, className, fallback, usedBy }: { id: string; cl
   if (asset?.kind === 'video') return <video src={assetUrl(asset)} muted preload="metadata" className={cn('object-cover', className)} />
   if (asset === null) return <MissingFile label="Missing picture" className={className} />
   if (fallback !== undefined) return <>{fallback}</>
-  return <div className={cn('flex items-center justify-center bg-black/60 font-mono text-[10px] uppercase text-faint', className)}>{asset?.name ?? ''}</div>
+  return <div className={cn('flex items-center justify-center tone-panel-60 font-label text-[10px] caps text-faint', className)}>{asset?.name ?? ''}</div>
 }

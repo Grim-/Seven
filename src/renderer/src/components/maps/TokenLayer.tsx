@@ -53,20 +53,20 @@ function Token({ token, handlers, mapSize }: { token: MapToken; handlers: TokenH
       )}
     >
       <span ref={vfxRef} style={{ width: px, height: px }}>
-        <SheetPortrait image={v.image} usedBy={`The map token ${showName(v.name)}`} className={cn('h-full w-full border-2 shadow-[0_4px_14px_rgba(0,0,0,0.7)]', v.sheet === handlers.mine ? 'border-accent' : v.agent ? 'border-purple' : 'border-cyan')} />
+        <SheetPortrait image={v.image} usedBy={`The map token ${showName(v.name)}`} className={cn('h-full w-full border-2 shadow-[0_4px_14px_color-mix(in_srgb,var(--color-shade)_70%,transparent)]', v.sheet === handlers.mine ? 'border-accent' : v.agent ? 'border-tint-purple' : 'border-secondary-ink')} />
       </span>
       {v.hp && <HpBar hp={v.hp} thin className="w-full" />}
-      <span className="max-w-[160px] truncate bg-black/85 px-1.5 py-0.5 font-mono text-[11px] text-white">{showName(v.name)}</span>
+      <span className="max-w-[160px] truncate tone-panel-85 px-1.5 py-0.5 font-ui text-[11px] text-ink">{showName(v.name)}</span>
     </div>
   )
 }
 
 export function TokenLayer({ tokens, handlers, mapSize }: { tokens: MapToken[]; handlers: TokenHandlers; mapSize: number }) {
   return (
-    <span className="pointer-events-none absolute inset-0 z-[4]">
+    <div className="pointer-events-none absolute inset-0 z-[22]">
       {tokens.map((t) => (
         <Token key={t.visitor.token} token={t} handlers={handlers} mapSize={mapSize} />
       ))}
-    </span>
+    </div>
   )
 }

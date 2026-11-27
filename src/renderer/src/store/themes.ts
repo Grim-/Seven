@@ -5,13 +5,20 @@ import { DEFAULT_THEME_ID, NO_AMBIENCE, SEVEN_THEME, type Ambience, type Theme }
 import { engine } from '../lib/ipc'
 import { useAgents } from './agents'
 import { useApp } from './app'
-import { useAgentIdOf, useFocusedConversation } from '../lib/conversation'
+import { focusedConversation, useAgentIdOf, useFocusedConversation } from '../lib/conversation'
 import { failed } from '../lib/notify'
+import { SEVEN_PALETTE, type Palette } from '../lib/skins/palette'
+import type { Roles } from '../lib/skins/roles'
 
 interface ThemesState {
   list: Theme[]
   ambience: Record<string, Ambience>
   preview: Theme | null
+  active: Theme
+  palette: Palette
+  roles: Roles | null
+  plain: boolean
+  switching: boolean
   refresh: () => Promise<void>
   loadAmbience: (sessionId: string) => Promise<void>
   setAmbience: (sessionId: string, ambience: Ambience) => void
@@ -21,6 +28,11 @@ export const useThemes = create<ThemesState>((set) => ({
   list: [SEVEN_THEME],
   ambience: {},
   preview: null,
+  active: SEVEN_THEME,
+  palette: SEVEN_PALETTE,
+  roles: null,
+  plain: false,
+  switching: false,
   refresh: async () => {
     set({ list: await engine('themes.list') })
   },
@@ -39,6 +51,7 @@ export function useActiveTheme(): { theme: Theme; ambience: Ambience; sessionId:
   const fallback = useApp((s) => s.settings?.defaultTheme ?? DEFAULT_THEME_ID)
   const list = useThemes((s) => s.list)
   const preview = useThemes((s) => s.preview)
+  const plain = useThemes((s) => s.plain)
   const stored = useThemes((s) => (sessionId ? s.ambience[sessionId] : undefined))
   const [, tick] = useState(0)
   useEffect(() => {
@@ -52,10 +65,17 @@ export function useActiveTheme(): { theme: Theme; ambience: Ambience; sessionId:
   }, [until])
   const ambience = stored && (!stored.until || stored.until > Date.now()) ? stored : NO_AMBIENCE
   const find = (id: string | null) => (id ? list.find((t) => t.id === id) : undefined)
+  if (plain) return { theme: SEVEN_THEME, ambience: NO_AMBIENCE, sessionId }
   const theme = preview ?? find(ambience.theme) ?? find(agentTheme) ?? find(fallback) ?? SEVEN_THEME
   return { theme, ambience: preview ? NO_AMBIENCE : ambience, sessionId }
 }
 
 export function applyTheme(id: string): void {
+  if (useThemes.getState().switching) return
+  const sessionId = focusedConversation()?.sessionId ?? null
+  if (sessionId)
+    void engine('ambience.set', { sessionId, ambience: null, minutes: null })
+      .then((ambience) => useThemes.getState().setAmbience(sessionId, ambience))
+      .catch(failed("Could not clear the chat's mood"))
   void useApp.getState().updateSettings({ defaultTheme: id }).catch(failed('Could not change the theme'))
 }

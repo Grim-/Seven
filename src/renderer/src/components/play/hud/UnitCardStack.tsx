@@ -58,7 +58,7 @@ export function UnitCardStack({
       expanded={expanded}
       onToggleExpand={() => setExpanded((v) => !v)}
       onRemove={onClear}
-      className={cn('pointer-events-auto w-64 font-mono text-[11px]', className)}
+      className={cn('pointer-events-auto w-64 font-ui text-[11px]', className)}
     >
       <div className="flex flex-col gap-1.5 p-1.5">
         {units.map((unit) => {
@@ -75,7 +75,7 @@ export function UnitCardStack({
                 : hpPct <= 50
                   ? 'bg-accent'
                   : isLeft
-                    ? 'bg-cyan'
+                    ? 'bg-tint-cyan'
                     : 'bg-alert'
 
           return (
@@ -83,14 +83,14 @@ export function UnitCardStack({
               key={unit.id}
               onClick={() => onSelect?.(unit.id)}
               className={cn(
-                'group relative flex flex-col border bg-black/70 p-1.5 transition-all',
-                onSelect && 'cursor-pointer hover:bg-white/[0.04]',
+                'group relative flex flex-col border tone-panel-70 p-1.5 transition-all',
+                onSelect && 'cursor-pointer hover:bg-ink/[0.04]',
                 isActive
                   ? isLeft
-                    ? 'border-cyan shadow-[0_0_12px_rgba(0,216,246,0.25)]'
-                    : 'border-alert shadow-[0_0_12px_rgba(255,77,77,0.25)]'
+                    ? 'border-tint-cyan shadow-[0_0_12px_color-mix(in_srgb,rgb(0,216,246)_calc(25%*var(--glow)),transparent)]'
+                    : 'border-alert shadow-[0_0_12px_color-mix(in_srgb,rgb(255,77,77)_calc(25%*var(--glow)),transparent)]'
                   : isSelected
-                    ? 'border-accent shadow-[0_0_10px_rgba(255,160,0,0.2)]'
+                    ? 'border-accent shadow-[0_0_10px_color-mix(in_srgb,rgb(255,160,0)_calc(20%*var(--glow)),transparent)]'
                     : 'border-line/50 hover:border-line'
               )}
             >
@@ -98,14 +98,14 @@ export function UnitCardStack({
                 <div className="relative shrink-0">
                   <div
                     className={cn(
-                      'flex h-9 w-9 items-center justify-center overflow-hidden border bg-black/80 text-[11px] font-bold',
+                      'flex h-9 w-9 items-center justify-center overflow-hidden border tone-well-80 text-[11px] font-bold',
                       isActive
                         ? isLeft
-                          ? 'border-cyan text-cyan'
+                          ? 'border-tint-cyan text-tint-cyan'
                           : 'border-alert text-alert'
                         : isSelected
                           ? 'border-accent text-accent'
-                          : 'border-line/50 text-white'
+                          : 'border-line/50 text-ink'
                     )}
                   >
                     {unit.image ? (
@@ -118,8 +118,8 @@ export function UnitCardStack({
                   {isActive && (
                     <div
                       className={cn(
-                        'absolute -right-1 -top-1 flex h-3 items-center justify-center border px-1 text-[7.5px] font-extrabold uppercase',
-                        isLeft ? 'border-cyan bg-cyan text-black' : 'border-alert bg-alert text-white'
+                        'absolute -right-1 -top-1 flex h-3 items-center justify-center border px-1 text-[7.5px] font-extrabold caps',
+                        isLeft ? 'border-tint-cyan bg-tint-cyan text-on-accent' : 'border-alert bg-alert text-ink'
                       )}
                     >
                       ACT
@@ -127,7 +127,7 @@ export function UnitCardStack({
                   )}
 
                   {isSelected && !isActive && (
-                    <div className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center border border-accent bg-black text-accent">
+                    <div className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center border border-accent bg-well text-accent">
                       <Crosshair className="h-2.5 w-2.5" />
                     </div>
                   )}
@@ -138,7 +138,7 @@ export function UnitCardStack({
                     <span
                       className={cn(
                         'truncate text-[11px] font-bold',
-                        isDead ? 'text-faint line-through' : 'text-white group-hover:text-cyan'
+                        isDead ? 'text-faint line-through' : 'text-ink group-hover:text-tint-cyan'
                       )}
                     >
                       {unit.name}
@@ -154,7 +154,7 @@ export function UnitCardStack({
                   <div className="flex items-center gap-1.5 truncate text-[8.5px] text-faint">
                     {unit.level !== undefined && unit.level !== null && <span className="text-dim">LVL {unit.level}</span>}
                     {unit.cr !== undefined && unit.cr !== null && <span className="text-dim">CR {unit.cr}</span>}
-                    {unit.faction && <span className="truncate uppercase text-faint">{unit.faction}</span>}
+                    {unit.faction && <span className="truncate caps text-faint">{unit.faction}</span>}
                     {unit.subtitle && <span className="truncate text-dim">{unit.subtitle}</span>}
                   </div>
                 </div>
@@ -165,7 +165,7 @@ export function UnitCardStack({
                   <span className="font-semibold text-faint">{isDead ? 'DOWNED' : 'HEALTH'}</span>
                   <span
                     className={cn(
-                      'font-mono font-bold',
+                      'font-ui font-bold',
                       isDead ? 'text-faint' : hpPct <= 25 ? 'text-alert' : hpPct <= 50 ? 'text-accent' : 'text-dim'
                     )}
                   >
@@ -174,7 +174,7 @@ export function UnitCardStack({
                   </span>
                 </div>
 
-                <div className="h-1.5 w-full border border-line/40 bg-black/60">
+                <div className="h-1.5 w-full border border-line/40 tone-panel-60">
                   <div className={cn('h-full transition-all duration-300', hpColor)} style={{ width: `${hpPct}%` }} />
                 </div>
               </div>
@@ -184,7 +184,7 @@ export function UnitCardStack({
                   {unit.conditions.map((cond) => (
                     <span
                       key={cond}
-                      className="border border-line/50 bg-white/[0.04] px-1 py-0.2 text-[8px] font-semibold uppercase text-dim"
+                      className="border border-line/50 bg-ink/[0.04] px-1 py-0.2 text-[8px] font-semibold caps text-dim"
                     >
                       {cond}
                     </span>

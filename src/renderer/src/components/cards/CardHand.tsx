@@ -34,17 +34,23 @@ function FormFan({ card, layout, forms, onPick }: { card: Card; layout: ReturnTy
       {forms.map((form, i) => {
         const at = i - (forms.length - 1) / 2
         return (
-          <button
+          <div
             key={form.id}
-            type="button"
+            role="button"
+            tabIndex={form.blocked ? -1 : 0}
+            aria-disabled={form.blocked ? true : undefined}
             className="card-hand-form"
             data-blocked={form.blocked ? true : undefined}
-            disabled={!!form.blocked}
             title={form.blocked ?? `Play as ${form.label}`}
             style={{ '--fx': `${at * step}px`, '--fr': `${at * 9}deg` } as CSSProperties}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
+              if (!form.blocked) onPick(form)
+            }}
+            onKeyDown={(e) => {
+              if (form.blocked || (e.key !== 'Enter' && e.key !== ' ')) return
+              e.preventDefault()
               onPick(form)
             }}
           >
@@ -55,7 +61,7 @@ function FormFan({ card, layout, forms, onPick }: { card: Card; layout: ReturnTy
                 {form.blocked && <span className="card-hand-form-why">{form.blocked}</span>}
               </span>
             </span>
-          </button>
+          </div>
         )
       })}
     </div>

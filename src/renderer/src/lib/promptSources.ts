@@ -21,22 +21,22 @@ const TONE_PALETTE = {
     text: 'text-accent'
   },
   cyan: {
-    block: 'border-l-2 border-l-cyan/55 bg-cyan/[0.03]',
-    blockActive: 'border-l-2 border-l-cyan bg-cyan/[0.10]',
-    pill: 'border-cyan/35 bg-cyan/[0.06] text-cyan hover:border-cyan/70 hover:bg-cyan/[0.14]',
-    pillActive: 'border-cyan bg-cyan/[0.18] text-cyan',
-    bar: 'bg-cyan/75',
-    dot: 'text-cyan',
-    text: 'text-cyan'
+    block: 'border-l-2 border-l-tint-cyan/55 bg-tint-cyan/[0.03]',
+    blockActive: 'border-l-2 border-l-tint-cyan bg-tint-cyan/[0.10]',
+    pill: 'border-tint-cyan/35 bg-tint-cyan/[0.06] text-tint-cyan hover:border-tint-cyan/70 hover:bg-tint-cyan/[0.14]',
+    pillActive: 'border-tint-cyan bg-tint-cyan/[0.18] text-tint-cyan',
+    bar: 'bg-tint-cyan/75',
+    dot: 'text-tint-cyan',
+    text: 'text-tint-cyan'
   },
   purple: {
-    block: 'border-l-2 border-l-purple/55 bg-purple/[0.04]',
-    blockActive: 'border-l-2 border-l-purple bg-purple/[0.11]',
-    pill: 'border-purple/35 bg-purple/[0.06] text-purple hover:border-purple/75 hover:bg-purple/[0.14]',
-    pillActive: 'border-purple bg-purple/[0.18] text-purple',
-    bar: 'bg-purple/75',
-    dot: 'text-purple',
-    text: 'text-purple'
+    block: 'border-l-2 border-l-tint-purple/55 bg-tint-purple/[0.04]',
+    blockActive: 'border-l-2 border-l-tint-purple bg-tint-purple/[0.11]',
+    pill: 'border-tint-purple/35 bg-tint-purple/[0.06] text-tint-purple hover:border-tint-purple/75 hover:bg-tint-purple/[0.14]',
+    pillActive: 'border-tint-purple bg-tint-purple/[0.18] text-tint-purple',
+    bar: 'bg-tint-purple/75',
+    dot: 'text-tint-purple',
+    text: 'text-tint-purple'
   },
   ok: {
     block: 'border-l-2 border-l-ok/55 bg-ok/[0.03]',
@@ -48,13 +48,13 @@ const TONE_PALETTE = {
     text: 'text-ok'
   },
   teal: {
-    block: 'border-l-2 border-l-teal/55 bg-teal/[0.03]',
-    blockActive: 'border-l-2 border-l-teal bg-teal/[0.10]',
-    pill: 'border-teal/35 bg-teal/[0.06] text-teal hover:border-teal/70 hover:bg-teal/[0.14]',
-    pillActive: 'border-teal bg-teal/[0.18] text-teal',
-    bar: 'bg-teal/75',
-    dot: 'text-teal',
-    text: 'text-teal'
+    block: 'border-l-2 border-l-tint-teal/55 bg-tint-teal/[0.03]',
+    blockActive: 'border-l-2 border-l-tint-teal bg-tint-teal/[0.10]',
+    pill: 'border-tint-teal/35 bg-tint-teal/[0.06] text-tint-teal hover:border-tint-teal/70 hover:bg-tint-teal/[0.14]',
+    pillActive: 'border-tint-teal bg-tint-teal/[0.18] text-tint-teal',
+    bar: 'bg-tint-teal/75',
+    dot: 'text-tint-teal',
+    text: 'text-tint-teal'
   },
   alert: {
     block: 'border-l-2 border-l-alert/55 bg-alert/[0.03]',
@@ -66,13 +66,13 @@ const TONE_PALETTE = {
     text: 'text-alert'
   },
   neutral: {
-    block: 'border-l-2 border-l-line-strong bg-white/[0.02]',
-    blockActive: 'border-l-2 border-l-white/80 bg-white/[0.07]',
-    pill: 'border-line/50 bg-white/[0.03] text-dim hover:border-white/50 hover:text-white',
-    pillActive: 'border-white/70 bg-white/[0.12] text-white',
-    bar: 'bg-white/40',
+    block: 'border-l-2 border-l-line-strong bg-ink/[0.02]',
+    blockActive: 'border-l-2 border-l-ink/80 bg-ink/[0.07]',
+    pill: 'border-line/50 bg-ink/[0.03] text-dim hover:border-ink/50 hover:text-ink',
+    pillActive: 'border-ink/70 bg-ink/[0.12] text-ink',
+    bar: 'bg-ink/40',
     dot: 'text-dim',
-    text: 'text-white/85'
+    text: 'text-ink/85'
   }
 } as const satisfies Record<string, SourceTone>
 

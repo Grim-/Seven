@@ -42,7 +42,7 @@ export function CountsEditor({ pageId, title, start, what, extra }: { pageId: st
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <AddonTitle pageId={pageId} title={title} status={saver.status} error={saver.error} onRenamed={(name) => saver.set((d) => ({ ...d, name }))} />
-        <span className="font-mono text-[12px] font-bold text-accent">{totalOf(list.cards)} cards</span>
+        <span className="font-ui text-[12px] font-bold text-accent">{totalOf(list.cards)} cards</span>
         <span className="flex-1" />
         {extra?.({ list, set: saver.set, addSet })}
       </div>

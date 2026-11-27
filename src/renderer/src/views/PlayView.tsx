@@ -124,7 +124,7 @@ export function PlayView() {
 
   if (!worlds.length) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-6 bg-bg font-mono">
+      <div className="flex h-full flex-col items-center justify-center p-6 bg-bg font-ui">
         <EmptyState title="No worlds created yet">
           Create a world in the Data tab first to play.
         </EmptyState>
@@ -133,12 +133,12 @@ export function PlayView() {
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-bg font-mono select-none">
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-bg font-ui select-none">
       {/* DIEGETIC TOP APP NAV BAR - SINGLE UNIFIED BAR */}
-      <header className="flex h-9 shrink-0 items-center justify-between border-b border-line bg-panel px-3 text-[11px] z-40">
+      <header className="flex h-9 shrink-0 items-center justify-between border-b border-line tone-surface-60 px-3 text-[11px] z-40">
         {/* LEFT: PLAY BADGE, WORLD SELECTOR, INTENTIONAL SAVE PILL */}
         <div className="flex items-center gap-2.5">
-          <span className="border border-cyan/40 bg-cyan/15 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-cyan">
+          <span className="border border-secondary-ink/40 bg-secondary-ink/15 px-1.5 py-0.5 text-[9.5px] font-bold caps-5 text-secondary-ink">
             PLAY
           </span>
           <span className="text-line">|</span>
@@ -154,7 +154,7 @@ export function PlayView() {
             />
           ) : (
             <span className="text-dim">
-              World: <strong className="text-white">{worlds[0]?.name}</strong>
+              World: <strong className="text-ink">{worlds[0]?.name}</strong>
             </span>
           )}
 
@@ -191,7 +191,7 @@ export function PlayView() {
           <Button
             size="sm"
             variant="secondary"
-            icon={<Sliders className="h-3 w-3 text-cyan" />}
+            icon={<Sliders className="h-3 w-3 text-secondary-ink" />}
             onClick={() => setShowSettingsModal(true)}
             className="h-6 px-2 text-[10.5px]"
             title="Gameplay settings and keybinds"
@@ -210,7 +210,7 @@ export function PlayView() {
               side="bottom"
               align="end"
               trigger={
-                <StatusBadge tone="idle" className="cursor-pointer text-teal font-mono text-[11px] hover:border-accent hover:text-accent" title={`${agent?.name ?? 'Agent'} settings · Click or right-click`}>
+                <StatusBadge tone="idle" className="cursor-pointer text-secondary font-ui text-[11px] hover:border-accent hover:text-accent" title={`${agent?.name ?? 'Agent'} settings · Click or right-click`}>
                   {agent?.name ?? 'Agent'}
                 </StatusBadge>
               }
@@ -248,15 +248,15 @@ export function PlayView() {
         onClose={() => {}}
         wide={false}
       >
-        <div className="flex flex-col gap-3 font-mono">
+        <div className="flex flex-col gap-3 font-ui">
           <div className="text-[12px] text-dim">
-            World: <strong className="text-white">{worlds.find((w) => w.id === activeWorldId)?.name ?? activeWorldId}</strong>
+            World: <strong className="text-ink">{worlds.find((w) => w.id === activeWorldId)?.name ?? activeWorldId}</strong>
           </div>
 
           {/* START NEW ADVENTURE IF NO SAVES EXIST */}
           {!latestSave && (
-            <div className="flex flex-col gap-3 border border-line/50 bg-card/60 p-4">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
+            <div className="flex flex-col gap-3 border border-line/50 tone-card-60 p-4">
+              <span className="text-[10px] font-bold caps-5 text-accent">
                 Fresh World · Ready to Play
               </span>
               <p className="text-[12px] text-dim">
@@ -264,9 +264,9 @@ export function PlayView() {
               </p>
 
               {/* CHOOSE STARTING CHARACTER */}
-              <div className="flex flex-col gap-1.5 border border-line/60 bg-black/50 p-3">
+              <div className="flex flex-col gap-1.5 border border-line/60 tone-panel-50 p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-accent">
+                  <span className="text-[10px] font-bold caps-5 text-accent">
                     SELECT YOUR STARTING CHARACTER
                   </span>
                   <span className="text-[10px] text-dim">{sheets.length} sheets in library</span>
@@ -338,12 +338,12 @@ export function PlayView() {
           {/* RECOMMENDED LAST PLAYED SAVE */}
           {latestSave && (
             <div className="flex flex-col gap-2">
-              <span className="text-[9.5px] font-bold uppercase tracking-wider text-accent">
+              <span className="text-[9.5px] font-bold caps-5 text-accent">
                 CONTINUE ADVENTURE (LAST PLAYED)
               </span>
               <div className="flex flex-col gap-2 border border-accent/60 bg-accent/10 p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[14px] font-bold text-white">{latestSave.name}</span>
+                  <span className="text-[14px] font-bold text-ink">{latestSave.name}</span>
                   <span className="text-[10px] text-dim">
                     Last played: {formatTimeAgo(latestSave.updatedAt)}
                   </span>
@@ -354,9 +354,9 @@ export function PlayView() {
                 </div>
 
                 {/* CHARACTER SELECTION FOR EXISTING SAVE */}
-                <div className="flex flex-col gap-1 border border-line/40 bg-black/40 p-2">
+                <div className="flex flex-col gap-1 border border-line/40 tone-panel-40 p-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[9.5px] font-bold uppercase tracking-wider text-accent">
+                    <span className="text-[9.5px] font-bold caps-5 text-accent">
                       ACTIVE PLAYER CHARACTER
                     </span>
                     <span className="text-[9.5px] text-dim">Change character if desired</span>
@@ -394,17 +394,17 @@ export function PlayView() {
           {/* OTHER SAVES LIST */}
           {sortedSaves.length > 1 && (
             <div className="mt-2 flex flex-col gap-1.5">
-              <span className="text-[9.5px] font-bold uppercase tracking-wider text-faint">
+              <span className="text-[9.5px] font-bold caps-5 text-faint">
                 OTHER SAVES
               </span>
               <div className="flex max-h-[140px] flex-col gap-1 overflow-y-auto pr-1">
                 {sortedSaves.slice(1).map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between border border-line/60 bg-black/60 px-2.5 py-1.5 hover:border-line"
+                    className="flex items-center justify-between border border-line/60 tone-well-60 px-2.5 py-1.5 hover:border-line"
                   >
                     <div className="flex flex-col">
-                      <span className="text-[11.5px] font-bold text-white">{s.name}</span>
+                      <span className="text-[11.5px] font-bold text-ink">{s.name}</span>
                       <span className="text-[9.5px] text-dim">{formatTimeAgo(s.updatedAt)}</span>
                     </div>
                     <Button
@@ -443,10 +443,10 @@ export function PlayView() {
         wide={false}
       >
         {currentSave && (
-          <div className="flex flex-col gap-3 font-mono">
-            <div className="flex flex-col gap-1 border border-line/60 bg-black/60 p-2.5">
-              <span className="text-[9.5px] uppercase tracking-wider text-faint">ACTIVE SAVE</span>
-              <div className="text-[13px] font-bold text-white">{currentSave.name}</div>
+          <div className="flex flex-col gap-3 font-ui">
+            <div className="flex flex-col gap-1 border border-line/60 tone-panel-60 p-2.5">
+              <span className="text-[9.5px] caps-5 text-faint">Active save</span>
+              <div className="text-[13px] font-bold text-ink">{currentSave.name}</div>
               <div className="text-[10px] text-dim">
                 Last updated: {formatTimeAgo(currentSave.updatedAt)} ·{' '}
                 {currentSave.characters.length} character
@@ -480,7 +480,7 @@ export function PlayView() {
             {/* SWITCH SAVE WITH INTENTIONAL CONFIRMATION */}
             {sortedSaves.length > 1 && (
               <div className="mt-2 flex flex-col gap-1">
-                <span className="text-[9.5px] uppercase tracking-wider text-faint">
+                <span className="text-[9.5px] caps-5 text-faint">
                   SWITCH SAVE (CONFIRMED LOAD)
                 </span>
                 <div className="flex max-h-[120px] flex-col gap-1 overflow-y-auto">
@@ -489,9 +489,9 @@ export function PlayView() {
                     .map((s) => (
                       <div
                         key={s.id}
-                        className="flex items-center justify-between border border-line/60 bg-black/60 px-2 py-1 text-[11px]"
+                        className="flex items-center justify-between border border-line/60 tone-panel-60 px-2 py-1 text-[11px]"
                       >
-                        <span className="text-white">{s.name}</span>
+                        <span className="text-ink">{s.name}</span>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -504,7 +504,7 @@ export function PlayView() {
                               void handleSelectSave(s.id)
                             }
                           }}
-                          className="h-6 px-2 text-[10px] text-accent hover:text-white"
+                          className="h-6 px-2 text-[10px] text-accent hover:text-ink"
                         >
                           LOAD
                         </Button>
@@ -530,7 +530,7 @@ export function PlayView() {
           title="Select Active Player Character"
           onClose={() => setShowPlayerModal(false)}
         >
-          <div className="flex flex-col gap-3 font-mono">
+          <div className="flex flex-col gap-3 font-ui">
             <p className="text-[12px] text-dim">
               Choose which character you want to control in this world:
             </p>
@@ -563,7 +563,7 @@ export function PlayView() {
       {confirmedSaveId && activeWorldId ? (
         <WorldPlay world={activeWorldId} />
       ) : (!latestSave || showNewAdventure) && activeWorldId ? null : (
-        <div className="flex flex-1 items-center justify-center font-mono text-[12px] text-faint">
+        <div className="flex flex-1 items-center justify-center font-ui text-[12px] text-faint">
           Select a save file above to enter the game world.
         </div>
       )}

@@ -34,14 +34,14 @@ export function ChipInput({
       <div
         onClick={() => input.current?.focus()}
         className={cn(
-          'flex min-h-9 flex-wrap items-center gap-1.5 border bg-black/60 px-1.5 py-1',
+          'flex min-h-9 flex-wrap items-center gap-1.5 border tone-well-60 px-1.5 py-1',
           focus ? 'border-accent/60' : 'border-line'
         )}
       >
         {value.map((t) => (
           <span
             key={t}
-            className="flex items-center gap-1 border border-accent/40 bg-accent/10 py-0.5 pl-1.5 pr-0.5 font-mono text-[11.5px] text-white"
+            className="flex items-center gap-1 border border-accent/40 bg-accent/10 py-0.5 pl-1.5 pr-0.5 font-ui text-[11.5px] text-ink"
           >
             {prefix}
             {t}
@@ -79,7 +79,7 @@ export function ChipInput({
             else if (!move(e) && e.key === 'Escape') setText('')
           }}
           placeholder={value.length ? '' : placeholder}
-          className="h-6 min-w-[8ch] flex-1 bg-transparent px-1 text-[12.5px] text-white outline-none placeholder:text-dim/60"
+          className="h-6 min-w-[8ch] flex-1 bg-transparent px-1 text-[12.5px] text-ink outline-none placeholder:text-dim/60"
         />
       </div>
       {focus && (

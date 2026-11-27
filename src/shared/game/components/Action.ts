@@ -39,9 +39,10 @@ export interface ActionEvent extends UseContext {
 
 export function actionValue(formula: string, event: UseContext & { [extra: string]: unknown }, seed: string): number {
   let n = 0
+  const resolved = event.user.catalog.formula(formula.trim()) ?? formula
   const read = (who: GameEntity | null, stat: string) => (who ? who.comp(Stats)?.value(stat) : undefined)
   const mult = event.crit === true ? 2 : 1
-  return evaluate(formula, {
+  return evaluate(resolved, {
     value: (name) => {
       if (name === 'distance') return event.distance
       const [who, stat] = name.split('.')
@@ -61,9 +62,10 @@ export function actionValue(formula: string, event: UseContext & { [extra: strin
 
 /** Deterministic expected midpoint of a formula using average dice values for AI/tactical scoring. */
 export function expectedActionValue(formula: string, ctx: UseContext & { [extra: string]: unknown }): number {
+  const resolved = ctx.user.catalog.formula(formula.trim()) ?? formula
   const read = (who: GameEntity | null, stat: string) => (who ? who.comp(Stats)?.value(stat) : undefined)
   try {
-    return evaluate(formula, {
+    return evaluate(resolved, {
       value: (name) => {
         if (name === 'distance') return ctx.distance
         const [who, stat] = name.split('.')
@@ -144,6 +146,9 @@ export abstract class ActionPiece extends Component {
   static readonly BRANCHES: EffectBranch[] = [{ param: 'emit', label: 'If it works', tone: 'pass' }]
 
   canApply(host: Component | GameEntity): true | string {
+    if ((host.constructor as { type?: string }).type === 'world_effects') {
+      return 'only for characters, abilities, and items'
+    }
     return host instanceof Action ? true : 'this piece belongs inside an ability, item or reaction'
   }
 

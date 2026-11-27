@@ -50,7 +50,7 @@ export function ModuleAdds({ module }: { module: ModuleInfo }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">
+      <div className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">
         What it adds
       </div>
 
@@ -61,8 +61,8 @@ export function ModuleAdds({ module }: { module: ModuleInfo }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[12.5px] font-semibold text-white">{tab.label}</span>
-              <span className="inline-flex items-center gap-1 border border-accent/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-accent-soft">
+              <span className="font-ui text-[12.5px] font-semibold text-ink">{tab.label}</span>
+              <span className="inline-flex items-center gap-1 border border-accent/40 px-1.5 py-0.5 font-label text-[10px] caps-10 text-accent-soft">
                 Main tab
               </span>
             </div>
@@ -78,14 +78,14 @@ export function ModuleAdds({ module }: { module: ModuleInfo }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[12.5px] font-semibold text-white">{module.panel.label}</span>
-              <span className="inline-flex items-center gap-1 border border-accent/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-accent-soft">
+              <span className="font-ui text-[12.5px] font-semibold text-ink">{module.panel.label}</span>
+              <span className="inline-flex items-center gap-1 border border-accent/40 px-1.5 py-0.5 font-label text-[10px] caps-10 text-accent-soft">
                 <PanelRight className="h-2.5 w-2.5" />
                 Panel tab
               </span>
             </div>
             <p className="mt-0.5 text-[12px] text-dim">
-              Adds a dedicated <span className="font-mono text-white/85">{module.panel.label}</span> tab in the side panel.
+              Adds a dedicated <span className="font-ui text-ink/85">{module.panel.label}</span> tab in the side panel.
             </p>
           </div>
         </div>
@@ -97,18 +97,18 @@ export function ModuleAdds({ module }: { module: ModuleInfo }) {
             const badges = pageBadges(p)
             const partKeys = Object.keys(p.parts ?? {})
             return (
-              <div key={p.type} className="flex flex-col gap-2 border border-line/45 bg-black/25 p-3">
+              <div key={p.type} className="flex flex-col gap-2 border border-line/45 tone-panel-25 p-3">
                 <div className="flex items-start gap-2.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-line/60 bg-white/[0.03] text-accent">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-line/60 bg-ink/[0.03] text-accent">
                     <KindIcon name={p.icon} className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="font-mono text-[12.5px] font-semibold text-white">{p.label}</span>
+                      <span className="font-ui text-[12.5px] font-semibold text-ink">{p.label}</span>
                       {p.plural && p.plural !== p.label && (
-                        <span className="font-mono text-[11px] text-faint">({p.plural})</span>
+                        <span className="font-ui text-[11px] text-faint">({p.plural})</span>
                       )}
-                      <span className="ml-auto border border-line/50 px-1.5 py-0.5 font-mono text-[10px] text-accent-soft">
+                      <span className="ml-auto border border-line/50 px-1.5 py-0.5 font-ui text-[10px] text-accent-soft">
                         {module.id}:{p.type}
                       </span>
                     </div>
@@ -116,9 +116,9 @@ export function ModuleAdds({ module }: { module: ModuleInfo }) {
                   </div>
                 </div>
                 {(badges.length > 0 || partKeys.length > 0 || p.actions.length > 0) && (
-                  <div className="flex flex-wrap gap-1 border-t border-line/30 pt-2 font-mono text-[10px]">
+                  <div className="flex flex-wrap gap-1 border-t border-line/30 pt-2 font-ui text-[10px]">
                     {badges.map((b) => (
-                      <span key={b} className="border border-line/40 bg-white/[0.03] px-1.5 py-0.5 text-white/75">
+                      <span key={b} className="border border-line/40 bg-ink/[0.03] px-1.5 py-0.5 text-ink/75">
                         {b}
                       </span>
                     ))}
@@ -146,17 +146,17 @@ export function ModuleAdds({ module }: { module: ModuleInfo }) {
             const meta = metaForCategory(g.label)
             const Icon = meta.icon
             return (
-              <div key={g.label} className="flex flex-col gap-2 border border-line/45 bg-black/25 p-3">
+              <div key={g.label} className="flex flex-col gap-2 border border-line/45 tone-panel-25 p-3">
                 <div className="flex items-start gap-2.5">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-accent/35 bg-accent/10 text-accent-soft">
                     <Icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-accent-soft">
+                      <span className="font-label text-[11px] font-semibold caps-12 text-accent-soft">
                         {g.label}
                       </span>
-                      <span className="font-mono text-[10.5px] text-faint">{g.items.length}</span>
+                      <span className="font-ui text-[10.5px] text-faint">{g.items.length}</span>
                     </div>
                     <p className="mt-0.5 text-[11.5px] text-dim">{meta.hint}</p>
                   </div>
@@ -165,7 +165,7 @@ export function ModuleAdds({ module }: { module: ModuleInfo }) {
                   {g.items.map((item) => (
                     <span
                       key={item}
-                      className="border border-line/50 bg-white/[0.03] px-2 py-0.5 font-mono text-[11px] text-white/90"
+                      className="border border-line/50 bg-ink/[0.03] px-2 py-0.5 font-ui text-[11px] text-ink/90"
                     >
                       {item}
                     </span>

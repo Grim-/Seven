@@ -21,16 +21,16 @@ function CharacterCard({
   const valid = preview && !('missing' in preview) ? preview : null
 
   return (
-    <div className="flex items-center gap-2 border border-line bg-black/40 p-1.5 font-mono text-[11px]">
+    <div className="flex items-center gap-2 border border-line tone-panel-40 p-1.5 font-ui text-[11px]">
       <CharacterAvatar sheetId={sheetId} size={28} />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-semibold text-white">{valid ? showName(valid.title) : sheetId}</div>
+        <div className="truncate font-semibold text-ink">{valid ? showName(valid.title) : sheetId}</div>
         <div className="text-[9.5px] text-dim">{label}</div>
       </div>
       <button
         type="button"
         onClick={() => openEntry('sheet', sheetId)}
-        className="notch-sm border border-line/60 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-dim hover:border-accent hover:text-white"
+        className="notch-sm border border-line/60 bg-ink/5 px-2 py-0.5 text-[10px] font-semibold caps-5 text-dim hover:border-accent hover:text-ink"
       >
         Open
       </button>
@@ -63,7 +63,7 @@ export function CharacterPicker({ agent }: { agent: AgentProfile }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 border-t border-line/60 pt-2 font-mono">
+    <div className="flex flex-col gap-2 border-t border-line/60 pt-2 font-ui">
       <Field label={sheets.length > 1 ? `Agent Roster (${sheets.length})` : 'Agent Roster'}>
         <div className="flex flex-col gap-1.5">
           {sheets.map((sheetId, idx) => (

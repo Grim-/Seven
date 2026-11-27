@@ -76,7 +76,7 @@ export function SkillsPanel({ initial = null }: { initial?: string | null }) {
         {selected ? (
           <>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[11px] text-faint">{selected}/SKILL.md{current?.updatedAt ? ` · ${formatRelative(current.updatedAt)}` : ''}</span>
+              <span className="font-ui text-[11px] text-faint">{selected}/SKILL.md{current?.updatedAt ? ` · ${formatRelative(current.updatedAt)}` : ''}</span>
               <span className="ml-auto flex items-center gap-1.5">
                 {draft === null ? (
                   <>
@@ -96,9 +96,9 @@ export function SkillsPanel({ initial = null }: { initial?: string | null }) {
               </span>
             </div>
             {draft !== null ? (
-              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} className="min-h-0 flex-1 resize-none border border-line/60 bg-black/60 p-3 font-mono text-[12.5px] leading-relaxed text-white" />
+              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} className="min-h-0 flex-1 resize-none border border-line/60 tone-panel-60 p-3 font-ui text-[12.5px] leading-relaxed text-ink" />
             ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto border border-line/40 bg-black/40 p-4">
+              <div className="min-h-0 flex-1 overflow-y-auto border border-line/40 tone-panel-40 p-4">
                 <Markdown text={text || '_Empty_'} />
               </div>
             )}

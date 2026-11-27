@@ -17,6 +17,6 @@ export function LiveCard({ id, className }: { id: string; className?: string }) 
   const page = usePage(id)
   const card = page ? readCard(page.data, page.title) : null
   const layout = useLayoutNamed(card?.layout ?? null)
-  if (!card) return <div className="font-mono text-[11px] text-dim">{page === null ? 'This card no longer exists.' : 'Loading…'}</div>
+  if (!card) return <div className="font-ui text-[11px] text-dim">{page === null ? 'This card no longer exists.' : 'Loading…'}</div>
   return <CardOf card={card} layout={layout} className={className} />
 }

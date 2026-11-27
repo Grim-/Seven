@@ -8,7 +8,7 @@ export function TextCards<T = string>({ values, onChange, addLabel, empty, edito
   return (
     <div className="flex flex-col gap-2">
       {values.map((v, i) => (
-        <div key={i} {...reorder.props(i)} className={cn('group flex gap-1.5 border border-line/40 bg-black/40 p-1.5', reorder.isOver(i) && 'border-t-2 border-t-accent')}>
+        <div key={i} {...reorder.props(i)} className={cn('group flex gap-1.5 border border-line/40 tone-well-40 p-1.5', reorder.isOver(i) && 'border-t-2 border-t-accent')}>
           <span className="flex w-4 shrink-0 cursor-grab items-start justify-center pt-2 text-faint opacity-0 group-hover:opacity-100">
             <GripVertical className="h-3.5 w-3.5" />
           </span>

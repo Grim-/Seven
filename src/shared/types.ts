@@ -1,11 +1,12 @@
 import type { ProblemPrefs } from './problems'
 import type { PortabilityPrefs } from './portability'
+import type { StartColors } from './startColors'
+import type { WidgetLook } from './widgetLook'
 import type { EntityRecord } from './game/core/GameEntity'
 import { isAssetId } from './ids'
 import type { DndStats } from './dnd'
 import type { Story, StoryMemory } from './story'
 import type { RelationshipEntry } from './relationships'
-import type { WorldBinding } from './world'
 import type { PickDecisionProps } from './pickDecision'
 import type { RolledDecisionProps } from './rolledDecision'
 import type { OpposedProps } from './opposedCheck'
@@ -59,9 +60,18 @@ export const MODEL_KINDS = {
     plural: 'LoRAs',
     runnable: false,
     chats: false,
-    always: false,
-    listed: false,
-    note: 'A LoRA adapter modifies a diffusion image model; it is not a standalone model.'
+    always: true,
+    listed: true,
+    note: 'A LoRA adapter modifies a diffusion image model; select it inside Image Generator.'
+  },
+  control_vector: {
+    label: 'Control vector',
+    plural: 'Control vectors',
+    runnable: false,
+    chats: false,
+    always: true,
+    listed: true,
+    note: 'A control vector steers a chat model; it is not a standalone model.'
   },
   imatrix: {
     label: 'Importance matrix',
@@ -138,12 +148,25 @@ export interface ImageCompanions {
 
 export type ImageHostStatus = 'unloaded' | 'loading' | 'ready' | 'generating' | 'error'
 
+export interface ImageLoraSelection {
+  id: string
+  weight: number
+}
+
+export interface ImageModelInstalledEvent {
+  modelId: string
+  modelName: string
+  missingSlots: string[]
+}
+
 export interface ImageProgress {
   stage: string
   detail: string
   completed: number | null
   total: number | null
   elapsedMs: number
+  /** Optional base64 data URL of an intermediate streaming preview image. */
+  previewDataUrl?: string | null
 }
 
 export interface ImageHostState {
@@ -171,6 +194,7 @@ export interface ImageGenerateRequest {
   cfgScale?: number
   seed?: number
   sampler?: string
+  loras?: ImageLoraSelection[]
   name?: string
   originTool?: string
   sessionId?: string
@@ -295,6 +319,7 @@ export interface DownloadItem {
   files?: DownloadBundleFile[]
   imageConfig?: Partial<ImageModelConfig>
   targetModelId?: string
+  expectedKind?: ModelKind
 }
 
 export interface ChatServerStatus {
@@ -716,7 +741,6 @@ export interface AgentProfile {
   look: AgentLook
   toolsets?: string[]
   offTools?: string[]
-  world?: WorldBinding | null
   folder?: string | null
   incognito?: boolean
   private?: boolean
@@ -728,7 +752,7 @@ export interface AgentProfile {
   reasoningStyle?: string | null
   thinking?: ThinkingLevel | null
   toolChoice?: ToolChoiceMode | null
-  mindAuto?: { recall: boolean }
+  mindAuto?: { recall: boolean; recallCooldown?: number }
   remindEvery?: number
   maxToolRounds?: number
   sheet?: string | null
@@ -738,6 +762,11 @@ export interface AgentProfile {
   createdBy?: string | null
   createdAt: number
   updatedAt: number
+}
+
+export interface ChatWorld {
+  world: string | null
+  sheets: { sheet: string; world: string | null }[]
 }
 
 export function chatPlayer(agent: { player?: string | null } | null | undefined, worldPlayer: string | null): string | null {
@@ -1395,6 +1424,7 @@ export interface ChatMessage {
   attachments?: string[]
   elements?: ChatElement[]
   edited?: boolean
+  modelText?: string
 }
 
 export interface SessionSnapshot {
@@ -1606,6 +1636,8 @@ export interface Settings {
   droppedPictures: DropPrefs
   problems: ProblemPrefs
   portability: PortabilityPrefs
+  startColors: StartColors | null
+  widgetLook: WidgetLook | null
 }
 
 export interface AppInfo {
@@ -1717,6 +1749,8 @@ export interface CharacterMind {
   voiceConstraints?: string
   forceReason?: boolean
   memories?: StoryMemory[]
+  knowledge?: string[]
+  excluded?: string[]
 }
 
 export interface CharacterSheet {

@@ -43,8 +43,13 @@ export function useTriggerPlay(options: Options) {
     const { use, uses, onGo } = latest.current
     const target = uses.find((u) => u.map === mapId)
     if (!target) return toast.error('Can\'t go there', 'That map is not used in this world.')
+    const explicit = placeKey ? target.spawns?.[placeKey] : undefined
     const form = placeKey ? target.shapes[placeKey] : undefined
-    const at = form ? centre(shapeBounds(form)) : await engine('maps.get', { id: mapId }).then((m) => ({ x: Math.round((m?.size.w ?? 0) / 2), y: Math.round((m?.size.h ?? 0) / 2) }))
+    const at: Point = explicit
+      ? explicit
+      : form
+        ? centre(shapeBounds(form))
+        : await engine('maps.get', { id: mapId }).then((m) => ({ x: Math.round((m?.size.w ?? 0) / 2), y: Math.round((m?.size.h ?? 0) / 2) }))
     const before: Standing | undefined = use.stand[sheet]
     const standing: Standing = { actions: before?.actions ?? '', decisions: before?.decisions ?? '', at }
     if (target.map === use.map) await saveUse({ ...use, stand: { ...use.stand, [sheet]: standing } })

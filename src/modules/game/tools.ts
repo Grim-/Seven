@@ -111,7 +111,7 @@ registerSchemaSource({
   id: GAME_DEF_SCOPE,
   entries: (on) =>
     on('game')
-      ? defTypes().map((t) => ({ name: t.type, summary: t.description, params: { type: 'object' as const, properties: { notes: { type: ['string', 'null'] }, values: paramsSchema(t.params) } } }))
+      ? defTypes().map((t) => ({ name: t.kind ?? t.type, summary: t.description, params: { type: 'object' as const, properties: { notes: { type: ['string', 'null'] }, values: paramsSchema(t.params) } } }))
       : []
 })
 
@@ -511,7 +511,7 @@ export const gameTools: ToolDef[] = [
     params: {
       type: 'object',
       properties: {
-        type: { enum: defTypes().map((d) => d.type), description: 'Game definition kind' },
+        type: { enum: defTypes().map((d) => d.kind ?? d.type), description: 'Game definition kind' },
         id: { type: ['string', 'null'], description: 'Existing id or omitted to create from name' },
         name: { type: 'string', description: 'Display name' },
         data: { type: 'object', description: `fields: inspect_schema(${GAME_DEF_SCOPE}, <type>)` }
@@ -519,12 +519,14 @@ export const gameTools: ToolDef[] = [
       required: ['type', 'name']
     },
     async execute(params) {
-      const defKind = str(params.type)
+      const defType = gameDefs.typeOf(str(params.type))
+      const defKind = defType.type
+      const shown = defType.kind ?? defType.type
       const name = str(params.name)
       const existing = str(params.id) ? gameDefs.find(defKind, str(params.id)) : gameDefs.find(defKind, name)
       const extra = params.data && typeof params.data === 'object' && !Array.isArray(params.data) ? (params.data as Record<string, unknown>) : {}
-      checkKeys(GAME_DEF_SCOPE, defKind, extra)
-      if (extra.values && typeof extra.values === 'object' && !Array.isArray(extra.values)) checkKeys(GAME_DEF_SCOPE, defKind, extra.values as Record<string, unknown>, [], ['values'])
+      checkKeys(GAME_DEF_SCOPE, shown, extra)
+      if (extra.values && typeof extra.values === 'object' && !Array.isArray(extra.values)) checkKeys(GAME_DEF_SCOPE, shown, extra.values as Record<string, unknown>, [], ['values'])
       const payload = {
         ...(existing ?? {}),
         ...extra,
@@ -532,7 +534,7 @@ export const gameTools: ToolDef[] = [
         name
       }
       const saved = gameDefs.save(defKind, payload, existing?.id ?? null)
-      return `${existing ? 'Updated' : 'Created'} ${defKind} "${saved.name}" (${saved.id}).`
+      return `${existing ? 'Updated' : 'Created'} ${shown} "${saved.name}" (${saved.id}).`
     }
   }
 ]

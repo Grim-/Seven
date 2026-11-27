@@ -1,6 +1,6 @@
 import { HARM, type EffectGroup } from '../../effectGroups'
 import { entryLink, registerComponent, type Component, type GameEntity, type TooltipRow } from '../../core'
-import { ITEM_TEMPLATES } from '../../templateKinds'
+import { ITEM_KIND } from '../../templateKinds'
 import { Ability } from '../Abilities'
 import { ActionPiece, actionValue, expectedActionValue, type ActionEvent, type UseContext } from '../Action'
 import { Item } from '../Inventory'
@@ -53,7 +53,7 @@ export class WeaponHit extends ActionPiece {
     if (!event.nonTriggering && dealt > 0) {
       event.user.emit('OnHit', { target: event.target.uid, damage: dealt, type: String(weapon.params.damageType), action: item.id, chainDepth: (event.chainDepth ?? 0) + 1 })
     }
-    this.report(event, { hits, from, to }, `${entryLink(ITEM_TEMPLATES, item.id)} hit ${event.target.named} ${hits === 1 ? 'once' : `${hits} times`} for ${dealt} (${from} → ${to} HP)${health.isDead ? `; ${event.target.named} is down` : ''}.`)
+    this.report(event, { hits, from, to }, `${entryLink(ITEM_KIND, item.id)} hit ${event.target.named} ${hits === 1 ? 'once' : `${hits} times`} for ${dealt} (${from} → ${to} HP)${health.isDead ? `; ${event.target.named} is down` : ''}.`)
     this.next(event)
   }
 

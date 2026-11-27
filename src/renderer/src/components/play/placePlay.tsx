@@ -31,7 +31,7 @@ function builder(p: PlacePlay, kind: PlayKind, index: number | null, initial: { 
 }
 
 export function placePlay(world: string, placeKey: string, place: WorldEntity, character: string | null, agents: string[]): PlacePlay {
-  return { world, placeKey, place, character, where: { link: `@place:${placeKey}`, agents } }
+  return { world, placeKey, place, character, where: { link: `@world:${world}/place/${placeKey}`, agents } }
 }
 
 export function newPlayItems(p: PlacePlay): MenuItem[] {

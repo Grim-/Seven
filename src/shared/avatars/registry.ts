@@ -1,20 +1,10 @@
 import { isAssetId } from '../ids'
-import { ACTIVITIES, MOODS, REACTION_POSES } from '../moods'
 import { pickSettings, settingsFor, type SettingSpec, type SettingValues } from '../settingSpec'
 import type { AvatarRef } from '../types'
+import { POSE_KEYS, type AvatarSize } from './basics'
+import { cleanTreatments, type TreatmentEntry } from './treatments'
 
-export type AvatarSize = 'dot' | 'badge' | 'portrait' | 'stage'
-
-export const AVATAR_SIZES: { size: AvatarSize; below: number }[] = [
-  { size: 'dot', below: 20 },
-  { size: 'badge', below: 48 },
-  { size: 'portrait', below: 160 },
-  { size: 'stage', below: Infinity }
-]
-
-export function avatarSizeOf(px: number): AvatarSize {
-  return (AVATAR_SIZES.find((s) => px < s.below) ?? AVATAR_SIZES[AVATAR_SIZES.length - 1]).size
-}
+export { AVATAR_SIZES, POSE_KEYS, avatarSizeOf, sizeRank, type AvatarSize } from './basics'
 
 export interface Avatar {
   id: string
@@ -23,6 +13,7 @@ export interface Avatar {
   renderer: string
   settings: SettingValues
   poses: Record<string, SettingValues>
+  treatments?: TreatmentEntry[]
   builtin?: boolean
   createdBy?: string | null
   createdAt: number
@@ -37,6 +28,7 @@ export interface AvatarSeed {
   description: string
   settings?: SettingValues
   poses?: Record<string, SettingValues>
+  treatments?: unknown[]
 }
 
 export interface AvatarRendererInfo {
@@ -50,8 +42,6 @@ export interface AvatarRendererInfo {
 }
 
 export const MEDIA_CLIP_SETTING: SettingSpec = { name: 'picture', label: 'Fallback clip', type: 'picture', group: 'look', default: '' }
-
-export const POSE_KEYS: string[] = [...new Set<string>([...MOODS.map((m) => m.name), ...ACTIVITIES.map((a) => a.name), ...REACTION_POSES.map((r) => r.name)])]
 
 const renderers = new Map<string, AvatarRendererInfo>()
 
@@ -95,6 +85,7 @@ export function builtinAvatars(): Avatar[] {
       renderer: info.id,
       settings: settingsFor(info.settings, seed.settings),
       poses: cleanPoses(info, seed.poses),
+      ...withTreatments(cleanTreatments(seed.treatments)),
       builtin: true,
       createdBy: null,
       createdAt: 0,
@@ -114,8 +105,13 @@ export function cleanAvatar(input: AvatarInput, base: Avatar | null): Omit<Avata
     renderer,
     settings: settingsFor(info.settings, { ...(base?.settings ?? {}), ...(input.settings ?? {}) }),
     poses: cleanPoses(info, input.poses ?? kept?.poses ?? {}),
+    ...withTreatments(cleanTreatments(input.treatments ?? base?.treatments)),
     createdBy: input.createdBy ?? base?.createdBy ?? null
   }
+}
+
+function withTreatments(treatments: TreatmentEntry[]): { treatments?: TreatmentEntry[] } {
+  return treatments.length ? { treatments } : {}
 }
 
 const CODED_TYPE = /^[a-z][a-z0-9_-]{0,40}$/

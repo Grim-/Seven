@@ -11,7 +11,8 @@ export function ReasoningStylePicker() {
   const styles = useStyles()
   if (!agent || !styles.length || !ready) return null
   if (!agentGroups(agent, toolsetList, modules).includes('mind') || agent.offTools?.includes('reason')) return null
-  const fallback = agent.reasoningStyle ?? styles[0]?.name ?? 'none'
+  const assigned = agent.reasoningStyle ? styles.find((s) => s.id === agent.reasoningStyle || s.name === agent.reasoningStyle) : null
+  const fallback = assigned?.name ?? styles[0]?.name ?? 'none'
   const options = [{ value: '', label: `Style: ${fallback}` }, ...styles.map((s) => ({ value: s.name, label: s.name }))]
   return (
     <Field label="Reasoning style">

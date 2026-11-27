@@ -23,8 +23,8 @@ export function BoardMessageCard({ message }: { message: BoardMessage }) {
       <AgentAvatar agent={agent} size={28} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold text-white">{agent?.name ?? message.author}</span>
-          <span className="font-mono text-[10.5px] text-faint">
+          <span className="text-[13px] font-semibold text-ink">{agent?.name ?? message.author}</span>
+          <span className="font-ui text-[10.5px] text-faint">
             {formatRelative(message.at)}
             {message.editedAt ? ' · edited' : ''}
           </span>

@@ -28,8 +28,8 @@ export function GatherCard({ ui, answer }: { ui: UiRequestState; answer: (value:
     const summary = ui.status === 'cancelled' ? 'Cancelled' : given?.declined != null ? `Declined${given.declined ? `: ${given.declined}` : ''}` : `Gave ${given?.items.length ?? 0}: ${given?.items.map((i) => i.title).join(', ') ?? ''}`
     return (
       <div className="flex flex-col gap-1.5">
-        <div className="text-[13.5px] text-white">{props.purpose}</div>
-        <div className="font-mono text-[11px] text-dim">{summary}</div>
+        <div className="text-[13.5px] text-ink">{props.purpose}</div>
+        <div className="font-ui text-[11px] text-dim">{summary}</div>
       </div>
     )
   }
@@ -37,15 +37,15 @@ export function GatherCard({ ui, answer }: { ui: UiRequestState; answer: (value:
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-accent-soft">Needs data</div>
-        <div className="text-[14px] leading-snug text-white">{props.purpose}</div>
+        <div className="font-label text-[10.5px] caps-16 text-accent-soft">Needs data</div>
+        <div className="text-[14px] leading-snug text-ink">{props.purpose}</div>
         {props.wants && <div className="mt-0.5 text-[12.5px] text-dim">{props.wants}</div>}
       </div>
       {items.length > 0 && (
         <div className="flex flex-col gap-1 border border-line/40 p-1.5">
           {items.map((item, i) => (
-            <div key={i} className="flex items-center gap-2 px-1.5 py-0.5 text-[12.5px] text-white/85">
-              <KindIcon name={iconOf(item.source)} className="h-3.5 w-3.5 shrink-0 text-teal/70" />
+            <div key={i} className="flex items-center gap-2 px-1.5 py-0.5 text-[12.5px] text-ink/85">
+              <KindIcon name={iconOf(item.source)} className="h-3.5 w-3.5 shrink-0 text-secondary/70" />
               <span className="truncate">{item.title}</span>
               <button onClick={() => setItems(items.filter((_, j) => j !== i))} className="ml-auto text-faint hover:text-alert">
                 <X className="h-3.5 w-3.5" />
@@ -56,7 +56,7 @@ export function GatherCard({ ui, answer }: { ui: UiRequestState; answer: (value:
       )}
       <div className="flex flex-wrap gap-1">
         {props.sources.map((s) => (
-          <button key={s.kind} onClick={() => setTab(s.kind)} className={cn('flex items-center gap-1.5 border px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-[0.12em]', tab === s.kind ? 'border-accent bg-accent/10 text-white' : 'border-line/40 text-dim hover:text-white')}>
+          <button key={s.kind} onClick={() => setTab(s.kind)} className={cn('flex items-center gap-1.5 border px-2.5 py-1 font-label text-[10.5px] caps-12 ', tab === s.kind ? 'border-accent bg-accent/10 text-ink' : 'border-line/40 text-dim hover:text-ink')}>
             <KindIcon name={s.icon} className="h-3.5 w-3.5" />
             {s.label}
           </button>

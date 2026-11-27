@@ -42,12 +42,12 @@ export const str = (v: unknown): string => (typeof v === 'string' ? v : v === nu
 
 function Generic({ fields }: PresentationProps) {
   return (
-    <div className="flex flex-col gap-2 border border-line/50 bg-black/40 p-3">
+    <div className="flex flex-col gap-2 border border-line/50 tone-panel-40 p-3">
       {Object.entries(fields)
         .filter(([, v]) => v !== null && v !== undefined && v !== '')
         .map(([k, v]) => (
           <div key={k}>
-            <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-accent-soft">{k}</div>
+            <div className="font-label text-[10px] caps-14 text-accent-soft">{k}</div>
             {typeof v === 'string' ? <Markdown text={v} /> : <pre className="whitespace-pre-wrap font-mono text-[12px] text-dim">{JSON.stringify(v, null, 2)}</pre>}
           </div>
         ))}
@@ -83,8 +83,8 @@ export function StageOverlay() {
   }, [playing, close])
   if (!playing) return null
   return (
-    <div className="fixed inset-0 z-[195] flex items-center justify-center overflow-hidden bg-black/85 p-6 backdrop-blur-sm" onClick={close}>
-      <button title="Close" onClick={close} className="absolute right-3 top-3 z-10 text-dim hover:text-white">
+    <div className="fixed inset-0 z-[195] flex items-center justify-center overflow-hidden bg-scrim/85 p-6 backdrop-blur-[var(--panel-blur)]" onClick={close}>
+      <button title="Close" onClick={close} className="absolute right-3 top-3 z-10 text-dim hover:text-ink">
         <X className="h-5 w-5" />
       </button>
       <div className="flex max-h-full w-full max-w-4xl flex-col overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -96,10 +96,10 @@ export function StageOverlay() {
 
 function Stub({ icon, text, action, onClick }: { icon: React.ReactNode; text: string; action: string; onClick: () => void }) {
   return (
-    <div className="my-2 flex items-center gap-2 border border-line/50 bg-black/40 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-dim">
+    <div className="my-2 flex items-center gap-2 border border-line/50 tone-panel-40 px-3 py-2 font-label text-[11px] caps-14 text-dim">
       {icon}
       <span className="truncate">{text}</span>
-      <button onClick={onClick} className="ml-auto shrink-0 text-accent hover:text-white">
+      <button onClick={onClick} className="ml-auto shrink-0 text-accent hover:text-ink">
         {action}
       </button>
     </div>
@@ -149,15 +149,15 @@ export function PresentationPart({ part }: { part: ToolPart }) {
 function Card({ fields, draft, stage }: PresentationProps) {
   const footer = str(fields.footer)
   return (
-    <div className={cn('notch-sm flex flex-col border border-line border-l-2 border-l-accent bg-black/60', stage && 'text-[16px]')}>
-      <div className={cn('border-b border-line/50 px-3.5 py-2 font-semibold uppercase tracking-[0.06em] text-white', stage ? 'text-[20px]' : 'text-[14px]')}>
+    <div className={cn('notch-sm flex flex-col border border-line border-l-2 border-l-accent tone-panel-60', stage && 'text-[16px]')}>
+      <div className={cn('border-b border-line/50 px-3.5 py-2 font-semibold caps-6 text-ink', stage ? 'text-[20px]' : 'text-[14px]')}>
         {str(fields.title)}
         {draft && <span className="ml-1 inline-block h-3.5 w-1.5 animate-blink bg-accent align-middle" />}
       </div>
       <div className="px-3.5 py-2.5">
         <Markdown text={str(fields.body)} />
       </div>
-      {footer && <div className="border-t border-line/40 px-3.5 py-1.5 font-mono text-[11px] text-dim">{footer}</div>}
+      {footer && <div className="border-t border-line/40 px-3.5 py-1.5 font-ui text-[11px] text-dim">{footer}</div>}
     </div>
   )
 }
@@ -169,23 +169,23 @@ function CodeView({ fields, draft }: PresentationProps) {
   const lines = code.split('\n')
   const label = str(fields.title) || str(fields.language) || 'Code'
   return (
-    <div className="flex flex-col border border-line/60 bg-black/70">
+    <div className="flex flex-col border border-line/60 tone-panel-70">
       <div className="flex items-center gap-2 border-b border-line/50 px-3 py-1.5">
-        <span className="truncate font-mono text-[11px] uppercase tracking-[0.14em] text-accent-soft">{label}</span>
-        {str(fields.title) && str(fields.language) && <span className="font-mono text-[10px] text-faint">{str(fields.language)}</span>}
+        <span className="truncate font-label text-[11px] caps-14 text-accent-soft">{label}</span>
+        {str(fields.title) && str(fields.language) && <span className="font-ui text-[10px] text-faint">{str(fields.language)}</span>}
         {!draft && (
-          <button onClick={() => void copyText(code)} className="ml-auto font-mono text-[10px] uppercase tracking-[0.14em] text-dim hover:text-white">
+          <button onClick={() => void copyText(code)} className="ml-auto font-label text-[10px] caps-14 text-dim hover:text-ink">
             Copy
           </button>
         )}
       </div>
       <div className="max-h-[480px] overflow-auto py-2">
-        <table className="font-mono text-[12.5px] leading-relaxed">
+        <table className="font-ui text-[12.5px] leading-relaxed">
           <tbody>
             {lines.map((line, i) => (
               <tr key={i}>
                 <td className="select-none pl-3 pr-3 text-right align-top text-faint">{i + 1}</td>
-                <td className="whitespace-pre pr-4 text-white/90">{line || ' '}</td>
+                <td className="whitespace-pre pr-4 text-ink/90">{line || ' '}</td>
               </tr>
             ))}
           </tbody>
@@ -197,8 +197,8 @@ function CodeView({ fields, draft }: PresentationProps) {
 
 function DocumentView({ fields, draft, stage }: PresentationProps) {
   return (
-    <article className={cn('border border-line/50 bg-[#0e1016] px-6 py-5', stage && 'px-10 py-8')}>
-      <h1 className={cn('mb-3 border-b border-line/40 pb-2 font-semibold text-white', stage ? 'text-[26px]' : 'text-[19px]')}>
+    <article className={cn('border border-line/50 bg-sidebar px-6 py-5', stage && 'px-10 py-8')}>
+      <h1 className={cn('mb-3 border-b border-line/40 pb-2 font-semibold text-ink', stage ? 'text-[26px]' : 'text-[19px]')}>
         {str(fields.title)}
         {draft && <span className="ml-1 inline-block h-4 w-1.5 animate-blink bg-accent align-middle" />}
       </h1>

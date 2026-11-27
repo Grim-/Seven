@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Box, Compass, RefreshCw, RotateCcw, Sliders, Sparkles } from 'lucide-react'
 import { generateDungeon, generateMap, renderMapToCanvas } from 'agent_map_gen'
-import { Button, Field, Input, Modal, Segmented, Select, Toggle } from '../ui'
+import { Button, Field, Input, Modal, NumberField, Segmented, Select, Toggle } from '../ui'
 import { noteFailure } from '../../store/problems'
 
 export interface GenerateConfig {
@@ -343,27 +343,29 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
     let cancelled = false
     const run = async () => {
       try {
+        const safeW = Math.max(16, Math.round(width || 16))
+        const safeH = Math.max(16, Math.round(height || 16))
         const config = buildActiveConfig()
         const res =
           type === 'dungeon'
             ? await generateDungeon({
                 kind: dungeonKind,
-                width,
-                height,
+                width: safeW,
+                height: safeH,
                 seed,
                 config
               })
             : await generateMap({
                 shaper: overworldKind,
-                width,
-                height,
+                width: safeW,
+                height: safeH,
                 seed,
                 config
               })
         if (!cancelled) {
           setPreviewResult(res)
           if (canvasRef.current) {
-            renderMapToCanvas(canvasRef.current, res, { tileSize: Math.max(1, Math.floor(340 / Math.max(width, height))) })
+            renderMapToCanvas(canvasRef.current, res, { tileSize: Math.max(1, Math.floor(340 / Math.max(safeW, safeH))) })
           }
         }
       } catch (err) {
@@ -449,23 +451,17 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
             <div className="flex flex-col gap-2">
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-[11px] text-dim">W</span>
-                  <Input
-                    type="number"
-                    min={16}
-                    max={4096}
+                  <span className="font-ui text-[11px] text-dim">W</span>
+                  <NumberField
                     value={width}
-                    onChange={(e) => setWidth(Math.max(16, Math.min(4096, Number(e.target.value) || 16)))}
+                    onChange={(v) => v !== undefined && setWidth(v)}
                   />
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-[11px] text-dim">H</span>
-                  <Input
-                    type="number"
-                    min={16}
-                    max={4096}
+                  <span className="font-ui text-[11px] text-dim">H</span>
+                  <NumberField
                     value={height}
-                    onChange={(e) => setHeight(Math.max(16, Math.min(4096, Number(e.target.value) || 16)))}
+                    onChange={(v) => v !== undefined && setHeight(v)}
                   />
                 </div>
               </div>
@@ -475,7 +471,7 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
                     key={p.label}
                     type="button"
                     onClick={() => handleApplyPreset(p.w, p.h)}
-                    className="border border-line/60 bg-black/40 px-2 py-0.5 font-mono text-[10.5px] text-dim transition-colors hover:border-line-hover hover:text-white"
+                    className="border border-line/60 tone-well-40 px-2 py-0.5 font-ui text-[10.5px] text-dim transition-colors hover:border-line-hover hover:text-ink"
                   >
                     {p.label}
                   </button>
@@ -486,7 +482,7 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
 
           <Field label="Seed">
             <div className="flex items-center gap-1.5">
-              <Input value={seed} onChange={(e) => setSeed(e.target.value)} className="font-mono text-[12px]" />
+              <Input value={seed} onChange={(e) => setSeed(e.target.value)} className="font-ui text-[12px]" />
               <Button size="sm" variant="secondary" icon={<RefreshCw />} onClick={handleRandomSeed} title="Generate new random seed">
                 New
               </Button>
@@ -494,7 +490,7 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
           </Field>
 
           <div className="flex items-center justify-between border-t border-line/40 pt-3">
-            <span className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-accent-soft">
+            <span className="flex items-center gap-1.5 font-label text-[11px] font-semibold caps-5 text-accent-soft">
               <Sliders className="h-3.5 w-3.5" />
               Generator Parameters
             </span>
@@ -508,40 +504,28 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Room Count Range">
                   <div className="flex items-center gap-1.5">
-                    <Input
-                      type="number"
-                      min={2}
-                      max={500}
+                    <NumberField
                       value={dungeonParams.minRooms}
-                      onChange={(e) => setDungeonParams((p) => ({ ...p, minRooms: Number(e.target.value) || 2 }))}
+                      onChange={(v) => v !== undefined && setDungeonParams((p) => ({ ...p, minRooms: v }))}
                     />
                     <span className="text-dim">–</span>
-                    <Input
-                      type="number"
-                      min={2}
-                      max={500}
+                    <NumberField
                       value={dungeonParams.maxRooms}
-                      onChange={(e) => setDungeonParams((p) => ({ ...p, maxRooms: Number(e.target.value) || 2 }))}
+                      onChange={(v) => v !== undefined && setDungeonParams((p) => ({ ...p, maxRooms: v }))}
                     />
                   </div>
                 </Field>
 
                 <Field label="Room Size (Tiles)">
                   <div className="flex items-center gap-1.5">
-                    <Input
-                      type="number"
-                      min={4}
-                      max={120}
+                    <NumberField
                       value={dungeonParams.minRoomSize}
-                      onChange={(e) => setDungeonParams((p) => ({ ...p, minRoomSize: Number(e.target.value) || 4 }))}
+                      onChange={(v) => v !== undefined && setDungeonParams((p) => ({ ...p, minRoomSize: v }))}
                     />
                     <span className="text-dim">–</span>
-                    <Input
-                      type="number"
-                      min={4}
-                      max={120}
+                    <NumberField
                       value={dungeonParams.maxRoomSize}
-                      onChange={(e) => setDungeonParams((p) => ({ ...p, maxRoomSize: Number(e.target.value) || 4 }))}
+                      onChange={(v) => v !== undefined && setDungeonParams((p) => ({ ...p, maxRoomSize: v }))}
                     />
                   </div>
                 </Field>
@@ -550,31 +534,22 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Side Branches">
                   <div className="flex items-center gap-1.5">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={250}
+                    <NumberField
                       value={dungeonParams.minSideRooms}
-                      onChange={(e) => setDungeonParams((p) => ({ ...p, minSideRooms: Number(e.target.value) || 0 }))}
+                      onChange={(v) => v !== undefined && setDungeonParams((p) => ({ ...p, minSideRooms: v }))}
                     />
                     <span className="text-dim">–</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={250}
+                    <NumberField
                       value={dungeonParams.maxSideRooms}
-                      onChange={(e) => setDungeonParams((p) => ({ ...p, maxSideRooms: Number(e.target.value) || 0 }))}
+                      onChange={(v) => v !== undefined && setDungeonParams((p) => ({ ...p, maxSideRooms: v }))}
                     />
                   </div>
                 </Field>
 
                 <Field label="Corridor Width">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={8}
+                  <NumberField
                     value={dungeonParams.corridorWidth}
-                    onChange={(e) => setDungeonParams((p) => ({ ...p, corridorWidth: Number(e.target.value) || 1 }))}
+                    onChange={(v) => v !== undefined && setDungeonParams((p) => ({ ...p, corridorWidth: v }))}
                   />
                 </Field>
               </div>
@@ -589,27 +564,21 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Branching Chance (%)">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
+                  <NumberField
                     value={dungeonParams.branchingChance}
-                    onChange={(e) => setDungeonParams((p) => ({ ...p, branchingChance: Number(e.target.value) || 0 }))}
+                    onChange={(v) => v !== undefined && setDungeonParams((p) => ({ ...p, branchingChance: v }))}
                   />
                 </Field>
 
                 <Field label="Map Margin (Tiles)">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={30}
+                  <NumberField
                     value={dungeonParams.mapMargin}
-                    onChange={(e) => setDungeonParams((p) => ({ ...p, mapMargin: Number(e.target.value) || 0 }))}
+                    onChange={(v) => v !== undefined && setDungeonParams((p) => ({ ...p, mapMargin: v }))}
                   />
                 </Field>
               </div>
 
-              <div className="flex flex-col gap-2 rounded border border-line/40 bg-black/40 p-2.5">
+              <div className="flex flex-col gap-2 rounded border border-line/40 tone-panel-40 p-2.5">
                 <Toggle
                   checked={dungeonParams.allowHiddenRooms}
                   onChange={(checked) => setDungeonParams((p) => ({ ...p, allowHiddenRooms: checked }))}
@@ -617,12 +586,9 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
                 />
                 {dungeonParams.allowHiddenRooms && (
                   <Field label="Hidden Room Chance (%)">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
+                    <NumberField
                       value={dungeonParams.hiddenRoomChance}
-                      onChange={(e) => setDungeonParams((p) => ({ ...p, hiddenRoomChance: Number(e.target.value) || 0 }))}
+                      onChange={(v) => v !== undefined && setDungeonParams((p) => ({ ...p, hiddenRoomChance: v }))}
                     />
                   </Field>
                 )}
@@ -637,24 +603,18 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
             <div className="flex flex-col gap-3.5 text-[12.5px]">
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Noise Scale / Frequency">
-                  <Input
-                    type="number"
+                  <NumberField
                     step={0.01}
-                    min={0.01}
-                    max={0.5}
                     value={overworldParams.scale}
-                    onChange={(e) => setOverworldParams((p) => ({ ...p, scale: Number(e.target.value) || 0.05 }))}
+                    onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, scale: v }))}
                   />
                 </Field>
 
                 <Field label="Coastline Roughness">
-                  <Input
-                    type="number"
+                  <NumberField
                     step={0.05}
-                    min={0.05}
-                    max={1}
                     value={overworldParams.roughness}
-                    onChange={(e) => setOverworldParams((p) => ({ ...p, roughness: Number(e.target.value) || 0.3 }))}
+                    onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, roughness: v }))}
                   />
                 </Field>
               </div>
@@ -664,40 +624,28 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Stamp Count">
                       <div className="flex items-center gap-1.5">
-                        <Input
-                          type="number"
-                          min={2}
-                          max={100}
+                        <NumberField
                           value={overworldParams.minCount}
-                          onChange={(e) => setOverworldParams((p) => ({ ...p, minCount: Number(e.target.value) || 5 }))}
+                          onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, minCount: v }))}
                         />
                         <span className="text-dim">–</span>
-                        <Input
-                          type="number"
-                          min={2}
-                          max={100}
+                        <NumberField
                           value={overworldParams.maxCount}
-                          onChange={(e) => setOverworldParams((p) => ({ ...p, maxCount: Number(e.target.value) || 10 }))}
+                          onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, maxCount: v }))}
                         />
                       </div>
                     </Field>
 
                     <Field label="Stamp Radius (Tiles)">
                       <div className="flex items-center gap-1.5">
-                        <Input
-                          type="number"
-                          min={4}
-                          max={160}
+                        <NumberField
                           value={overworldParams.minSize}
-                          onChange={(e) => setOverworldParams((p) => ({ ...p, minSize: Number(e.target.value) || 10 }))}
+                          onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, minSize: v }))}
                         />
                         <span className="text-dim">–</span>
-                        <Input
-                          type="number"
-                          min={4}
-                          max={160}
+                        <NumberField
                           value={overworldParams.maxSize}
-                          onChange={(e) => setOverworldParams((p) => ({ ...p, maxSize: Number(e.target.value) || 20 }))}
+                          onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, maxSize: v }))}
                         />
                       </div>
                     </Field>
@@ -706,54 +654,39 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="River Count">
                       <div className="flex items-center gap-1.5">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={10}
+                        <NumberField
                           value={overworldParams.minRivers}
-                          onChange={(e) => setOverworldParams((p) => ({ ...p, minRivers: Number(e.target.value) || 0 }))}
+                          onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, minRivers: v }))}
                         />
                         <span className="text-dim">–</span>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={10}
+                        <NumberField
                           value={overworldParams.maxRivers}
-                          onChange={(e) => setOverworldParams((p) => ({ ...p, maxRivers: Number(e.target.value) || 0 }))}
+                          onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, maxRivers: v }))}
                         />
                       </div>
                     </Field>
 
                     <Field label="River Width (Tiles)">
-                      <Input
-                        type="number"
-                        min={1}
-                        max={10}
+                      <NumberField
                         value={overworldParams.riverWidth}
-                        onChange={(e) => setOverworldParams((p) => ({ ...p, riverWidth: Number(e.target.value) || 1 }))}
+                        onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, riverWidth: v }))}
                       />
                     </Field>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="River Wander (0–1)">
-                      <Input
-                        type="number"
+                      <NumberField
                         step={0.05}
-                        min={0}
-                        max={1}
                         value={overworldParams.riverWander}
-                        onChange={(e) => setOverworldParams((p) => ({ ...p, riverWander: Number(e.target.value) || 0.3 }))}
+                        onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, riverWander: v }))}
                       />
                     </Field>
 
                     <Field label="Elevation / Ridge Noise">
-                      <Input
-                        type="number"
-                        min={0}
-                        max={10}
+                      <NumberField
                         value={overworldParams.elevationNoise}
-                        onChange={(e) => setOverworldParams((p) => ({ ...p, elevationNoise: Number(e.target.value) || 0 }))}
+                        onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, elevationNoise: v }))}
                       />
                     </Field>
                   </div>
@@ -765,68 +698,50 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Island Count">
                       <div className="flex items-center gap-1.5">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={20}
+                        <NumberField
                           value={overworldParams.minIslands}
-                          onChange={(e) => setOverworldParams((p) => ({ ...p, minIslands: Number(e.target.value) || 1 }))}
+                          onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, minIslands: v }))}
                         />
                         <span className="text-dim">–</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={20}
+                        <NumberField
                           value={overworldParams.maxIslands}
-                          onChange={(e) => setOverworldParams((p) => ({ ...p, maxIslands: Number(e.target.value) || 1 }))}
+                          onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, maxIslands: v }))}
                         />
                       </div>
                     </Field>
 
                     <Field label="Min Island Span">
-                      <Input
-                        type="number"
-                        min={10}
-                        max={200}
+                      <NumberField
                         value={overworldParams.minIslandSize}
-                        onChange={(e) => setOverworldParams((p) => ({ ...p, minIslandSize: Number(e.target.value) || 20 }))}
+                        onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, minIslandSize: v }))}
                       />
                     </Field>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Island Margin">
-                      <Input
-                        type="number"
-                        min={2}
-                        max={30}
+                      <NumberField
                         value={overworldParams.islandMargin}
-                        onChange={(e) => setOverworldParams((p) => ({ ...p, islandMargin: Number(e.target.value) || 4 }))}
+                        onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, islandMargin: v }))}
                       />
                     </Field>
 
                     <Field label="Rivers per Island">
                       <div className="flex items-center gap-1.5">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={5}
+                        <NumberField
                           value={overworldParams.minRivers}
-                          onChange={(e) => setOverworldParams((p) => ({ ...p, minRivers: Number(e.target.value) || 0 }))}
+                          onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, minRivers: v }))}
                         />
                         <span className="text-dim">–</span>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={5}
+                        <NumberField
                           value={overworldParams.maxRivers}
-                          onChange={(e) => setOverworldParams((p) => ({ ...p, maxRivers: Number(e.target.value) || 0 }))}
+                          onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, maxRivers: v }))}
                         />
                       </div>
                     </Field>
                   </div>
 
-                  <div className="rounded border border-line/40 bg-black/40 p-2.5">
+                  <div className="rounded border border-line/40 tone-panel-40 p-2.5">
                     <Toggle
                       checked={Boolean(overworldParams.mainIsland)}
                       onChange={(checked) => setOverworldParams((p) => ({ ...p, mainIsland: checked }))}
@@ -839,35 +754,26 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
               {overworldKind === 'enclosed' && (
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Opening Threshold">
-                    <Input
-                      type="number"
+                    <NumberField
                       step={0.05}
-                      min={0.1}
-                      max={0.8}
                       value={overworldParams.threshold}
-                      onChange={(e) => setOverworldParams((p) => ({ ...p, threshold: Number(e.target.value) || 0.25 }))}
+                      onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, threshold: v }))}
                     />
                   </Field>
 
                   <Field label="Slope Falloff">
-                    <Input
-                      type="number"
+                    <NumberField
                       step={0.05}
-                      min={0.1}
-                      max={1}
                       value={overworldParams.falloff}
-                      onChange={(e) => setOverworldParams((p) => ({ ...p, falloff: Number(e.target.value) || 0.4 }))}
+                      onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, falloff: v }))}
                     />
                   </Field>
 
                   <Field label="Valley Stretch">
-                    <Input
-                      type="number"
+                    <NumberField
                       step={0.05}
-                      min={0.1}
-                      max={1.5}
                       value={overworldParams.stretch}
-                      onChange={(e) => setOverworldParams((p) => ({ ...p, stretch: Number(e.target.value) || 0.5 }))}
+                      onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, stretch: v }))}
                     />
                   </Field>
                 </div>
@@ -876,24 +782,18 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
               {overworldKind === 'void' && (
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Island Density Threshold">
-                    <Input
-                      type="number"
+                    <NumberField
                       step={0.02}
-                      min={0.1}
-                      max={0.7}
                       value={overworldParams.threshold}
-                      onChange={(e) => setOverworldParams((p) => ({ ...p, threshold: Number(e.target.value) || 0.38 }))}
+                      onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, threshold: v }))}
                     />
                   </Field>
 
                   <Field label="Void Drift / Wandering">
-                    <Input
-                      type="number"
+                    <NumberField
                       step={0.05}
-                      min={0}
-                      max={1}
                       value={overworldParams.drunkenness}
-                      onChange={(e) => setOverworldParams((p) => ({ ...p, drunkenness: Number(e.target.value) || 0.3 }))}
+                      onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, drunkenness: v }))}
                     />
                   </Field>
                 </div>
@@ -901,22 +801,16 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
 
               <div className="grid grid-cols-2 gap-3 border-t border-line/40 pt-2">
                 <Field label="Smoothing Passes">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={6}
+                  <NumberField
                     value={overworldParams.smoothing}
-                    onChange={(e) => setOverworldParams((p) => ({ ...p, smoothing: Number(e.target.value) || 0 }))}
+                    onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, smoothing: v }))}
                   />
                 </Field>
 
                 <Field label="Gap Filling Passes">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={6}
+                  <NumberField
                     value={overworldParams.gaps}
-                    onChange={(e) => setOverworldParams((p) => ({ ...p, gaps: Number(e.target.value) || 0 }))}
+                    onChange={(v) => v !== undefined && setOverworldParams((p) => ({ ...p, gaps: v }))}
                   />
                 </Field>
               </div>
@@ -924,14 +818,14 @@ export function GenerateMapModal({ open, onClose, onGenerate }: GenerateMapModal
           )}
         </div>
 
-        <div className="flex flex-col items-center justify-center gap-3 rounded border border-line/50 bg-black/60 p-4">
+        <div className="flex flex-col items-center justify-center gap-3 rounded border border-line/50 tone-panel-60 p-4">
           <div className="flex w-full items-center justify-between border-b border-line/40 pb-2">
-            <span className="flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-accent-soft">
+            <span className="flex items-center gap-1.5 font-label text-[11px] font-semibold caps-5 text-accent-soft">
               {type === 'dungeon' ? <Box className="h-3.5 w-3.5" /> : <Compass className="h-3.5 w-3.5" />}
               Live Preview ({width}×{height})
             </span>
             {previewResult?.stats && (
-              <span className="font-mono text-[11px] text-dim">
+              <span className="font-ui text-[11px] text-dim">
                 {type === 'dungeon'
                   ? `${previewResult.stats.rooms} rooms · ${Math.round(previewResult.stats.coverage * 100)}% floor`
                   : `${Math.round(previewResult.stats.landRatio * 100)}% land`}

@@ -36,21 +36,21 @@ export function TargetsTable({
       >
         {list.map((t) => (
           <GridRow key={`${t.id}|${t.workout}`} onClick={() => onOpen(t.id)}>
-            <span className="truncate text-[13px] font-semibold text-white">
+            <span className="truncate text-[13px] font-semibold text-ink">
               {showName(names.get(t.id) ?? '')}
             </span>
             <span className="truncate text-[12.5px] text-dim">
               {showName(workouts.get(t.workout) ?? '')}
             </span>
-            <span className="font-mono text-[12.5px] text-dim">
+            <span className="font-ui text-[12.5px] text-dim">
               {t.min === t.max ? t.max : `${t.min}-${t.max}`}
             </span>
-            <span className="text-right font-mono text-[12.5px] text-white">
+            <span className="text-right font-ui text-[12.5px] text-ink">
               {Math.round((t.hit / t.sets) * 100)}%
             </span>
             <span
               className={cn(
-                'text-right font-mono text-[12.5px]',
+                'text-right font-ui text-[12.5px]',
                 t.sets - t.hit ? 'text-alert' : 'text-faint'
               )}
             >

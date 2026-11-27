@@ -40,6 +40,8 @@ export class DirIndex<T> {
 
   get(target: string): T | null {
     const file = path.resolve(target)
+    const known = this.files.get(file)
+    if (known && this.listing && Date.now() - this.listing.at < FRESH_MS) return known.value
     let st: fs.Stats
     try {
       st = fs.statSync(file)
@@ -47,8 +49,7 @@ export class DirIndex<T> {
       this.files.delete(file)
       return null
     }
-    const hit = this.files.get(file)
-    if (hit && hit.size === st.size && hit.mtime === st.mtimeMs) return hit.value
+    if (known && known.size === st.size && known.mtime === st.mtimeMs) return known.value
     const value = this.read(file)
     this.files.set(file, { size: st.size, mtime: st.mtimeMs, value })
     return value
@@ -65,6 +66,7 @@ export class DirIndex<T> {
     const now = Date.now()
     const memo = this.listing
     if (memo && memo.dirMtime === dirMtime && now - memo.at < FRESH_MS) return memo.items
+    this.listing = null
     const items: Listing<T>['items'] = []
     const seen = new Set<string>()
     for (const entry of fs.readdirSync(this.dir, { withFileTypes: true })) {

@@ -89,7 +89,7 @@ export function TooltipHost() {
   return createPortal(
     <div ref={box} style={{ position: 'fixed', left: 0, top: 0, visibility: 'hidden' }} className="record pointer-events-none z-[1000] w-max max-w-80">
       {tip.title && <span className="record-header block">SYS.RECORD // {tip.title}</span>}
-      {tip.body && <span className={tip.title ? 'relative z-[2] block px-3 py-2 text-[12px] leading-relaxed text-white' : 'relative z-[2] block px-2.5 py-1.5 text-[12px] leading-snug text-white'}>{tip.body}</span>}
+      {tip.body && <span className={tip.title ? 'relative z-[2] block px-3 py-2 text-[12px] leading-relaxed text-ink' : 'relative z-[2] block px-2.5 py-1.5 text-[12px] leading-snug text-ink'}>{tip.body}</span>}
     </div>,
     document.body
   )

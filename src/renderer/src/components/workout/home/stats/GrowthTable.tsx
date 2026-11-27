@@ -41,15 +41,15 @@ export function GrowthTable({
           const ex = byId.get(g.id)
           return (
             <GridRow key={g.id} onClick={() => onOpen(g.id)}>
-              <span className="truncate text-[13px] font-semibold text-white">
+              <span className="truncate text-[13px] font-semibold text-ink">
                 {showName(ex?.name ?? '')}
               </span>
               <span className="truncate text-[12px] text-dim">{ex?.muscles.join(', ') || '—'}</span>
-              <span className="font-mono text-[12.5px] text-white">
+              <span className="font-ui text-[12.5px] text-ink">
                 {g.bestThen} → {g.bestNow}
                 <UnitLabel unit={ex?.unit ?? ''} />
               </span>
-              <span className="font-mono text-[12.5px] text-white">
+              <span className="font-ui text-[12.5px] text-ink">
                 {g.totalThen} → {g.totalNow}
               </span>
               <span className="text-right text-[12.5px]">
@@ -61,7 +61,7 @@ export function GrowthTable({
                   g.change !== null && g.change < 0 ? 'var(--color-alert)' : 'var(--color-ok)'
                 }
               />
-              <span className="text-right font-mono text-[12.5px] text-white">{g.sinceBest}</span>
+              <span className="text-right font-ui text-[12.5px] text-ink">{g.sinceBest}</span>
             </GridRow>
           )
         })}

@@ -84,15 +84,15 @@ export function TacticalCombatDock({
   const attacks = activeActor.attacks ?? []
 
   return (
-    <div className="pointer-events-auto absolute inset-x-0 bottom-2 z-30 flex justify-center font-mono select-none px-4">
-      <div className="flex items-center gap-3 border border-line bg-black/95 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.95)] backdrop-blur-md">
+    <div className="pointer-events-auto absolute inset-x-0 bottom-2 z-30 flex justify-center font-ui select-none px-4">
+      <div className="flex items-center gap-3 border border-line tone-panel-95 p-2 shadow-[0_12px_40px_color-mix(in_srgb,var(--color-shade)_95%,transparent)] backdrop-blur-[calc(var(--panel-blur)*1.5)]">
         {/* ACTIVE COMBATANT STATS */}
         <div className="flex items-center gap-2.5 border-r border-line/50 pr-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-cyan/70 bg-cyan/15 text-[11px] font-bold text-cyan">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-tint-cyan/70 bg-tint-cyan/15 text-[11px] font-bold text-tint-cyan">
             {activeActor.name.slice(0, 2).toUpperCase()}
           </div>
           <div className="flex flex-col gap-0.5">
-            <span className="text-[11px] font-bold text-white max-w-[120px] truncate">
+            <span className="text-[11px] font-bold text-ink max-w-[120px] truncate">
               {activeActor.name}
             </span>
             <div className="flex items-center gap-2 text-[9.5px]">
@@ -105,9 +105,9 @@ export function TacticalCombatDock({
               </span>
             </div>
             {/* HP PROGRESS BAR */}
-            <div className="h-1.5 w-24 border border-line/40 bg-black/60">
+            <div className="h-1.5 w-24 border border-line/40 tone-panel-60">
               <div
-                className="h-full bg-cyan transition-all"
+                className="h-full bg-tint-cyan transition-all"
                 style={{
                   width: `${Math.max(0, Math.min(100, (activeActor.hp.cur / activeActor.hp.max) * 100))}%`
                 }}
@@ -136,15 +136,15 @@ export function TacticalCombatDock({
                       : 'Select a target on the map or in the list first'
                   }
                   className={cn(
-                    'flex h-8 items-center gap-1.5 border px-2.5 text-[10.5px] font-bold uppercase transition-all',
+                    'flex h-8 items-center gap-1.5 border px-2.5 text-[10.5px] font-bold caps transition-all',
                     isPlayerTurn && !economy.actionUsed && targetCombatant
-                      ? 'border-cyan bg-cyan/20 text-white hover:border-cyan hover:bg-cyan hover:text-black cursor-pointer shadow-[0_0_12px_rgba(0,216,246,0.25)]'
-                      : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
+                      ? 'border-tint-cyan bg-tint-cyan/20 text-ink hover:border-tint-cyan hover:bg-tint-cyan hover:text-on-accent cursor-pointer shadow-[0_0_12px_color-mix(in_srgb,rgb(0,216,246)_calc(25%*var(--glow)),transparent)]'
+                      : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed opacity-50'
                   )}
                 >
-                  <Swords className="h-3.5 w-3.5 text-cyan" />
+                  <Swords className="h-3.5 w-3.5 text-tint-cyan" />
                   <span>{att.name}</span>
-                  <span className="border border-line/60 bg-line/20 px-1 text-[8.5px] text-cyan">
+                  <span className="border border-line/60 bg-line/20 px-1 text-[8.5px] text-tint-cyan">
                     [1/F]
                   </span>
                 </button>
@@ -165,10 +165,10 @@ export function TacticalCombatDock({
             onClick={dashAction}
             title={`${maneuvers.dashLabel}: Grants tactical movement this turn ([2])`}
             className={cn(
-              'flex h-8 items-center gap-1.5 border px-2.5 text-[10.5px] font-bold uppercase transition-all',
+              'flex h-8 items-center gap-1.5 border px-2.5 text-[10.5px] font-bold caps transition-all',
               maneuvers.canDash
-                ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent cursor-pointer'
-                : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
+                ? 'border-line/60 tone-well-60 text-ink hover:border-accent hover:text-accent cursor-pointer'
+                : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed opacity-50'
             )}
           >
             <Footprints className="h-3.5 w-3.5 text-accent" />
@@ -183,12 +183,12 @@ export function TacticalCombatDock({
             onClick={dodgeAction}
             title={`${maneuvers.dodgeLabel}: Incoming attacks suffer disadvantage ([3])`}
             className={cn(
-              'flex h-8 items-center gap-1.5 border px-2.5 text-[10.5px] font-bold uppercase transition-all',
+              'flex h-8 items-center gap-1.5 border px-2.5 text-[10.5px] font-bold caps transition-all',
               economy.isDodging
                 ? 'border-accent bg-accent/20 text-accent cursor-default'
                 : maneuvers.canDodge
-                ? 'border-line/60 bg-black/60 text-white hover:border-accent hover:text-accent cursor-pointer'
-                : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
+                ? 'border-line/60 tone-well-60 text-ink hover:border-accent hover:text-accent cursor-pointer'
+                : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed opacity-50'
             )}
           >
             <Shield className="h-3.5 w-3.5 text-accent" />
@@ -208,15 +208,15 @@ export function TacticalCombatDock({
             }}
             title="Parley: Speak with the enemy agent to negotiate, intimidate, deceive, or recruit them (P)"
             className={cn(
-              'flex h-8 items-center gap-1.5 border px-2.5 text-[10.5px] font-bold uppercase transition-all',
+              'flex h-8 items-center gap-1.5 border px-2.5 text-[10.5px] font-bold caps transition-all',
               targetCombatant
-                ? 'border-purple/70 bg-purple/15 text-purple hover:border-purple hover:bg-purple hover:text-black cursor-pointer shadow-[0_0_12px_rgba(180,100,255,0.3)]'
-                : 'border-line/30 bg-black/40 text-faint cursor-not-allowed opacity-50'
+                ? 'border-tint-purple/70 bg-tint-purple/15 text-tint-purple hover:border-tint-purple hover:bg-tint-purple hover:text-on-accent cursor-pointer shadow-[0_0_12px_color-mix(in_srgb,rgb(180,100,255)_calc(30%*var(--glow)),transparent)]'
+                : 'border-line/30 tone-panel-40 text-faint cursor-not-allowed opacity-50'
             )}
           >
-            <MessageSquarePlus className="h-3.5 w-3.5 text-purple" />
+            <MessageSquarePlus className="h-3.5 w-3.5 text-tint-purple" />
             <span>PARLEY</span>
-            <span className="border border-line/60 bg-line/20 px-1 text-[8.5px] text-purple">[P]</span>
+            <span className="border border-line/60 bg-line/20 px-1 text-[8.5px] text-tint-purple">[P]</span>
           </button>
 
           {/* 5. END TURN BUTTON */}
@@ -225,9 +225,9 @@ export function TacticalCombatDock({
             disabled={!isPlayerTurn}
             onClick={endTurn}
             className={cn(
-              'flex h-8 items-center gap-1 border px-3 text-[10.5px] font-bold uppercase tracking-wider transition-all ml-1',
+              'flex h-8 items-center gap-1 border px-3 text-[10.5px] font-bold caps-5 transition-all ml-1',
               isPlayerTurn
-                ? 'border-cyan bg-cyan text-black hover:bg-cyan/90 cursor-pointer shadow-[0_0_16px_rgba(0,216,246,0.35)]'
+                ? 'border-tint-cyan bg-tint-cyan text-on-accent hover:bg-tint-cyan/90 cursor-pointer shadow-[0_0_16px_color-mix(in_srgb,rgb(0,216,246)_calc(35%*var(--glow)),transparent)]'
                 : 'border-line/40 bg-line/20 text-faint cursor-not-allowed opacity-50'
             )}
           >
@@ -245,7 +245,7 @@ export function TacticalCombatDock({
               </div>
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10.5px] font-bold text-white max-w-[100px] truncate">
+                  <span className="text-[10.5px] font-bold text-ink max-w-[100px] truncate">
                     {targetCombatant.name}
                   </span>
                   <span className="border border-alert/60 bg-alert/20 px-1 text-[8px] font-bold text-alert">
@@ -259,14 +259,14 @@ export function TacticalCombatDock({
                   {targetCombatant.faction && (
                     <>
                       <span className="text-faint">·</span>
-                      <span className="text-alert uppercase">
+                      <span className="text-alert caps">
                         {targetCombatant.faction}
                       </span>
                     </>
                   )}
                 </div>
                 {/* TARGET HP BAR */}
-                <div className="h-1 w-20 border border-line/40 bg-black/60">
+                <div className="h-1 w-20 border border-line/40 tone-panel-60">
                   <div
                     className="h-full bg-alert transition-all"
                     style={{

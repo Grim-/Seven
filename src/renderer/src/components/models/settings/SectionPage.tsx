@@ -23,7 +23,7 @@ export function SectionPage({ label, defs, ctx, state, lead }: { label: string; 
         <Fold label="Not for this model" count={view.unavailable.length}>
           {view.unavailable.map(({ def, reason }) => (
             <SettingRow key={def.key} label={def.label} hint={reason}>
-              <span className="font-mono text-[11px] text-faint">{def.flag?.find((f) => f.startsWith('--')) ?? ''}</span>
+              <span className="font-ui text-[11px] text-faint">{def.flag?.find((f) => f.startsWith('--')) ?? ''}</span>
             </SettingRow>
           ))}
         </Fold>

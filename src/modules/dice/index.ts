@@ -7,6 +7,7 @@ import { ANY_CHECK, LIVE_CHECKS, type CheckSchema } from '../../engine/tools/che
 import type { JsonSchema } from '../../engine/tools/schema'
 import { rollFor } from '../../engine/actions'
 import { journalAction } from '../../engine/worlds/journeys'
+import { bindingOrNull } from '../../engine/worlds/ops'
 import { agentAccess } from '../../engine/agents/access'
 
 const factory: ModuleFactory = (sdk) =>
@@ -73,7 +74,7 @@ const actionCheck = presentationTool({
   run: async (f, ctx) => {
     const character = typeof f.character === 'string' && f.character.trim() ? f.character : (agentAccess.get(ctx.agentId ?? '')?.sheet ?? null)
     const result = rollFor(cleanAction(f), character, typeof f.try === 'number' ? f.try : null)
-    journalAction(agentAccess.get(ctx.agentId ?? '')?.world?.worldId ?? null, result)
+    journalAction(bindingOrNull(ctx.agentId ?? null)?.worldId ?? null, result)
     return { text: actionResultText(result), fields: { result } }
   }
 })

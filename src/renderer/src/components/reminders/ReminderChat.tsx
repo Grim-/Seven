@@ -21,7 +21,7 @@ export function ReminderChat({ id }: EntrySurfaceProps) {
   if (!list) return <Loading />
   if (!reminder) return <EmptyState title="Gone">This reminder has finished or was cancelled.</EmptyState>
   return (
-    <EntryCard title={reminder.text.split('\n')[0].slice(0, 60)} tag="reminder" aside={!reminder.enabled ? <span className="font-mono text-[11px] text-faint">PAUSED</span> : undefined}>
+    <EntryCard title={reminder.text.split('\n')[0].slice(0, 60)} tag="reminder" aside={!reminder.enabled ? <span className="font-label text-[11px] caps text-faint">Paused</span> : undefined}>
       <Facts rows={[['When', <span className="text-accent">{reminderWhen(reminder.next)}</span>], ['Repeats', REPEAT_LABEL[reminder.repeat]], ['Note', reminder.text]]} />
     </EntryCard>
   )
@@ -34,7 +34,7 @@ export function ReminderWidget({ id }: EntrySurfaceProps) {
   return (
     <div className="flex flex-col gap-2">
       <BigStat value={left(reminder.next - now)} label={reminderWhen(reminder.next)} />
-      <span className="text-[12.5px] text-white/90">{reminder.text}</span>
+      <span className="text-[12.5px] text-ink/90">{reminder.text}</span>
     </div>
   )
 }
@@ -44,9 +44,9 @@ export function ReminderStage({ id }: EntrySurfaceProps) {
   if (!reminder) return <Loading />
   return (
     <div className="flex h-[60vh] flex-col items-center justify-center gap-4 text-center">
-      <span className="font-mono text-[12px] uppercase tracking-[0.2em] text-teal">{reminderWhen(reminder.next)} · reminder</span>
-      <span className="max-w-3xl text-[44px] font-semibold leading-tight text-white">{reminder.text}</span>
-      <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint">{REPEAT_LABEL[reminder.repeat]}</span>
+      <span className="font-label text-[12px] caps-20 text-secondary">{reminderWhen(reminder.next)} · reminder</span>
+      <span className="max-w-3xl text-[44px] font-semibold leading-tight text-ink">{reminder.text}</span>
+      <span className="font-label text-[11px] caps-14 text-faint">{REPEAT_LABEL[reminder.repeat]}</span>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Import, LayoutDashboard, Plus } from 'lucide-react'
+import { Import, LayoutDashboard, Plus, Sparkles } from 'lucide-react'
 import { widgetUiOf } from '../../registries/widgets'
 import { useWidgetInfo } from '../../store/widgetInfo'
 import { useTools } from '../../store/tools'
@@ -71,11 +71,13 @@ export async function placeOnBoard(
   applyNewWidgetPoses(dashboardId, updated, targets, at, posePatch, canvas)
 }
 
-function GlancesAndWidgetsTab({
+function WidgetProviderTab({
+  only,
   dashboard,
   clickToPlace,
   onAdded
 }: {
+  only: 'glances' | 'widgets'
   dashboard: Dashboard
   clickToPlace: boolean
   onAdded: () => void
@@ -85,9 +87,14 @@ function GlancesAndWidgetsTab({
   const setPending = usePendingBoardPlacement((s) => s.setPending)
   const [, run] = useBusy()
 
+  const scoped = useMemo(
+    () => providers.filter((p) => (only === 'glances' ? p.kind === 'tool' : p.kind !== 'tool')),
+    [providers, only]
+  )
+
   const items: ShellItem[] = useMemo(() => {
     const out: ShellItem[] = []
-    for (const p of providers) {
+    for (const p of scoped) {
       const ui = widgetUiOf(p.kind)?.choices
       if (!ui) continue
       const list = (p.choices ?? []).filter((c) => !c.module || modules.some((m) => m.id === c.module && m.state === 'on'))
@@ -102,9 +109,9 @@ function GlancesAndWidgetsTab({
       }
     }
     return out
-  }, [providers, modules])
+  }, [scoped, modules])
 
-  const adds: ShellAdd[] = providers
+  const adds: ShellAdd[] = scoped
     .filter((p) => p.create)
     .map((p) => ({
       label: p.create as string,
@@ -129,7 +136,7 @@ function GlancesAndWidgetsTab({
 
   return (
     <KindShell
-      id="pick-board-widgets"
+      id={only === 'glances' ? 'pick-board-glances' : 'pick-board-widgets'}
       layouts={['cards', 'tiles', 'list']}
       items={items}
       adds={adds}
@@ -157,7 +164,7 @@ function GlancesAndWidgetsTab({
           onAdded()
         }, 'Could not add widget')
       }}
-      empty="No glances or tool widgets available."
+      empty={only === 'glances' ? 'No glances available.' : 'No widgets available.'}
     />
   )
 }
@@ -226,7 +233,7 @@ export function AddPicker({ dashboard, onClose }: { dashboard: Dashboard; onClos
           <Button variant="ghost" icon={<Import />} disabled={busy} onClick={() => void importFiles()}>
             Files from disk…
           </Button>
-          <span className="flex-1 font-mono text-[11px] text-dim">
+          <span className="flex-1 font-ui text-[11px] text-dim">
             {clickToPlace
               ? `Select any item, then click on ${dashboard.name} where you want to place it.`
               : `Click any card, tile, or row to place it on ${dashboard.name}, or drag items straight onto the board.`}
@@ -242,10 +249,16 @@ export function AddPicker({ dashboard, onClose }: { dashboard: Dashboard; onClos
         onPick={pickEntry}
         tabs={[
           {
+            id: '__glances',
+            label: 'Glances',
+            icon: <Sparkles className="h-3.5 w-3.5" />,
+            node: <WidgetProviderTab only="glances" dashboard={dashboard} clickToPlace={clickToPlace} onAdded={onClose} />
+          },
+          {
             id: '__widgets',
-            label: 'Glances & Widgets',
+            label: 'Widgets',
             icon: <LayoutDashboard className="h-3.5 w-3.5" />,
-            node: <GlancesAndWidgetsTab dashboard={dashboard} clickToPlace={clickToPlace} onAdded={onClose} />
+            node: <WidgetProviderTab only="widgets" dashboard={dashboard} clickToPlace={clickToPlace} onAdded={onClose} />
           }
         ]}
       />

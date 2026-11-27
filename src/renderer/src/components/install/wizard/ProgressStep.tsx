@@ -22,14 +22,14 @@ export function ProgressStep({ state, progress }: { state: InstallHelperState; p
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
         <StatusBadge tone={stage.tone}>{stage.label}</StatusBadge>
-        {progress.file && <span className="truncate font-mono text-[12px] text-dim">{progress.file}</span>}
+        {progress.file && <span className="truncate font-ui text-[12px] text-dim">{progress.file}</span>}
       </div>
       <SegmentBar value={stage.measured && progress.total ? progress.received / progress.total : stage.finished ? 1 : null} />
-      {progress.total > 0 && <span className="font-mono text-[11.5px] text-dim">{`${formatBytes(progress.received)} of ${formatBytes(progress.total)}`}</span>}
+      {progress.total > 0 && <span className="font-ui text-[11.5px] text-dim">{`${formatBytes(progress.received)} of ${formatBytes(progress.total)}`}</span>}
       {progress.error && <AlertBox>{progress.error}</AlertBox>}
       {stage.finished && version && (
         <>
-          {version.check?.ok ? <span className="text-[12.5px] text-white/80">{version.label} passed its check. Make it active when you want to use it.</span> : <AlertBox>{version.check?.error ?? 'It did not pass its check.'}</AlertBox>}
+          {version.check?.ok ? <span className="text-[12.5px] text-ink/80">{version.label} passed its check. Make it active when you want to use it.</span> : <AlertBox>{version.check?.error ?? 'It did not pass its check.'}</AlertBox>}
           <ActionBar items={versionActions(state, version)} />
         </>
       )}

@@ -11,7 +11,8 @@
     "inspect_schema": "none",
     "show": "none",
     "pick_random": "none",
-    "story_recall": "none",
+    "character_search_knowledge": "none",
+    "character_recall_relation": "none",
     "file_export": "custom",
     "update_file": "ask",
     "add_page": "ask",
@@ -28,11 +29,12 @@
     "add_slideshow": "ask",
     "update_slideshow": "ask",
     "update_stats": "ask",
-    "add_story_log": "ask",
-    "set_story_where": "ask",
-    "add_character_memory": "ask",
-    "set_character_relationship": "ask",
-    "remove_character_relationship": "ask",
+    "character_learn_memory": "ask",
+    "character_learn_event": "ask",
+    "character_learn_backstory": "ask",
+    "character_learn_world_knowledge": "ask",
+    "character_set_state": "ask",
+    "character_set_relation": "ask",
     "update_proficiencies": "ask"
   }
 }

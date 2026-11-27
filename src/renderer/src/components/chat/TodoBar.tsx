@@ -19,19 +19,19 @@ export function TodoBar({ compact }: { compact: boolean }) {
   const save = (next: TodoItem[]) => void setTodos(sessionId, next).catch(failed('Could not change the list'))
   const toggle = (id: string) => save(items.map((i) => (i.id === id ? { ...i, status: i.status === 'done' ? 'pending' : 'done' } : i)))
   return (
-    <div className={cn('border-t border-line/60 bg-black/80', compact ? 'px-2 py-1.5' : 'px-3 py-2')}>
+    <div className={cn('border-t border-line/60 tone-panel-80', compact ? 'px-2 py-1.5' : 'px-3 py-2')}>
       <div className="flex items-center gap-2">
         <button onClick={() => setOpen(!open)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-accent transition-transform', open && 'rotate-90')} />
           <ListTodo className="h-3.5 w-3.5 shrink-0 text-accent" />
-          <span className="shrink-0 font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-accent-soft">
+          <span className="shrink-0 font-label text-[10.5px] font-bold caps-16 text-accent-soft">
             Tasks {done}/{items.length}
           </span>
-          {!open && doing && <span className="min-w-0 truncate text-[12px] text-white/85">{doing.task}</span>}
+          {!open && doing && <span className="min-w-0 truncate text-[12px] text-ink/85">{doing.task}</span>}
         </button>
         <SegmentBar value={done / items.length} segments={Math.min(items.length, 24)} className="w-20 shrink-0" />
         {done === items.length && (
-          <button title="Clear the list" onClick={() => save([])} className="text-faint hover:text-white">
+          <button title="Clear the list" onClick={() => save([])} className="text-faint hover:text-ink">
             <X className="h-3.5 w-3.5" />
           </button>
         )}
@@ -48,7 +48,7 @@ export function TodoBar({ compact }: { compact: boolean }) {
               >
                 {item.status === 'done' && <Check className="h-3 w-3" />}
               </span>
-              <span className={cn('text-[12.5px] leading-snug', item.status === 'done' ? 'text-faint line-through' : item.status === 'doing' ? 'text-white' : 'text-white/80')}>{item.task}</span>
+              <span className={cn('text-[12.5px] leading-snug', item.status === 'done' ? 'text-faint line-through' : item.status === 'doing' ? 'text-ink' : 'text-ink/80')}>{item.task}</span>
             </button>
           ))}
         </div>

@@ -65,7 +65,7 @@ export function objectItems(
       ? [
           {
             label: 'Move here',
-            icon: <Footprints className="h-4 w-4 text-cyan" />,
+            icon: <Footprints className="h-4 w-4 text-secondary-ink" />,
             onSelect: () => onWalk(object.offset)
           }
         ]

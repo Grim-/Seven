@@ -53,7 +53,7 @@ export function RolledPanel({ start, where, onSaved }: { start: StoredDecision |
         <PanelLabel>Die</PanelLabel>
         <div className="flex flex-wrap gap-2">
           {DICE.map((d) => (
-            <button key={d} type="button" onClick={() => setDie(d)} className={cn('h-12 w-16 border font-mono text-[16px] font-bold', d === die ? 'border-accent bg-accent text-black' : 'border-line/60 bg-white/[0.02] text-white hover:border-accent/60')}>
+            <button key={d} type="button" onClick={() => setDie(d)} className={cn('h-12 w-16 border font-ui text-[16px] font-bold', d === die ? 'border-accent bg-accent text-on-accent' : 'border-line/60 bg-ink/[0.02] text-ink hover:border-accent/60')}>
               d{d}
             </button>
           ))}

@@ -13,12 +13,12 @@ const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(
 class GameDefs extends EventEmitter {
   typeOf(type: string): DefType {
     const t = defType(type)
-    if (!t) throw new ToolError(`There is no game definition type "${type}". The types are ${defTypes().map((d) => d.type).join(', ')}.`)
+    if (!t) throw new ToolError(`There is no game definition type "${type}". The types are ${defTypes().map((d) => d.kind ?? d.type).join(', ')}.`)
     return t
   }
 
   private file(type: string): string {
-    return path.join(DIR, `${type}.json`)
+    return path.join(DIR, `${this.typeOf(type).type}.json`)
   }
 
   list(type: string): GameDef[] {
@@ -38,7 +38,7 @@ class GameDefs extends EventEmitter {
   get(type: string, ref: string): GameDef {
     const { id } = splitDefRef(ref)
     const hit = this.list(type).find((d) => d.id === id)
-    if (!hit) throw new ToolError(`No ${this.typeOf(type).label.toLowerCase()} "${id}". Use find with kind ${type} to list them.`)
+    if (!hit) throw new ToolError(`No ${this.typeOf(type).label.toLowerCase()} "${id}". Use find with kind ${this.typeOf(type).kind ?? type} to list them.`)
     return hit
   }
 

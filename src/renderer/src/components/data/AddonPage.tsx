@@ -6,7 +6,7 @@ import { renamePage } from '../../lib/modulePage'
 
 export function AddonPage<T>({ id, what, read, render }: { id: string | null; what: string; read: (data: unknown, title: string) => T; render: (page: { pageId: string; title: string; start: T }) => ReactNode }) {
   const page = usePage(id)
-  if (page === undefined) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (page === undefined) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   if (!page) return <EmptyState title="Deleted">This {what} no longer exists.</EmptyState>
   return <Fragment key={page.id}>{render({ pageId: page.id, title: page.title, start: read(page.data, page.title) })}</Fragment>
 }

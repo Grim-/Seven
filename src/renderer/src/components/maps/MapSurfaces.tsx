@@ -17,8 +17,8 @@ export function MapChat({ id }: EntrySurfaceProps) {
   return (
     <Loaded id={id}>
       {(map) => (
-        <EntryCard title={map.name} tag="map" aside={<span className="font-mono text-[11px] text-faint">{map.size.w}×{map.size.h}</span>}>
-          <MapCanvas map={map} still className="h-56 bg-black/60" />
+        <EntryCard title={map.name} tag="map" aside={<span className="font-ui text-[11px] text-faint">{map.size.w}×{map.size.h}</span>}>
+          <MapCanvas map={map} still className="h-56 tone-panel-60" />
         </EntryCard>
       )}
     </Loaded>

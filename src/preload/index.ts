@@ -1,5 +1,16 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { Channel, type EventMessage, type SevenApi } from '@shared/protocol'
+import { START_COLOR_KEYS, startColorsFromArgs } from '@shared/startColors'
+
+const start = startColorsFromArgs(process.argv)
+
+function paintStart(): void {
+  if (!start) return
+  for (const k of START_COLOR_KEYS) document.documentElement.style.setProperty(`--boot-${k}`, start[k])
+}
+
+if (document.documentElement) paintStart()
+else document.addEventListener('DOMContentLoaded', paintStart, { once: true })
 
 const listeners = new Map<string, Set<(payload: unknown) => void>>()
 

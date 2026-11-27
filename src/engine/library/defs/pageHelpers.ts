@@ -111,7 +111,7 @@ export function workoutPageKind(
     ...(spec.textParts ? { textParts: spec.textParts } : {}),
     defaultPart: () => spec.parts[0],
     actions: spec.actions,
-    available: () => data.toolIsOn('workout'),
+    available: () => true,
     title: (id) => data.pages.get(id).title,
     search(query, limit) {
       workoutAccess.ensure()

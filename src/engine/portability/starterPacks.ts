@@ -53,7 +53,8 @@ export async function installStarterPacks(): Promise<{ installed: string[]; skip
       const result = await portabilityImport({
         source: { path: filePath },
         defaultMode: 'skip',
-        keepPicture: false
+        keepPicture: false,
+        folder: 'Starter packs'
       })
       const hadMissingModule = result.skipped.some((s) => s.reason.startsWith('Missing module'))
       if (hadMissingModule && result.imported.length === 0) {

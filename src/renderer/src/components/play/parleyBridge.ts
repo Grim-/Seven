@@ -44,7 +44,11 @@ export function sendParleyToChat(handoff: ParleyHandoff): void {
   const canSend = agent ? chatCanAnswer(agent) : false
 
   const npcRef = handoff.npcSheet ? `${handoff.npcName} (@sheet:${handoff.npcSheet})` : handoff.npcName
-  const whereRef = handoff.placeKey ? ` in @place:${handoff.placeKey}` : ''
+  const whereRef = handoff.placeKey
+    ? handoff.worldId
+      ? ` in @world:${handoff.worldId}/place/${handoff.placeKey}`
+      : ` in @place:${handoff.placeKey}`
+    : ''
   const playerRef = handoff.playerSheet
     ? ` The user plays ${handoff.playerName ?? handoff.playerSheet} (@sheet:${handoff.playerSheet}).`
     : handoff.playerName

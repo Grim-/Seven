@@ -6,7 +6,7 @@ import { StatInput } from './StatInput'
 export function Vitals({ dnd, onChange }: { dnd: DndStats; onChange: (patch: Partial<DndStats>) => void }) {
   const dice = hitDiceCount(dnd)
   return (
-    <div className="grid grid-cols-2 border border-line/50 bg-black/50 sm:grid-cols-3 xl:grid-cols-[minmax(19rem,2.4fr)_repeat(6,minmax(0,1fr))]">
+    <div className="grid grid-cols-2 border border-line/50 tone-panel-50 sm:grid-cols-3 xl:grid-cols-[minmax(19rem,2.4fr)_repeat(6,minmax(0,1fr))]">
       <div className="col-span-2 sm:col-span-3 xl:col-span-1">
         <HpControl dnd={dnd} onChange={onChange} />
       </div>

@@ -22,7 +22,7 @@ function referenceAt(doc: Node, at: number): Found | null {
     for (const m of node.text.matchAll(referencePattern())) {
       const from = pos + (m.index ?? 0) + m[1].length
       const to = pos + (m.index ?? 0) + m[0].length
-      if (at >= from && at <= to) found = { from, to, kind: m[2], ref: m[3], part: m[4] ?? null }
+      if (at >= from && at <= to) found = { from, to, kind: m[2], ref: m[3], part: m[5] ?? null }
     }
   })
   return found

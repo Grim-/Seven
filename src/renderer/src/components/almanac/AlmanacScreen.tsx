@@ -21,10 +21,8 @@ import { PLACE_TYPE_KEY, type WorldEntity, type WorldMeta } from '@shared/world'
 import {
   Archive,
   BookOpen,
-  Check,
   Clock,
   Compass,
-  Copy,
   Eye,
   EyeOff,
   MapPin,
@@ -56,8 +54,10 @@ import '../chat/MessageElements'
 import { Chip } from '../chat/References'
 import { RoleplayText } from '../chat/Roleplay'
 import { MarkdownEditor } from '../data/MarkdownEditor'
+import { setWhere } from '../maps/placeActions'
 import { StoryThreads } from '../data/sheet/story/StoryThreads'
 import {
+  BrowsePick,
   Button,
   ChipInput,
   EmptyState,
@@ -72,11 +72,12 @@ import {
   ShellTabs,
   StatusBadge,
   TagInput,
-  Textarea,
   Tooltip,
   askConfirm,
   askText
 } from '../ui'
+import { LinkInlineEdit } from '../data/LinkInlineEdit'
+import { BroadsheetView } from './BroadsheetView'
 
 type AlmanacTab = 'overview' | 'chronicle' | 'threads' | 'broadsheet'
 
@@ -100,9 +101,14 @@ function renderRefChip(raw: string, onRemove?: () => void) {
   return (
     <span
       key={clean}
-      className="inline-flex items-center gap-1 border border-line/45 bg-black/60 px-2 py-0.5 font-mono text-[11px] text-white/85"
+      className="inline-flex items-center gap-1 border border-line/45 tone-panel-60 px-2 py-0.5 font-ui text-[11px] text-ink/85"
     >
-      {clean}
+      <span>{clean}</span>
+      {onRemove && (
+        <button type="button" onClick={onRemove} title="Remove" className="cursor-pointer text-faint hover:text-alert">
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </span>
   )
 }
@@ -145,11 +151,11 @@ function AlmanacEntryEditor({
   }
 
   return (
-    <div className="flex flex-col gap-3 border border-accent/50 bg-black/60 p-4">
+    <div className="flex flex-col gap-3 border border-accent/50 tone-panel-60 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/35 pb-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <Eyebrow className="text-accent">{isNew ? 'Log Scene' : 'Edit Scene'}</Eyebrow>
-          <div className="flex items-center gap-1 border border-line/45 bg-black/50 px-2 py-0.5 font-mono text-[11.5px] text-white">
+          <div className="flex items-center gap-1 border border-line/45 tone-panel-50 px-2 py-0.5 font-ui text-[11.5px] text-ink">
             <span className="text-dim">Day</span>
             <InlineNumber
               value={entry.when.day}
@@ -183,7 +189,7 @@ function AlmanacEntryEditor({
             value={entry.title}
             placeholder="Scene title…"
             onSave={(title) => onChange({ ...entry, title })}
-            className="text-[15px] font-semibold text-white"
+            className="text-[15px] font-semibold text-ink"
           />
         </div>
 
@@ -201,38 +207,38 @@ function AlmanacEntryEditor({
 
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">Summary</span>
-          <InlineEdit
+          <span className="font-label text-[10px] font-bold caps-5 text-dim">Summary</span>
+          <LinkInlineEdit
             value={entry.summary}
             placeholder="Concise 1–2 sentence recap"
             onSave={(summary) => onChange({ ...entry, summary })}
-            className="border border-line/40 bg-black/40 px-2.5 py-1.5 text-[12.5px] text-white/90"
+            className="border border-line/40 tone-panel-40 px-2.5 py-1.5 text-[12.5px] text-ink/90"
           />
         </div>
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">Outcome / Consequence</span>
-          <InlineEdit
+          <span className="font-label text-[10px] font-bold caps-5 text-dim">Outcome / Consequence</span>
+          <LinkInlineEdit
             value={entry.outcome}
             placeholder="What changed as a result? (optional)"
             onSave={(outcome) => onChange({ ...entry, outcome })}
-            className="border border-line/40 bg-black/40 px-2.5 py-1.5 text-[12.5px] text-white/90"
+            className="border border-line/40 tone-panel-40 px-2.5 py-1.5 text-[12.5px] text-ink/90"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">Where (@place:...)</span>
-          <InlineEdit
+          <span className="font-label text-[10px] font-bold caps-5 text-dim">Where (@world:.../place/...)</span>
+          <LinkInlineEdit
             value={entry.where}
             suggestions={placeSuggestions}
-            placeholder="@place:... or location"
+            placeholder="@world:.../place/... or location"
             onSave={(where) => onChange({ ...entry, where: where.trim() })}
-            className="border border-line/40 bg-black/40 px-2.5 py-1.5 font-mono text-[12px] text-white/90"
+            className="border border-line/40 tone-panel-40 px-2.5 py-1.5 font-ui text-[12px] text-ink/90"
           />
         </div>
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">Who was involved</span>
+          <span className="font-label text-[10px] font-bold caps-5 text-dim">Who was involved</span>
           <ChipInput
             value={entry.who}
             suggestions={sheetSuggestions}
@@ -241,7 +247,7 @@ function AlmanacEntryEditor({
           />
         </div>
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">Tags</span>
+          <span className="font-label text-[10px] font-bold caps-5 text-dim">Tags</span>
           <TagInput
             value={entry.tags ?? []}
             onChange={(tags) => onChange({ ...entry, tags })}
@@ -251,14 +257,14 @@ function AlmanacEntryEditor({
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">
+        <span className="font-label text-[10px] font-bold caps-5 text-dim">
           Secret / Hidden Note (excluded from #public &amp; newspapers)
         </span>
-        <InlineEdit
+        <LinkInlineEdit
           value={entry.secret ?? ''}
           placeholder="Optional hidden truth…"
           onSave={(secret) => onChange({ ...entry, secret: secret.trim() || undefined })}
-          className="border border-line/40 bg-black/40 px-2.5 py-1.5 text-[12px] text-warn"
+          className="border border-line/40 tone-panel-40 px-2.5 py-1.5 text-[12px] text-warn"
         />
       </div>
 
@@ -298,7 +304,6 @@ export function AlmanacScreen({ id }: KindScreenProps) {
   const [editingEntry, setEditingEntry] = useState(false)
   const [composing, setComposing] = useState<AlmanacEntry | null>(null)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
-  const [copiedCatchUp, setCopiedCatchUp] = useState(false)
   const panelsRef = useRef<HTMLDivElement>(null)
 
   const reload = () => {
@@ -373,7 +378,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
   const sheetSuggestions = pages.filter((p) => pageKindOf(p.type) === 'sheet').map((p) => `@sheet:${p.id}`)
 
   const worldPlaceLinks = almanac.worldId
-    ? Object.keys(worldPlaces).map((k) => `@place:${almanac.worldId}/${k}`)
+    ? Object.keys(worldPlaces).map((k) => `@world:${almanac.worldId}/place/${k}`)
     : []
   const placeSuggestions = [
     ...new Set([
@@ -457,7 +462,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
       const defaultWhere =
         almanac.opening?.startingWhere ||
         (curSave ? Object.values(curSave.characters).find((c) => c.where)?.where : '') ||
-        (firstPlaceKey ? `@place:${worldId}/${firstPlaceKey}` : '')
+        (firstPlaceKey ? `@world:${worldId}/place/${firstPlaceKey}` : '')
       saveAlmanacPatch({
         worldId,
         saveId: curSave?.id ?? null,
@@ -488,29 +493,110 @@ export function AlmanacScreen({ id }: KindScreenProps) {
       .catch(failed('Could not open World Play'))
   }
 
+  const sheetIds = new Set(pages.filter((p) => pageKindOf(p.type) === 'sheet').map((p) => p.id))
+  const normCharRef = (raw: string): string => {
+    const t = raw.trim()
+    if (!t) return ''
+    const clean = stripRef(t).replace(/^sheet:/i, '')
+    return sheetIds.has(clean) ? `@sheet:${clean}` : t
+  }
+
+  const worldPlaceOptions = Object.entries(worldPlaces).map(([key, place]) => {
+    const link = almanac.worldId ? `@world:${almanac.worldId}/place/${key}` : key
+    const label = (typeof place.name === 'string' && place.name.trim()) || showName(key)
+    const note =
+      typeof place.summary === 'string' && place.summary.trim()
+        ? place.summary.trim()
+        : typeof place.description === 'string' && place.description.trim()
+          ? place.description.trim()
+          : undefined
+    return {
+      value: link,
+      label,
+      group: currentWorld?.name ?? 'Places',
+      ...(note ? { note } : {})
+    }
+  })
+
   const castStanding = (() => {
     const map = new Map<string, string>()
     const defaultWhere = almanac.opening?.startingWhere ?? ''
-    for (const c of almanac.cast) map.set(c, defaultWhere)
+    for (const c of almanac.cast) {
+      const key = normCharRef(c)
+      if (key) map.set(key, defaultWhere)
+    }
     for (const s of savePartySheets) {
-      const rawSheet = stripRef(s).replace(/^sheet:/i, '')
+      const key = normCharRef(s)
+      const rawSheet = stripRef(key).replace(/^sheet:/i, '')
       const saveWhere = activeSave?.characters[rawSheet]?.where ?? defaultWhere
-      map.set(s, saveWhere)
+      if (key) map.set(key, saveWhere)
     }
     const chronological = sortAlmanacEntries(almanac.entries, 'oldest')
     for (const e of chronological) {
       for (const w of e.who) {
-        if (e.where) map.set(w, e.where)
-        else if (!map.has(w)) map.set(w, defaultWhere)
+        const key = normCharRef(w)
+        if (!key) continue
+        if (e.where) map.set(key, e.where)
+        else if (!map.has(key)) map.set(key, defaultWhere)
       }
     }
     for (const s of liveSceneChats) {
       for (const c of s.scene?.characters ?? []) {
-        if (s.scene?.where) map.set(c, s.scene.where)
+        const key = normCharRef(c)
+        if (key && s.scene?.where) map.set(key, s.scene.where)
       }
+    }
+    // Live save character position overrides chronological fallback when present.
+    for (const key of map.keys()) {
+      const rawSheet = stripRef(key).replace(/^sheet:/i, '')
+      const saveWhere = activeSave?.characters[rawSheet]?.where
+      if (saveWhere) map.set(key, saveWhere)
     }
     return [...map.entries()]
   })()
+
+  const setCastLocation = async (charRef: string, nextWhere: string | null) => {
+    const rawSheet = stripRef(charRef).replace(/^sheet:/i, '')
+    if (!sheetIds.has(rawSheet)) return
+    const clean = (nextWhere ?? '').trim()
+    try {
+      if (almanac.saveId && !activeSave?.characters[rawSheet]) {
+        await engine('saves.bring', { id: almanac.saveId, sheet: rawSheet })
+      }
+      const placeMatch = /^(?:@world:[^/]+\/place\/|@place:)(.+)$/i.exec(clean)
+      if (placeMatch) {
+        await setWhere(rawSheet, placeMatch[1], almanac.worldId)
+      } else if (!clean) {
+        await setWhere(rawSheet, null, almanac.worldId)
+      } else {
+        const s = await engine('sheets.get', { id: rawSheet })
+        await engine('sheets.save', {
+          id: s.id,
+          title: s.title,
+          fields: s.fields,
+          values: s.values,
+          dnd: s.dnd,
+          story: { ...s.story, where: clean }
+        })
+      }
+      reload()
+    } catch (err) {
+      failed('Could not update character location')(err)
+    }
+  }
+
+  const removeCastEntry = (charRef: string) => {
+    const rawId = stripRef(charRef).replace(/^sheet:/i, '')
+    const matches = (v: string) => {
+      const t = v.trim()
+      return t === charRef || t === rawId || t === `@sheet:${rawId}`
+    }
+    const nextCast = almanac.cast.filter((c) => !matches(c))
+    const nextEntries = almanac.entries.map((e) =>
+      e.who.some(matches) ? { ...e, who: e.who.filter((w) => !matches(w)) } : e
+    )
+    saveAlmanacPatch({ cast: nextCast, entries: nextEntries })
+  }
 
   const distinctLocations = (() => {
     const counts = new Map<string, number>()
@@ -753,7 +839,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       {/* STORYLINE DASHBOARD HEADER + SHELL TABS */}
-      <div className="shrink-0 border-b border-line/50 bg-black/40 px-4 pt-2.5">
+      <div className="shrink-0 border-b border-line/50 tone-panel-40 px-4 pt-2.5">
         <ShellTabs<AlmanacTab>
           value={tab}
           onChange={setTab}
@@ -790,7 +876,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
           </StatusBadge>
 
           {/* Compact World Clock */}
-          <div className="flex items-center gap-1.5 border border-line/50 bg-black/60 px-2.5 py-1 font-mono text-[11.5px] text-white">
+          <div className="flex items-center gap-1.5 border border-line/50 tone-panel-60 px-2.5 py-1 font-ui text-[11.5px] text-ink">
             <Clock className="h-3.5 w-3.5 text-accent" />
             <span className="text-dim">Day</span>
             <InlineNumber
@@ -820,7 +906,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
             title="Bound Game World & Save"
             side="bottom"
             align="end"
-            triggerClassName="flex h-7 items-center gap-1.5 border border-line/50 bg-black/60 px-2.5 font-mono text-[11px] text-dim hover:border-accent/60 hover:text-white"
+            triggerClassName="flex h-7 items-center gap-1.5 border border-line/50 tone-well-60 px-2.5 font-ui text-[11px] text-dim hover:border-accent/60 hover:text-ink"
             trigger={
               <>
                 <span>{currentWorld ? currentWorld.name : 'Bind World…'}</span>
@@ -830,14 +916,14 @@ export function AlmanacScreen({ id }: KindScreenProps) {
             className="w-64 p-2.5"
           >
             <div className="flex flex-col gap-2">
-              <div className="font-mono text-[10px] uppercase tracking-wider text-dim">Game World</div>
+              <div className="font-label text-[10px] caps-5 text-dim">Game World</div>
               <div className="flex flex-col gap-0.5">
                 <button
                   type="button"
                   onClick={() => bindWorld(null)}
                   className={cn(
                     'px-2 py-1 text-left text-xs',
-                    !almanac.worldId ? 'bg-accent/15 text-white' : 'text-dim hover:bg-raise hover:text-text'
+                    !almanac.worldId ? 'bg-accent/15 text-ink' : 'text-dim hover:bg-ink/5 hover:text-ink'
                   )}
                 >
                   Unbound (standalone)
@@ -849,7 +935,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                     onClick={() => bindWorld(w.id)}
                     className={cn(
                       'px-2 py-1 text-left text-xs',
-                      almanac.worldId === w.id ? 'bg-accent/15 text-white' : 'text-dim hover:bg-raise hover:text-text'
+                      almanac.worldId === w.id ? 'bg-accent/15 text-ink' : 'text-dim hover:bg-ink/5 hover:text-ink'
                     )}
                   >
                     {w.name}
@@ -859,14 +945,14 @@ export function AlmanacScreen({ id }: KindScreenProps) {
 
               {worldSaves.length > 0 && (
                 <div className="border-t border-line/40 pt-2">
-                  <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-dim">Game Save</div>
+                  <div className="mb-1 font-label text-[10px] caps-5 text-dim">Game Save</div>
                   <div className="flex flex-col gap-0.5">
                     <button
                       type="button"
                       onClick={() => saveAlmanacPatch({ saveId: null })}
                       className={cn(
                         'px-2 py-1 text-left text-xs',
-                        !almanac.saveId ? 'bg-accent/15 text-white' : 'text-dim hover:bg-raise hover:text-text'
+                        !almanac.saveId ? 'bg-accent/15 text-ink' : 'text-dim hover:bg-ink/5 hover:text-ink'
                       )}
                     >
                       Active save
@@ -878,7 +964,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                         onClick={() => saveAlmanacPatch({ saveId: s.id })}
                         className={cn(
                           'px-2 py-1 text-left text-xs',
-                          almanac.saveId === s.id ? 'bg-accent/15 text-white' : 'text-dim hover:bg-raise hover:text-text'
+                          almanac.saveId === s.id ? 'bg-accent/15 text-ink' : 'text-dim hover:bg-ink/5 hover:text-ink'
                         )}
                       >
                         {s.name}
@@ -925,7 +1011,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
         >
           <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 p-5">
             {/* Contemporaneous Stage & Launch Banner */}
-            <section className="flex flex-wrap items-center justify-between gap-4 border border-accent/50 bg-black/55 p-4 shadow-[inset_3px_0_0_var(--color-accent)]">
+            <section className="flex flex-wrap items-center justify-between gap-4 border border-accent/50 tone-panel-55 p-4 shadow-[inset_3px_0_0_var(--color-accent)]">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <Eyebrow className="text-accent">
@@ -973,7 +1059,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
             </section>
 
             {/* STORY OPENING & SESSION 1 FOUNDATION */}
-            <section className="flex flex-col gap-3.5 border border-line/45 bg-black/45 p-4">
+            <section className="flex flex-col gap-3.5 border border-line/45 tone-panel-45 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/35 pb-2.5">
                 <div>
                   <Eyebrow className="text-accent">Story Opening &amp; Session 1 Setup</Eyebrow>
@@ -985,77 +1071,52 @@ export function AlmanacScreen({ id }: KindScreenProps) {
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="flex flex-col gap-1">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">
+              {/* Starting Location tied to the Bound World */}
+              <div className="flex flex-col gap-1.5">
+                <span className="font-label text-[10px] font-bold caps-5 text-dim">
+                  Session 1 Starting Location ({currentWorld ? currentWorld.name : 'World'})
+                </span>
+                <BrowsePick
+                  value={almanac.opening?.startingWhere || null}
+                  allowCustom
+                  placeholder="Pick a starting place or type a location…"
+                  options={worldPlaceOptions}
+                  onChange={(next) => saveOpeningPatch({ startingWhere: next?.trim() ?? '' })}
+                  className="max-w-md"
+                />
+              </div>
+
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <span className="font-label text-[10px] font-bold caps-5 text-dim">
                     Storyline Premise / Campaign Hook
                   </span>
-                  <InlineEdit
+                  <LinkInlineEdit
                     value={almanac.opening?.premise ?? ''}
                     placeholder="What is the overarching premise or central conflict of this storyline?"
                     onSave={(premise) => saveOpeningPatch({ premise })}
-                    className="border border-line/40 bg-black/45 px-2.5 py-1.5 text-[13px] text-white"
+                    className="border border-line/40 tone-panel-45 px-2.5 py-1.5 text-[13px] h-22.5 text-ink"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">
+                  <span className="font-label text-[10px] font-bold caps-5  text-dim">
                     Tone &amp; Core Stakes
                   </span>
                   <InlineEdit
                     value={almanac.opening?.tone ?? ''}
                     placeholder="e.g. Gritty noir intrigue · High-stakes frontier survival"
                     onSave={(tone) => saveOpeningPatch({ tone })}
-                    className="border border-line/40 bg-black/45 px-2.5 py-1.5 text-[13px] text-white"
+                    className="border border-line/40 tone-panel-45 px-2.5 py-1.5 h-22.5 text-[13px] text-ink"
                   />
                 </div>
               </div>
 
-              {/* Starting Location tied to the Bound World */}
-              <div className="flex flex-col gap-1.5">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">
-                  Session 1 Starting Location (@place in {currentWorld ? currentWorld.name : 'World'})
-                </span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="min-w-[240px] flex-1">
-                    <InlineEdit
-                      value={almanac.opening?.startingWhere ?? ''}
-                      suggestions={placeSuggestions}
-                      placeholder="@place:... or starting location"
-                      onSave={(startingWhere) => saveOpeningPatch({ startingWhere: startingWhere.trim() })}
-                      className="border border-line/40 bg-black/45 px-2.5 py-1.5 font-mono text-[12.5px] text-white"
-                    />
-                  </div>
-                  {almanac.opening?.startingWhere && renderRefChip(almanac.opening.startingWhere)}
-                </div>
-
-                {worldPlaceLinks.length > 0 && (
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-[10px] uppercase text-faint">
-                      Places in {currentWorld?.name}:
-                    </span>
-                    {worldPlaceLinks.slice(0, 12).map((link) => {
-                      const active = almanac.opening?.startingWhere === link
-                      return (
-                        <button
-                          key={link}
-                          type="button"
-                          onClick={() => saveOpeningPatch({ startingWhere: link })}
-                          className={cn(
-                            'border px-2 py-0.5 font-mono text-[11px] transition-colors',
-                            active
-                              ? 'border-accent bg-accent/15 text-white'
-                              : 'border-line/40 bg-black/50 text-dim hover:border-accent/50 hover:text-white'
-                          )}
-                        >
-                          {showName(stripRef(link))}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-
               <div className="flex flex-col gap-1">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-dim">
+                <span className="font-label text-[10px] font-bold caps-5 text-dim">
                   Session 1 Opening Scene / Inciting Situation
                 </span>
                 <MarkdownEditor
@@ -1072,52 +1133,80 @@ export function AlmanacScreen({ id }: KindScreenProps) {
             {/* WORLD SAVE PARTY & ACTIVE SCENE CHATS (2-COLUMN GRID) */}
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               {/* Cast & World Save Standing */}
-              <section className="flex flex-col gap-3 border border-line/45 bg-black/45 p-4">
-                <div className="flex items-center justify-between border-b border-line/35 pb-2">
+              <section className="flex flex-col gap-3 border border-line/45 tone-panel-45 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/35 pb-2">
                   <div>
                     <Eyebrow className="text-accent">Storyline Cast &amp; World Standing ({castStanding.length})</Eyebrow>
                     <div className="mt-0.5 text-[12px] text-dim">
-                      Characters participating in this storyline and their current location in the world/save.
+                      Characters in this storyline and their current location.
                     </div>
                   </div>
-                  {currentWorld && (
-                    <Button size="sm" variant="ghost" onClick={() => openEntry('world', currentWorld.id)}>
-                      Open World
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <BrowsePick
+                      value={null}
+                      allowCustom
+                      clearable={false}
+                      placeholder="+ Add character…"
+                      options={pages
+                        .filter((p) => pageKindOf(p.type) === 'sheet' && !almanac.cast.includes(`@sheet:${p.id}`) && !almanac.cast.includes(p.id))
+                        .map((p) => ({
+                          value: `@sheet:${p.id}`,
+                          label: p.title,
+                          group: 'Characters'
+                        }))}
+                      onChange={(next) => {
+                        if (!next) return
+                        const clean = next.trim()
+                        if (!clean || almanac.cast.includes(clean)) return
+                        saveAlmanacPatch({ cast: [...almanac.cast, clean] })
+                      }}
+                      className="w-52"
+                    />
+                    {currentWorld && (
+                      <Button size="sm" variant="ghost" onClick={() => openEntry('world', currentWorld.id)}>
+                        Open World
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
-                <ChipInput
-                  value={almanac.cast}
-                  suggestions={sheetSuggestions}
-                  onChange={(cast) => saveAlmanacPatch({ cast })}
-                  placeholder="Add @sheet:character to storyline cast…"
-                />
-
                 {castStanding.length > 0 && (
-                  <div className="flex flex-col gap-1.5">
-                    {castStanding.map(([charRef, locRef]) => (
-                      <div
-                        key={charRef}
-                        className="flex items-center justify-between gap-2 border border-line/40 bg-black/55 px-3 py-2"
-                      >
-                        {renderRefChip(charRef)}
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-[10px] text-faint">at</span>
-                          {locRef ? (
-                            renderRefChip(locRef)
-                          ) : (
-                            <span className="font-mono text-[10.5px] text-faint">Unplaced</span>
-                          )}
+                  <div className="divide-y divide-line/30 border border-line/35 tone-well-40">
+                    {castStanding.map(([charRef, locRef]) => {
+                      const rawSheet = stripRef(charRef).replace(/^sheet:/i, '')
+                      const isSheet = sheetIds.has(rawSheet)
+                      return (
+                        <div
+                          key={charRef}
+                          className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5"
+                        >
+                          {renderRefChip(charRef, () => removeCastEntry(charRef))}
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-ui text-[10px] text-faint">at</span>
+                            {isSheet ? (
+                              <BrowsePick
+                                value={locRef || null}
+                                allowCustom
+                                placeholder="Place character…"
+                                options={worldPlaceOptions}
+                                onChange={(next) => void setCastLocation(charRef, next)}
+                                className="w-56"
+                              />
+                            ) : locRef ? (
+                              renderRefChip(locRef)
+                            ) : (
+                              <span className="font-ui text-[10.5px] text-faint">Unplaced</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </section>
 
               {/* Active Scene Chats */}
-              <section className="flex flex-col gap-3 border border-line/45 bg-black/45 p-4">
+              <section className="flex flex-col gap-3 border border-line/45 tone-panel-45 p-4">
                 <div className="flex items-center justify-between border-b border-line/35 pb-2">
                   <div>
                     <Eyebrow className="text-accent">Active Scene Chats ({liveSceneChats.length})</Eyebrow>
@@ -1152,18 +1241,18 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                     {liveSceneChats.map((s) => (
                       <div
                         key={s.id}
-                        className="flex flex-col gap-2.5 border border-line/45 bg-black/55 p-3"
+                        className="flex flex-col gap-2.5 border border-line/45 tone-panel-55 p-3"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <button
                             type="button"
                             onClick={() => openChat(s.id)}
-                            className="flex items-center gap-2 text-left text-[13.5px] font-semibold text-white hover:text-accent"
+                            className="flex items-center gap-2 text-left text-[13.5px] font-semibold text-ink hover:text-accent"
                           >
                             <span className="h-2 w-2 rounded-full bg-ok" />
                             <span>{s.title}</span>
                           </button>
-                          <span className="font-mono text-[11px] text-dim">
+                          <span className="font-ui text-[11px] text-dim">
                             {formatAlmanacClock(s.scene?.worldTime ?? almanac.currentTime)}
                           </span>
                         </div>
@@ -1207,7 +1296,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
             {/* LEFT MASTER PANE: WORLD-TIME LEDGER */}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-line/45">
               {/* Filter Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/40 bg-black/30 px-4 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/40 tone-panel-30 px-4 py-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <Segmented
                     value={groupMode}
@@ -1234,7 +1323,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                         setWhoFilter(null)
                         setTagFilter(null)
                       }}
-                      className="flex items-center gap-1 border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[10.5px] text-accent"
+                      className="flex items-center gap-1 border border-accent/50 bg-accent/10 px-2 py-0.5 font-ui text-[10.5px] text-accent"
                     >
                       <span>{whereFilter ?? whoFilter ?? `#${tagFilter}`}</span>
                       <X className="h-3 w-3" />
@@ -1251,8 +1340,8 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                       type="button"
                       onClick={() => setShowSecrets((v) => !v)}
                       className={cn(
-                        'flex h-7 items-center gap-1 border px-2 font-mono text-[10.5px] uppercase',
-                        showSecrets ? 'border-line/50 bg-black/40 text-dim hover:text-white' : 'border-accent/60 bg-accent/10 text-accent'
+                        'flex h-7 items-center gap-1 border px-2 font-label text-[10.5px] caps',
+                        showSecrets ? 'border-line/50 tone-well-40 text-dim hover:text-ink' : 'border-accent/60 bg-accent/10 text-accent'
                       )}
                     >
                       {showSecrets ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
@@ -1313,10 +1402,10 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                     {groupedEntries.map((group) => (
                       <section key={group.key} className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between border-b border-line/40 pb-1">
-                          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-accent">
+                          <span className="font-label text-[11px] font-bold caps-14 text-accent">
                             {group.label}
                           </span>
-                          {group.sub && <span className="font-mono text-[10.5px] text-faint">{group.sub}</span>}
+                          {group.sub && <span className="font-ui text-[10.5px] text-faint">{group.sub}</span>}
                         </div>
 
                         <div className="ml-2 flex flex-col border-l border-line/50">
@@ -1337,7 +1426,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                                   'group relative flex cursor-pointer items-start gap-3 border-b border-line/30 py-3 pl-4 pr-2 transition-colors',
                                   isSelected
                                     ? 'bg-accent/10 shadow-[inset_2px_0_0_var(--color-accent)]'
-                                    : 'hover:bg-white/[0.02]'
+                                    : 'hover:bg-ink/[0.02]'
                                 )}
                               >
                                 <span
@@ -1348,8 +1437,8 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                                 />
 
                                 {/* Time & Sequence */}
-                                <div className="w-20 shrink-0 pt-0.5 font-mono text-[11.5px]">
-                                  <div className="font-semibold text-white">
+                                <div className="w-20 shrink-0 pt-0.5 font-ui text-[11.5px]">
+                                  <div className="font-semibold text-ink">
                                     {padClock(entry.when.hour)}:{padClock(entry.when.minute)}
                                   </div>
                                   <div className="text-[10px] text-faint">#{entry.when.seq}</div>
@@ -1358,14 +1447,14 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                                 {/* Headline & Summary */}
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-[14px] font-semibold text-white">{entry.title}</span>
+                                    <span className="text-[14px] font-semibold text-ink">{entry.title}</span>
                                     {hasTranscript && (
                                       <StatusBadge tone={liveChat ? 'ok' : 'busy'}>
                                         {entry.messages!.length} turns
                                       </StatusBadge>
                                     )}
                                     {entry.tags?.map((t) => (
-                                      <span key={t} className="font-mono text-[10.5px] text-accent/80">
+                                      <span key={t} className="font-ui text-[10.5px] text-accent/80">
                                         #{t}
                                       </span>
                                     ))}
@@ -1378,7 +1467,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                                   )}
 
                                   {entry.outcome && (
-                                    <div className="mt-1 font-mono text-[11px] text-ok">→ {entry.outcome}</div>
+                                    <div className="mt-1 font-ui text-[11px] text-ok">→ {entry.outcome}</div>
                                   )}
 
                                   {(entry.where || entry.who.length > 0) && (
@@ -1401,10 +1490,10 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                                   }}
                                   title="Stage in Catch-Up Pack"
                                   className={cn(
-                                    'shrink-0 border px-1.5 py-0.5 font-mono text-[10px] uppercase',
+                                    'shrink-0 border px-1.5 py-0.5 font-label text-[10px] caps',
                                     isChecked
                                       ? 'border-accent/60 bg-accent/15 text-accent'
-                                      : 'border-line/40 text-faint opacity-0 hover:text-white group-hover:opacity-100'
+                                      : 'border-line/40 text-faint opacity-0 hover:text-ink group-hover:opacity-100'
                                   )}
                                 >
                                   {isChecked ? '✓ Pack' : '+ Pack'}
@@ -1422,13 +1511,13 @@ export function AlmanacScreen({ id }: KindScreenProps) {
 
             {/* RIGHT DETAIL PANE: DEDICATED DRILL-DOWN READING PANE */}
             {activeEntry && (
-              <ReadingPane className="w-[480px] max-w-[48%] shrink-0 overflow-y-auto bg-black/35">
-                <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-line/45 bg-surface/95 px-4 py-3 backdrop-blur-sm">
+              <ReadingPane className="w-[480px] max-w-[48%] shrink-0 overflow-y-auto tone-panel-35">
+                <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-line/45 tone-surface-95 px-4 py-3 backdrop-blur-[var(--panel-blur)]">
                   <div className="min-w-0">
-                    <div className="font-mono text-[10.5px] uppercase tracking-wider text-accent">
+                    <div className="font-label text-[10.5px] caps-5 text-accent">
                       {formatAlmanacTime(activeEntry.when)} · #{activeEntry.when.seq}
                     </div>
-                    <h3 className="mt-0.5 text-[16px] font-semibold text-white">{activeEntry.title}</h3>
+                    <h3 className="mt-0.5 text-[16px] font-semibold text-ink">{activeEntry.title}</h3>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <RowAction
@@ -1469,7 +1558,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                           {activeEntry.where && renderRefChip(activeEntry.where)}
                           {activeEntry.who.map((w) => renderRefChip(w))}
                           {activeEntry.tags?.map((t) => (
-                            <span key={t} className="font-mono text-[11px] text-accent">
+                            <span key={t} className="font-ui text-[11px] text-accent">
                               #{t}
                             </span>
                           ))}
@@ -1478,23 +1567,23 @@ export function AlmanacScreen({ id }: KindScreenProps) {
 
                       {/* Outcome Callout */}
                       {activeEntry.outcome && (
-                        <div className="border-l-2 border-ok bg-black/50 px-3 py-2">
-                          <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-ok">
+                        <div className="border-l-2 border-ok tone-panel-50 px-3 py-2">
+                          <div className="font-label text-[10px] font-bold caps-5 text-ok">
                             Outcome / Consequence
                           </div>
-                          <div className="mt-0.5 text-[13px] text-white">{activeEntry.outcome}</div>
+                          <div className="mt-0.5 text-[13px] text-ink">{activeEntry.outcome}</div>
                         </div>
                       )}
 
                       {/* Summary */}
                       {activeEntry.summary && (
-                        <div className="text-[13.5px] leading-relaxed text-white/90">{activeEntry.summary}</div>
+                        <div className="text-[13.5px] leading-relaxed text-ink/90">{activeEntry.summary}</div>
                       )}
 
                       {/* Secret */}
                       {showSecrets && activeEntry.secret && (
                         <div className="border-l-2 border-warn bg-warn/5 px-3 py-2">
-                          <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-warn">
+                          <div className="font-label text-[10px] font-bold caps-5 text-warn">
                             Secret (omitted from #public)
                           </div>
                           <div className="mt-0.5 text-[12.5px] text-warn">{activeEntry.secret}</div>
@@ -1503,14 +1592,14 @@ export function AlmanacScreen({ id }: KindScreenProps) {
 
                       {/* Notes */}
                       {activeEntry.notes.trim() && (
-                        <div className="border border-line/40 bg-black/45 p-3 text-[13px]">
+                        <div className="border border-line/40 tone-panel-45 p-3 text-[13px]">
                           <Markdown text={activeEntry.notes} />
                         </div>
                       )}
 
                       {/* Origin Chat Provenance & Controls */}
                       {(activeEntry.chatId || (activeEntry.messages && activeEntry.messages.length > 0)) && (
-                        <div className="flex flex-col gap-2 border border-line/45 bg-black/50 p-3">
+                        <div className="flex flex-col gap-2 border border-line/45 tone-panel-50 p-3">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                               <span
@@ -1519,11 +1608,11 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                                   liveOriginChat ? 'bg-ok' : 'bg-faint'
                                 )}
                               />
-                              <span className="text-[12.5px] font-medium text-white">
+                              <span className="text-[12.5px] font-medium text-ink">
                                 {activeEntry.chatTitle ?? activeEntry.chatId ?? 'Archived Scene Chat'}
                               </span>
                             </div>
-                            <span className="font-mono text-[10px] text-dim">
+                            <span className="font-ui text-[10px] text-dim">
                               {liveOriginChat ? '● Live in Chats' : '○ Deleted from Chats · Preserved here'}
                             </span>
                           </div>
@@ -1587,20 +1676,20 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                           </Eyebrow>
                           <div className="flex flex-col gap-2.5">
                             {activeEntry.messages.map((m) => (
-                              <div key={m.id} className="border border-line/40 bg-black/55 p-3">
+                              <div key={m.id} className="border border-line/40 tone-panel-55 p-3">
                                 <div className="mb-1.5 flex items-center justify-between">
                                   <span
                                     className={cn(
-                                      'font-mono text-[10.5px] font-bold uppercase tracking-wider',
-                                      m.role === 'user' ? 'text-cyan' : 'text-accent'
+                                      'font-label text-[10.5px] font-bold caps-5 ',
+                                      m.role === 'user' ? 'text-secondary-ink' : 'text-accent'
                                     )}
                                   >
                                     {m.speaker}
                                   </span>
-                                  <span className="font-mono text-[10px] text-faint">{m.role}</span>
+                                  <span className="font-ui text-[10px] text-faint">{m.role}</span>
                                 </div>
                                 {m.text && (
-                                  <div className="text-[13px] text-white/90">
+                                  <div className="text-[13px] text-ink/90">
                                     {m.role === 'assistant' ? (
                                       <RoleplayText text={m.text} agent={null} />
                                     ) : (
@@ -1638,9 +1727,9 @@ export function AlmanacScreen({ id }: KindScreenProps) {
             />
 
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2.5 border border-line/45 bg-black/45 p-3.5">
+              <div className="flex flex-col gap-2.5 border border-line/45 tone-panel-45 p-3.5">
                 <div className="flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-cyan" />
+                  <MapPin className="h-3.5 w-3.5 text-secondary-ink" />
                   <Eyebrow>Locations ({distinctLocations.length})</Eyebrow>
                 </div>
                 {distinctLocations.length === 0 ? (
@@ -1655,17 +1744,17 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                           setWhereFilter(loc)
                           setTab('chronicle')
                         }}
-                        className="flex items-baseline gap-1.5 border border-line/45 bg-black/55 px-2.5 py-1 text-[12px] text-dim hover:border-accent/60 hover:text-white"
+                        className="flex items-baseline gap-1.5 border border-line/45 tone-well-55 px-2.5 py-1 text-[12px] text-dim hover:border-accent/60 hover:text-ink"
                       >
                         <span>{showName(stripRef(loc))}</span>
-                        <span className="font-mono text-[10px] text-faint">{count}</span>
+                        <span className="font-ui text-[10px] text-faint">{count}</span>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="flex flex-col gap-2.5 border border-line/45 bg-black/45 p-3.5">
+              <div className="flex flex-col gap-2.5 border border-line/45 tone-panel-45 p-3.5">
                 <div className="flex items-center gap-1.5">
                   <Users className="h-3.5 w-3.5 text-accent" />
                   <Eyebrow>Cast &amp; Factions ({distinctCast.length})</Eyebrow>
@@ -1682,10 +1771,10 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                           setWhoFilter(person)
                           setTab('chronicle')
                         }}
-                        className="flex items-baseline gap-1.5 border border-line/45 bg-black/55 px-2.5 py-1 text-[12px] text-dim hover:border-accent/60 hover:text-white"
+                        className="flex items-baseline gap-1.5 border border-line/45 tone-well-55 px-2.5 py-1 text-[12px] text-dim hover:border-accent/60 hover:text-ink"
                       >
                         <span>{showName(stripRef(person))}</span>
-                        <span className="font-mono text-[10px] text-faint">{count}</span>
+                        <span className="font-ui text-[10px] text-faint">{count}</span>
                       </button>
                     ))}
                   </div>
@@ -1693,7 +1782,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
               </div>
 
               {distinctTags.length > 0 && (
-                <div className="flex flex-col gap-2.5 border border-line/45 bg-black/45 p-3.5">
+                <div className="flex flex-col gap-2.5 border border-line/45 tone-panel-45 p-3.5">
                   <Eyebrow>Scene Tags ({distinctTags.length})</Eyebrow>
                   <div className="flex flex-wrap gap-1.5">
                     {distinctTags.map(([tag, count]) => (
@@ -1704,7 +1793,7 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                           setTagFilter(tag)
                           setTab('chronicle')
                         }}
-                        className="flex items-baseline gap-1 border border-line/45 bg-black/55 px-2 py-0.5 font-mono text-[11px] text-dim hover:border-accent/60 hover:text-white"
+                        className="flex items-baseline gap-1 border border-line/45 tone-well-55 px-2 py-0.5 font-ui text-[11px] text-dim hover:border-accent/60 hover:text-ink"
                       >
                         <span>#{tag}</span>
                         <span className="text-[10px] text-faint">{count}</span>
@@ -1725,43 +1814,14 @@ export function AlmanacScreen({ id }: KindScreenProps) {
           {...(tab !== 'broadsheet' ? ({ hidden: 'until-found' } as Record<string, unknown>) : {})}
           className={cn(tab === 'broadsheet' ? 'flex-1 overflow-y-auto' : '')}
         >
-          <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-4 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3 border border-line/45 bg-black/45 p-4">
-              <div>
-                <Eyebrow className="text-accent">
-                  {checkedIds.size > 0
-                    ? `Staged Catch-Up Pack (${checkedIds.size} scenes)`
-                    : 'Public Chronicle & Newspaper Feed'}
-                </Eyebrow>
-                <div className="mt-0.5 text-[12.5px] text-dim">
-                  Reference <code className="text-accent">@almanac:{almanac.id}#public</code> in any chat or agent prompt to generate an in-world newspaper front page (secret notes are automatically excluded).
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="border border-line/45 bg-black/60 px-2.5 py-1 font-mono text-[11px] text-white">
-                  ~{catchUpTokens} est. tokens
-                </span>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  icon={copiedCatchUp ? <Check /> : <Copy />}
-                  onClick={() => {
-                    void navigator.clipboard.writeText(catchUpPackText)
-                    setCopiedCatchUp(true)
-                    setTimeout(() => setCopiedCatchUp(false), 1800)
-                  }}
-                >
-                  {copiedCatchUp ? 'Copied' : 'Copy Markdown'}
-                </Button>
-                <Button size="sm" variant="primary" icon={<MessageSquare />} onClick={() => startSceneChat()}>
-                  Start Scene Chat
-                </Button>
-              </div>
-            </div>
-
-            <Textarea value={catchUpPackText} readOnly rows={20} className="font-mono text-xs" />
-          </div>
+          <BroadsheetView
+            almanac={almanac}
+            catchUpPackText={catchUpPackText}
+            catchUpTokens={catchUpTokens}
+            checkedCount={checkedIds.size}
+            onSaveEditions={(editions) => saveAlmanacPatch({ editions })}
+            onStartSceneChat={() => startSceneChat()}
+          />
         </div>
       </div>
     </div>

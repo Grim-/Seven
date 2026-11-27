@@ -7,9 +7,19 @@ export async function spawnBeside(host: WorldViewHost, token: MapToken | null, d
   const creature = String(data.creature ?? '')
   if (!creature) return null
   const at = spotBeside(host, token)
-  const save = await engine('saves.spawnBlueprint', { world: host.world, map: host.map.id, source: String(data.source ?? ''), id: creature, name: '', faction: String(data.faction ?? ''), at })
-  const made = save.creatures[save.creatures.length - 1]
-  return made ? { uid: made.uid, at } : null
+  const before = new Set(Object.keys(host.save?.stand[host.map.id] ?? {}))
+  const save = await engine('saves.spawnBlueprint', {
+    world: host.world,
+    map: host.map.id,
+    source: String(data.source ?? ''),
+    id: creature,
+    name: '',
+    faction: String(data.faction ?? ''),
+    at
+  })
+  const standMap = save.stand[host.map.id] ?? {}
+  const addedKey = Object.keys(standMap).find((k) => !before.has(k)) ?? Object.keys(standMap).pop()
+  return addedKey ? { uid: addedKey, at } : null
 }
 
 registerViewAct('spawn_creature', (data, { host, token }) => spawnBeside(host, token, data))

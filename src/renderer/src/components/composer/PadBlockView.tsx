@@ -60,12 +60,12 @@ function Clamp({ open, onOpen, children }: { open: boolean; onOpen: (open: boole
 
 function PlayBlock({ tag, title, lines, purple }: { tag: string; title: string; lines: string[]; purple?: boolean }) {
   return (
-    <div className={cn('w-full border px-3 py-2', purple ? 'border-purple/50 bg-purple/[0.06]' : 'border-accent/50 bg-accent/[0.05]')}>
+    <div className={cn('w-full border px-3 py-2', purple ? 'border-tint-purple/50 bg-tint-purple/[0.06]' : 'border-accent/50 bg-accent/[0.05]')}>
       <div className="flex items-center gap-2">
-        <span className={cn('border px-1 font-mono text-[9.5px] font-bold', purple ? 'border-purple/50 text-purple' : 'border-accent/60 text-accent')}>{tag}</span>
-        <span className="text-[13.5px] font-semibold text-white">{title}</span>
+        <span className={cn('border px-1 font-label text-[9.5px] font-bold caps', purple ? 'border-tint-purple/50 text-tint-purple' : 'border-accent/60 text-accent')}>{tag}</span>
+        <span className="text-[13.5px] font-semibold text-ink">{title}</span>
       </div>
-      <div className="mt-1 flex flex-wrap gap-1 font-mono text-[10.5px] text-dim">
+      <div className="mt-1 flex flex-wrap gap-1 font-ui text-[10.5px] text-dim">
         {lines.map((l, i) => (
           <span key={i} className="border border-line/50 px-1.5">
             {l}
@@ -92,8 +92,8 @@ function BlockFrame({ block, pad, drag, over, items, title, wide, badge, childre
         <GripVertical className="h-3.5 w-3.5" />
       </span>
       <div className="min-w-0 flex-1">{children}</div>
-      {badge && <span className="pad-badge absolute left-6 top-1 font-mono">{badge}</span>}
-      <button type="button" title="Remove from paper" onClick={() => pad.remove(block.key)} className="absolute -right-2 -top-2 z-10 border border-line bg-black/90 p-0.5 text-dim opacity-0 transition-opacity hover:border-alert hover:text-alert group-hover:opacity-100 cursor-pointer">
+      {badge && <span className="pad-badge absolute left-6 top-1 font-ui">{badge}</span>}
+      <button type="button" title="Remove from paper" onClick={() => pad.remove(block.key)} className="absolute -right-2 -top-2 z-10 border border-line tone-well-90 p-0.5 text-dim opacity-0 transition-opacity hover:border-alert hover:text-alert group-hover:opacity-100 cursor-pointer">
         <X className="h-3 w-3" />
       </button>
     </div>
@@ -128,7 +128,7 @@ function LinkBlockView({ block, pad, rollable, drag, over, wide, onWide, open, o
           type="button"
           title="Roll this item now"
           onClick={rollNow}
-          className="absolute right-6 top-1 z-10 hidden items-center gap-1 border border-accent/60 bg-black/80 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent transition-colors hover:bg-accent/20 group-hover:flex cursor-pointer"
+          className="absolute right-6 top-1 z-10 hidden items-center gap-1 border border-accent/60 tone-well-80 px-1.5 py-0.5 font-label text-[9px] caps-5 text-accent transition-colors hover:bg-accent/20 group-hover:flex cursor-pointer"
         >
           <Dices className="h-3 w-3" />
           <span>Roll</span>
@@ -148,15 +148,15 @@ export function PadBlockView(props: Props) {
   let body: ReactNode
   if (shape.as === 'action') {
     const a = parseActions(block.text)[0]
-    body = <PlayBlock tag="ACTION" title={a.attempt} lines={[NEEDS_LABEL[a.needs], ...a.checks.map((c) => showName(c.against ?? 'chance'))]} />
+    body = <PlayBlock tag="Action" title={a.attempt} lines={[NEEDS_LABEL[a.needs], ...a.checks.map((c) => showName(c.against ?? 'chance'))]} />
   } else if (shape.as === 'decision') {
     const d = parseDecisions(block.text)[0]
-    body = <PlayBlock tag="DECISION" purple title={d.question} lines={d.options.map((o) => o.text)} />
+    body = <PlayBlock tag="Decision" purple title={d.question} lines={d.options.map((o) => o.text)} />
   } else {
     body = (
-      <div className="flex w-full flex-col border border-line/50 bg-black/40 p-2.5 shadow-sm transition-all hover:border-line">
-        <div className="mb-1.5 flex items-center justify-between border-b border-line/25 pb-1 font-mono text-[10px] text-faint uppercase tracking-wider select-none">
-          <span className="font-bold text-dim">TEXT NOTE</span>
+      <div className="flex w-full flex-col border border-line/50 tone-well-40 p-2.5 shadow-sm transition-all hover:border-line">
+        <div className="mb-1.5 flex items-center justify-between border-b border-line/25 pb-1 font-label text-[10px] text-faint caps-5 select-none">
+          <span className="font-bold text-dim">Text note</span>
           <span>{block.text.length} chars</span>
         </div>
         <LinkTextarea
@@ -164,7 +164,7 @@ export function PadBlockView(props: Props) {
           onValue={(text) => pad.replace(block.key, text)}
           rows={Math.max(2, block.text.split('\n').length)}
           placeholder="Write prompt text here… (type @ to reference kinds)"
-          className="pad-text w-full resize-none font-mono text-[13.5px] leading-relaxed"
+          className="pad-text w-full resize-none font-ui text-[13.5px] leading-relaxed"
         />
       </div>
     )

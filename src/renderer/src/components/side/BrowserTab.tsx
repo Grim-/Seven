@@ -151,17 +151,17 @@ function BrowserTab() {
           }}
           spellCheck={false}
           placeholder="Search or type an address"
-          className={cn('h-6 min-w-0 flex-1 border bg-black/60 px-2 font-mono text-[11.5px] text-white outline-none', editing ? 'border-accent/50' : 'border-line/40')}
+          className={cn('h-6 min-w-0 flex-1 border tone-well-60 px-2 font-ui text-[11.5px] text-ink outline-none', editing ? 'border-accent/50' : 'border-line/40')}
         />
         <button title="Open in your own browser" onClick={() => view.current && void window.open(view.current.getURL(), '_blank')} className={button}>
           <ExternalLink className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="relative min-h-0 flex-1 bg-white">
+      <div className="relative min-h-0 flex-1 bg-page">
         <webview ref={view as unknown as React.Ref<HTMLWebViewElement>} src={first} partition={PARTITION} className="absolute inset-0 h-full w-full" />
         {loading && <span className="seven-pulse" />}
       </div>
-      {note && <div className="shrink-0 border-t border-line/40 px-2.5 py-1 font-mono text-[10.5px] text-cyan">{note}</div>}
+      {note && <div className="shrink-0 border-t border-line/40 px-2.5 py-1 font-ui text-[10.5px] text-secondary-ink">{note}</div>}
     </div>
   )
 }

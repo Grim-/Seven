@@ -14,7 +14,7 @@ function ResourcePanel({ comp, catalog, changed }: PanelProps<Resource>) {
   return (
     <Section title={def?.label ?? comp.stat} aside={refills || undefined}>
       <div className="flex items-center gap-3">
-        <div className="h-2.5 flex-1 border border-line/40 bg-black/60">
+        <div className="h-2.5 flex-1 border border-line/40 tone-panel-60">
           <div className="h-full transition-[width]" style={{ width: `${Math.round(part * 100)}%`, background: barColour(def?.colour ?? null) }} />
         </div>
         <NumberField
@@ -27,7 +27,7 @@ function ResourcePanel({ comp, catalog, changed }: PanelProps<Resource>) {
           }}
           className="h-7 w-20 text-[12.5px]"
         />
-        <span className="font-mono text-[12.5px] text-dim">/ {Math.round(max)}</span>
+        <span className="font-ui text-[12.5px] text-dim">/ {Math.round(max)}</span>
       </div>
     </Section>
   )

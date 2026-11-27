@@ -23,13 +23,18 @@ import { showInData } from '../../lib/library'
 import { chooseFiles } from '../../lib/importFiles'
 import { pageImageContext, useRegisterImageContext } from '../../lib/imagePromptContext'
 import { noteFailure } from '../../store/problems'
+import { askPlace } from '../../lib/savePlace'
+import { FOLDER_TYPE } from '@shared/ids'
+import { skinSurface } from '../skins/skinSurface'
 
 
 export async function createPage(title: string, type: string | null = null, parent: string | null = null): Promise<string | null> {
   const clean = title.trim()
   if (!clean) return null
   try {
-    const page = await engine('data.pages.create', { title: clean, body: '', fields: [], type, parent })
+    const choice = parent || type === FOLDER_TYPE ? undefined : await askPlace({ type })
+    if (choice === null) return null
+    const page = await engine('data.pages.create', { title: clean, body: '', fields: [], type, parent, ...(choice ? { folder: choice.folder, tags: choice.tags } : {}) })
     return page.id
   } catch (err) {
     toast.error('Could not create the page', errorText(err))
@@ -54,7 +59,7 @@ export function askRenamePage(id: string, title: string): void {
 
 export function askNewFolder(onCreated: (id: string) => void, parent: string | null = null): void {
   askText('New folder', 'Name', '', async (title) => {
-    const id = await createPage(title, 'folder', parent)
+    const id = await createPage(title, FOLDER_TYPE, parent)
     if (id) onCreated(id)
   })
 }
@@ -120,10 +125,10 @@ function Backlinks({ id }: { id: string }) {
   }, [id, pages])
   if (!links.length) return null
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line/40 pt-2 font-mono text-[10.5px] uppercase tracking-[0.12em] text-faint">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line/40 pt-2 font-label text-[10.5px] caps-12 text-faint">
       Linked from
       {links.map((l) => (
-        <button key={l.id} onClick={() => nav?.(l.id)} className="normal-case tracking-normal text-accent-soft hover:text-white">
+        <button key={l.id} onClick={() => nav?.(l.id)} className="normal-case tracking-normal text-accent-soft hover:text-ink">
           {l.title}
         </button>
       ))}
@@ -144,7 +149,7 @@ export function PageDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
     [page?.title, page?.body, page?.records, typeLabel]
   )
   useRegisterImageContext(!Screen ? pageContext : null)
-  if (page === undefined) return <div className="p-3 font-mono text-[11px] text-dim">Loading…</div>
+  if (page === undefined) return <div className="p-3 font-ui text-[11px] text-dim">Loading…</div>
   if (!page) return <EmptyState title="Deleted">This page no longer exists.</EmptyState>
 
   const hasItems = !page.type && page.records.length > 0
@@ -173,10 +178,10 @@ export function PageDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
     ])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+    <div {...skinSurface('page')} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
       <AddressTools order={2}>
-        {page.type && <span className="shrink-0 border border-line/60 px-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-accent-soft">{typeLabel ?? 'Tool off'}</span>}
-        <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{formatRelative(page.updatedAt)}</span>
+        {page.type && <span className="shrink-0 border border-line/60 px-1.5 font-label text-[10px] caps-12 text-accent-soft">{typeLabel ?? 'Tool off'}</span>}
+        <span className="shrink-0 font-label text-[10px] caps-12 text-faint">{formatRelative(page.updatedAt)}</span>
         <Button size="sm" variant="ghost" icon={<MoreHorizontal />} title="More" onClick={menu} />
       </AddressTools>
       {page.image && picture && (
@@ -200,7 +205,7 @@ export function PageDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       ) : null}
       {page.type ? (
         <details open={Boolean(page.body.trim())} className="group">
-          <summary className="cursor-pointer font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Notes</summary>
+          <summary className="cursor-pointer font-label text-[10.5px] font-semibold caps-14 text-accent-soft">Notes</summary>
           <div className="pt-2">
             <NoteBody page={page} heading={false} maxHeight="" contents bar />
           </div>
@@ -257,7 +262,7 @@ function Jump({ current, onPick }: { current: string; onPick: (ref: string, crea
   return (
     <div ref={box} className="relative min-w-0 flex-1">
       {open ? (
-        <div className="flex h-7 items-center gap-1.5 border border-accent/60 bg-black/60 px-2">
+        <div className="flex h-7 items-center gap-1.5 border border-accent/60 tone-well-60 px-2">
           <Search className="h-3.5 w-3.5 shrink-0 text-dim" />
           <input
             autoFocus
@@ -273,13 +278,13 @@ function Jump({ current, onPick }: { current: string; onPick: (ref: string, crea
               if (e.key === 'Enter') pick(active)
               if (e.key === 'Escape') setOpen(false)
             }}
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-white outline-none placeholder:text-faint"
+            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-ink outline-none placeholder:text-faint"
           />
         </div>
       ) : (
         <button onClick={() => setOpen(true)} className="flex h-7 w-full items-center gap-2 border border-line/50 px-2 text-left hover:border-accent/60">
           <FileText className="h-3.5 w-3.5 shrink-0 text-accent" />
-          <span className="truncate font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white">{title}</span>
+          <span className="truncate font-label text-[11px] font-semibold caps-12 text-ink">{title}</span>
           <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0 text-dim" />
         </button>
       )}
@@ -290,7 +295,7 @@ function Jump({ current, onPick }: { current: string; onPick: (ref: string, crea
               key={`${o.create}-${o.id}`}
               onMouseEnter={() => setActive(i)}
               onClick={() => pick(i)}
-              className={cn('px-2.5 py-1.5 text-left text-[12.5px]', i === active ? 'bg-accent/10 text-white' : 'text-white/80', o.create && 'text-accent')}
+              className={cn('px-2.5 py-1.5 text-left text-[12.5px]', i === active ? 'bg-accent/10 text-ink' : 'text-ink/80', o.create && 'text-accent')}
             >
               {o.label}
             </button>
@@ -360,10 +365,10 @@ export function PageHost({ id, onChange, onClose }: { id: string; onChange?: (id
 
 export function ToolPage({ id }: { id: string }) {
   const page = usePage(id)
-  if (page === undefined) return <div className="p-3 font-mono text-[11px] text-dim">Loading…</div>
+  if (page === undefined) return <div className="p-3 font-ui text-[11px] text-dim">Loading…</div>
   if (!page) return <EmptyState title="Gone">This tool's page no longer exists.</EmptyState>
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto border border-line/60 bg-black/70 p-2">
+    <div className="min-h-0 flex-1 overflow-y-auto border border-line/60 tone-panel-70 p-2">
       <ModulePageView pageId={page.id} version={page.version} />
     </div>
   )

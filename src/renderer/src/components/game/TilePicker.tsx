@@ -5,6 +5,8 @@ import { pickPicture } from '../data/PicturePicker'
 import { choosePictures } from '../../lib/importFiles'
 import { readImage } from '../../lib/assetSource'
 import { noteFailure } from '../../store/problems'
+import { rgba } from '../../lib/cssColors'
+import { useRoleColours } from '../../lib/skins/useRoleColours'
 
 export interface TilePickResult {
   assetId: string
@@ -50,6 +52,7 @@ export function TilePicker({
   const [croppedPreview, setCroppedPreview] = useState<string | null>(null)
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const { colours } = useRoleColours()
 
   // Load image whenever assetId changes
   useEffect(() => {
@@ -105,7 +108,7 @@ export function TilePicker({
     ctx.drawImage(imageBitmap, 0, 0)
 
     // 2. Draw subtle grid overlay
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+    ctx.strokeStyle = rgba(colours.ink, 0.15)
     ctx.lineWidth = 1
     for (let x = 0; x <= canvas.width; x += tileW) {
       ctx.beginPath()
@@ -122,20 +125,20 @@ export function TilePicker({
 
     // 3. Draw hover tile outline
     if (hoverTile) {
-      ctx.strokeStyle = 'rgba(102, 252, 241, 0.8)'
+      ctx.strokeStyle = rgba(colours.cyan, 0.8)
       ctx.lineWidth = 2
       ctx.strokeRect(hoverTile.col * tileW + 1, hoverTile.row * tileH + 1, tileW - 2, tileH - 2)
     }
 
     // 4. Draw selected tile outline
     if (selectedTile) {
-      ctx.strokeStyle = '#f59e0b'
+      ctx.strokeStyle = colours.accent
       ctx.lineWidth = 2
       ctx.strokeRect(selectedTile.col * tileW + 1, selectedTile.row * tileH + 1, tileW - 2, tileH - 2)
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.25)'
+      ctx.fillStyle = rgba(colours.accent, 0.25)
       ctx.fillRect(selectedTile.col * tileW + 1, selectedTile.row * tileH + 1, tileW - 2, tileH - 2)
     }
-  }, [imageBitmap, tileW, tileH, hoverTile, selectedTile])
+  }, [imageBitmap, tileW, tileH, hoverTile, selectedTile, colours])
 
   if (!open) return null
 
@@ -201,7 +204,7 @@ export function TilePicker({
 
   return (
     <Modal open={open} onClose={onClose} title="SELECT TILE FROM TILESHEET" wide>
-      <div className="flex flex-col gap-3 font-mono text-[12px] select-none p-1">
+      <div className="flex flex-col gap-3 font-ui text-[12px] select-none p-1">
         {/* Top Controls Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
           <div className="flex items-center gap-2">
@@ -214,7 +217,7 @@ export function TilePicker({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase text-dim font-bold">Tile Grid:</span>
+            <span className="text-[10px] caps text-dim font-bold">Tile Grid:</span>
             <Segmented
               value={String(tileW)}
               options={TILE_SIZES}
@@ -229,7 +232,7 @@ export function TilePicker({
         </div>
 
         {/* Tilesheet Canvas Viewport */}
-        <div className="relative flex h-[420px] w-full flex-col items-center justify-center overflow-auto border border-line/60 bg-black/90 p-4">
+        <div className="relative flex h-[420px] w-full flex-col items-center justify-center overflow-auto border border-line/60 tone-panel-90 p-4">
           {!assetId ? (
             <div className="flex flex-col items-center gap-2 text-dim text-[11px]">
               <span>No tilesheet selected.</span>
@@ -254,7 +257,7 @@ export function TilePicker({
         <div className="flex items-center justify-between border-t border-line pt-2.5">
           <div className="flex items-center gap-3">
             {croppedPreview && (
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-accent bg-black p-0.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-accent bg-well p-0.5">
                 <img src={croppedPreview} alt="Selected tile" className="h-full w-full object-contain [image-rendering:pixelated]" />
               </div>
             )}

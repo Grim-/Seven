@@ -28,7 +28,7 @@ export function CountCards({ id, onCardMenu }: { id: string; onCardMenu?: (e: Mo
         const meta = cards.find((c) => toId(c.title) === toId(e.card))
         return (
           <div key={e.card} className="relative" title={showName(e.card)} onContextMenu={onCardMenu ? (ev) => onCardMenu(ev, e.card, meta?.id ?? null) : undefined}>
-            {meta ? <LiveCard id={meta.id} /> : <div className="font-mono text-[11px] text-dim">{showName(e.card)} (missing)</div>}
+            {meta ? <LiveCard id={meta.id} /> : <div className="font-ui text-[11px] text-dim">{showName(e.card)} (missing)</div>}
             <FaceCount count={e.count} />
           </div>
         )

@@ -30,7 +30,7 @@ function Turns({ snap, count, large = false }: { snap: SessionSnapshot; count: n
       {turns.map((m) => (
         <div key={m.id} className={cn('flex gap-2', m.role === 'user' && 'justify-end')}>
           {m.role === 'assistant' && <AgentAvatar agent={agent} size={large ? 30 : 24} />}
-          <span className={cn('max-w-[85%] whitespace-pre-wrap border px-2.5 py-1.5 leading-relaxed', large ? 'text-[15px]' : 'line-clamp-4 text-[12.5px]', m.role === 'user' ? 'border-teal/25 bg-teal/5' : 'border-white/10 bg-white/[0.03]')}>{textOf(m)}</span>
+          <span className={cn('max-w-[85%] whitespace-pre-wrap border px-2.5 py-1.5 leading-relaxed', large ? 'text-[15px]' : 'line-clamp-4 text-[12.5px]', m.role === 'user' ? 'border-secondary/25 bg-secondary/5' : 'border-ink/10 bg-ink/[0.03]')}>{textOf(m)}</span>
         </div>
       ))}
     </div>
@@ -51,7 +51,7 @@ export function ChatEntryChat({ id }: EntrySurfaceProps) {
   if (!snap.meta) return <EmptyState title="Removed">This chat no longer exists.</EmptyState>
   const last = snap.messages[snap.messages.length - 1]
   return (
-    <EntryCard title={snap.meta.title} tag="chat" aside={<span className="font-mono text-[11px] text-faint">{last ? formatRelative(last.createdAt) : ''} · {snap.messages.length} turns</span>}>
+    <EntryCard title={snap.meta.title} tag="chat" aside={<span className="font-ui text-[11px] text-faint">{last ? formatRelative(last.createdAt) : ''} · {snap.messages.length} turns</span>}>
       <Turns snap={snap} count={3} />
       <Open id={id} label="Open chat" />
     </EntryCard>
@@ -63,7 +63,7 @@ export function ChatEntryStage({ id }: EntrySurfaceProps) {
   if (!snap?.meta) return <Loading />
   return (
     <div className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">
-      <span className="font-mono text-[12px] uppercase tracking-[0.2em] text-accent-soft">{snap.meta.title}</span>
+      <span className="font-label text-[12px] caps-20 text-accent-soft">{snap.meta.title}</span>
       <Turns snap={snap} count={snap.messages.length} large />
     </div>
   )

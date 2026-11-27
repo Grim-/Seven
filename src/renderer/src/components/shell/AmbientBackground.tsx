@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+import { rgba } from '../../lib/cssColors'
+import { useRoleColours } from '../../lib/skins/useRoleColours'
 
 const FEED = [
   'SYS.ENGINE // UTILITY_PROCESS READY',
@@ -15,8 +17,6 @@ const FEED = [
   'WARNING: CONTEXT SHIFT ON OVERFLOW'
 ]
 
-const COLOR = '0, 229, 255'
-
 interface Packet {
   text: string
   original: string
@@ -30,6 +30,9 @@ interface Packet {
 
 export function AmbientBackground() {
   const ref = useRef<HTMLCanvasElement>(null)
+  const { colours, fonts } = useRoleColours()
+  const tone = colours.secondary
+  const mono = fonts.mono
 
   useEffect(() => {
     const canvas = ref.current
@@ -83,7 +86,7 @@ export function AmbientBackground() {
       frame = requestAnimationFrame(draw)
       if (document.hidden) return
       ctx.clearRect(0, 0, w(), h())
-      ctx.font = '11px ui-monospace, Consolas, monospace'
+      ctx.font = `11px ${mono}`
       for (const p of packets) {
         p.x += p.vx
         p.y += p.vy
@@ -108,7 +111,7 @@ export function AmbientBackground() {
           p.text = p.original
           p.alpha += (p.base - p.alpha) * 0.05
         }
-        ctx.fillStyle = `rgba(${COLOR}, ${p.alpha})`
+        ctx.fillStyle = rgba(tone, p.alpha)
         ctx.fillText(p.text, p.x, p.y)
       }
     }
@@ -120,11 +123,11 @@ export function AmbientBackground() {
       window.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseleave', onOut)
     }
-  }, [])
+  }, [tone, mono])
 
   return (
     <div className="pointer-events-none absolute inset-0 z-0">
-      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:24px_24px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(color-mix(in_srgb,var(--color-ink)_3%,transparent)_1px,transparent_1px)] [background-size:24px_24px]" />
       <canvas ref={ref} className="absolute inset-0 h-full w-full" />
       <div className="absolute inset-0 shadow-[inset_0_0_160px_60px_var(--color-bg)]" />
     </div>

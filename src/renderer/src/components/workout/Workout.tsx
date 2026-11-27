@@ -92,21 +92,21 @@ export function Figure({ svg, large = false }: { svg: string; large?: boolean })
     return root.tagName.toLowerCase() === 'svg' ? toReact(root, 0) : null
   }, [svg])
   if (!tree) return null
-  return <div className={cn('wk-fig w-full border border-line/40 bg-black/50 p-1.5', !large && 'max-w-[240px]')}>{tree}</div>
+  return <div className={cn('wk-fig w-full border border-line/40 tone-panel-50 p-1.5', !large && 'max-w-[240px]')}>{tree}</div>
 }
 
 export function Note({ note }: { note: WorkoutNote }) {
   return (
     <div className="border border-line/40 border-l-2 border-l-accent bg-accent/[0.04] px-3 py-2">
-      <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">{note.title}</div>
-      <div className="mt-1 text-[13px] leading-relaxed text-white/85">{note.text}</div>
+      <div className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">{note.title}</div>
+      <div className="mt-1 text-[13px] leading-relaxed text-ink/85">{note.text}</div>
     </div>
   )
 }
 
 export function WorkoutState({ error, className }: { error: string | null; className?: string }) {
   if (error) return <AlertBox className={className}>{error}</AlertBox>
-  return <div className={cn('font-mono text-[11px] text-dim', className)}>Loading…</div>
+  return <div className={cn('font-ui text-[11px] text-dim', className)}>Loading…</div>
 }
 
 export function openEntry(kind: string, id: string): void {
@@ -123,7 +123,7 @@ export function ExerciseVisual({ ex, large = false }: { ex: Pick<WorkoutExercise
         <Figure key={i} svg={f} large={large} />
       ))}
       {ex.video && (
-        <button onClick={() => showBrowser(ex.video, true)} className="flex items-center gap-1.5 border border-line/50 px-2 py-1 text-left text-[12px] text-accent hover:border-accent hover:text-white" title={ex.video}>
+        <button onClick={() => showBrowser(ex.video, true)} className="flex items-center gap-1.5 border border-line/50 px-2 py-1 text-left text-[12px] text-accent hover:border-accent hover:text-ink" title={ex.video}>
           <Video className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">Watch the video</span>
         </button>
@@ -133,12 +133,12 @@ export function ExerciseVisual({ ex, large = false }: { ex: Pick<WorkoutExercise
 }
 
 export function ExerciseGuide({ ex, large = false }: { ex: Pick<WorkoutExercise, 'how' | 'dos' | 'donts' | 'easier'>; large?: boolean }) {
-  const tip = large ? 'border-l-4 px-[0.5em] py-[0.2em] text-[0.9em] leading-snug text-white' : 'border-l-2 px-2.5 py-1 text-[12.5px] text-white/85'
-  const tag = large ? 'mr-[0.5em] font-mono text-[0.7em] font-bold uppercase tracking-wider' : 'mr-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider'
+  const tip = large ? 'border-l-4 px-[0.5em] py-[0.2em] text-[0.9em] leading-snug text-ink' : 'border-l-2 px-2.5 py-1 text-[12.5px] text-ink/85'
+  const tag = large ? 'mr-[0.5em] font-label text-[0.7em] font-bold caps-5 ' : 'mr-1.5 font-label text-[10.5px] font-semibold caps-5 '
   return (
     <>
       {ex.how.length > 0 && (
-        <ol className={cn('flex list-decimal flex-col marker:font-mono marker:text-accent-soft', large ? 'gap-[0.3em] pl-[1.6em] text-[1em] leading-snug text-white' : 'gap-1 pl-5 text-[13px] leading-relaxed text-white/85')}>
+        <ol className={cn('flex list-decimal flex-col marker:font-ui marker:text-accent-soft', large ? 'gap-[0.3em] pl-[1.6em] text-[1em] leading-snug text-ink' : 'gap-1 pl-5 text-[13px] leading-relaxed text-ink/85')}>
           {ex.how.map((s, i) => (
             <li key={i}>{s}</li>
           ))}
@@ -159,8 +159,8 @@ export function ExerciseGuide({ ex, large = false }: { ex: Pick<WorkoutExercise,
             </div>
           ))}
           {ex.easier && (
-            <div className={cn(tip, 'border-l-teal bg-teal/5')}>
-              <span className={cn(tag, 'text-teal')}>Easier</span>
+            <div className={cn(tip, 'border-l-secondary bg-secondary/5')}>
+              <span className={cn(tag, 'text-secondary')}>Easier</span>
               <Markdown text={ex.easier} />
             </div>
           )}
@@ -174,19 +174,19 @@ type Last = { date: string; values: number[] }
 
 function ExerciseCard({ ex, index, last, sets, onSet }: { ex: WorkoutExercise; index: number; last?: Last; sets?: string[]; onSet?: (i: number, v: string) => void }) {
   return (
-    <div className="flex flex-col gap-3 border border-line/50 bg-black/40 p-3">
+    <div className="flex flex-col gap-3 border border-line/50 tone-panel-40 p-3">
       <div className="flex items-baseline gap-3">
-        <span className="font-mono text-[12px] text-faint">{String(index + 1).padStart(2, '0')}</span>
-        <button onClick={() => openEntry('exercise', ex.id)} onContextMenu={(e) => entryMenuAt(e, 'exercise', ex.id, ex.name)} className="min-w-0 flex-1 truncate text-left text-[15px] font-semibold text-white hover:text-accent" title="Open this exercise">
+        <span className="font-ui text-[12px] text-faint">{String(index + 1).padStart(2, '0')}</span>
+        <button onClick={() => openEntry('exercise', ex.id)} onContextMenu={(e) => entryMenuAt(e, 'exercise', ex.id, ex.name)} className="min-w-0 flex-1 truncate text-left text-[15px] font-semibold text-ink hover:text-accent" title="Open this exercise">
           {showName(ex.name)}
         </button>
-        <span className="shrink-0 border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-accent">{doseText(ex, ex.unit)}</span>
+        <span className="shrink-0 border border-accent/50 bg-accent/10 px-2 py-0.5 font-ui text-[11px] font-semibold text-accent">{doseText(ex, ex.unit)}</span>
       </div>
       <div className="flex flex-wrap gap-4">
         <ExerciseVisual ex={ex} />
         <div className="flex min-w-[220px] flex-1 flex-col gap-2.5">
           <ExerciseGuide ex={ex} />
-          <div className="font-mono text-[11px] text-dim">{last ? <>Last ({last.date}): <span className="text-white">{valuesText(last.values)}</span></> : <span className="text-faint">Not logged yet</span>}</div>
+          <div className="font-ui text-[11px] text-dim">{last ? <>Last ({last.date}): <span className="text-ink">{valuesText(last.values)}</span></> : <span className="text-faint">Not logged yet</span>}</div>
           {onSet && (
             <div className="flex flex-wrap gap-1.5">
               {Array.from({ length: ex.sets }, (_, i) => (
@@ -198,7 +198,7 @@ function ExerciseCard({ ex, index, last, sets, onSet }: { ex: WorkoutExercise; i
                   placeholder={`Set ${i + 1}`}
                   value={sets?.[i] ?? ''}
                   onChange={(e) => onSet(i, e.target.value)}
-                  className="h-8 w-20 font-mono text-[12.5px]"
+                  className="h-8 w-20 font-ui text-[12.5px]"
                 />
               ))}
             </div>
@@ -290,23 +290,23 @@ function WorkoutFocus({ day, overview, date, start, values, onSet, onClose }: { 
   const last = overview.last[ex.id]
   const sets = values(ex)
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex flex-col bg-black">
+    <div className="fixed inset-0 z-[200] flex flex-col bg-scrim">
       <div className="flex shrink-0 items-center gap-6 border-b border-line/40 px-8 py-4">
-        <span className="text-[clamp(20px,2vw,32px)] font-semibold text-white">{showName(day.label)}</span>
-        <span className="font-mono text-[clamp(20px,2vw,32px)] text-accent-soft">
+        <span className="text-[clamp(20px,2vw,32px)] font-semibold text-ink">{showName(day.label)}</span>
+        <span className="font-ui text-[clamp(20px,2vw,32px)] text-accent-soft">
           {at + 1} / {day.exercises.length}
         </span>
-        <span className="font-mono text-[clamp(16px,1.4vw,24px)] text-dim">{date}</span>
-        <button title="Close (Esc)" onClick={close} className="ml-auto flex h-14 w-14 items-center justify-center text-dim hover:text-white">
+        <span className="font-ui text-[clamp(16px,1.4vw,24px)] text-dim">{date}</span>
+        <button title="Close (Esc)" onClick={close} className="ml-auto flex h-14 w-14 items-center justify-center text-dim hover:text-ink">
           <X className="h-9 w-9" />
         </button>
       </div>
       <div ref={box} className="flex min-h-0 flex-1 gap-[1em] overflow-hidden px-10 py-8">
         <ExerciseVisual ex={ex} large />
         <div className="flex min-w-0 flex-1 flex-col gap-[0.5em]">
-          <div className="text-[2.6em] font-bold leading-none text-white">{showName(ex.name)}</div>
-          <div className="font-mono text-[2.1em] font-bold leading-none text-accent">{doseText(ex, ex.unit)}</div>
-          <div className="font-mono text-[1.1em] text-dim">{last ? <>Last {last.date.slice(5)}: <span className="font-semibold text-white">{valuesText(last.values)}</span></> : 'Not logged yet'}</div>
+          <div className="text-[2.6em] font-bold leading-none text-ink">{showName(ex.name)}</div>
+          <div className="font-ui text-[2.1em] font-bold leading-none text-accent">{doseText(ex, ex.unit)}</div>
+          <div className="font-ui text-[1.1em] text-dim">{last ? <>Last {last.date.slice(5)}: <span className="font-semibold text-ink">{valuesText(last.values)}</span></> : 'Not logged yet'}</div>
           <div className="flex flex-wrap gap-[0.4em]">
             {Array.from({ length: ex.sets }, (_, i) => (
               <input
@@ -327,7 +327,7 @@ function WorkoutFocus({ day, overview, date, start, values, onSet, onClose }: { 
                   if (next) next.focus()
                   else go(at + 1)
                 }}
-                className="h-[1.5em] w-[2.2em] appearance-none border-2 border-line/70 bg-black px-[0.1em] text-center font-mono text-[2.2em] font-bold text-white outline-none placeholder:text-white/15 focus:border-accent [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="h-[1.5em] w-[2.2em] appearance-none border-2 border-line/70 bg-well px-[0.1em] text-center font-ui text-[2.2em] font-bold text-ink outline-none placeholder:text-ink/15 focus:border-accent [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             ))}
           </div>
@@ -335,7 +335,7 @@ function WorkoutFocus({ day, overview, date, start, values, onSet, onClose }: { 
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-6 border-t border-line/40 px-8 py-5">
-        <button onClick={() => go(at - 1)} disabled={at === 0} className="flex h-20 items-center gap-3 border-2 border-line/70 px-8 text-[clamp(22px,2.2vw,34px)] font-semibold text-white hover:border-accent disabled:opacity-30">
+        <button onClick={() => go(at - 1)} disabled={at === 0} className="flex h-20 items-center gap-3 border-2 border-line/70 px-8 text-[clamp(22px,2.2vw,34px)] font-semibold text-ink hover:border-accent disabled:opacity-30">
           <ChevronLeft className="h-9 w-9" />
           Back
         </button>
@@ -344,7 +344,7 @@ function WorkoutFocus({ day, overview, date, start, values, onSet, onClose }: { 
             <button key={`${e.id}${i}`} title={showName(e.name)} onClick={() => go(i)} className={cn('h-5 w-5 rounded-full', i === at ? 'bg-accent' : numbers(values(e)).length ? 'bg-ok' : 'bg-line')} />
           ))}
         </div>
-        <button onClick={() => go(at + 1)} className="flex h-20 items-center gap-3 border-2 border-accent bg-accent/15 px-8 text-[clamp(22px,2.2vw,34px)] font-semibold text-white hover:bg-accent/25">
+        <button onClick={() => go(at + 1)} className="flex h-20 items-center gap-3 border-2 border-accent bg-accent/15 px-8 text-[clamp(22px,2.2vw,34px)] font-semibold text-ink hover:bg-accent/25">
           {at + 1 === day.exercises.length ? 'Done' : 'Next'}
           <ChevronRight className="h-9 w-9" />
         </button>
@@ -397,8 +397,8 @@ export function DayView({ overview, day }: { overview: WorkoutOverview; day: Wor
         <ExerciseCard key={`${ex.id}${i}`} ex={ex} index={i} last={overview.last[ex.id]} sets={drafts.get(key(ex))} onSet={(n, v) => setValue(ex, n, v)} />
       ))}
       {day.exercises.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border border-line/50 bg-black/60 p-2.5">
-          <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Date</span>
+        <div className="flex flex-wrap items-center gap-2 border border-line/50 tone-panel-60 p-2.5">
+          <span className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">Date</span>
           <Input
             type="date"
             value={date}
@@ -406,7 +406,7 @@ export function DayView({ overview, day }: { overview: WorkoutOverview; day: Wor
               setDate(e.target.value)
               dates.set(day.id, e.target.value)
             }}
-            className="h-8 w-40 font-mono text-[12.5px]"
+            className="h-8 w-40 font-ui text-[12.5px]"
           />
           <Button variant="primary" icon={<Save />} disabled={busy} onClick={() => void save()} className="ml-auto">
             Save session
@@ -438,15 +438,15 @@ export function HistoryView({ overview, limit, editable = true, workout = null }
               ...(editable ? [{ label: 'Delete this session', icon: <Trash2 />, danger: true, onSelect: () => deleteSession(h.label, h.date, h.workout) }] : [])
             ])
           }
-          className="group flex flex-col gap-1 border border-line/40 bg-black/40 px-3 py-2">
+          className="group flex flex-col gap-1 border border-line/40 tone-panel-40 px-3 py-2">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[12px] text-white">{h.date}</span>
+            <span className="font-ui text-[12px] text-ink">{h.date}</span>
             {h.workout ? (
-              <button onClick={() => openEntry('workout', h.workout!)} className="font-mono text-[11px] text-dim hover:text-accent">
+              <button onClick={() => openEntry('workout', h.workout!)} className="font-ui text-[11px] text-dim hover:text-accent">
                 {showName(h.label)}
               </button>
             ) : (
-              <span className="font-mono text-[11px] text-faint">{h.label}</span>
+              <span className="font-ui text-[11px] text-faint">{h.label}</span>
             )}
             {editable && (
               <button
@@ -460,8 +460,8 @@ export function HistoryView({ overview, limit, editable = true, workout = null }
           </div>
           {h.rows.map((r) => (
             <div key={r.exercise} className="flex gap-2 text-[12.5px]">
-              <span className="w-44 shrink-0 truncate text-white/80">{showName(r.name)}</span>
-              <span className="font-mono text-accent">{valuesText(r.values)}</span>
+              <span className="w-44 shrink-0 truncate text-ink/80">{showName(r.name)}</span>
+              <span className="font-ui text-accent">{valuesText(r.values)}</span>
             </div>
           ))}
         </div>
@@ -522,7 +522,7 @@ export function WorkoutResult({ data }: { data: unknown }) {
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.1em] text-white">{day ? showName(day.label) : 'Workout history'}</span>
+        <span className="font-label text-[12px] font-semibold caps-10 text-ink">{day ? showName(day.label) : 'Workout history'}</span>
         <Button size="sm" variant="ghost" onClick={() => (day ? openEntry('workout', day.id) : openWorkout())} className="ml-auto">
           Open
         </Button>
@@ -542,16 +542,16 @@ export function WorkoutGlance() {
   return (
     <div className="flex h-full flex-col gap-2 overflow-y-auto">
       <div className="flex items-baseline gap-2">
-        <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Last done</span>
-        <span className="text-[14px] font-semibold text-white">{showName(day.label)}</span>
-        {lastSession && <span className="ml-auto font-mono text-[10.5px] text-faint">last {lastSession.date}</span>}
+        <span className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">Last done</span>
+        <span className="text-[14px] font-semibold text-ink">{showName(day.label)}</span>
+        {lastSession && <span className="ml-auto font-ui text-[10.5px] text-faint">last {lastSession.date}</span>}
       </div>
       <div className="flex flex-col">
         {day.exercises.map((ex, i) => (
           <div key={`${ex.id}${i}`} className="flex items-baseline gap-2 border-b border-line/20 py-1 text-[12.5px]">
-            <span className="min-w-0 flex-1 truncate text-white/85">{showName(ex.name)}</span>
-            <span className="shrink-0 font-mono text-[11px] text-accent">{doseText(ex, ex.unit)}</span>
-            <span className="w-24 shrink-0 truncate text-right font-mono text-[11px] text-dim">{overview.last[ex.id] ? valuesText(overview.last[ex.id].values) : '—'}</span>
+            <span className="min-w-0 flex-1 truncate text-ink/85">{showName(ex.name)}</span>
+            <span className="shrink-0 font-ui text-[11px] text-accent">{doseText(ex, ex.unit)}</span>
+            <span className="w-24 shrink-0 truncate text-right font-ui text-[11px] text-dim">{overview.last[ex.id] ? valuesText(overview.last[ex.id].values) : '—'}</span>
           </div>
         ))}
       </div>

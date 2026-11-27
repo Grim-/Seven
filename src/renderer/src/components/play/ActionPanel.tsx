@@ -37,7 +37,7 @@ export function ActionPanel({ start, character, where, onSaved }: { start: Store
         <>
           {best !== null && (
             <span className="mr-auto text-[13px] text-dim">
-              Best chance <b className="font-mono text-accent">{Math.round(best * 100)}%</b>
+              Best chance <b className="font-ui text-accent">{Math.round(best * 100)}%</b>
             </span>
           )}
           <Button size="sm" icon={<Save />} disabled={!ready} onClick={save}>
@@ -71,10 +71,10 @@ export function ActionPanel({ start, character, where, onSaved }: { start: Store
       <div className="flex flex-col gap-2">
         <PanelLabel>Ways to try it</PanelLabel>
         {a.checks.map((c, i) => (
-          <div key={i} className="grid grid-cols-[minmax(12rem,1.2fr)_6rem_4rem_minmax(0,1fr)_minmax(0,1fr)_2rem] items-center gap-2 border border-line/50 bg-white/[0.02] p-2">
+          <div key={i} className="grid grid-cols-[minmax(12rem,1.2fr)_6rem_4rem_minmax(0,1fr)_minmax(0,1fr)_2rem] items-center gap-2 border border-line/50 bg-ink/[0.02] p-2">
             <SkillSelect chance targets={targets} value={c.against ?? CHANCE} onChange={(against) => setCheck(i, { against })} />
             <NumberField value={targetOf(c)} onChange={(dc) => setCheck(i, { base: (dc ?? 0) - 1, difficulty: MIDDLE })} />
-            <span className="text-center font-mono text-[16px] font-bold text-accent">{Math.round(chance(c) * 100)}%</span>
+            <span className="text-center font-ui text-[16px] font-bold text-accent">{Math.round(chance(c) * 100)}%</span>
             <Input value={c.pass ?? ''} onChange={(e) => setCheck(i, { pass: e.target.value || null })} placeholder="If this decides it and passes…" />
             <Input value={c.fail ?? ''} onChange={(e) => setCheck(i, { fail: e.target.value || null })} placeholder="If this decides it and fails…" />
             <Button size="sm" variant="ghost" icon={<X />} title="Remove" onClick={() => setA({ ...a, checks: a.checks.filter((_, j) => j !== i) })} />
@@ -86,12 +86,12 @@ export function ActionPanel({ start, character, where, onSaved }: { start: Store
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] gap-3">
         <div className="flex flex-col gap-2 border border-ok/40 bg-ok/[0.06] p-3">
-          <span className="text-[12px] font-bold uppercase tracking-[0.08em] text-ok">On a pass</span>
+          <span className="text-[12px] font-bold caps-8 text-ok">On a pass</span>
           <Textarea value={a.pass} onChange={(e) => setA({ ...a, pass: e.target.value })} rows={2} placeholder="What happens on success" />
           <CardSwapField value={a.passCards} onChange={(passCards) => setA({ ...a, passCards })} />
         </div>
         <div className="flex flex-col gap-2 border border-alert/40 bg-alert/[0.06] p-3">
-          <span className="text-[12px] font-bold uppercase tracking-[0.08em] text-alert">On a fail</span>
+          <span className="text-[12px] font-bold caps-8 text-alert">On a fail</span>
           <Textarea value={a.fail} onChange={(e) => setA({ ...a, fail: e.target.value })} rows={2} placeholder="What happens on failure" />
           <CardSwapField value={a.failCards} onChange={(failCards) => setA({ ...a, failCards })} />
         </div>

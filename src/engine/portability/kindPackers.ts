@@ -1,7 +1,7 @@
 import { cleanMap, mapObjects, type MapLayer } from '@shared/maps'
 import { componentClass, type ParamSchema, type ParamSpec } from '@shared/game/core'
 import { defId, type DefType, type GameDef } from '@shared/game/defs'
-import { PLACE_TYPE_KEY, type WorldEntity, type WorldLaunch, type WorldPost, type WorldSchema } from '@shared/world'
+import { PLACE_TYPE_KEY, REGION_TYPE_KEY, type WorldEntity, type WorldLaunch, type WorldPost, type WorldSchema } from '@shared/world'
 import { refsIn } from '@shared/story'
 import type { EntryRef, Packing, Unpack } from '../library/packing'
 import { freeName } from '../library/packing'
@@ -11,9 +11,17 @@ import { data } from '../data/hub'
 import { agentAccess } from '../agents/access'
 import { maps } from '../maps/store'
 import { worlds } from '../worlds/store'
+import { knowledge } from '../worlds/knowledge'
+import type { WorldKnowledge } from '@shared/worldKnowledge'
+import { worldEvents } from '../worlds/events'
+import type { WorldEvent } from '@shared/game/worldEvents'
+import { factions } from '../factions/store'
+import type { StoredFaction } from '@shared/game/factions'
+import { npcs } from '../worlds/npcs'
+import { NPC_SEGMENT, npcActorId, splitNpcRef, type WorldNpc } from '@shared/worldNpcs'
 import { saves } from '../worlds/saves'
 import { tags as tagStore } from '../library/tags'
-import { pageKindOf as pageKindForType } from '@shared/types'
+import { pageKindOf as pageKindForType, type AgentProfile } from '@shared/types'
 import { noteFailure } from '../util/report'
 
 const isObj = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v))
@@ -194,49 +202,51 @@ export function gameDefSwap(type: DefType, def: GameDef, entry: Unpack['entry'])
   return { ...def, values }
 }
 
-export const sheetRefs = {
-  uses(value: unknown): EntryRef[] {
-    const out: EntryRef[] = []
-    const seen = new Set<string>()
-    if (!isObj(value)) return out
-    if (isObj(value.mind) && typeof value.mind.reasoningStyle === 'string') pushRef(out, seen, 'style', value.mind.reasoningStyle)
-    if (typeof value.faction === 'string') pushRef(out, seen, 'faction', value.faction)
-    if (Array.isArray(value.relationships)) {
-      for (const rel of value.relationships) {
-        if (isObj(rel) && typeof rel.target === 'string' && data.pages.metaFor(rel.target)) pushRef(out, seen, 'sheet', rel.target)
+export function sheetRefs(): { uses(value: unknown): EntryRef[]; swap(value: unknown, entry: Unpack['entry']): unknown } {
+  return {
+    uses(value: unknown): EntryRef[] {
+      const out: EntryRef[] = []
+      const seen = new Set<string>()
+      if (!isObj(value)) return out
+      if (isObj(value.mind) && typeof value.mind.reasoningStyle === 'string') pushRef(out, seen, 'style', value.mind.reasoningStyle)
+      if (typeof value.faction === 'string') pushRef(out, seen, 'faction', value.faction)
+      if (Array.isArray(value.relationships)) {
+        for (const rel of value.relationships) {
+          if (isObj(rel) && typeof rel.target === 'string' && data.pages.metaFor(rel.target)) pushRef(out, seen, 'sheet', rel.target)
+        }
       }
-    }
-    if (isObj(value.game)) {
-      if (isObj(value.game.template) && typeof value.game.template.kind === 'string' && typeof value.game.template.id === 'string') {
-        pushRef(out, seen, value.game.template.kind, value.game.template.id)
+      if (isObj(value.game)) {
+        if (isObj(value.game.template) && typeof value.game.template.kind === 'string' && typeof value.game.template.id === 'string') {
+          pushRef(out, seen, value.game.template.kind, value.game.template.id)
+        }
+        collectComponentListRefs(value.game.comps, out, seen)
       }
-      collectComponentListRefs(value.game.comps, out, seen)
-    }
-    return out
-  },
-  swap(value: unknown, entry: Unpack['entry']): unknown {
-    if (!isObj(value)) return value
-    const next: Record<string, unknown> = { ...value }
-    if (isObj(next.mind) && typeof next.mind.reasoningStyle === 'string' && next.mind.reasoningStyle) {
-      next.mind = { ...next.mind, reasoningStyle: entry(next.mind.reasoningStyle, 'style') }
-    }
-    if (typeof next.faction === 'string' && next.faction) next.faction = entry(next.faction, 'faction')
-    if (Array.isArray(next.relationships)) {
-      next.relationships = next.relationships.map((rel) =>
-        isObj(rel) && typeof rel.target === 'string' && rel.target ? { ...rel, target: entry(rel.target, 'sheet') } : rel
-      )
-    }
-    if (isObj(next.game)) {
-      const tpl = isObj(next.game.template) ? next.game.template : null
-      next.game = {
-        ...next.game,
-        ...(tpl && typeof tpl.kind === 'string' && typeof tpl.id === 'string'
-          ? { template: { ...tpl, id: entry(tpl.id, tpl.kind) } }
-          : {}),
-        comps: swapComponentListRefs(next.game.comps, entry)
+      return out
+    },
+    swap(value: unknown, entry: Unpack['entry']): unknown {
+      if (!isObj(value)) return value
+      const next: Record<string, unknown> = { ...value }
+      if (isObj(next.mind) && typeof next.mind.reasoningStyle === 'string' && next.mind.reasoningStyle) {
+        next.mind = { ...next.mind, reasoningStyle: entry(next.mind.reasoningStyle, 'style') }
       }
+      if (typeof next.faction === 'string' && next.faction) next.faction = entry(next.faction, 'faction')
+      if (Array.isArray(next.relationships)) {
+        next.relationships = next.relationships.map((rel) =>
+          isObj(rel) && typeof rel.target === 'string' && rel.target ? { ...rel, target: entry(rel.target, 'sheet') } : rel
+        )
+      }
+      if (isObj(next.game)) {
+        const tpl = isObj(next.game.template) ? next.game.template : null
+        next.game = {
+          ...next.game,
+          ...(tpl && typeof tpl.kind === 'string' && typeof tpl.id === 'string'
+            ? { template: { ...tpl, id: entry(tpl.id, tpl.kind) } }
+            : {}),
+          comps: swapComponentListRefs(next.game.comps, entry)
+        }
+      }
+      return next
     }
-    return next
   }
 }
 
@@ -403,31 +413,33 @@ function swapMapLayers(layers: MapLayer[], entry: Unpack['entry']): MapLayer[] {
   })
 }
 
-export const mapPacking: Packing = {
-  pack(id) {
-    const found = maps.get(id)
-    if (!found) throw new Error(`Map ${id} not found`)
-    return found
-  },
-  uses(id) {
-    const found = maps.get(id)
-    if (!found) return []
-    const out: EntryRef[] = []
-    const seen = new Set<string>()
-    collectMapLayerRefs(found.layers, out, seen)
-    return out
-  },
-  unpack(value, how) {
-    if (!isObj(value)) throw new Error('The map in this bundle is damaged')
-    const base = cleanMap(value, typeof value.id === 'string' && value.id ? value.id : 'map')
-    const layers = swapMapLayers(base.layers, how.entry)
-    const taken = new Set(maps.list().map((m) => m.name.toLowerCase()))
-    const name = how.replace ? base.name : freeName(base.name, (n) => taken.has(n.toLowerCase()))
-    if (how.replace && maps.get(how.replace)) {
-      return maps.save({ ...base, id: how.replace, name, layers }).id
+export function mapPacking(): Packing {
+  return {
+    pack(id) {
+      const found = maps.get(id)
+      if (!found) throw new Error(`Map ${id} not found`)
+      return found
+    },
+    uses(id) {
+      const found = maps.get(id)
+      if (!found) return []
+      const out: EntryRef[] = []
+      const seen = new Set<string>()
+      collectMapLayerRefs(found.layers, out, seen)
+      return out
+    },
+    unpack(value, how) {
+      if (!isObj(value)) throw new Error('The map in this bundle is damaged')
+      const base = cleanMap(value, typeof value.id === 'string' && value.id ? value.id : 'map')
+      const layers = swapMapLayers(base.layers, how.entry)
+      const taken = new Set(maps.list().map((m) => m.name.toLowerCase()))
+      const name = how.replace ? base.name : freeName(base.name, (n) => taken.has(n.toLowerCase()))
+      if (how.replace && maps.get(how.replace)) {
+        return maps.save({ ...base, id: how.replace, name, layers }).id
+      }
+      const { id: _id, name: _n, updatedAt: _u, ...init } = base
+      return maps.create(name, { ...init, layers }).id
     }
-    const { id: _id, name: _n, updatedAt: _u, ...init } = base
-    return maps.create(name, { ...init, layers }).id
   }
 }
 
@@ -442,119 +454,208 @@ interface WorldPack {
   entities: Record<string, Record<string, WorldEntity>>
   board: WorldPost[]
   mapUses: ReturnType<typeof worlds.mapUses>
+  knowledge?: WorldKnowledge[]
+  events?: WorldEvent[]
+  factions?: StoredFaction[]
+  npcs?: WorldNpc[]
   saves?: ReturnType<typeof saves.list>
 }
 
-export const worldPacking: Packing = {
-  pack(id, opts?: Record<string, unknown>) {
-    if (id.includes('/')) {
-      const [w, tk, key] = id.split('/')
-      const ent = worlds.get(w, tk, key, true, 'template')
-      if (!ent) throw new Error(`Record ${id} not found`)
-      return { worldId: w, typeKey: tk, key, name: String(ent.Name ?? key), entity: ent }
-    }
-    const meta = worlds.meta(id)
-    const schema = worlds.schema(id)
-    const entities: Record<string, Record<string, WorldEntity>> = {
-      [PLACE_TYPE_KEY]: worlds.entities(id, PLACE_TYPE_KEY, true, 'template')
-    }
-    for (const typeKey of Object.keys(schema.types)) {
-      entities[typeKey] = worlds.entities(id, typeKey, true, 'template')
-    }
-    const includeSaves = Boolean(opts?.includeSaves)
-    const pack: WorldPack = {
-      name: meta.name,
-      player: meta.player ?? null,
-      rules: meta.rules ?? '',
-      tags: meta.tags ?? [],
-      flags: meta.flags ?? {},
-      ...(meta.launch ? { launch: meta.launch } : {}),
-      schema,
-      entities,
-      board: worlds.board(id),
-      mapUses: worlds.mapUses(id),
-      ...(includeSaves ? { saves: saves.list().filter((s) => s.world === id) } : {})
-    }
-    return pack
-  },
-  uses(id) {
-    if (id.includes('/')) return []
-    const out: EntryRef[] = []
-    const seen = new Set<string>()
-    const meta = worlds.meta(id)
-    if (meta.player) pushRef(out, seen, 'sheet', meta.player)
-    if (meta.launch?.startingMap) pushRef(out, seen, 'map', meta.launch.startingMap)
-    for (const aId of meta.launch?.openingActionIds ?? []) pushRef(out, seen, 'trigger_action', aId)
-    for (const p of Object.values(worlds.entities(id, PLACE_TYPE_KEY, true, 'template'))) {
-      if (typeof p.Files === 'string') {
-        for (const r of refsIn(p.Files)) {
-          if (r.kind === 'sheet' || r.kind === 'page' || r.kind === 'agent') pushRef(out, seen, r.kind, r.ref)
+export function worldPacking(): Packing {
+  return {
+    pack(id, opts?: Record<string, unknown>) {
+      const npcRef = splitNpcRef(id)
+      if (npcRef) {
+        const npc = npcs.get(npcRef.id, npcRef.world, 'play')
+        return { worldId: npcRef.world, segment: NPC_SEGMENT, key: npc.id, npc }
+      }
+      if (id.includes('/')) {
+        const [w, tk, key] = id.split('/')
+        const ent = worlds.get(w, tk, key, true, 'template')
+        if (!ent) throw new Error(`Record ${id} not found`)
+        return { worldId: w, typeKey: tk, key, name: String(ent.Name ?? key), entity: ent }
+      }
+      const meta = worlds.meta(id)
+      const schema = worlds.schema(id)
+      const entities: Record<string, Record<string, WorldEntity>> = {
+        [REGION_TYPE_KEY]: worlds.entities(id, REGION_TYPE_KEY, true, 'template'),
+        [PLACE_TYPE_KEY]: worlds.entities(id, PLACE_TYPE_KEY, true, 'template')
+      }
+      for (const typeKey of Object.keys(schema.types)) {
+        entities[typeKey] = worlds.entities(id, typeKey, true, 'template')
+      }
+      const includeSaves = Boolean(opts?.includeSaves)
+      const pack: WorldPack = {
+        name: meta.name,
+        player: meta.player ?? null,
+        rules: meta.rules ?? '',
+        tags: meta.tags ?? [],
+        flags: meta.flags ?? {},
+        ...(meta.launch ? { launch: meta.launch } : {}),
+        schema,
+        entities,
+        board: worlds.board(id),
+        mapUses: worlds.mapUses(id),
+        knowledge: knowledge.list(id),
+        events: worldEvents.listDefinitions(id),
+        factions: factions.list(id, 'template'),
+        npcs: npcs.list(id, 'template'),
+        ...(includeSaves ? { saves: saves.list().filter((s) => s.world === id) } : {})
+      }
+      return pack
+    },
+    uses(id) {
+      const npcRef = splitNpcRef(id)
+      if (npcRef) {
+        const out: EntryRef[] = []
+        const seen = new Set<string>()
+        const npc = npcs.find(npcRef.id, npcRef.world, 'play')
+        if (npc?.image) pushRef(out, seen, 'asset', npc.image)
+        if (npc?.lootTableId) pushRef(out, seen, 'loot_table', npc.lootTableId)
+        for (const val of Object.values(npc?.values ?? {})) {
+          for (const r of refsIn(val)) {
+            if (r.kind === 'repo' || r.kind === 'page') pushRef(out, seen, r.kind, r.ref)
+          }
+        }
+        return out
+      }
+      if (id.includes('/')) return []
+      const out: EntryRef[] = []
+      const seen = new Set<string>()
+      const meta = worlds.meta(id)
+      if (meta.player && !splitNpcRef(meta.player)) pushRef(out, seen, 'sheet', meta.player)
+      if (meta.launch?.startingMap) pushRef(out, seen, 'map', meta.launch.startingMap)
+      for (const aId of meta.launch?.openingActionIds ?? []) pushRef(out, seen, 'trigger_action', aId)
+      for (const p of Object.values(worlds.entities(id, PLACE_TYPE_KEY, true, 'template'))) {
+        if (typeof p.Files === 'string') {
+          for (const r of refsIn(p.Files)) {
+            if (r.kind === 'sheet' || r.kind === 'page' || r.kind === 'agent') pushRef(out, seen, r.kind, r.ref)
+          }
         }
       }
-    }
-    for (const u of worlds.mapUses(id)) {
-      pushRef(out, seen, 'map', u.map)
-      for (const sId of Object.keys(u.stand ?? {})) pushRef(out, seen, 'sheet', sId)
-      for (const trig of u.triggers ?? []) {
-        collectComponentListRefs(trig.comps, out, seen)
-      }
-    }
-    return out
-  },
-  unpack(value, how) {
-    if (!isObj(value)) throw new Error('The world in this bundle is damaged')
-    if (typeof value.typeKey === 'string' && typeof value.key === 'string' && isObj(value.entity)) {
-      const targetWorld = how.replace?.split('/')[0] ?? worlds.list()[0]?.id
-      if (!targetWorld) throw new Error('Create or select a world first to import a single world record.')
-      worlds.put(targetWorld, value.typeKey, value.key, value.entity as WorldEntity, 'template')
-      return `${targetWorld}/${value.typeKey}/${value.key}`
-    }
-    const raw = value as unknown as WorldPack
-    const taken = new Set(worlds.list().map((w) => w.name.toLowerCase()))
-    const name = how.replace ? raw.name : freeName(raw.name || 'Imported World', (n) => taken.has(n.toLowerCase()))
-    const target = how.replace && worlds.exists(how.replace)
-      ? worlds.saveSchema(how.replace, raw.schema)
-      : worlds.create(name, raw.schema)
-    if (how.replace && worlds.exists(target.id)) worlds.rename(target.id, name)
-    if (raw.player) worlds.setPlayer(target.id, how.entry(raw.player, 'sheet'))
-    if (raw.tags?.length) worlds.setTags(target.id, raw.tags)
-    if (raw.flags && Object.keys(raw.flags).length) worlds.setFlags(target.id, raw.flags)
-    if (raw.launch) {
-      worlds.setLaunch(target.id, {
-        ...raw.launch,
-        startingMap: raw.launch.startingMap ? how.entry(raw.launch.startingMap, 'map') : null,
-        openingActionIds: (raw.launch.openingActionIds ?? []).map((aId) => how.entry(aId, 'trigger_action'))
-      })
-    }
-    for (const [typeKey, records] of Object.entries(raw.entities ?? {})) {
-      if (!raw.schema.types[typeKey] && typeKey !== PLACE_TYPE_KEY) continue
-      for (const [key, ent] of Object.entries(records ?? {})) {
-        if (typeKey === PLACE_TYPE_KEY && typeof ent.Files === 'string' && ent.Files) {
-          const remappedFiles = ent.Files.replace(/@(sheet|page|agent):([^\s]+)/g, (_, kind: string, refId: string) => `@${kind}:${how.entry(refId, kind)}`)
-          worlds.put(target.id, typeKey, key, { ...ent, Files: remappedFiles }, 'template')
-        } else {
-          worlds.put(target.id, typeKey, key, ent, 'template')
+      for (const npc of npcs.list(id, 'template')) {
+        if (npc.image) pushRef(out, seen, 'asset', npc.image)
+        if (npc.lootTableId) pushRef(out, seen, 'loot_table', npc.lootTableId)
+        for (const val of Object.values(npc.values)) {
+          for (const r of refsIn(val)) {
+            if (r.kind === 'repo' || r.kind === 'page') pushRef(out, seen, r.kind, r.ref)
+          }
         }
       }
-    }
-    if (Array.isArray(raw.board)) {
-      for (const post of raw.board) {
-        worlds.post(target.id, post.author ?? 'Unknown', post.to ?? 'ALL', post.message ?? '')
+      for (const u of worlds.mapUses(id)) {
+        pushRef(out, seen, 'map', u.map)
+        for (const sId of Object.keys(u.stand ?? {})) {
+          if (!splitNpcRef(sId)) pushRef(out, seen, 'sheet', sId)
+        }
+        for (const trig of u.triggers ?? []) {
+          collectComponentListRefs(trig.comps, out, seen)
+        }
       }
-    }
-    if (Array.isArray(raw.mapUses)) {
-      const remappedUses = raw.mapUses.map((u) => ({
-        ...u,
-        map: how.entry(u.map, 'map'),
-        stand: Object.fromEntries(Object.entries(u.stand ?? {}).map(([sId, st]) => [how.entry(sId, 'sheet'), st])),
-        triggers: (u.triggers ?? []).map((t) => ({
-          ...t,
-          comps: swapComponentListRefs(t.comps, how.entry) as typeof t.comps
+      return out
+    },
+    unpack(value, how) {
+      if (!isObj(value)) throw new Error('The world in this bundle is damaged')
+      if (value.segment === NPC_SEGMENT && isObj(value.npc)) {
+        const targetWorld = how.replace?.split('/')[0] ?? worlds.list()[0]?.id
+        if (!targetWorld) throw new Error('Create or select a world first to import a world NPC.')
+        const rawNpc = value.npc as Record<string, unknown>
+        const image = typeof rawNpc.image === 'string' && rawNpc.image ? how.entry(rawNpc.image, 'asset') : null
+        const saved = npcs.saveTemplate(targetWorld, { ...rawNpc, image })
+        return npcActorId(targetWorld, saved.id)
+      }
+      if (typeof value.typeKey === 'string' && typeof value.key === 'string' && isObj(value.entity)) {
+        const targetWorld = how.replace?.split('/')[0] ?? worlds.list()[0]?.id
+        if (!targetWorld) throw new Error('Create or select a world first to import a single world record.')
+        worlds.put(targetWorld, value.typeKey, value.key, value.entity as WorldEntity, 'template')
+        return `${targetWorld}/${value.typeKey}/${value.key}`
+      }
+      const raw = value as unknown as WorldPack
+      const taken = new Set(worlds.list().map((w) => w.name.toLowerCase()))
+      const name = how.replace ? raw.name : freeName(raw.name || 'Imported World', (n) => taken.has(n.toLowerCase()))
+      const target = how.replace && worlds.exists(how.replace)
+        ? worlds.saveSchema(how.replace, raw.schema)
+        : worlds.create(name, raw.schema)
+      if (how.replace && worlds.exists(target.id)) worlds.rename(target.id, name)
+      const remapActorId = (actorRef: string): string => {
+        const split = splitNpcRef(actorRef)
+        if (split) return npcActorId(target.id, split.id)
+        return how.entry(actorRef, 'sheet')
+      }
+      if (raw.player) worlds.setPlayer(target.id, remapActorId(raw.player))
+      if (raw.tags?.length) worlds.setTags(target.id, raw.tags)
+      if (raw.flags && Object.keys(raw.flags).length) worlds.setFlags(target.id, raw.flags)
+      if (raw.launch) {
+        worlds.setLaunch(target.id, {
+          ...raw.launch,
+          startingMap: raw.launch.startingMap ? how.entry(raw.launch.startingMap, 'map') : null,
+          openingActionIds: (raw.launch.openingActionIds ?? []).map((aId) => how.entry(aId, 'trigger_action'))
+        })
+      }
+      for (const [typeKey, records] of Object.entries(raw.entities ?? {})) {
+        if (!raw.schema.types[typeKey] && typeKey !== PLACE_TYPE_KEY && typeKey !== REGION_TYPE_KEY) continue
+        for (const [key, ent] of Object.entries(records ?? {})) {
+          if (typeKey === PLACE_TYPE_KEY && typeof ent.Files === 'string' && ent.Files) {
+            const remappedFiles = ent.Files.replace(/@(sheet|page|agent):([^\s]+)/g, (_, kind: string, refId: string) => `@${kind}:${how.entry(refId, kind)}`)
+            worlds.put(target.id, typeKey, key, { ...ent, Files: remappedFiles }, 'template')
+          } else {
+            worlds.put(target.id, typeKey, key, ent, 'template')
+          }
+        }
+      }
+      for (const k of Array.isArray(raw.knowledge) ? raw.knowledge : []) knowledge.save(target.id, k)
+      for (const npc of Array.isArray(raw.npcs) ? raw.npcs : []) {
+        npcs.saveTemplate(target.id, {
+          ...npc,
+          image: npc.image ? how.entry(npc.image, 'asset') : null,
+          ...(npc.lootTableId ? { lootTableId: how.entry(npc.lootTableId, 'loot_table') } : {})
+        })
+      }
+      for (const f of Array.isArray(raw.factions) ? raw.factions : []) {
+        factions.save(
+          {
+            ...f,
+            ...(f.leaderSheet ? { leaderSheet: remapActorId(f.leaderSheet) } : {}),
+            ...(f.members?.length ? { members: f.members.map(remapActorId) } : {})
+          },
+          target.id
+        )
+      }
+      for (const ev of Array.isArray(raw.events) ? raw.events : []) {
+        worldEvents.save({
+          ...ev,
+          worldId: target.id,
+          scope:
+            ev.scope?.level === 'map' && ev.scope.refId
+              ? { ...ev.scope, refId: how.entry(ev.scope.refId, 'map') }
+              : ev.scope?.refId?.includes('/')
+                ? { ...ev.scope, refId: `${target.id}/${ev.scope.refId.split('/').pop()}` }
+                : ev.scope,
+          outcomes: (ev.outcomes ?? []).map((o) => ({
+            ...o,
+            triggerActionIds: (o.triggerActionIds ?? []).map((aId) => how.entry(aId, 'trigger_action')),
+            effects: swapComponentListRefs(o.effects ?? [], how.entry) as typeof o.effects
+          }))
+        })
+      }
+      if (Array.isArray(raw.board)) {
+        for (const post of raw.board) {
+          worlds.post(target.id, post.author ?? 'Unknown', post.to ?? 'ALL', post.message ?? '')
+        }
+      }
+      if (Array.isArray(raw.mapUses)) {
+        const remappedUses = raw.mapUses.map((u) => ({
+          ...u,
+          map: how.entry(u.map, 'map'),
+          stand: Object.fromEntries(Object.entries(u.stand ?? {}).map(([sId, st]) => [remapActorId(sId), st])),
+          triggers: (u.triggers ?? []).map((t) => ({
+            ...t,
+            comps: swapComponentListRefs(t.comps, how.entry) as typeof t.comps
+          }))
         }))
-      }))
-      worlds.saveMapUses(target.id, remappedUses)
+        worlds.saveMapUses(target.id, remappedUses)
+      }
+      return target.id
     }
-    return target.id
   }
 }
 
@@ -563,7 +664,7 @@ export function agentPacking(): Packing {
     pack(id) {
       const a = agentAccess.get(id)
       if (!a) throw new Error(`Agent ${id} not found`)
-      const { id: _id, createdAt: _c, updatedAt: _u, createdBy: _cb, private: _p, world: _w, folder: _f, workspace: _ws, ...portable } = a
+      const { id: _id, createdAt: _c, updatedAt: _u, createdBy: _cb, private: _p, world: _w, folder: _f, workspace: _ws, ...portable } = a as AgentProfile & { world?: unknown }
       return portable
     },
     uses(id) {

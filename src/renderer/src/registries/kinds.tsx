@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import { surfaceDefaults } from './surfaceDefaults'
 import type { MenuItem } from '../components/ui'
 import type { DataSelection } from '../store/data'
 import { isPageTypeKind, type LibrarySection } from '@shared/types'
@@ -67,6 +68,8 @@ export interface KindUi {
   pictures?: (id: string) => string[]
   whole?: boolean
   open?: (id: string) => void
+  opensAt?: (part: string) => boolean
+  slateParts?: { part: string; label: string }[]
   add?: (kind: string, select: (s: DataSelection | null) => void) => (() => void) | undefined
   addLabel?: string
   importer?: ComponentType<{ onClose: () => void }>
@@ -109,12 +112,11 @@ export interface KindHomeProps {
 
 const uis = new Map<string, KindUi>()
 const NONE: KindUi = {}
-let defaultSlate: ComponentType<EntrySlateProps> | undefined
 
 const addonKind = isPageTypeKind
 
 export function setDefaultEntrySlate(Slate: ComponentType<EntrySlateProps>): void {
-  defaultSlate = Slate
+  surfaceDefaults.slate = Slate
   setDefaultEntryWidgetUi(entryWidget(Slate))
 }
 
@@ -149,7 +151,7 @@ export function kindModuleLists(): KindModuleList[] {
 
 export function presentOf(kind: string): KindPresent {
   const p = kindUi(kind).present ?? {}
-  const Slate = p.Slate ?? defaultSlate
+  const Slate = p.Slate ?? surfaceDefaults.slate
   const Chat = p.Chat ?? Slate
   const Stage = p.Stage ?? Chat
   return {

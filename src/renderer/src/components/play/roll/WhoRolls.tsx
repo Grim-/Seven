@@ -66,7 +66,7 @@ export function WhoRolls({
         )}
       </div>
       {!filtered.length ? (
-        <span className="font-mono text-[12px] text-dim">{empty}</span>
+        <span className="font-ui text-[12px] text-dim">{empty}</span>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-1.5">
           {filtered.map((p) => {
@@ -88,10 +88,10 @@ export function WhoRolls({
               >
                 <SheetPortrait image={p.image} className="h-8 w-8 shrink-0" />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[13px] text-white">{showName(p.name)}</span>
+                  <span className="truncate text-[13px] text-ink">{showName(p.name)}</span>
                   <span className="truncate text-[11px] text-dim">{cannotMake ? 'Cannot make check' : (p.note ?? '')}</span>
                 </span>
-                <span className="font-mono text-[14px] font-bold text-white">{cannotMake ? '—' : signed(p.bonus!)}</span>
+                <span className="font-ui text-[14px] font-bold text-ink">{cannotMake ? '—' : signed(p.bonus!)}</span>
               </button>
             )
           })}

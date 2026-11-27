@@ -31,7 +31,7 @@ export function VitalsPanel({
     <GamePanel
       title="Vitals & Combat"
       className={className}
-      bodyClassName="gap-2.5 p-3"
+      bodyClassName="gap-2 p-2.5"
       action={
         changed && resources.some((r) => r.get() < r.max()) ? (
           <Button size="sm" variant="ghost" icon={<RotateCcw />} onClick={restoreAll} title="Restore all vitals to full">
@@ -41,7 +41,7 @@ export function VitalsPanel({
       }
     >
       {resources.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           {resources.map((r) => {
             const def = catalog.stat(r.stat)
             const max = r.max()
@@ -50,14 +50,14 @@ export function VitalsPanel({
             const roundedNow = Math.round(now * 100) / 100
             const roundedMax = Math.round(max)
             return (
-              <div key={r.uid} className="flex items-center gap-2.5">
-                <div className="w-24 shrink-0">
-                  <div className="truncate font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-white">
-                    {def?.label ?? r.stat}
-                  </div>
-                  {refills && <div className="truncate font-mono text-[10px] text-dim">{refills}</div>}
-                </div>
-                <GameBar value={now} max={max} colour={def?.colour ?? null} size="md" className="flex-1" />
+              <div key={r.uid} className="flex items-center gap-2">
+                <span
+                  className="w-20 shrink-0 truncate font-label text-[10.5px] font-bold caps-10 text-ink"
+                  title={refills ? `Refills on: ${refills}` : def?.label ?? r.stat}
+                >
+                  {def?.label ?? r.stat}
+                </span>
+                <GameBar value={now} max={max} colour={def?.colour ?? null} size="sm" className="flex-1" />
                 {changed ? (
                   <div className="flex shrink-0 items-center gap-1 [--tone:var(--color-accent)]">
                     <EffectTokenButton
@@ -69,10 +69,10 @@ export function VitalsPanel({
                         changed()
                       }}
                     />
-                    <span className="font-mono text-[11px] text-dim">/ {roundedMax}</span>
+                    <span className="font-data text-[11px] tabular-nums text-dim">/ {roundedMax}</span>
                   </div>
                 ) : (
-                  <span className="shrink-0 font-mono text-[11.5px] text-white">
+                  <span className="shrink-0 font-data text-[11.5px] tabular-nums text-ink">
                     {roundedNow} / {roundedMax}
                   </span>
                 )}
@@ -82,15 +82,13 @@ export function VitalsPanel({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-1.5 border-t border-line/35 pt-2 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-1.5 border-t border-line/35 pt-1.5 sm:grid-cols-5">
         {vitals.map(({ key, label, value, Icon, toneClass }) => (
-          <div key={key} className="flex items-center gap-2 border border-line/50 bg-black/55 px-2 py-1.5">
-            <div className={cn('flex h-6 w-6 shrink-0 items-center justify-center border', toneClass)}>
-              <Icon className="h-3.5 w-3.5" />
-            </div>
+          <div key={key} className="flex items-center gap-1.5 border border-line/40 tone-panel-40 px-2 py-1">
+            <Icon className={cn('h-3.5 w-3.5 shrink-0 bg-transparent border-0', toneClass)} />
             <div className="min-w-0">
-              <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-dim">{label}</div>
-              <div className="truncate font-mono text-[12px] font-bold leading-tight text-white">{value}</div>
+              <div className="font-label text-[9px] caps-10 text-dim">{label}</div>
+              <div className="truncate font-data text-[12px] font-semibold leading-tight tabular-nums text-ink">{value}</div>
             </div>
           </div>
         ))}

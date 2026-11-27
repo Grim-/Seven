@@ -32,7 +32,7 @@ export function withoutTitle(markdown: string, title: string): string {
 }
 
 export function referencePattern(): RegExp {
-  return /(^|\s)@([a-z][\w.-]*):("[^"]+"|[^\s,;!?)#&:]+)(?::([a-z][\w-]*))?(?:#([a-z][\w-]*))?/gi
+  return /(^|[\s(])@([a-z][\w.-]*):("[^"]+"|[^\s,;!?)#&:]*[^\s,;!?)#&:.])(?::([a-z][\w-]*))?(?:#([a-z][\w-]*))?/gi
 }
 
 export interface TextReference {
@@ -67,6 +67,15 @@ export function splitLink(text: string): { kind: string | null; ref: string; act
 
 export function referenceHref(kind: string, ref: string): string {
   return `seven:${kind}/${encodeURIComponent(ref.replace(/^"|"$/g, ''))}`
+}
+
+const linkKey = (kind: string, ref: string): string => `${kind.toLowerCase()}:${ref.replace(/^"|"$/g, '').toLowerCase()}`
+
+export function relinkText(text: string, kind: string, ref: string, to: string): string {
+  const want = linkKey(kind, ref)
+  return text.replace(referencePattern(), (whole: string, lead: string, k: string, r: string, action?: string, part?: string) =>
+    linkKey(k, r) !== want ? whole : to ? `${lead}${to}${action ? `:${action}` : ''}${part ? `#${part}` : ''}` : ''
+  )
 }
 
 export function textLines(text: string): string[] {

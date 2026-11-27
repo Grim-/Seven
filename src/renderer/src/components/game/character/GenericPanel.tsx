@@ -8,7 +8,7 @@ export function GenericPanel({ comp }: { comp: Component }) {
       {rows.length ? rows.map((r) => (
         <div key={r.label} className="flex gap-2 text-[13px]">
           <span className="flex-1 text-dim">{r.label}</span>
-          <span className="font-mono text-white/90">{r.value}</span>
+          <span className="font-ui text-ink/90">{r.value}</span>
         </div>
       )) : <span className="text-[12px] text-faint">Nothing to show.</span>}
     </Section>

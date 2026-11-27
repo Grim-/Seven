@@ -16,21 +16,21 @@ export function ReviewStep({ tag, choice, root, folder, source }: { tag: string;
         <Fact label="Download">{formatBytes(choice.size)}</Fact>
         <Fact label="From">{source}</Fact>
         <Fact label="New folder">
-          <span className="font-mono text-[12px]">{folder}</span>
+          <span className="font-ui text-[12px]">{folder}</span>
         </Fact>
         <Fact label="Inside" wide>
-          <span className="font-mono text-[12px]">{root}</span>
+          <span className="font-ui text-[12px]">{root}</span>
         </Fact>
       </FactGrid>
       <GridTable columns={COLUMNS}>
         {choice.files.map((f) => (
           <GridRow key={f.name}>
-            <span className="truncate font-mono text-[12px]">{f.name}</span>
-            <span className="text-right font-mono text-[12px] text-dim">{formatBytes(f.size)}</span>
+            <span className="truncate font-ui text-[12px]">{f.name}</span>
+            <span className="text-right font-ui text-[12px] text-dim">{formatBytes(f.size)}</span>
           </GridRow>
         ))}
       </GridTable>
-      <p className="text-[12.5px] text-white/80">Nothing has been downloaded yet. After it installs, Seven runs it to check it works; you then choose whether to make it active.</p>
+      <p className="text-[12.5px] text-ink/80">Nothing has been downloaded yet. After it installs, Seven runs it to check it works; you then choose whether to make it active.</p>
     </div>
   )
 }

@@ -17,7 +17,7 @@ export function EffectExtras({ Class, def, revealed, reveal, onChange }: { Class
     <Popover
       title="More settings"
       className="notch-sm w-[min(22rem,94vw)] gap-3 p-3"
-      triggerClassName="grid h-[26px] w-[26px] place-items-center text-faint hover:bg-white/5 hover:text-white"
+      triggerClassName="grid h-[26px] w-[26px] place-items-center text-faint hover:bg-ink/5 hover:text-ink"
       trigger={<SlidersHorizontal className="h-3.5 w-3.5" />}
     >
       {(close) => (
@@ -31,9 +31,9 @@ export function EffectExtras({ Class, def, revealed, reveal, onChange }: { Class
                 reveal(p.at)
                 close()
               }}
-              className="border border-dashed border-line/70 px-2.5 py-1.5 text-left text-[13px] text-dim hover:border-accent hover:text-white"
+              className="border border-dashed border-line/70 px-2.5 py-1.5 text-left text-[13px] text-dim hover:border-accent hover:text-ink"
             >
-              …{p.optional.map((q, i) => ('text' in q ? <span key={i}>{q.text}</span> : 'param' in q ? <b key={i} className="font-mono text-white">{paramLabel(q.param, Class.PARAMS[q.param])}</b> : null))}
+              …{p.optional.map((q, i) => ('text' in q ? <span key={i}>{q.text}</span> : 'param' in q ? <b key={i} className="font-ui text-ink">{paramLabel(q.param, Class.PARAMS[q.param])}</b> : null))}
             </button>
           ))}
           {Object.keys(extra).length > 0 && <ParamTokens schema={extra} values={def} onChange={(next) => onChange({ ...def, ...next })} />}

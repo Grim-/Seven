@@ -27,7 +27,7 @@ export function WorldMaps({ worldId, onStart }: { worldId: string; onStart: (pla
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <ShellTabs value={current ?? ''} options={(uses ?? []).map((u) => ({ value: u.map, label: nameOf(u.map) }))} onChange={setShown} onMenu={tabMenu}>
-        <Popover trigger={<span className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-accent hover:text-white"><Plus className="h-3.5 w-3.5" />Use a map</span>} title="Use a map from Map Editor">
+        <Popover trigger={<span className="flex items-center gap-1 font-label text-[10.5px] caps-12 text-accent hover:text-ink"><Plus className="h-3.5 w-3.5" />Use a map</span>} title="Use a map from Map Editor">
           {(close) => <EntryPicker kind="map" title="Use a map" inline onClose={close} onPick={(hit) => (use(hit.id), close())} />}
         </Popover>
         {current && (
@@ -35,7 +35,7 @@ export function WorldMaps({ worldId, onStart }: { worldId: string; onStart: (pla
             <button
               type="button"
               onClick={() => openEntry('map', current)}
-              className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-dim hover:text-accent"
+              className="flex items-center gap-1 font-label text-[10.5px] caps-12 text-dim hover:text-accent"
               title="Open this map in the Map Editor"
             >
               <ExternalLink className="h-3.5 w-3.5" />
@@ -52,7 +52,7 @@ export function WorldMaps({ worldId, onStart }: { worldId: string; onStart: (pla
                   'Remove from World'
                 )
               }
-              className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-alert/70 hover:text-alert border border-alert/30 bg-alert/5 px-2 py-0.5 hover:bg-alert/15 transition-colors"
+              className="flex items-center gap-1 font-label text-[10.5px] caps-12 text-alert/70 hover:text-alert border border-alert/30 bg-alert/5 px-2 py-0.5 hover:bg-alert/15 transition-colors"
               title="Remove this map from this world"
             >
               <Unlink className="h-3.5 w-3.5 text-alert" />

@@ -1,68 +1,31 @@
-import { ImagePlus, Images, Plus, X } from 'lucide-react'
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, CopyPlus, ImageOff, ImagePlus, Images, Plus, Trash2 } from 'lucide-react'
 import { frameMedia, frameText, normalizeFrame, type FrameEntry } from '@shared/settingSpec'
+import { cn } from '../../../lib/cn'
 import { AssetMedia } from '../../pictures/AssetMedia'
 import { MEDIA_OPTIONS } from '../../pictures/mediaOptions'
 import { usePicturePick } from '../../pictures/usePicturePick'
-import { Button, Field, Textarea } from '../../ui'
+import { CardStack, Field, IconActions, RowAction, Textarea, moved, openMenu, type MenuItem } from '../../ui'
 import { registerSettingControl, type SettingControlProps } from '../controls'
 
-function FrameCard({
-  index,
-  entry,
-  canRemove,
-  onUpdate,
-  onRemove
-}: {
-  index: number
-  entry: FrameEntry
-  canRemove: boolean
-  onUpdate: (next: FrameEntry) => void
-  onRemove: () => void
-}) {
+function FrameFace({ entry, index, front, tools, onText }: { entry: FrameEntry; index: number; front: boolean; tools: ReactNode; onText: (text: string) => void }) {
   const text = frameText(entry)
   const media = frameMedia(entry)
-  const { fromSeven, fromDisk } = usePicturePick(media || null, (id) => onUpdate(normalizeFrame(text, id ?? '')), MEDIA_OPTIONS)
-  const lineCount = Math.min(4, Math.max(1, text.split('\n').length))
-
   return (
-    <div className="flex min-w-[148px] max-w-[230px] flex-1 basis-[168px] flex-col gap-1.5 border border-line/70 bg-black/45 p-1.5">
-      <div className="flex items-center justify-between gap-1">
-        <span className="font-mono text-[9.5px] uppercase text-faint">#{index + 1}</span>
-        <div className="flex items-center gap-0.5">
-          {media ? (
-            <>
-              <button type="button" onClick={fromSeven} title="Change media clip from Seven" className="h-5 w-5 shrink-0 overflow-hidden border border-accent/60 bg-black hover:border-white">
-                <AssetMedia id={media} className="h-full w-full object-cover" />
-              </button>
-              <button type="button" onClick={fromDisk} title="Pick media file from disk" className="px-1 text-dim hover:text-white">
-                <ImagePlus className="h-3 w-3" />
-              </button>
-              <button type="button" onClick={() => onUpdate(normalizeFrame(text, ''))} title="Clear media on this frame" className="px-0.5 text-faint hover:text-alert">
-                <X className="h-3 w-3" />
-              </button>
-            </>
-          ) : (
-            <>
-              <button type="button" onClick={fromSeven} title="Attach image, GIF or video from Seven to this frame" className="flex items-center gap-0.5 px-1 text-faint hover:text-accent">
-                <Images className="h-3 w-3" />
-              </button>
-              <button type="button" onClick={fromDisk} title="Attach media file from disk to this frame" className="px-0.5 text-faint hover:text-accent">
-                <ImagePlus className="h-3 w-3" />
-              </button>
-            </>
-          )}
-          <button type="button" title="Remove frame" disabled={!canRemove} onClick={onRemove} className="ml-0.5 text-faint hover:text-alert disabled:opacity-25">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+    <div className={cn('flex flex-col border tone-panel-75', front ? 'border-accent shadow-[0_0_14px_color-mix(in_srgb,var(--color-accent)_calc(22%*var(--glow)),transparent)]' : 'border-line')}>
+      <div className="flex h-7 items-center gap-1 pl-2 pr-1">
+        <span className="font-data text-[10.5px] text-faint">{index + 1}</span>
+        {front && <span className="ml-auto opacity-0 transition-opacity focus-within:opacity-100 group-hover/card:opacity-100 touch:opacity-100">{tools}</span>}
       </div>
+      {media && <AssetMedia id={media} className="max-h-36 w-full object-contain px-2 pb-1.5" />}
       <Textarea
+        mono
         value={text}
-        rows={lineCount}
-        placeholder={media ? 'Optional text...' : 'Frame text...'}
+        rows={Math.min(8, Math.max(2, text.split('\n').length))}
         spellCheck={false}
-        onChange={(e) => onUpdate(normalizeFrame(e.target.value, media))}
-        className="min-h-0 w-full resize-y whitespace-pre font-mono text-[11.5px] leading-snug"
+        placeholder={media ? 'Caption' : 'Frame'}
+        onChange={(e) => onText(e.target.value)}
+        className="min-h-0 resize-none whitespace-pre border-0 text-center leading-snug"
       />
     </div>
   )
@@ -71,27 +34,80 @@ function FrameCard({
 function FramesControl({ spec, value, onChange }: SettingControlProps) {
   const frames = (Array.isArray(value) ? value : []) as FrameEntry[]
   const minFrames = Array.isArray(spec.default) && !spec.default.length ? 0 : 1
-  const add = () => {
-    const last = frames.at(-1)
-    onChange([...frames, last ?? '( • _ • )'])
+  const [at, setAt] = useState(0)
+  const current = Math.max(0, Math.min(at, frames.length - 1))
+  const target = useRef(current)
+
+  const write = (next: FrameEntry[], focus: number) => {
+    onChange(next)
+    setAt(Math.max(0, Math.min(focus, next.length - 1)))
   }
+  const update = (i: number, entry: FrameEntry) => onChange(frames.map((f, j) => (j === i ? entry : f)))
+  const pick = usePicturePick(frames.length ? frameMedia(frames[current]) || null : null, (id) => update(target.current, normalizeFrame(frameText(frames[target.current] ?? ''), id ?? '')), MEDIA_OPTIONS)
+  const onFrame = (i: number, run: () => void) => () => {
+    target.current = i
+    run()
+  }
+
+  const add = () => write([...frames.slice(0, current + 1), '', ...frames.slice(current + 1)], frames.length ? current + 1 : 0)
+  const remove = (i: number) => write(frames.filter((_, j) => j !== i), i)
+  const actions = (i: number): MenuItem[] => [
+    { label: 'Picture from Seven', icon: <Images />, onSelect: onFrame(i, pick.fromSeven) },
+    { label: 'Picture from disk', icon: <ImagePlus />, onSelect: onFrame(i, pick.fromDisk) },
+    { label: 'Remove picture', icon: <ImageOff />, disabled: !frameMedia(frames[i]), onSelect: () => update(i, normalizeFrame(frameText(frames[i]), '')) },
+    { label: '', separator: true },
+    { label: 'Duplicate', icon: <CopyPlus />, onSelect: () => write([...frames.slice(0, i + 1), frames[i], ...frames.slice(i + 1)], i + 1) },
+    { label: 'Move earlier', icon: <ArrowLeft />, disabled: i === 0, onSelect: () => write(moved(frames, i, i - 1), i - 1) },
+    { label: 'Move later', icon: <ArrowRight />, disabled: i === frames.length - 1, onSelect: () => write(moved(frames, i, i + 1), i + 1) },
+    { label: '', separator: true },
+    { label: 'Delete frame', icon: <Trash2 />, hint: 'Del', danger: true, disabled: frames.length <= minFrames, onSelect: () => remove(i) }
+  ]
+  const keys = (e: KeyboardEvent<HTMLDivElement>) => {
+    const run = [
+      { key: 'Delete', ok: frames.length > minFrames, act: () => remove(current) },
+      { key: 'Insert', ok: true, act: add }
+    ].find((k) => k.key === e.key && k.ok)
+    if (!run) return
+    e.preventDefault()
+    run.act()
+  }
+
   return (
-    <Field label={`${spec.label} (${frames.length})`} hint={spec.hint}>
-      <div className="flex flex-wrap items-stretch gap-2">
-        {frames.map((frame, i) => (
-          <FrameCard
-            key={i}
-            index={i}
-            entry={frame}
-            canRemove={frames.length > minFrames}
-            onUpdate={(next) => onChange(frames.map((f, j) => (j === i ? next : f)))}
-            onRemove={() => onChange(frames.filter((_, j) => j !== i))}
-          />
-        ))}
-        <Button size="sm" variant="ghost" icon={<Plus />} onClick={add} className="min-h-[52px] self-stretch border border-dashed border-line/60 px-3">
+    <Field
+      group
+      label={spec.label}
+      hint={spec.hint}
+      aside={
+        <span className="flex items-center gap-0.5">
+          {frames.length > 0 && (
+            <>
+              <RowAction title="Previous frame (Left)" icon={<ChevronLeft />} disabled={current === 0} onClick={() => setAt(current - 1)} />
+              <span className="min-w-9 text-center font-data text-[11px] text-dim">
+                {current + 1}/{frames.length}
+              </span>
+              <RowAction title="Next frame (Right)" icon={<ChevronRight />} disabled={current === frames.length - 1} onClick={() => setAt(current + 1)} />
+            </>
+          )}
+          <RowAction title="Add frame (Insert)" icon={<Plus />} onClick={add} />
+        </span>
+      }
+    >
+      {frames.length ? (
+        <CardStack
+          count={frames.length}
+          current={current}
+          onCurrent={setAt}
+          label={(i) => `Frame ${i + 1}`}
+          onMenu={(e, i) => openMenu(e, `Frame ${i + 1}`, actions(i))}
+          onKeyDown={keys}
+          card={(i, front) => <FrameFace entry={frames[i]} index={i} front={front} tools={front && <IconActions items={actions(i)} />} onText={(text) => update(i, normalizeFrame(text, frameMedia(frames[i])))} />}
+        />
+      ) : (
+        <button type="button" onClick={add} className="mx-auto flex h-24 w-full max-w-sm items-center justify-center gap-1.5 border border-dashed border-line font-label text-[11px] caps-10 text-dim hover:border-accent hover:text-accent">
+          <Plus className="h-3.5 w-3.5" />
           Frame
-        </Button>
-      </div>
+        </button>
+      )}
     </Field>
   )
 }

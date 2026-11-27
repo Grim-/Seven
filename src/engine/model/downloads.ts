@@ -83,7 +83,7 @@ class Downloads extends EventEmitter {
     this.emit('changed', this.list())
   }
 
-  start(input: { repo: string; file: string; name: string; folder: string; total: number; files?: DownloadBundleFile[]; imageConfig?: Partial<ImageModelConfig>; targetModelId?: string }): DownloadItem[] {
+  start(input: { repo: string; file: string; name: string; folder: string; total: number; files?: DownloadBundleFile[]; imageConfig?: Partial<ImageModelConfig>; targetModelId?: string; expectedKind?: import('@shared/types').ModelKind }): DownloadItem[] {
     if (!input.folder) throw new Error('Pick a model folder to save it in. Add one under Folders in Models first if there are none.')
     const same = this.all().find((d) => d.repo === input.repo && d.file === input.file && d.folder === input.folder && d.state !== 'done')
     if (same) throw new Error(`${input.name} is already in your downloads. Resume it there instead.`)

@@ -86,9 +86,9 @@ function ChatViewSwitcherContent({ onClose }: { onClose: () => void }) {
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
-      className="pointer-events-auto fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/88 backdrop-blur-md select-none"
+      className="pointer-events-auto fixed inset-0 z-[200] flex flex-col items-center justify-center bg-scrim/88 backdrop-blur-[calc(var(--panel-blur)*1.5)] select-none"
     >
-      <div className="pointer-events-none absolute top-5 flex items-center gap-3 border border-line/60 bg-black/85 px-3.5 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.16em] text-dim">
+      <div className="pointer-events-none absolute top-5 flex items-center gap-3 border border-line/60 tone-panel-85 px-3.5 py-1.5 font-label text-[10.5px] caps-16 text-dim">
         <span className="font-bold text-accent">Chat</span>
         <span>·</span>
         <span>View Mode Overview</span>
@@ -115,7 +115,7 @@ function ChatViewSwitcherContent({ onClose }: { onClose: () => void }) {
               className={cn(
                 'shell-slate group flex flex-col justify-between p-2.5 text-left transition-all cursor-pointer',
                 isCurrent
-                  ? 'border-accent border-l-2 border-l-accent bg-accent/15 shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_25%,transparent)]'
+                  ? 'border-accent border-l-2 border-l-accent bg-accent/15 shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_calc(25%*var(--glow)),transparent)]'
                   : 'hover:border-accent/70'
               )}
             >
@@ -123,15 +123,15 @@ function ChatViewSwitcherContent({ onClose }: { onClose: () => void }) {
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span
                     className={cn(
-                      'flex h-5 w-5 shrink-0 items-center justify-center border font-mono text-[11px] font-bold',
+                      'flex h-5 w-5 shrink-0 items-center justify-center border font-ui text-[11px] font-bold',
                       isCurrent
-                        ? 'border-accent bg-accent text-black'
-                        : 'border-line bg-black/60 text-accent-soft'
+                        ? 'border-accent bg-accent text-on-accent'
+                        : 'border-line tone-panel-60 text-accent-soft'
                     )}
                   >
                     {def.index}
                   </span>
-                  <span className="truncate font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-white">
+                  <span className="truncate font-label text-[10.5px] font-bold caps-12 text-ink">
                     {def.label}
                   </span>
                 </div>
@@ -142,14 +142,14 @@ function ChatViewSwitcherContent({ onClose }: { onClose: () => void }) {
                 {tags.slice(0, 4).map((tag) => (
                   <span
                     key={tag}
-                    className="max-w-full truncate border border-line/60 border-l-2 border-l-accent bg-black/75 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/85"
+                    className="max-w-full truncate border border-line/60 border-l-2 border-l-accent tone-panel-75 px-1.5 py-0.5 font-label text-[9px] caps-5 text-ink/85"
                   >
                     {tag}
                   </span>
                 ))}
               </div>
 
-              <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-faint">
+              <div className="flex items-center justify-between font-label text-[9px] caps-14 text-faint">
                 <span>{isCurrent ? 'Active' : 'Click to switch'}</span>
               </div>
             </button>

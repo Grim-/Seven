@@ -14,7 +14,7 @@ export function KindList({ section, selected, select }: { section: LibrarySectio
   const ui = kindUi(section.kind)
   const { Thumb } = presentOf(section.kind)
   const add = ui.add?.(section.kind, select)
-  if (list === null) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (list === null) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   return (
     <KindShell
       id={`kind-${section.kind}`}

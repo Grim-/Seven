@@ -1,13 +1,16 @@
 import { useMemo } from 'react'
-import { Compass, Sparkles, Zap } from 'lucide-react'
-import { placePath } from '@shared/maps'
-import { PLACE_TYPE_KEY, cleanWorldLaunch, type WorldLaunch, type WorldMeta } from '@shared/world'
+import { cleanWorldLaunch, type WorldLaunch, type WorldMeta } from '@shared/world'
 import { engine } from '../../lib/ipc'
-import { useLive } from '../../lib/useLive'
 import { failed } from '../../lib/notify'
-import { cn } from '../../lib/cn'
-import { Eyebrow, Field, InlineNumber, Input, Select } from '../ui'
+import { useLive } from '../../lib/useLive'
+import { CharacterAvatar } from '../chat/CharacterAvatar'
+import { Chip } from '../chat/References'
+import { LinkInlineEdit } from '../data/LinkInlineEdit'
+import { MarkdownEditor } from '../data/MarkdownEditor'
 import { SheetSelect } from '../data/sheet/SheetSelect'
+import { LinkFaceList } from '../entries/LinkFaces'
+import { BrowsePick, Eyebrow, Field, InlineNumber } from '../ui'
+import { WorldPlacePick } from './WorldPlacePick'
 
 interface Props {
   world: WorldMeta
@@ -15,25 +18,32 @@ interface Props {
 
 export function WorldOpening({ world }: Props) {
   const launch = useMemo(() => cleanWorldLaunch(world.launch), [world.launch])
-  const places = useLive(() => engine('worlds.records', { id: world.id, type: PLACE_TYPE_KEY }), 'worlds.changed') ?? {}
-  const mapUses = useLive(() => engine('worlds.maps', { id: world.id }), 'worlds.changed') ?? []
+  const mapUses = useLive(() => engine('worlds.maps', { id: world.id }), 'worlds.changed', [world.id]) ?? []
+  const mapList = useLive(() => engine('maps.list'), 'maps.changed') ?? []
   const triggerActions = useLive(() => engine('triggerActions.list'), 'triggerActions.changed') ?? []
 
-  const placeOptions = useMemo(() => {
-    const entries = Object.keys(places)
-      .map((key) => {
-        const breadcrumb = placePath(places, key)
-          .map((k) => String(places[k]?.Name || k))
-          .join(' › ')
-        return { value: key, label: `${breadcrumb} (@place:${key})` }
-      })
-      .sort((a, b) => a.label.localeCompare(b.label))
-    return [{ value: '', label: '— None (choose at start) —' }, ...entries]
-  }, [places])
-
   const mapOptions = useMemo(
-    () => [{ value: '', label: '— Auto / First map —' }, ...mapUses.map((u) => ({ value: u.map, label: u.map }))],
-    [mapUses]
+    () =>
+      mapUses.map((u) => ({
+        value: u.map,
+        label: mapList.find((m) => m.id === u.map)?.name ?? u.map,
+        group: 'World Maps',
+        note: `${Object.keys(u.regionShapes ?? {}).length} regions · ${Object.keys(u.shapes).length} places`
+      })),
+    [mapUses, mapList]
+  )
+
+  const availableActionOptions = useMemo(
+    () =>
+      triggerActions
+        .filter((a) => !launch.openingActionIds.includes(a.id))
+        .map((a) => ({
+          value: a.id,
+          label: a.name,
+          group: 'Trigger Actions',
+          note: a.description || undefined
+        })),
+    [triggerActions, launch.openingActionIds]
   )
 
   const totalMinutes = Math.floor(launch.startingTime / 60)
@@ -52,144 +62,197 @@ export function WorldOpening({ world }: Props) {
     saveLaunch({ startingTime: ((clampedDay - 1) * 24 * 60 + clampedHour * 60 + clampedMin) * 60 })
   }
 
-  const toggleAction = (actionId: string) => {
-    const has = launch.openingActionIds.includes(actionId)
-    const next = has ? launch.openingActionIds.filter((id) => id !== actionId) : [...launch.openingActionIds, actionId]
-    saveLaunch({ openingActionIds: next })
-  }
-
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* LEFT: WHERE, WHEN & WHO */}
-        <div className="flex flex-col gap-3 border border-line/60 bg-panel/60 p-3.5">
-          <div className="flex items-center gap-2 border-b border-line/50 pb-2">
-            <Compass className="h-4 w-4 text-accent" />
-            <Eyebrow>Starting Place, Time &amp; Player</Eyebrow>
-          </div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-bg p-5 font-ui select-none">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+        {/* CAMPAIGN HEADER BANNER */}
+        <section className="flex flex-col gap-4 border border-accent/40 tone-panel-60 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line/40 pb-4">
+            <div className="flex flex-col gap-1">
+              <Eyebrow className="text-accent">Campaign Opening &amp; Story Frame</Eyebrow>
+              <h2 className="text-[22px] font-bold text-ink">{world.name}</h2>
+            </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Setting">
-              <Input
-                value={launch.setting}
-                onChange={(e) => saveLaunch({ setting: e.target.value })}
-                placeholder="e.g. Low-magic borderlands"
-              />
-            </Field>
-            <Field label="Time Period / Era">
-              <Input
-                value={launch.timePeriod}
-                onChange={(e) => saveLaunch({ timePeriod: e.target.value })}
-                placeholder="e.g. Late Autumn, Year 412"
-              />
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Starting Place (Room-Scoped)">
-              <Select
-                value={launch.startingPlace ?? ''}
-                options={placeOptions}
-                onChange={(v) => saveLaunch({ startingPlace: v || null })}
-              />
-            </Field>
-            <Field label="Starting Map">
-              <Select
-                value={launch.startingMap ?? ''}
-                options={mapOptions}
-                onChange={(v) => saveLaunch({ startingMap: v || null })}
-              />
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Default Player Character">
-              <SheetSelect
-                value={world.player}
-                onChange={(sheet) => void engine('worlds.setPlayer', { id: world.id, sheet }).catch(failed('Could not set default player'))}
-              />
-            </Field>
-            <Field label="Starting World Clock">
-              <div className="flex h-8 items-center gap-2 border border-line/70 bg-black/50 px-2.5 font-mono text-[11.5px] text-white">
-                <span className="text-faint">Day</span>
+            {/* STARTING CLOCK */}
+            <div className="flex flex-col items-end gap-1">
+              <span className="font-label text-[9.5px] caps-8 text-faint">Starting World Clock</span>
+              <div className="flex h-9 items-center gap-2 border border-line/70 tone-well-70 px-3 font-data text-[13px] text-ink">
+                <span className="text-dim">Day</span>
                 <InlineNumber value={day} min={1} onSave={(v) => setClock(v, hour, minute)} />
                 <span className="text-faint">·</span>
                 <InlineNumber value={hour} min={0} max={23} onSave={(v) => setClock(day, v, minute)} />
                 <span>:</span>
                 <InlineNumber value={minute} min={0} max={59} onSave={(v) => setClock(day, hour, v)} />
               </div>
+            </div>
+          </div>
+
+          {/* SETTING / ERA / TONE STRIP */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Field label="Setting">
+              <div className="border border-line/60 tone-well-50 px-3 py-2 text-[13px] text-ink">
+                <LinkInlineEdit
+                  value={launch.setting}
+                  onSave={(setting) => saveLaunch({ setting })}
+                  placeholder="e.g. Rain-slicked port city on the edge of the Rift"
+                />
+              </div>
+            </Field>
+            <Field label="Era &amp; Calendar">
+              <div className="border border-line/60 tone-well-50 px-3 py-2 text-[13px] text-ink">
+                <LinkInlineEdit
+                  value={launch.timePeriod}
+                  onSave={(timePeriod) => saveLaunch({ timePeriod })}
+                  placeholder="e.g. Late Autumn, Year 412"
+                />
+              </div>
+            </Field>
+            <Field label="Tone &amp; Stakes">
+              <div className="border border-line/60 tone-well-50 px-3 py-2 text-[13px] text-ink">
+                <LinkInlineEdit
+                  value={launch.tone}
+                  onSave={(tone) => saveLaunch({ tone })}
+                  placeholder="e.g. Tense, investigative, low-magic survival"
+                />
+              </div>
             </Field>
           </div>
-        </div>
+        </section>
 
-        {/* RIGHT: STORY OPENING & TRIGGER ACTIONS */}
-        <div className="flex flex-col gap-3 border border-line/60 bg-panel/60 p-3.5">
-          <div className="flex items-center gap-2 border-b border-line/50 pb-2">
-            <Sparkles className="h-4 w-4 text-cyan" />
-            <Eyebrow>Session 1 Opening &amp; Triggers</Eyebrow>
-          </div>
-
-          <Field label="Tone &amp; Stakes">
-            <Input
-              value={launch.tone}
-              onChange={(e) => saveLaunch({ tone: e.target.value })}
-              placeholder="e.g. Tense, investigative, low-clairvoyancy"
-            />
-          </Field>
-
-          <Field label="World Premise">
-            <textarea
-              value={launch.premise}
-              onChange={(e) => saveLaunch({ premise: e.target.value })}
-              rows={2}
-              placeholder="The overarching premise of this world's storyline..."
-              className="w-full resize-y border border-line/70 bg-black/50 px-2.5 py-2 text-[12.5px] text-white outline-none focus:border-accent"
-            />
-          </Field>
-
-          <Field label="Session 1 Opening Situation (Inciting Incident)">
-            <textarea
-              value={launch.incitingIncident}
-              onChange={(e) => saveLaunch({ incitingIncident: e.target.value })}
-              rows={3}
-              placeholder="What is happening the moment a new save begins in the starting room?"
-              className="w-full resize-y border border-line/70 bg-black/50 px-2.5 py-2 text-[12.5px] text-white outline-none focus:border-accent"
-            />
-          </Field>
-
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-1.5">
-              <Zap className="h-3.5 w-3.5 text-purple-300" />
-              <Eyebrow>Opening Trigger Actions (Fire on New Save)</Eyebrow>
+        {/* STORY PREMISE & INCITING INCIDENT (RICH MARKDOWN + LINK CHIPS) */}
+        <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="flex flex-col gap-2.5 border border-line/60 tone-surface-60 p-4">
+            <div className="border-b border-line/40 pb-2">
+              <Eyebrow>World Premise</Eyebrow>
             </div>
-            {!triggerActions.length ? (
-              <p className="text-[11.5px] text-faint">No reusable Trigger Actions created yet.</p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {triggerActions.map((a) => {
-                  const active = launch.openingActionIds.includes(a.id)
-                  return (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => toggleAction(a.id)}
-                      className={cn(
-                        'border px-2.5 py-1 font-mono text-[11px] transition-colors',
-                        active
-                          ? 'border-accent/60 bg-accent/15 text-accent'
-                          : 'border-line/60 bg-black/40 text-dim hover:border-line hover:text-white'
-                      )}
-                      title={a.description || a.name}
-                    >
-                      {active ? '✓ ' : '+ '}
-                      {a.name}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+            <MarkdownEditor
+              compact
+              rolls={false}
+              value={launch.premise}
+              onValue={(premise) => saveLaunch({ premise })}
+              placeholder="The overarching premise and tension driving this world — type @ to link factions, places, or lore…"
+            />
+            <LinkFaceList text={launch.premise} />
           </div>
-        </div>
+
+          <div className="flex flex-col gap-2.5 border border-line/60 tone-surface-60 p-4">
+            <div className="border-b border-line/40 pb-2">
+              <Eyebrow className="text-secondary-ink">Session 1 · Opening Situation</Eyebrow>
+            </div>
+            <MarkdownEditor
+              compact
+              rolls={false}
+              value={launch.incitingIncident}
+              onValue={(incitingIncident) => saveLaunch({ incitingIncident })}
+              placeholder="What is unfolding the moment a new playthrough opens in the starting place — type @ to link characters, places, or events…"
+            />
+            <LinkFaceList text={launch.incitingIncident} />
+          </div>
+        </section>
+
+        {/* STARTING STAGE: PROTAGONIST, STARTING LOCATION, AND LAUNCH TRIGGERS */}
+        <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          {/* PROTAGONIST SPOTLIGHT */}
+          <div className="flex flex-col gap-3 border border-line/60 tone-surface-60 p-4">
+            <Eyebrow>Default Protagonist</Eyebrow>
+            <div className="flex items-center gap-3 border border-line/40 tone-well-50 p-3">
+              <CharacterAvatar sheetId={world.player} size={44} />
+              <div className="min-w-0 flex-1">
+                {world.player ? (
+                  <Chip
+                    kind="sheet"
+                    refText={world.player}
+                    onRemove={() =>
+                      void engine('worlds.setPlayer', { id: world.id, sheet: null }).catch(
+                        failed('Could not clear default player')
+                      )
+                    }
+                  />
+                ) : (
+                  <span className="text-[12px] text-faint">No default protagonist chosen</span>
+                )}
+              </div>
+            </div>
+            <SheetSelect
+              value={world.player}
+              onChange={(sheet) =>
+                void engine('worlds.setPlayer', { id: world.id, sheet }).catch(failed('Could not set default player'))
+              }
+            />
+          </div>
+
+          {/* STARTING PLACE & MAP */}
+          <div className="flex flex-col gap-3 border border-line/60 tone-surface-60 p-4">
+            <Eyebrow>Starting Stage</Eyebrow>
+            <Field label="Starting Place">
+              <div className="flex flex-col gap-1.5">
+                {launch.startingPlace && (
+                  <Chip
+                    kind="world"
+                    refText={`${world.id}/place/${launch.startingPlace}`}
+                    onRemove={() => saveLaunch({ startingPlace: null })}
+                  />
+                )}
+                <WorldPlacePick
+                  world={world.id}
+                  value={launch.startingPlace}
+                  placeholder="Choose starting place…"
+                  onChange={(startingPlace) => saveLaunch({ startingPlace })}
+                />
+              </div>
+            </Field>
+            <Field label="Starting Map">
+              <div className="flex flex-col gap-1.5">
+                {launch.startingMap && (
+                  <Chip
+                    kind="map"
+                    refText={launch.startingMap}
+                    onRemove={() => saveLaunch({ startingMap: null })}
+                  />
+                )}
+                <BrowsePick
+                  value={launch.startingMap}
+                  options={mapOptions}
+                  placeholder="Auto / First map"
+                  onChange={(startingMap) => saveLaunch({ startingMap })}
+                />
+              </div>
+            </Field>
+          </div>
+
+          {/* OPENING TRIGGER ACTIONS */}
+          <div className="flex flex-col gap-3 border border-line/60 tone-surface-60 p-4">
+            <Eyebrow>On New Save · Trigger Actions</Eyebrow>
+            {launch.openingActionIds.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {launch.openingActionIds.map((actionId) => (
+                  <Chip
+                    key={actionId}
+                    kind="triggerAction"
+                    refText={actionId}
+                    onRemove={() =>
+                      saveLaunch({ openingActionIds: launch.openingActionIds.filter((id) => id !== actionId) })
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-faint">
+                Fire flags, starter items, or buffs automatically when a new save begins.
+              </p>
+            )}
+            <BrowsePick
+              value={null}
+              options={availableActionOptions}
+              placeholder={triggerActions.length ? 'Add opening trigger action…' : 'No trigger actions created yet'}
+              onChange={(actionId) => {
+                if (actionId && !launch.openingActionIds.includes(actionId)) {
+                  saveLaunch({ openingActionIds: [...launch.openingActionIds, actionId] })
+                }
+              }}
+            />
+          </div>
+        </section>
       </div>
     </div>
   )

@@ -11,7 +11,7 @@ export function CommandChat({ id }: EntrySurfaceProps) {
   if (!command) return <EmptyState title="Removed">This command no longer exists.</EmptyState>
   return (
     <EntryCard title={`/${command.name}`} tag="command">
-      <span className="font-mono text-[12.5px] text-accent">{command.usage.split('\n')[0].replace(/`/g, '')}</span>
+      <span className="font-ui text-[12.5px] text-accent">{command.usage.split('\n')[0].replace(/`/g, '')}</span>
       <span className="text-[12.5px] text-dim">{command.summary}</span>
     </EntryCard>
   )

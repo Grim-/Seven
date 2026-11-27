@@ -8,9 +8,9 @@ import { CardSwapLine } from './CardSwapLine'
 export function ActionResultCard({ result }: { result: ActionResult }) {
   return (
     <EntryCard title="Action" tag={NEEDS_LABEL[result.needs]}>
-      <div className="text-[14px] font-semibold leading-snug text-white">{result.attempt}</div>
+      <div className="text-[14px] font-semibold leading-snug text-ink">{result.attempt}</div>
       {result.character && (
-        <div className="flex items-center gap-2 font-mono text-[11px] text-dim">
+        <div className="flex items-center gap-2 font-ui text-[11px] text-dim">
           <SheetPortrait image={result.character.image} className="h-5 w-5" />
           {result.character.name}
         </div>
@@ -27,12 +27,12 @@ export function ActionResultCard({ result }: { result: ActionResult }) {
 
 export function ActionOutcome({ result }: { result: ActionResult }) {
   return (
-    <div className="border border-cyan/30 bg-cyan/[0.05] px-2.5 py-2">
-      <div className="mb-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan">
+    <div className="border border-secondary-ink/30 bg-secondary-ink/[0.05] px-2.5 py-2">
+      <div className="mb-0.5 font-label text-[10px] font-semibold caps-16 text-secondary-ink">
         {result.passed ? 'Success' : 'Failure'}
         {result.deciding ? ` · ${result.deciding} ${result.passed ? 'pass' : 'fail'}` : ''}
       </div>
-      <Markdown text={result.outcome} className="text-[13px] leading-relaxed text-white/90" />
+      <Markdown text={result.outcome} className="text-[13px] leading-relaxed text-ink/90" />
       <CardSwapLine swap={result.cards} />
     </div>
   )

@@ -59,7 +59,7 @@ const GROUPS: Group[] = [
     ],
     extra: (s, change) => (
       <SettingRow label="Sent files folder" hint="Files sent from a device land in a seven-files folder inside this folder. Empty means Seven's own data folder." wide>
-        <Input value={s.uploadFolder} onChange={(e) => change({ uploadFolder: e.target.value })} placeholder="Seven's data folder" spellCheck={false} className="h-7 w-full font-mono text-[12px]" />
+        <Input value={s.uploadFolder} onChange={(e) => change({ uploadFolder: e.target.value })} placeholder="Seven's data folder" spellCheck={false} className="h-7 w-full font-ui text-[12px]" />
       </SettingRow>
     )
   },
@@ -71,7 +71,7 @@ const GROUPS: Group[] = [
     ],
     extra: (s, change) => (
       <SettingRow label="Announcement type" hint="The DNS-SD service type devices look for. Leave it alone unless it clashes with something else on your network.">
-        <Input value={s.announceType} onChange={(e) => change({ announceType: e.target.value })} spellCheck={false} className="h-7 w-32 font-mono text-[12px]" />
+        <Input value={s.announceType} onChange={(e) => change({ announceType: e.target.value })} spellCheck={false} className="h-7 w-32 font-ui text-[12px]" />
       </SettingRow>
     )
   }
@@ -85,7 +85,7 @@ export function FineTuning({ settings, change, saver }: { settings: NetworkSetti
       <Fold label="Port, limits, timeouts and pairing codes" note="Most people never change these" count={COUNT}>
         {GROUPS.map((g) => (
           <div key={g.title} className="flex flex-col">
-            <div className="px-3.5 pb-1 pt-3 font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-accent-soft">{g.title}</div>
+            <div className="px-3.5 pb-1 pt-3 font-label text-[9.5px] font-bold caps-20 text-accent-soft">{g.title}</div>
             <SettingGrid min="22rem">
               {g.numbers.map((n) => (
                 <SettingRow key={n.key} label={n.label} hint={n.hint}>

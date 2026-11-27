@@ -4,7 +4,7 @@ import { AssetMedia } from '../pictures/AssetMedia'
 
 export function SheetPortrait({ image, className, usedBy }: { image: string | null; className?: string; usedBy?: string }) {
   return (
-    <span className={cn('block shrink-0 overflow-hidden border border-line-strong bg-black/60', className)}>
+    <span className={cn('block shrink-0 overflow-hidden border border-line-strong tone-panel-60', className)}>
       {image ? (
         <AssetMedia id={image} usedBy={usedBy} className="h-full w-full object-cover" />
       ) : (

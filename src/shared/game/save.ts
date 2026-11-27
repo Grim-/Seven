@@ -1,18 +1,15 @@
 import type { ClockState } from './core/clock'
 import type { EntityRecord } from './core/GameEntity'
-import { cleanStand, type CreatureDisposition, type JourneyEntry, type Standing } from '../maps'
+import { cleanStand, type JourneyEntry, type Standing } from '../maps'
 import type { WorldPost } from '../world'
+import { cleanEntityRecord, cleanSaveNpcs, type SaveNpcState } from '../worldNpcs'
 import { cleanBattleRecord, type BattleRecord } from './state/battle'
+import { cleanSaveFactionState, type SaveFactionState } from './factions'
 import { cleanWorldEventRuntime, type WorldEventRuntime } from './worldEvents'
 
 export interface SaveCharacter {
   game: EntityRecord | null
   where: string
-}
-
-export interface SaveCreature extends EntityRecord {
-  faction: string
-  disposition?: CreatureDisposition
 }
 
 export type SaveRecord = Record<string, unknown> | null
@@ -37,6 +34,15 @@ export interface SaveCreateOptions {
   loadout?: Record<string, SaveLoadoutOverride>
 }
 
+export interface SaveMapLayerState {
+  visible?: boolean
+  solid?: boolean
+}
+
+export interface SaveSpawnerState {
+  disabled?: boolean
+}
+
 export interface GameSave {
   id: string
   name: string
@@ -46,10 +52,10 @@ export interface GameSave {
   updatedAt: number
   clockId: string
   clock: ClockState
-  creatures: SaveCreature[]
+  npcs: Record<string, SaveNpcState | null>
   flags: Record<string, string | number | boolean>
   used: string[]
-  /** Sheet IDs belonging to the player's actual party (player + recruited companions). NPCs in `characters` are NOT in `party`. */
+  /** Actor IDs belonging to the player's actual party (player + recruited companions). Non-party NPCs are NOT in `party`. */
   party?: string[]
   characters: Record<string, SaveCharacter>
   stand: Record<string, Record<string, Standing>>
@@ -61,6 +67,9 @@ export interface GameSave {
   longRestAt?: number
   battle?: BattleRecord | null
   eventStates?: Record<string, WorldEventRuntime>
+  factions?: Record<string, SaveFactionState>
+  mapLayers?: Record<string, Record<string, SaveMapLayerState>>
+  spawnerStates?: Record<string, Record<string, SaveSpawnerState>>
 }
 
 export interface SaveMeta {
@@ -87,10 +96,10 @@ export function cleanClockState(raw: unknown): ClockState {
   return { time: Math.max(0, num(c.time, 0)) }
 }
 
-const isRecord = (c: unknown): c is EntityRecord => Boolean(c) && typeof c === 'object' && typeof (c as EntityRecord).uid === 'string' && Array.isArray((c as EntityRecord).comps)
+const isRecord = (c: unknown): c is EntityRecord => cleanEntityRecord(c) !== null
 
 function cleanCharacters(raw: unknown): Record<string, SaveCharacter> {
-  return Object.fromEntries(Object.entries(obj(raw)).map(([sheet, v]) => [sheet, { game: isRecord(obj(v).game) ? (obj(v).game as EntityRecord) : null, where: str(obj(v).where) }]))
+  return Object.fromEntries(Object.entries(obj(raw)).map(([sheet, v]) => [sheet, { game: cleanEntityRecord(obj(v).game), where: str(obj(v).where) }]))
 }
 
 function cleanRecords(raw: unknown): Record<string, Record<string, SaveRecord>> {
@@ -134,16 +143,22 @@ export function cleanSave(raw: unknown, id: string): GameSave {
           )
         }
       : {}),
-    creatures: Array.isArray(v.creatures)
-      ? v.creatures.filter(isRecord).map((c) => {
-          const disp = str(obj(c).disposition)
-          return {
-            ...c,
-            faction: str(obj(c).faction),
-            ...(disp === 'hostile' || disp === 'neutral' || disp === 'friendly' ? { disposition: disp as CreatureDisposition } : {})
-          }
-        })
-      : [],
+    ...(v.factions && typeof v.factions === 'object' && !Array.isArray(v.factions)
+      ? {
+          factions: Object.fromEntries(
+            Object.entries(v.factions as Record<string, unknown>)
+              .map(([k, val]) => [k, cleanSaveFactionState(val)] as const)
+              .filter((e): e is [string, SaveFactionState] => Boolean(e[1]))
+          )
+        }
+      : {}),
+    ...(v.mapLayers && typeof v.mapLayers === 'object' && !Array.isArray(v.mapLayers)
+      ? { mapLayers: v.mapLayers as GameSave['mapLayers'] }
+      : {}),
+    ...(v.spawnerStates && typeof v.spawnerStates === 'object' && !Array.isArray(v.spawnerStates)
+      ? { spawnerStates: v.spawnerStates as GameSave['spawnerStates'] }
+      : {}),
+    npcs: cleanSaveNpcs(v.npcs),
     flags,
     used: Array.isArray(v.used) ? v.used.filter((u): u is string => typeof u === 'string') : [],
     ...(Array.isArray(v.party) ? { party: v.party.filter((p): p is string => typeof p === 'string' && Boolean(p.trim())) } : {}),

@@ -14,9 +14,9 @@ export function TextPart({ entry }: { entry: string }) {
       live = false
     }
   }, [entry])
-  if (text === null) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (text === null) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   return (
-    <div className="border border-line/40 bg-black/40 p-3">
+    <div className="border border-line/40 tone-panel-40 p-3">
       <Markdown text={text} />
     </div>
   )

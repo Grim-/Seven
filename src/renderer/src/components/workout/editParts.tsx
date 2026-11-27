@@ -27,10 +27,10 @@ export function move<T>(list: T[], i: number, by: number): T[] {
 export function RowButtons({ onUp, onDown, onRemove }: { onUp: () => void; onDown: () => void; onRemove: () => void }) {
   return (
     <span className="ml-auto flex shrink-0 gap-0.5">
-      <button title="Move up" onClick={onUp} className="flex h-6 w-6 items-center justify-center text-dim hover:text-white">
+      <button title="Move up" onClick={onUp} className="flex h-6 w-6 items-center justify-center text-dim hover:text-ink">
         <ArrowUp className="h-3.5 w-3.5" />
       </button>
-      <button title="Move down" onClick={onDown} className="flex h-6 w-6 items-center justify-center text-dim hover:text-white">
+      <button title="Move down" onClick={onDown} className="flex h-6 w-6 items-center justify-center text-dim hover:text-ink">
         <ArrowDown className="h-3.5 w-3.5" />
       </button>
       <button title="Remove" onClick={onRemove} className="flex h-6 w-6 items-center justify-center text-dim hover:text-alert">

@@ -105,7 +105,7 @@ export function LogScreen({
             value={date}
             max={overview.today}
             onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="h-8 border border-line/50 bg-black/60 px-2 font-mono text-[12.5px] text-white outline-none focus:border-accent/70"
+            className="h-8 border border-line/50 tone-well-60 px-2 font-ui text-[12.5px] text-ink outline-none focus:border-accent/70"
           />
           Start from
           <Select
@@ -121,11 +121,11 @@ export function LogScreen({
             const last = lastValues(history.rows, r.exercise, date)
             return (
               <GridRow key={r.exercise}>
-                <span className="truncate text-[13px] font-semibold text-white">
+                <span className="truncate text-[13px] font-semibold text-ink">
                   {showName(ex?.name ?? 'removed exercise')}
                   <UnitLabel unit={ex?.unit ?? ''} />
                 </span>
-                <span className="font-mono text-[12px] text-dim">
+                <span className="font-ui text-[12px] text-dim">
                   {last ? `${valuesText(last.values)} · ${shortDate(last.date)}` : 'first time'}
                 </span>
                 <SetBoxes

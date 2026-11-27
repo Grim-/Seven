@@ -66,7 +66,7 @@ export function FlagSelect({
 
   if (isTypingNew) {
     return (
-      <div className={cn('flex items-center gap-1.5 font-mono w-full', className)}>
+      <div className={cn('flex items-center gap-1.5 font-ui w-full', className)}>
         <Input
           autoFocus
           value={newFlagText}
@@ -112,7 +112,7 @@ export function FlagSelect({
   ]
 
   return (
-    <div className={cn('flex items-center gap-1.5 font-mono w-full', className)}>
+    <div className={cn('flex items-center gap-1.5 font-ui w-full', className)}>
       <Select
         value={currentValue}
         options={options}

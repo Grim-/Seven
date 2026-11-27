@@ -64,11 +64,11 @@ export function CombatTurnHud() {
   // VICTORY MODAL OVERLAY
   if (battle.status === 'victory') {
     return (
-      <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm font-mono">
-        <div className="flex w-[440px] flex-col border border-accent bg-black p-5 shadow-[0_16px_48px_rgba(255,160,0,0.25)]">
+      <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-scrim/80 backdrop-blur-[var(--panel-blur)] font-ui">
+        <div className="flex w-[440px] flex-col border border-accent bg-panel p-5 shadow-[0_16px_48px_color-mix(in_srgb,rgb(255,160,0)_calc(25%*var(--glow)),transparent)]">
           <div className="flex items-center gap-2 border-b border-line/60 pb-3">
             <Trophy className="h-6 w-6 text-accent animate-bounce" />
-            <span className="text-[16px] font-extrabold uppercase tracking-widest text-white">
+            <span className="text-[16px] font-extrabold caps-10 text-ink">
               VICTORY ACHIEVED
             </span>
           </div>
@@ -77,20 +77,20 @@ export function CombatTurnHud() {
             <p className="text-dim leading-relaxed">
               All hostile threats have been neutralized or recruited. The combat arena has cleared.
             </p>
-            <div className="flex items-center justify-between border border-line/40 bg-white/[0.03] px-3 py-2 text-[11px]">
-              <span className="text-faint">ROUNDS COMPLETED</span>
-              <strong className="text-white">{battle.round}</strong>
+            <div className="flex items-center justify-between border border-line/40 bg-ink/[0.03] px-3 py-2 text-[11px]">
+              <span className="text-faint caps">Rounds completed</span>
+              <strong className="text-ink">{battle.round}</strong>
             </div>
-            <div className="flex items-center justify-between border border-line/40 bg-white/[0.03] px-3 py-2 text-[11px]">
-              <span className="text-faint">COMBATANTS ENGAGED</span>
-              <strong className="text-cyan">{battle.queue.length}</strong>
+            <div className="flex items-center justify-between border border-line/40 bg-ink/[0.03] px-3 py-2 text-[11px]">
+              <span className="text-faint caps">Combatants engaged</span>
+              <strong className="text-tint-cyan">{battle.queue.length}</strong>
             </div>
           </div>
 
           <button
             type="button"
             onClick={() => endBattle('victory')}
-            className="flex h-9 items-center justify-center gap-2 border border-accent bg-accent/20 text-[12px] font-bold uppercase tracking-wider text-accent hover:bg-accent hover:text-black transition-all cursor-pointer shadow-[0_0_16px_rgba(255,160,0,0.3)]"
+            className="flex h-9 items-center justify-center gap-2 border border-accent bg-accent/20 text-[12px] font-bold caps-5 text-accent hover:bg-accent hover:text-on-accent transition-all cursor-pointer shadow-[0_0_16px_color-mix(in_srgb,rgb(255,160,0)_calc(30%*var(--glow)),transparent)]"
           >
             <Sparkles className="h-4 w-4" />
             <span>CONTINUE EXPLORING</span>
@@ -103,11 +103,11 @@ export function CombatTurnHud() {
   // DEFEAT MODAL OVERLAY
   if (battle.status === 'defeat') {
     return (
-      <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm font-mono">
-        <div className="flex w-[440px] flex-col border border-alert bg-black p-5 shadow-[0_16px_48px_rgba(255,77,77,0.3)]">
+      <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-scrim/85 backdrop-blur-[var(--panel-blur)] font-ui">
+        <div className="flex w-[440px] flex-col border border-alert bg-panel p-5 shadow-[0_16px_48px_color-mix(in_srgb,rgb(255,77,77)_calc(30%*var(--glow)),transparent)]">
           <div className="flex items-center gap-2 border-b border-line/60 pb-3">
             <Skull className="h-6 w-6 text-alert" />
-            <span className="text-[16px] font-extrabold uppercase tracking-widest text-alert">
+            <span className="text-[16px] font-extrabold caps-10 text-alert">
               PARTY DEFEATED
             </span>
           </div>
@@ -122,7 +122,7 @@ export function CombatTurnHud() {
             <button
               type="button"
               onClick={() => endBattle('flee')}
-              className="flex h-9 flex-1 items-center justify-center gap-2 border border-line/60 bg-line/20 text-[11.5px] font-bold uppercase tracking-wider text-white hover:border-alert hover:text-alert transition-all cursor-pointer"
+              className="flex h-9 flex-1 items-center justify-center gap-2 border border-line/60 bg-line/20 text-[11.5px] font-bold caps-5 text-ink hover:border-alert hover:text-alert transition-all cursor-pointer"
             >
               <RotateCcw className="h-4 w-4" />
               <span>RETREAT (FLEE)</span>

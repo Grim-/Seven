@@ -32,8 +32,8 @@ function PlaceRow({ node, selected, onSelect, onMenu, depth }: Omit<Props, 'node
         >
           {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         </button>
-        <span className="min-w-0 flex-1 truncate text-white/90">{node.name}</span>
-        {!node.shaped && <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.1em] text-faint">No shape</span>}
+        <span className="min-w-0 flex-1 truncate text-ink/90">{node.name}</span>
+        {!node.shaped && <span className="shrink-0 font-label text-[9px] caps-10 text-faint">No shape</span>}
       </div>
       {open && <PlaceTree nodes={node.children} selected={selected} onSelect={onSelect} onMenu={onMenu} depth={depth + 1} />}
     </>

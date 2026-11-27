@@ -1,25 +1,27 @@
-import { useState, useMemo } from 'react'
-import { Search, Skull, Swords, Compass, RefreshCw } from 'lucide-react'
-import type { Point } from '@shared/shapes'
+import { useMemo, useState } from 'react'
 import type { CompendiumRef } from '@shared/compendium'
 import type { StoredFaction } from '@shared/game/factions'
+import { showName } from '@shared/ids'
 import type { CreatureDisposition, CreatureSpawner, SpawnerResetMode, SpawnerTriggerMode } from '@shared/maps'
-import { Button, Modal, Select, Input } from '../ui'
+import type { Point } from '@shared/shapes'
+import type { WorldNpc } from '@shared/worldNpcs'
+import { Button, EmptyState, Field, ListRow, Modal, NumberField, SearchListPanel, Segmented, Select } from '../ui'
+import { LinkTextarea } from '../data/LinkTextarea'
 import { useCompendiumList } from '../dnd/useCompendiumList'
 import { engine } from '../../lib/ipc'
 import { useLive } from '../../lib/useLive'
-import { cn } from '../../lib/cn'
 
 interface Props {
   at: Point
+  world?: string
   onClose: () => void
   onPlaced: (spawner: CreatureSpawner) => void
 }
 
 const DISPOSITION_OPTIONS: { value: CreatureDisposition; label: string }[] = [
-  { value: 'hostile', label: 'Hostile (Aggressive)' },
-  { value: 'neutral', label: 'Neutral (Defensive)' },
-  { value: 'friendly', label: 'Friendly (Peaceful)' }
+  { value: 'hostile', label: 'Hostile' },
+  { value: 'neutral', label: 'Neutral' },
+  { value: 'friendly', label: 'Friendly' }
 ]
 
 const SPAWN_WHEN_OPTIONS: { value: SpawnerTriggerMode; label: string }[] = [
@@ -37,9 +39,24 @@ const RESET_WHEN_OPTIONS: { value: SpawnerResetMode; label: string }[] = [
   { value: 'on_map_enter', label: 'Every Map Entry' }
 ]
 
-export function PlaceSpawnerModal({ at, onClose, onPlaced }: Props) {
+type SpawnerSourceTab = 'archetypes' | 'bestiary'
+
+export function PlaceSpawnerModal({ at, world = '', onClose, onPlaced }: Props) {
+  const worlds = useLive(() => engine('worlds.list'), 'worlds.changed') ?? []
+  const allTemplateNpcs: WorldNpc[] =
+    useLive(() => engine('npcs.list', { world: world || null, layer: 'template' }), 'npcs.changed', [world]) ?? []
+  const archetypes = useMemo(
+    () => allTemplateNpcs.filter((n) => n.archetype || Boolean(world)),
+    [allTemplateNpcs, world]
+  )
+  const { refs: monsters } = useCompendiumList('monster')
+  const factions: StoredFaction[] =
+    useLive(() => engine('factions.list', { world: world || null }), 'factions.changed', [world]) ?? []
+
+  const [sourceTab, setSourceTab] = useState<SpawnerSourceTab>(archetypes.length > 0 ? 'archetypes' : 'bestiary')
   const [search, setSearch] = useState('')
-  const [selectedMonster, setSelectedMonster] = useState<CompendiumRef | null>(null)
+  const [selectedNpcKey, setSelectedNpcKey] = useState<string | null>(null)
+  const [selectedMonsterId, setSelectedMonsterId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [faction, setFactionId] = useState('')
   const [disposition, setDisposition] = useState<CreatureDisposition>('hostile')
@@ -47,12 +64,22 @@ export function PlaceSpawnerModal({ at, onClose, onPlaced }: Props) {
   const [triggerRadius, setTriggerRadius] = useState(128)
   const [resetWhen, setResetWhen] = useState<SpawnerResetMode>('never')
 
-  const { refs: monsters } = useCompendiumList('monster')
-  const factions: StoredFaction[] = useLive(() => engine('factions.list'), 'factions.changed') ?? []
-
-  const filtered = useMemo(() => {
+  const filteredNpcs = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return monsters.slice(0, 30)
+    const list = q
+      ? archetypes.filter(
+          (n) =>
+            n.title.toLowerCase().includes(q) ||
+            n.id.toLowerCase().includes(q) ||
+            (n.values.Identity ?? '').toLowerCase().includes(q)
+        )
+      : archetypes
+    return list.slice(0, 50)
+  }, [archetypes, search])
+
+  const filteredMonsters = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return monsters.slice(0, 40)
     return monsters
       .filter((m) => {
         const nameMatch = m.name.toLowerCase().includes(q)
@@ -63,23 +90,45 @@ export function PlaceSpawnerModal({ at, onClose, onPlaced }: Props) {
       .slice(0, 40)
   }, [monsters, search])
 
-  const handleSelect = (m: CompendiumRef) => {
-    setSelectedMonster(m)
-    setName(m.name)
-    setFactionId((prev) => prev || factions.find((f) => f.defaultStance === disposition)?.id || factions[0]?.id || '')
+  const activeNpc =
+    filteredNpcs.find((n) => `${n.worldId ?? world}/${n.id}` === selectedNpcKey) ?? filteredNpcs[0] ?? null
+  const activeMonster: CompendiumRef | null =
+    filteredMonsters.find((m) => m.id === selectedMonsterId) ?? filteredMonsters[0] ?? null
+
+  const selectNpc = (n: WorldNpc) => {
+    const wId = n.worldId || world
+    setSelectedNpcKey(`${wId}/${n.id}`)
+    setName(n.title)
+    if (n.faction) setFactionId(n.faction)
+    if (n.disposition) setDisposition(n.disposition)
   }
 
-  // Auto-select first if none selected
-  if (!selectedMonster && filtered.length > 0) {
-    handleSelect(filtered[0])
+  const selectMonster = (m: CompendiumRef) => {
+    setSelectedMonsterId(m.id)
+    setName(m.name)
+    setFactionId(
+      (prev) => prev || factions.find((f) => f.defaultStance === disposition)?.id || factions[0]?.id || ''
+    )
   }
+
+  const resolvedMonsterId =
+    sourceTab === 'archetypes'
+      ? activeNpc
+        ? `@world:${activeNpc.worldId || world}/npc/${activeNpc.id}`
+        : ''
+      : (activeMonster?.id ?? '')
+
+  const defaultName =
+    sourceTab === 'archetypes'
+      ? (activeNpc?.title ?? '')
+      : (activeMonster?.name ?? '')
 
   const handlePlace = () => {
-    if (!selectedMonster) return
+    if (!resolvedMonsterId) return
     const spawner: CreatureSpawner = {
       id: crypto.randomUUID(),
-      name: name.trim() || selectedMonster.name,
-      monsterId: selectedMonster.id,
+      name: name.trim() || defaultName || resolvedMonsterId,
+      monsterId: resolvedMonsterId,
       at,
       scale: 1,
       facing: 0,
@@ -94,87 +143,97 @@ export function PlaceSpawnerModal({ at, onClose, onPlaced }: Props) {
   }
 
   return (
-    <Modal open={true} title={`Place Creature Spawner at (${at.x}, ${at.y})`} onClose={onClose} wide>
-      <div className="flex flex-col gap-4 font-mono select-none">
-        {/* TOP SEARCH BAR */}
-        <div className="flex items-center gap-2 border-b border-line pb-2.5">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-dim" />
-            <input
-              type="text"
-              placeholder="Search creature bestiary (e.g. Goblin, Skeleton, Dire Wolf, Orc, Bandit)..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full border border-line bg-panel py-1.5 pl-8 pr-3 text-[12px] text-white placeholder-dim focus:border-cyan focus:outline-none"
-            />
-          </div>
-          <span className="text-[10px] text-faint shrink-0">{monsters.length} templates in compendium</span>
+    <Modal open={true} title={`Place Spawner at (${at.x}, ${at.y})`} onClose={onClose} wide>
+      <div className="flex flex-col gap-4 font-ui select-none">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-2.5">
+          <span className="text-[12px] text-dim">
+            Pick a World NPC Archetype or Bestiary Creature to spawn
+          </span>
+          <Segmented
+            value={sourceTab}
+            onChange={setSourceTab}
+            options={[
+              { value: 'archetypes', label: `Archetypes (${archetypes.length})` },
+              { value: 'bestiary', label: `Bestiary (${monsters.length})` }
+            ]}
+          />
         </div>
 
-        {/* TWO-COLUMN GALLERY & CONFIG */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 min-h-[400px]">
-          {/* MONSTER LIST */}
-          <div className="flex flex-col gap-1.5 border border-line bg-black/40 p-2 lg:col-span-5 max-h-[440px] overflow-y-auto divide-y divide-line/30">
-            {filtered.map((m) => {
-              const isSelected = selectedMonster?.id === m.id
-              const cr = String(m.facts?.cr ?? '—')
-              const hp = String(m.facts?.hp ?? '—')
-              const type = String(m.facts?.type ?? 'Creature')
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => handleSelect(m)}
-                  className={cn(
-                    'flex items-center justify-between p-2 text-left transition-colors',
-                    isSelected
-                      ? 'border-l-2 border-l-cyan bg-cyan/15 text-white'
-                      : 'text-dim hover:bg-panel hover:text-white'
-                  )}
-                >
-                  <div className="flex flex-col min-w-0">
-                    <span className="truncate text-[12px] font-bold text-white">{m.name}</span>
-                    <span className="text-[10px] text-faint capitalize">{type}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] shrink-0">
-                    <span className="border border-line/60 bg-black/60 px-1 py-0.5 text-dim">CR {cr}</span>
-                    <span className="border border-line/60 bg-black/60 px-1 py-0.5 text-alert">{hp} HP</span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* SPAWNER BLUEPRINT CONFIG */}
-          <div className="flex flex-col justify-between border border-line bg-black/60 p-4 lg:col-span-7">
-            <div className="flex flex-col gap-3.5">
-              {/* INSTANCE IDENTITY */}
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase font-bold text-dim">Spawner Instance Name:</span>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Goblin Sentry, Crypt Skeleton"
-                  className="border border-line bg-black/60 px-2.5 py-1 text-[13px] font-bold text-white focus:border-cyan focus:outline-none"
-                />
-              </div>
-
-              {/* DISPOSITION & FACTION */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col gap-1">
-                  <span className="text-[10px] uppercase font-bold text-dim flex items-center gap-1">
-                    <Swords className="h-3 w-3 text-alert" /> Initial Disposition:
-                  </span>
-                  <Select
-                    value={disposition}
-                    options={DISPOSITION_OPTIONS}
-                    onChange={(d) => setDisposition(d as CreatureDisposition)}
-                    className="h-8 text-[11px]"
+        <div className="grid min-h-[400px] grid-cols-1 gap-4 lg:grid-cols-12">
+          {sourceTab === 'archetypes' ? (
+            <SearchListPanel
+              query={search}
+              onQuery={setSearch}
+              placeholder="Filter world archetypes"
+              count={`${filteredNpcs.length} templates`}
+              className="max-h-[440px] lg:col-span-5"
+            >
+              {filteredNpcs.map((n) => {
+                const wId = n.worldId || world
+                const wName = worlds.find((w) => w.id === wId)?.name ?? wId
+                const key = `${wId}/${n.id}`
+                return (
+                  <ListRow
+                    key={key}
+                    active={activeNpc ? `${activeNpc.worldId || world}/${activeNpc.id}` === key : false}
+                    onClick={() => selectNpc(n)}
+                    title={showName(n.title)}
+                    subtitle={[!world && wName ? wName : '', n.values.Identity ?? ''].filter(Boolean).join(' · ') || 'World NPC template'}
+                    meta={n.archetype ? 'Archetype' : 'NPC'}
                   />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-[10px] uppercase font-bold text-dim">Faction:</span>
+                )
+              })}
+              {!filteredNpcs.length && (
+                <EmptyState title="No world archetypes found">
+                  Create an Archetype in Cast &amp; Party, or switch to Bestiary.
+                </EmptyState>
+              )}
+            </SearchListPanel>
+          ) : (
+            <SearchListPanel
+              query={search}
+              onQuery={setSearch}
+              placeholder="Filter bestiary (Goblin, Bandit, Dire Wolf)"
+              count={`${filteredMonsters.length} creatures`}
+              className="max-h-[440px] lg:col-span-5"
+            >
+              {filteredMonsters.map((m) => (
+                <ListRow
+                  key={m.id}
+                  active={activeMonster?.id === m.id}
+                  onClick={() => selectMonster(m)}
+                  title={m.name}
+                  subtitle={[
+                    String(m.facts?.type ?? 'Creature'),
+                    m.facts?.hp !== undefined ? `${m.facts.hp} HP` : ''
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  meta={m.facts?.cr !== undefined ? `CR ${m.facts.cr}` : undefined}
+                />
+              ))}
+              {!filteredMonsters.length && <EmptyState title="No match">Try another creature name.</EmptyState>}
+            </SearchListPanel>
+          )}
+
+          <div className="flex flex-col justify-between border border-line/60 tone-panel-50 p-4 lg:col-span-7">
+            <div className="flex flex-col gap-3.5">
+              <Field label="Spawned Instance Name" tip="Type @ to link a repo with :roll.">
+                <LinkTextarea
+                  rolls={false}
+                  rows={1}
+                  value={name}
+                  onValue={setName}
+                  placeholder={defaultName || 'Harbor Sentry'}
+                  className="min-h-8 resize-none"
+                />
+              </Field>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Field label="Initial Disposition">
+                  <Segmented value={disposition} onChange={setDisposition} options={DISPOSITION_OPTIONS} />
+                </Field>
+                <Field label="Faction">
                   <Select
                     value={faction}
                     options={[
@@ -184,59 +243,54 @@ export function PlaceSpawnerModal({ at, onClose, onPlaced }: Props) {
                     onChange={setFactionId}
                     className="h-8 text-[11px]"
                   />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 border-t border-line/40 pt-3 md:grid-cols-2">
+                <Field label="Spawn When">
+                  <Select
+                    value={spawnWhen}
+                    options={SPAWN_WHEN_OPTIONS}
+                    onChange={(sw) => setSpawnWhen(sw as SpawnerTriggerMode)}
+                    className="h-8 text-[11.5px]"
+                  />
+                </Field>
+                <Field label="Reset When">
+                  <Select
+                    value={resetWhen}
+                    options={RESET_WHEN_OPTIONS}
+                    onChange={(rw) => setResetWhen(rw as SpawnerResetMode)}
+                    className="h-8 text-[11.5px]"
+                  />
+                </Field>
+              </div>
+
+              {spawnWhen === 'proximity' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10.5px] caps text-dim">Detection Radius:</span>
+                  <NumberField
+                    min={32}
+                    max={800}
+                    step={32}
+                    value={triggerRadius}
+                    onChange={(v) => v !== undefined && setTriggerRadius(Math.round(v))}
+                    className="h-7 w-20 text-[11px]"
+                  />
+                  <span className="text-[10.5px] text-faint">pixels ({Math.round(triggerRadius / 32)} tiles)</span>
                 </div>
-              </div>
-
-              {/* AXIS 1: SPAWN WHEN */}
-              <div className="border-t border-line/40 pt-2.5 flex flex-col gap-1.5">
-                <span className="text-[10px] uppercase font-bold text-cyan flex items-center gap-1">
-                  <Compass className="h-3 w-3" /> Spawn When (Trigger Condition):
-                </span>
-                <Select
-                  value={spawnWhen}
-                  options={SPAWN_WHEN_OPTIONS}
-                  onChange={(sw) => setSpawnWhen(sw as SpawnerTriggerMode)}
-                  className="h-8 text-[11.5px]"
-                />
-                {spawnWhen === 'proximity' && (
-                  <div className="flex items-center gap-2 pt-1">
-                    <span className="text-[10px] text-dim uppercase">Detection Radius:</span>
-                    <Input
-                      type="number"
-                      min={32}
-                      max={800}
-                      step={32}
-                      value={triggerRadius}
-                      onChange={(e) => setTriggerRadius(Math.max(32, Number(e.target.value)))}
-                      className="h-7 w-20 text-[11px]"
-                    />
-                    <span className="text-[10px] text-faint">pixels ({Math.round(triggerRadius / 32)} tiles)</span>
-                  </div>
-                )}
-              </div>
-
-              {/* AXIS 2: RESET WHEN */}
-              <div className="border-t border-line/40 pt-2.5 flex flex-col gap-1.5">
-                <span className="text-[10px] uppercase font-bold text-accent flex items-center gap-1">
-                  <RefreshCw className="h-3 w-3" /> Reset When (Respawn & Persistence):
-                </span>
-                <Select
-                  value={resetWhen}
-                  options={RESET_WHEN_OPTIONS}
-                  onChange={(rw) => setResetWhen(rw as SpawnerResetMode)}
-                  className="h-8 text-[11.5px]"
-                />
-              </div>
+              )}
             </div>
 
-            {/* FOOTER BUTTONS */}
-            <div className="flex items-center justify-end gap-2 border-t border-line/40 pt-3 mt-4">
-              <Button size="sm" variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button size="sm" variant="primary" icon={<Skull className="h-3.5 w-3.5" />} onClick={handlePlace}>
-                Place Spawner on Map
-              </Button>
+            <div className="mt-4 flex items-center justify-between border-t border-line/50 pt-3">
+              <span className="truncate font-mono text-[10.5px] text-dim">{resolvedMonsterId || 'No template selected'}</span>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button size="sm" variant="primary" onClick={handlePlace} disabled={!resolvedMonsterId}>
+                  Place Spawner
+                </Button>
+              </div>
             </div>
           </div>
         </div>

@@ -9,8 +9,9 @@ import type { Events } from '@shared/protocol'
 import type { ChatElement } from '@shared/chatElements'
 import type { ModelHost } from '../model/host'
 import { checkFits } from './fit'
-import { buildInstructionSections, buildInstructions, parseFrozenInstructionSections, withState } from './context'
+import { buildHydratedInstructions, buildInstructionSections, buildInstructionSetup, buildInstructions, parseFrozenInstructionSections, withState } from './context'
 import { buildGameplaySceneDelta } from './sceneDelta'
+import { chatWorld } from '../worlds/chatWorld'
 import { isGameplayScene } from '@shared/almanac'
 import { TurnMeter, usageOf } from './stats'
 import { NEXT_TURN, activeSummary, rebuildHistory, summaryBlock, type FitResult } from './history'
@@ -23,14 +24,14 @@ import type { ModelRegistry } from '../model/registry'
 import type { AgentRegistry } from '../agents/registry'
 import type { SessionStore } from '../sessions/store'
 import type { UiRequests } from '../ui/requests'
-import type { ToolDef } from '../tools/types'
+import { ToolError, type ToolDef } from '../tools/types'
 import type { PermissionStore } from '../permissions/rules'
 import type { CheckpointStore } from '../checkpoints/store'
 import { newGrants, type SessionGrants } from '../permissions/gate'
 import { detectShell } from '../tools/shell'
 import { promptOptions, serverSampling, thinkingLevel, withThinking } from '../model/params'
 import { findTool, toolsFor } from '../tools/registry'
-import { USER, referenceText, resolveEntry, rollText } from '../library/kinds'
+import { USER, claimLink, hydrateForAgent, referenceText, resolveEntry, rollText } from '../library/kinds'
 import { referencePattern } from '@shared/text'
 
 const ACTIVITY_KEYS = ['command', 'path', 'pattern', 'query', 'url', 'title', 'collection', 'name', 'board']
@@ -53,6 +54,7 @@ import { newId, readText, writeText } from '../util/fs'
 import { secure } from '../util/secure'
 import { minds } from '../mind/store'
 import { characterMindFor } from '../library/sheets'
+import { campaignOf } from '../library/holds'
 import { characterRecallBlock, mindAuto, recallBlock } from '../mind/auto'
 import { CHECK_IN, checkInText } from './checkin'
 import { probeBrief, probeInstructions, probePageTitle, probeState, probeTools } from '../probe/probe'
@@ -155,7 +157,7 @@ function userImages(message: ChatMessage): string[] {
   return [...new Set([...attached, ...linkImages(text)])]
 }
 
-function referenceBlock(prompt: string): string {
+function referenceBlock(prompt: string, agentId: string): string {
   const seen = new Set<string>()
   const parts: string[] = []
   for (const m of prompt.matchAll(referencePattern())) {
@@ -163,18 +165,16 @@ function referenceBlock(prompt: string): string {
     const action = m[4]?.toLowerCase() ?? null
     const part = m[5]?.toLowerCase() ?? null
     if (part === 'random' || action) continue
-    const key = `${m[2].toLowerCase()}:${ref}#${part ?? ''}`
-    if (seen.has(key) || seen.size >= 8) continue
-    seen.add(key)
+    if (parts.length >= 8 || !claimLink(seen, m[2], ref, part)) continue
     const tag = `@${m[2]}:${ref}${part ? `#${part}` : ''}`
     let found: ReturnType<typeof referenceText> = null
     let problem = 'Not found.'
     try {
-      found = referenceText(m[2], ref, part)
+      found = referenceText(m[2], ref, part, { agentId })
     } catch (err) {
       problem = err instanceof Error ? err.message : String(err)
     }
-    parts.push(found ? `### ${tag} (${found.label}: ${found.title})\n${found.text}` : `### ${tag}\n(${problem})`)
+    parts.push(found ? `### ${tag} (${found.label}: ${found.title})\n${hydrateForAgent(found.text, { agentId }, false, seen)}` : `### ${tag}\n(${problem})`)
   }
   return parts.length ? `\n\n[The user referenced these:]\n${parts.join('\n\n')}` : ''
 }
@@ -184,6 +184,7 @@ export class ChatRunner extends EventEmitter {
   private turn: Turn | null = null
   private compacting: { sessionId: string; controller: AbortController } | null = null
   private preparing = false
+  private recallCooldown = new Map<string, Map<string, number>>()
 
   get busy(): boolean {
     return this.preparing || this.turn !== null || this.compacting !== null
@@ -370,29 +371,46 @@ export class ChatRunner extends EventEmitter {
     return crypto.createHash('sha1').update(JSON.stringify(history)).digest('hex')
   }
 
-  private async saveState(active: ActiveChat): Promise<void> {
-    if (!contextPrefs.get().saveChatState || active.chat.disposed || this.models.isRemote(active.modelId) || this.host.loadedId !== active.modelId) return
+  private cachePhase(sessionId: string, state: 'building' | 'saving' | 'restoring' | 'idle'): void {
+    this.emitEvent('cache.state', { sessionId, state })
+  }
+
+  private async saveState(active: ActiveChat, force = false): Promise<boolean> {
+    if ((!force && !contextPrefs.get().saveChatState) || active.chat.disposed || this.models.isRemote(active.modelId) || this.host.loadedId !== active.modelId) return false
     const file = this.sessions.stateFile(active.sessionId)
-    if (!file) return
+    if (!file) return false
+    this.cachePhase(active.sessionId, 'saving')
     try {
       await this.host.saveState(file)
       writeText(`${file}.json`, JSON.stringify({ key: this.stateKey(active.modelId), history: this.hashHistory(active.chat.getChatHistory()), savedAt: Date.now() }))
       this.sessions.pruneStates(3)
+      return true
     } catch (err) {
       this.emitEvent('engine.problem', { severity: 'error', area: 'chat', sessionId: active.sessionId, message: `Could not save the chat's model state: ${err instanceof Error ? err.message : String(err)}` })
+      return false
+    } finally {
+      this.cachePhase(active.sessionId, 'idle')
     }
+  }
+
+  async saveCache(sessionId: string): Promise<boolean> {
+    if (!this.active || this.active.sessionId !== sessionId) return false
+    return this.saveState(this.active, true)
   }
 
   private async loadState(sessionId: string, modelId: string, history: ChatHistoryItem[] | null): Promise<void> {
     if (!contextPrefs.get().saveChatState || !history) return
     const file = this.sessions.stateFile(sessionId)
     if (!file) return
+    this.cachePhase(sessionId, 'restoring')
     try {
       const meta = JSON.parse(readText(`${file}.json`)) as { key: string; history: string }
       if (meta.key !== this.stateKey(modelId) || meta.history !== this.hashHistory(history)) return
       await this.host.loadState(file)
     } catch {
       await this.host.clearContext().catch((err: unknown) => noteFailure(err, 'chat', "Could not clear the model's context"))
+    } finally {
+      this.cachePhase(sessionId, 'idle')
     }
   }
 
@@ -443,7 +461,9 @@ export class ChatRunner extends EventEmitter {
   }
 
   private allowedFor(sessionId: string, agent: AgentProfile): ToolDef[] {
-    return this.probeOf(sessionId) ? probeTools() : toolsFor(agent)
+    if (this.probeOf(sessionId)) return probeTools()
+    const hasSceneChars = (this.sessions.list().find((s) => s.id === sessionId)?.scene?.characters?.length ?? 0) > 0
+    return toolsFor(agent, hasSceneChars)
   }
 
   private effectiveAgentFor(sessionId: string, agent: AgentProfile): AgentProfile {
@@ -465,21 +485,35 @@ export class ChatRunner extends EventEmitter {
     }
   }
 
-  private promptFor(sessionId: string, agent: AgentProfile, tools: ToolDef[], memoryText: string): string {
+  private promptFor(sessionId: string, agent: AgentProfile, tools: ToolDef[], memoryText: string, build = buildInstructions): string {
     const probe = this.probeOf(sessionId)
     const meta = this.sessions.list().find((s) => s.id === sessionId)
-    if (!probe) return buildInstructions(this.effectiveAgentFor(sessionId, agent), tools, memoryText, meta?.scene ?? null, meta?.dmMode === true)
+    if (!probe) return build(this.effectiveAgentFor(sessionId, agent), tools, memoryText, meta?.scene ?? null, meta?.dmMode === true)
     return probeInstructions(agent, probe.subject, data.pages.find(probe.pageId)?.title ?? probePageTitle(probe.subject), tools.some((t) => t.name === 'ask_user'))
   }
 
-  private frozenFor(sessionId: string, agent: AgentProfile): { systemPrompt: string; tools: ToolDef[] } | null {
-    const allowed = this.allowedFor(sessionId, agent)
+  private setupFor(sessionId: string, agent: AgentProfile, tools: ToolDef[], memoryText: string): string {
+    return this.promptFor(sessionId, agent, tools, memoryText, buildInstructionSetup)
+  }
+
+  private frozenFor(sessionId: string, _agent: AgentProfile): { systemPrompt: string; tools: ToolDef[] } | null {
     const frozen = this.sessions.loadContext(sessionId).instructions
-    const stillAllowed = frozen ? frozen.tools.every((name) => allowed.some((t) => t.name === name)) : false
-    if (frozen && stillAllowed && frozen.workspace === agent.workspace) {
-      return { systemPrompt: frozen.systemPrompt, tools: allowed.filter((t) => frozen.tools.includes(t.name)) }
-    }
-    return null
+    if (!frozen) return null
+    return { systemPrompt: frozen.systemPrompt, tools: frozen.tools.flatMap((name) => findTool(name) ?? []) }
+  }
+
+  private callable(sessionId: string, agent: AgentProfile, tools: ToolDef[]): ToolDef[] {
+    const live = new Set(this.allowedFor(sessionId, agent).map((t) => t.name))
+    return tools.map((t) =>
+      live.has(t.name)
+        ? t
+        : {
+            ...t,
+            execute: async () => {
+              throw new ToolError(`${t.name} is turned off for this chat.`)
+            }
+          }
+    )
   }
 
   agentInstructions(agentId: string): string | null {
@@ -603,9 +637,11 @@ export class ChatRunner extends EventEmitter {
 
   private freeze(sessionId: string, agent: AgentProfile, tools: ToolDef[]): { systemPrompt: string; tools: ToolDef[] } {
     const memoryText = this.memoryFor(agent)
-    const systemPrompt = this.promptFor(sessionId, agent, tools, memoryText)
+    const template = this.promptFor(sessionId, agent, tools, memoryText)
+    const setup = this.setupFor(sessionId, agent, tools, memoryText)
+    const systemPrompt = this.promptFor(sessionId, agent, tools, memoryText, buildHydratedInstructions)
     this.sessions.saveContext(sessionId, {
-      instructions: { systemPrompt, tools: tools.map((t) => t.name), workspace: agent.workspace, builtAt: Date.now(), memory: memoryText },
+      instructions: { systemPrompt, template, setup, tools: tools.map((t) => t.name), workspace: agent.workspace, builtAt: Date.now(), memory: memoryText },
       usage: null
     })
     return { systemPrompt, tools }
@@ -619,8 +655,13 @@ export class ChatRunner extends EventEmitter {
     const names = allowed.map((t) => t.name)
     if (names.join(',') !== frozen.tools.join(',') || frozen.workspace !== agent.workspace) return true
     const memoryText = this.memoryFor(agent)
-    if (this.promptFor(sessionId, agent, allowed, memoryText) === frozen.systemPrompt) return false
-    return !(frozen.acceptedMemory === memoryText && this.promptFor(sessionId, agent, allowed, frozen.memory ?? '') === frozen.systemPrompt)
+    if (frozen.setup === undefined) {
+      this.sessions.saveContext(sessionId, { instructions: { ...frozen, setup: this.setupFor(sessionId, agent, allowed, frozen.memory ?? '') } })
+      return false
+    }
+    const current = (memory: string) => this.setupFor(sessionId, agent, allowed, memory)
+    if (current(memoryText) === frozen.setup) return false
+    return !(frozen.acceptedMemory === memoryText && current(frozen.memory ?? '') === frozen.setup)
   }
 
   refreshInstructions(sessionId: string): boolean {
@@ -649,7 +690,7 @@ export class ChatRunner extends EventEmitter {
     this.emitEvent('session.rewritten', { sessionId })
   }
 
-  private begin(sessionId: string, prompt: string, agent: AgentProfile, controller: AbortController, historyIndex?: number, attachments: string[] = [], elements: ChatElement[] = []): Turn {
+  private begin(sessionId: string, prompt: string, agent: AgentProfile, controller: AbortController, historyIndex?: number, attachments: string[] = [], elements: ChatElement[] = [], modelText?: string): Turn {
     const meta = this.sessions.get(sessionId)
     const now = Date.now()
     const userMessage: ChatMessage = {
@@ -660,7 +701,8 @@ export class ChatRunner extends EventEmitter {
       status: 'complete',
       ...(historyIndex !== undefined ? { historyIndex } : {}),
       ...(attachments.length ? { attachments } : {}),
-      ...(elements.length ? { elements } : {})
+      ...(elements.length ? { elements } : {}),
+      ...(modelText !== undefined && modelText !== prompt ? { modelText } : {})
     }
     const message: ChatMessage = { id: newId('m'), role: 'assistant', parts: [], createdAt: now + 1, status: 'running' }
     const turn: Turn = { sessionId, prompt, modelPrompt: prompt, agent, controller, message, userMessageId: userMessage.id, blocks: 0, stopReason: null, lastCall: null, historyIndex }
@@ -859,11 +901,11 @@ export class ChatRunner extends EventEmitter {
     const meta = this.sessions.get(sessionId)
     let sceneDeltaBlock = ''
     if (isGameplayScene(meta.scene) && meta.scene) {
-      const delta = buildGameplaySceneDelta(meta.scene, resolvedModelText ?? prompt, this.lastSceneSig.get(sessionId) ?? null)
+      const delta = buildGameplaySceneDelta(meta.scene, chatWorld(meta.scene, agent).world, resolvedModelText ?? prompt, this.lastSceneSig.get(sessionId) ?? null)
       this.lastSceneSig.set(sessionId, delta.sig)
       sceneDeltaBlock = delta.block
     }
-    const stated = withState(resolvedModelText ?? prompt) + sceneDeltaBlock + referenceBlock(resolvedModelText ?? prompt) + fileBlock + todoBlock + boardBlock + (probe ? probeState(probe.pageId, this.sessions.messages(sessionId)) : '')
+    const stated = withState(resolvedModelText ?? prompt) + sceneDeltaBlock + referenceBlock(resolvedModelText ?? prompt, agent.id) + fileBlock + todoBlock + boardBlock + (probe ? probeState(probe.pageId, this.sessions.messages(sessionId)) : '')
     let modelPrompt = pending ? `${summaryBlock(pending)}\n\n${stated}` : stated
 
     const placeholder: Turn = {
@@ -885,7 +927,7 @@ export class ChatRunner extends EventEmitter {
     this.preparing = true
     try {
       const auto = mindAuto(agent)
-      if (auto.recall && tools.some((t) => t.name === 'recall')) {
+      if (auto.recall && tools.some((t) => t.name === 'agent_recall')) {
         const recalled = await recallBlock(agent.id, prompt).catch((err: unknown) => (noteFailure(err, 'memory', 'Could not recall memories for this turn'), ''))
         if (recalled) {
           modelPrompt += recalled
@@ -893,7 +935,18 @@ export class ChatRunner extends EventEmitter {
         }
       }
       if (auto.recall && agentSheets(agent).length > 0) {
-        const sheetRecall = characterRecallBlock(agent, prompt)
+        let cdMap = this.recallCooldown.get(sessionId)
+        if (!cdMap) {
+          cdMap = new Map()
+          this.recallCooldown.set(sessionId, cdMap)
+        }
+        const turnIndex = this.sessions.messages(sessionId).filter((m) => m.role === 'user').length
+        const sheetRecall = characterRecallBlock(agent, prompt, campaignOf(sessionId), {
+          sceneWhere: meta.scene?.where,
+          cooldownTurns: auto.cooldown,
+          lastRecalled: cdMap,
+          turnIndex
+        })
         if (sheetRecall) {
           modelPrompt += sheetRecall
           placeholder.modelPrompt = modelPrompt
@@ -913,7 +966,7 @@ export class ChatRunner extends EventEmitter {
     }
     this.turn = null
 
-    const turn = this.begin(sessionId, prompt, agent, placeholder.controller, chat.getChatHistory().length, files.map((f) => f.id), elements)
+    const turn = this.begin(sessionId, prompt, agent, placeholder.controller, chat.getChatHistory().length, files.map((f) => f.id), elements, modelPrompt)
     if (pending) this.sessions.saveContext(sessionId, { summaries: ctx.summaries.map((s) => (s.id === pending.id ? { ...s, upTo: turn.userMessageId } : s)) })
     turn.modelPrompt = modelPrompt
     turn.systemPrompt = systemPrompt
@@ -936,7 +989,7 @@ export class ChatRunner extends EventEmitter {
     const { sessionId, message, controller } = turn
     const config = this.configFor(modelId, turn.agent, sessionId)
     const sampling = promptOptions(config, turn.agent.sampling)
-    const functions = tools.length ? buildFunctions(tools, this.hooks(turn)) : undefined
+    const functions = tools.length ? buildFunctions(this.callable(sessionId, turn.agent, tools), this.hooks(turn)) : undefined
     const local = chat.local
     const every = turn.agent.remindEvery ?? DEFAULT_REMIND_EVERY
     if (local && functions && every > 0)
@@ -959,6 +1012,7 @@ export class ChatRunner extends EventEmitter {
     const fixed = estimateTokens((turn.systemPrompt ?? '') + JSON.stringify(definitions))
     turn.usageBase = { fixed, before: chat.used || fixed + estimateTokens(JSON.stringify(chat.getChatHistory().filter((h) => h.type !== 'system'))), size: chat.contextSize }
     this.phase(turn, 'reading')
+    if (local) this.cachePhase(sessionId, 'building')
     let chosenToolChoice: ToolChoiceMode | null = null
     try {
       chosenToolChoice = this.sessions.get(sessionId).toolChoice ?? null
@@ -969,6 +1023,12 @@ export class ChatRunner extends EventEmitter {
     const charMind = characterMindFor(agentSheets(turn.agent))
     const baseChoice = chosenToolChoice ?? turn.agent.toolChoice ?? 'auto'
     const effectiveToolChoice: ToolChoiceMode = baseChoice === 'auto' && charMind?.forceReason ? 'force_reason' : baseChoice
+    let cacheCleared = false
+    const clearBuilding = () => {
+      if (cacheCleared || !local) return
+      cacheCleared = true
+      this.cachePhase(sessionId, 'idle')
+    }
     try {
       await chat.prompt(turn.modelPrompt, {
         ...sampling,
@@ -980,11 +1040,13 @@ export class ChatRunner extends EventEmitter {
         ...(functions ? { functions } : {}),
         signal: controller.signal,
         onFunctionCallParamsChunk: (chunk) => {
+          clearBuilding()
           meter.mark()
           this.phase(turn, 'calling', chunk.functionName)
           this.emitEvent('tool.draft', { sessionId, messageId: message.id, callIndex: chunk.callIndex, name: chunk.functionName, chunk: chunk.paramsChunk, done: chunk.done })
         },
         onResponseChunk: (chunk) => {
+          clearBuilding()
           meter.mark()
           if (chunk.type === 'segment') {
             if (chunk.segmentType !== 'thought' || !chunk.text) return
@@ -1006,6 +1068,8 @@ export class ChatRunner extends EventEmitter {
       else message.status = 'complete'
     } catch (err) {
       this.fail(turn, err)
+    } finally {
+      clearBuilding()
     }
     const history = this.active?.chat === chat && !chat.disposed ? chat.getChatHistory() : null
     if (!chat.disposed) {

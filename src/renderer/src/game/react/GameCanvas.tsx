@@ -5,6 +5,7 @@ import { readImage } from '../../lib/assetSource'
 import { useViewPlace } from '../../lib/viewPlace'
 import { ZoomControls } from '../../components/space/ZoomControls'
 import { cn } from '../../lib/cn'
+import { useRoleColours } from '../../lib/skins/useRoleColours'
 
 const ZOOM_STEP = 1.25
 
@@ -16,6 +17,7 @@ export function GameCanvas({ place, onReady, className }: { place: string; onRea
   savedRef.current = saved
   const readyRef = useRef(onReady)
   readyRef.current = onReady
+  const roles = useRoleColours()
 
   useEffect(() => {
     const el = host.current
@@ -32,7 +34,7 @@ export function GameCanvas({ place, onReady, className }: { place: string; onRea
       made?.destroy()
       setEngine(null)
     }
-  }, [])
+  }, [roles])
 
   useEffect(() => {
     if (!engine) return

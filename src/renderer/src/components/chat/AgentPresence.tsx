@@ -36,12 +36,12 @@ export function AgentPresence({ agent, sessionId, eyebrow, size, children }: { a
         )}
       </span>
       <div className="min-w-0 flex-1">
-        {eyebrow && <div className="truncate font-mono text-[10px] uppercase tracking-[0.22em] text-accent-soft">{eyebrow}</div>}
-        <div className={cn('truncate font-mono uppercase leading-tight text-white', look.name)}>
+        {eyebrow && <div className="truncate font-label text-[10px] caps-22 text-accent-soft">{eyebrow}</div>}
+        <div className={cn('truncate font-label caps leading-tight text-ink', look.name)}>
           <span className="text-accent">/</span>
           {agent?.name ?? 'Seven'}
         </div>
-        <div className={cn('mt-1 flex min-w-0 items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em]', phase ? 'text-cyan' : 'text-faint')}>
+        <div className={cn('mt-1 flex min-w-0 items-center gap-2 font-label text-[10px] caps-18 ', phase ? 'text-secondary-ink' : 'text-faint')}>
           {phase && (
             <span className="signal shrink-0">
               <i />

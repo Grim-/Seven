@@ -1,6 +1,6 @@
 import { entryLink } from '@shared/game/core'
 import { Inventory } from '@shared/game/components'
-import { ITEM_TEMPLATES } from '@shared/game/templateKinds'
+import { ITEM_KIND, ITEM_TEMPLATES } from '@shared/game/templateKinds'
 import { lootTablesStore } from '../../lootTables/store'
 import { registerWorldAct } from '../acts'
 
@@ -13,7 +13,7 @@ registerWorldAct('roll_loot', (data, { target, catalog }) => {
   for (const item of drop.items) {
     const def = catalog.template(ITEM_TEMPLATES, item.itemId)
     const given = def ? bag.give(def, item.quantity) : 0
-    if (given) got.push(`${given}× ${entryLink(ITEM_TEMPLATES, item.itemId)}`)
+    if (given) got.push(`${given}× ${entryLink(ITEM_KIND, item.itemId)}`)
   }
   if (drop.gold > 0) {
     bag.changeGold(drop.gold)

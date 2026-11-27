@@ -9,7 +9,7 @@ export const optionalShown = (Class: PieceClass, def: ComponentDef, part: { opti
 export function EffectSentence({ def, onChange, revealed, chips = false }: { def: ComponentDef; onChange?: (def: ComponentDef) => void; revealed?: Set<number>; chips?: boolean }) {
   const Class = pieceClass(def.type)
   const parts = useMemo(() => (Class ? parseSentence(Class.SENTENCE) : []), [Class])
-  if (!Class) return <span className="font-mono text-dim">{def.type}</span>
+  if (!Class) return <span className="font-ui text-dim">{def.type}</span>
   const token = (key: string): ReactNode => {
     const spec = Class.PARAMS[key]
     if (!spec) return `{${key}}`

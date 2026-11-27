@@ -4,7 +4,7 @@ export function PanelBody({ children, footer }: { children: ReactNode; footer: R
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">{children}</div>
-      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line/60 bg-white/[0.03] px-5 py-3">{footer}</div>
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line/60 bg-ink/[0.03] px-5 py-3">{footer}</div>
     </div>
   )
 }

@@ -1,8 +1,9 @@
 import { DICE } from '@shared/rolledDecision'
 import type { DecisionMode, StoredDecision } from '@shared/storedDecision'
-import { Field, Input, NumberField, Segmented, Select, TagInput, Textarea } from '../ui'
+import { Field, Input, NumberField, Segmented, Select, TagInput } from '../ui'
 import { RollerField } from '../play/roll/RollerField'
 import { PickOptionsEditor } from './PickOptionsEditor'
+import { LinkTextarea } from '../data/LinkTextarea'
 
 export function DecisionEditor({ value: decision, onChange }: { value: StoredDecision; onChange: (next: StoredDecision) => void }) {
   const set = (patch: Partial<StoredDecision>) => onChange({ ...decision, ...patch })
@@ -36,7 +37,7 @@ export function DecisionEditor({ value: decision, onChange }: { value: StoredDec
       </div>
       {!rolled && <RollerField value={decision.roller ?? 'agent'} onChange={(roller) => set({ roller })} />}
       <Field label="Prompt">
-        <Textarea value={decision.prompt} onChange={(e) => set({ prompt: e.target.value })} placeholder="What the options are about, for the agent to write them from" rows={3} />
+        <LinkTextarea rolls={false} value={decision.prompt} onValue={(v) => set({ prompt: v })} placeholder="What the options are about, for the agent to write them from" rows={3} />
       </Field>
       <Field label="Tags">
         <TagInput value={decision.tags} onChange={(tags) => set({ tags })} />
@@ -44,7 +45,7 @@ export function DecisionEditor({ value: decision, onChange }: { value: StoredDec
       <Field label={rolled ? `Kept options (none, or exactly ${decision.die})` : 'Kept options (none to have them written each time)'} group>
         <div className="flex flex-col gap-2">
           <PickOptionsEditor options={decision.options} onChange={(options) => set({ options })} rolls={!rolled} />
-          {rolled && kept > 0 && kept !== decision.die && <span className="font-mono text-[11px] text-alert">{kept} kept; a d{decision.die} needs {decision.die}.</span>}
+          {rolled && kept > 0 && kept !== decision.die && <span className="font-ui text-[11px] text-alert">{kept} kept; a d{decision.die} needs {decision.die}.</span>}
         </div>
       </Field>
     </div>

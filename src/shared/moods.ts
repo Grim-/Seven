@@ -60,9 +60,9 @@ export function isActivity(value: unknown): value is Activity {
 }
 
 export const REACTION_POSES = [
-  { name: 'hit', label: 'Hit' },
-  { name: 'heal', label: 'Heal' },
-  { name: 'crit', label: 'Crit' }
+  { name: 'hit', label: 'Hit', vfx: { preset: 'hit', color: 'alert' } },
+  { name: 'heal', label: 'Heal', vfx: { preset: 'flash', color: 'ok' } },
+  { name: 'crit', label: 'Crit', vfx: { preset: 'hit', color: 'alert' } }
 ] as const
 
 export type ReactionPoseName = (typeof REACTION_POSES)[number]['name']

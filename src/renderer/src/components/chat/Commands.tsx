@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { Fragment, useEffect, useRef, useState, type RefObject } from 'react'
+import { FloatLayer } from '../ui/FloatLayer'
 import { create } from 'zustand'
 import { useAui, useAuiState } from '@assistant-ui/react'
 import { Terminal, X } from 'lucide-react'
-import { hitDetail, type CommandArg, type CommandInfo, type LibraryHit } from '@shared/types'
+import { hitDetail, type CommandArg, type CommandInfo } from '@shared/types'
 import {
   argLabel,
   commandVariables,
@@ -13,7 +14,9 @@ import {
 import { engine } from '../../lib/ipc'
 import { useCommands } from '../../store/commands'
 import { Markdown } from './Markdown'
+import { COMMAND_TONE, CommandLine } from './CommandLine'
 import { cn } from '../../lib/cn'
+import { skinSurface } from '../skins/skinSurface'
 import { toast } from '../../store/toasts'
 import { failed } from '../../lib/notify'
 import { useConversation } from '../../lib/conversation'
@@ -21,6 +24,7 @@ import { useKindInfos } from '../../lib/kinds'
 import { toId } from '@shared/ids'
 import { useKeepInView } from '../../lib/useKeepInView'
 import { noteFailure } from '../../store/problems'
+import { useLibraryFind } from '../../lib/useLibraryFind'
 
 export interface Hint {
   key: string
@@ -90,22 +94,8 @@ export function useReferenceHints(text: string, setText: (t: string) => void): H
   const parent = slash > 0 && actionColon < 0 ? query.slice(0, slash) : null
   const tail = slash > 0 ? query.slice(slash + 1).toLowerCase() : ''
   const kinds = useKindInfos(token !== null)
-  const [hits, setHits] = useState<LibraryHit[]>([])
-  const [inside, setInside] = useState<{ segment: string; kind: string; title: string }[]>([])
-
-  useEffect(() => {
-    if (!kind || parent !== null || actionColon > 0) return setHits([])
-    let live = true
-    const timer = setTimeout(() => {
-      void engine('library.find', { query, kind })
-        .then((h) => live && setHits(h))
-        .catch(noteFailure('chat', 'Could not search', () => live && setHits([])))
-    }, 150)
-    return () => {
-      live = false
-      clearTimeout(timer)
-    }
-  }, [kind, query, parent])
+  const hits = useLibraryFind(query, kind, 30, Boolean(kind) && parent === null && actionColon <= 0) ?? []
+  const [inside, setInside] = useState<{ segment: string; kind: string; title: string; path?: string }[]>([])
 
   useEffect(() => {
     if (!kind || parent === null) return setInside([])
@@ -135,9 +125,13 @@ export function useReferenceHints(text: string, setText: (t: string) => void): H
   }
   if (parent !== null) {
     const label = (k: string) => kinds.find((x) => x.kind === k)?.label ?? k
-    return inside
+    const here: Hint[] = tail ? [] : [{ key: `${kind}:${parent}:here`, label: `@${kind}:${parent}`, detail: 'Link this one', apply: () => setText(`${before}${kind}:${parent} `) }]
+    return here.concat(inside
       .filter((c) => !tail || c.segment.startsWith(tail) || c.title.toLowerCase().startsWith(tail))
-      .map((c) => ({ key: `${kind}:${parent}/${c.segment}`, label: c.title, detail: `${label(c.kind)} · ${parent}/${c.segment}`, apply: () => descend(`${parent}/${c.segment}`) }))
+      .map((c) => {
+        const ref = c.path ?? `${parent}/${c.segment}`
+        return { key: `${kind}:${ref}`, label: c.title, detail: `${label(c.kind)} · ${ref}`, apply: () => descend(ref) }
+      }))
   }
   const info = kinds.find((k) => k.kind === kind || k.short === kind?.toLowerCase())
   const actions = info?.linkActions ?? (info?.rollable ? [{ name: 'roll', label: 'roll', detail: 'put a random value from it here', mode: 'insert' as const }] : [])
@@ -174,7 +168,6 @@ export function useReferenceHints(text: string, setText: (t: string) => void): H
   })
 }
 
-const PIECE_STYLE = { '--tone': '#e08d47' } as CSSProperties
 
 interface CommandBarState {
   editingIndex: number | null
@@ -276,7 +269,7 @@ function CommandPieceToken({
     return (
       <label
         data-cmd-piece
-        className="mx-0.5 inline-grid h-[26px] max-w-[32rem] min-w-[7rem] items-center border border-[var(--tone)] bg-[color-mix(in_srgb,var(--tone)_18%,#090c11)] px-2 align-middle shadow-[0_0_12px_color-mix(in_srgb,var(--tone)_28%,transparent)]"
+        className="mx-0.5 inline-grid h-[26px] max-w-[32rem] min-w-[7rem] items-center border border-[var(--tone)] bg-[color-mix(in_srgb,var(--tone)_18%,var(--color-surface))] px-2 align-middle shadow-[0_0_12px_color-mix(in_srgb,var(--tone)_28%,transparent)]"
       >
         <span className="invisible col-start-1 row-start-1 whitespace-pre px-0.5 font-mono text-[13px] font-semibold">
           {value || placeholder}
@@ -302,7 +295,7 @@ function CommandPieceToken({
               onDone()
             }
           }}
-          className="col-start-1 row-start-1 w-full min-w-0 bg-transparent font-mono text-[13px] font-semibold text-white outline-none placeholder:font-normal placeholder:text-dim/70"
+          className="col-start-1 row-start-1 w-full min-w-0 bg-transparent font-ui text-[13px] font-semibold text-ink outline-none placeholder:font-normal placeholder:text-dim/70"
         />
       </label>
     )
@@ -316,12 +309,12 @@ function CommandPieceToken({
       onMouseDown={(e) => e.preventDefault()}
       onClick={onStartEdit}
       className={cn(
-        'mx-0.5 inline-flex h-[26px] max-w-full cursor-pointer items-center gap-1.5 border px-2 align-middle font-mono text-[13px] transition-colors',
+        'mx-0.5 inline-flex h-[26px] max-w-full cursor-pointer items-center gap-1.5 border px-2 align-middle font-ui text-[13px] transition-colors',
         active
-          ? 'border-[var(--tone)] bg-[color-mix(in_srgb,var(--tone)_18%,transparent)] font-semibold text-white shadow-[0_0_10px_color-mix(in_srgb,var(--tone)_22%,transparent)]'
+          ? 'border-[var(--tone)] bg-[color-mix(in_srgb,var(--tone)_18%,transparent)] font-semibold text-ink shadow-[0_0_10px_color-mix(in_srgb,var(--tone)_22%,transparent)]'
           : filled
-            ? 'border-[color-mix(in_srgb,var(--tone)_45%,transparent)] bg-[color-mix(in_srgb,var(--tone)_10%,transparent)] font-semibold text-white hover:border-[var(--tone)] hover:bg-[color-mix(in_srgb,var(--tone)_20%,transparent)]'
-            : 'border-dashed border-line text-dim hover:border-dim hover:text-white'
+            ? 'border-[color-mix(in_srgb,var(--tone)_45%,transparent)] bg-[color-mix(in_srgb,var(--tone)_10%,transparent)] font-semibold text-ink hover:border-[var(--tone)] hover:bg-[color-mix(in_srgb,var(--tone)_20%,transparent)]'
+            : 'border-dashed border-line text-dim hover:border-dim hover:text-ink'
       )}
     >
       <span className="truncate">{filled ? value : def.default ? `${label}: ${def.default}` : label}</span>
@@ -347,8 +340,8 @@ export function ActiveCommand() {
 
   if (!info.prompt || vars.length === 0) {
     return (
-      <div className="absolute bottom-full left-0 right-0 z-50 mb-px flex items-start gap-3 border border-accent/70 bg-black/95 px-3 py-2">
-        <span className="shrink-0 border border-accent bg-accent/15 px-1.5 py-0.5 font-mono text-[12px] font-bold text-white">/{info.name}</span>
+      <div {...skinSurface('chat-popover')} className="absolute bottom-full left-0 right-0 z-50 mb-px flex items-start gap-3 border border-accent/70 tone-panel-95 px-3 py-2">
+        <span className="shrink-0 border border-accent bg-accent/15 px-1.5 py-0.5 font-mono text-[12px] font-bold text-ink">/{info.name}</span>
         <div className="min-w-0 flex-1 text-[12px] text-dim">
           <Markdown text={info.usage} />
         </div>
@@ -379,11 +372,12 @@ export function ActiveCommand() {
 
   return (
     <div
-      style={PIECE_STYLE}
-      className="absolute bottom-full left-0 right-0 z-50 mb-px flex flex-col gap-2 border border-accent/70 bg-black/95 px-3 py-2.5 shadow-[0_-10px_28px_rgba(0,0,0,0.7)]"
+      style={COMMAND_TONE}
+      {...skinSurface('chat-popover')}
+      className="absolute bottom-full left-0 right-0 z-50 mb-px flex flex-col gap-2 border border-accent/70 tone-panel-95 px-3 py-2.5 shadow-[0_-10px_28px_color-mix(in_srgb,var(--color-shade)_70%,transparent)]"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="shrink-0 border border-accent bg-accent/15 px-1.5 py-0.5 font-mono text-[12px] font-bold text-white">
+        <span className="shrink-0 border border-accent bg-accent/15 px-1.5 py-0.5 font-mono text-[12px] font-bold text-ink">
           /{info.name}
         </span>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -398,12 +392,12 @@ export function ActiveCommand() {
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setEditingIndex(idx)}
                 className={cn(
-                  'inline-flex items-center gap-1.5 border px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] transition-colors',
+                  'inline-flex items-center gap-1.5 border px-2 py-0.5 font-label text-[10.5px] caps-8 transition-colors',
                   isCur
-                    ? 'border-[var(--tone)] bg-[color-mix(in_srgb,var(--tone)_20%,transparent)] text-white'
+                    ? 'border-[var(--tone)] bg-[color-mix(in_srgb,var(--tone)_20%,transparent)] text-ink'
                     : val
-                      ? 'border-[color-mix(in_srgb,var(--tone)_45%,transparent)] bg-[color-mix(in_srgb,var(--tone)_8%,transparent)] text-white/85 hover:border-[var(--tone)]'
-                      : 'border-dashed border-line text-dim hover:border-dim hover:text-white'
+                      ? 'border-[color-mix(in_srgb,var(--tone)_45%,transparent)] bg-[color-mix(in_srgb,var(--tone)_8%,transparent)] text-ink/85 hover:border-[var(--tone)]'
+                      : 'border-dashed border-line text-dim hover:border-dim hover:text-ink'
                 )}
               >
                 <span className="text-[9.5px] text-faint">{idx + 1}</span>
@@ -412,11 +406,11 @@ export function ActiveCommand() {
             )
           })}
         </div>
-        <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-faint">
+        <span className="shrink-0 font-label text-[10px] caps-10 text-faint">
           Tab next · Click piece · Enter send
         </span>
       </div>
-      <div className="notch-sm border border-[#1c1f28] border-l-[3px] border-l-[var(--tone)] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--tone)_7%,#12151c),#12151c_60%)] px-3 py-2 text-[14px] leading-[30px] text-white/90">
+      <CommandLine>
         {segments.map((seg, i) => {
           if (seg.type === 'text') {
             return (
@@ -445,7 +439,7 @@ export function ActiveCommand() {
             />
           )
         })}
-      </div>
+      </CommandLine>
     </div>
   )
 }
@@ -461,7 +455,7 @@ export function ComposerHints({ hints, selected, onSelect, inline = false }: { h
   const list = useKeepInView<HTMLDivElement>(selected)
   if (!hints.length) return null
   return (
-    <div ref={list} className={cn('max-h-80 overflow-y-auto border border-line bg-black/95 py-1', inline ? 'shrink-0' : 'absolute bottom-full left-0 right-0 z-50 mb-px')}>
+    <div ref={list} {...(inline ? {} : skinSurface('chat-popover'))} className={cn('max-h-80 overflow-y-auto border border-line tone-panel-95 py-1', inline ? 'shrink-0' : 'absolute bottom-full left-0 right-0 z-50 mb-px')}>
       {hints.map((h, i) => (
         <button
           key={h.key}
@@ -471,12 +465,21 @@ export function ComposerHints({ hints, selected, onSelect, inline = false }: { h
           onClick={h.apply}
           className={cn('flex w-full items-baseline gap-3 border-l-2 px-3 py-1.5 text-left', i === selected ? 'border-l-accent bg-accent/15' : 'border-l-transparent')}
         >
-          <span className={cn('max-w-[45%] shrink-0 truncate font-mono text-[12.5px]', i === selected ? 'text-white' : 'text-accent')}>{h.label}</span>
+          <span className={cn('max-w-[45%] shrink-0 truncate font-ui text-[12.5px]', i === selected ? 'text-ink' : 'text-accent')}>{h.label}</span>
           <span className="min-w-0 flex-1 truncate text-[12px] text-dim">{h.detail}</span>
-          {i === selected && <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-faint">Tab / Enter</span>}
+          {i === selected && <span className="shrink-0 font-label text-[10px] caps-5 text-faint">Tab / Enter</span>}
         </button>
       ))}
     </div>
+  )
+}
+
+export function FloatingHints({ anchor, hints, selected, onSelect, onClose }: { anchor: RefObject<HTMLElement | null>; hints: Hint[]; selected: number; onSelect: (index: number) => void; onClose: () => void }) {
+  if (!hints.length) return null
+  return (
+    <FloatLayer anchor={anchor} onClose={onClose} side="top" align="start" className="w-[min(32rem,90vw)] border-0 bg-transparent shadow-none">
+      <ComposerHints hints={hints} selected={selected} onSelect={onSelect} inline />
+    </FloatLayer>
   )
 }
 
@@ -486,20 +489,20 @@ export function CommandOutputCard() {
   const { sessionId } = useConversation()
   if (!output || output.sessionId !== sessionId) return null
   return (
-    <div className={cn('flex max-h-72 shrink-0 gap-3 border-t px-3.5 py-2', output.error ? 'border-alert/40 bg-alert/[0.06]' : 'border-teal/40 bg-teal/[0.05]')}>
-      <Terminal className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', output.error ? 'text-alert' : 'text-teal')} />
+    <div className={cn('flex max-h-72 shrink-0 gap-3 border-t px-3.5 py-2', output.error ? 'border-alert/40 bg-alert/[0.06]' : 'border-secondary/40 bg-secondary/[0.05]')}>
+      <Terminal className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', output.error ? 'text-alert' : 'text-secondary')} />
       <div className="min-w-0 flex-1 overflow-y-auto text-[12.5px]">
-        <div className="mb-1 font-mono text-[11px] text-faint">{output.line}</div>
+        <div className="mb-1 font-ui text-[11px] text-faint">{output.line}</div>
         {output.busy ? (
-          <div className="font-mono text-[11.5px] text-dim">Working…</div>
+          <div className="font-ui text-[11.5px] text-dim">Working…</div>
         ) : output.error ? (
-          <div className="font-mono text-[12px] text-alert">{output.text}</div>
+          <div className="font-ui text-[12px] text-alert">{output.text}</div>
         ) : (
           <Markdown text={output.text ?? ''} />
         )}
       </div>
       {!output.busy && (
-        <button title="Close" onClick={dismiss} className="h-5 w-5 shrink-0 text-dim hover:text-white">
+        <button title="Close" onClick={dismiss} className="h-5 w-5 shrink-0 text-dim hover:text-ink">
           <X className="h-3.5 w-3.5" />
         </button>
       )}

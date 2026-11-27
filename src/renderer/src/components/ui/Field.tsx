@@ -19,7 +19,7 @@ export function Field({ label, hint, tip, error, className, aside, group = false
     <Tag className={cn('flex flex-col gap-1.5', className)}>
       <span className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">{label}</span>
+          <span className="truncate font-label text-[10.5px] font-semibold caps-14 text-accent-soft">{label}</span>
           <InfoTip title={label} text={tip} />
         </span>
         {aside}

@@ -60,13 +60,13 @@ export function DecisionForm({ initial, where, onKeep, onChange, keepLabel }: Pr
     <div className="flex flex-col gap-2.5">
       <Input value={d.question} placeholder="What is to be decided?" onChange={(e) => set({ ...d, question: e.target.value })} />
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-faint">Decided by</span>
+        <span className="font-label text-[10.5px] caps-12 text-faint">Decided by</span>
         <Segmented value={who} options={[...WHO]} onChange={(v) => set({ ...d, decider: v === 'agent' ? (agents[0]?.id ?? null) : null })} />
         {who === 'agent' && <AgentSelect value={d.decider} onChange={(decider) => set({ ...d, decider })} className="h-8 flex-1 text-[12px]" />}
       </div>
       <Eyebrow>Options</Eyebrow>
       {d.options.map((o, i) => (
-        <div key={i} className="flex flex-col gap-1.5 border border-line/40 bg-black/20 p-2">
+        <div key={i} className="flex flex-col gap-1.5 border border-line/40 tone-panel-20 p-2">
           <div className="flex items-center gap-1.5">
             <Input
               value={o.text}

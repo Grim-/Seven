@@ -137,9 +137,9 @@ function DeckSourcePill({
       type="button"
       onClick={onPick}
       title="Switch draw deck or card set"
-      className="flex min-w-0 items-center gap-1.5 border border-line/60 bg-black/45 px-2 py-0.5 font-mono text-[10.5px] text-white/90 hover:border-accent hover:text-accent"
+      className="flex min-w-0 items-center gap-1.5 border border-line/60 tone-well-45 px-2 py-0.5 font-ui text-[10.5px] text-ink/90 hover:border-accent hover:text-accent"
     >
-      <Layers className="h-3 w-3 shrink-0 text-teal/80" />
+      <Layers className="h-3 w-3 shrink-0 text-secondary/80" />
       <span className="min-w-0 truncate">{label}</span>
       <span className="shrink-0 font-bold text-accent">{isSet ? '∞' : remaining}</span>
     </button>
@@ -166,7 +166,7 @@ function DrawPedestal({
   const layers = hasDeck ? stackLayers(remaining, isSet) : 0
   const empty = !hasDeck || (!isSet && remaining <= 0)
   return (
-    <div className="flex shrink-0 items-center justify-between gap-2.5 border border-line/40 bg-black/35 p-2 @[340px]:flex-col @[340px]:justify-center">
+    <div className="flex shrink-0 items-center justify-between gap-2.5 border border-line/40 tone-panel-35 p-2 @[340px]:flex-col @[340px]:justify-center">
       <button
         type="button"
         disabled={empty}
@@ -182,18 +182,18 @@ function DrawPedestal({
           empty ? 'cursor-not-allowed opacity-45' : 'cursor-pointer hover:-translate-y-0.5 active:translate-y-0'
         )}
       >
-        {layers >= 3 && <span aria-hidden className="pointer-events-none absolute inset-0 translate-x-1.5 translate-y-1.5 border border-line/45 bg-bg/90" />}
-        {layers >= 2 && <span aria-hidden className="pointer-events-none absolute inset-0 translate-x-0.5 translate-y-0.5 border border-line/65 bg-bg/95" />}
+        {layers >= 3 && <span aria-hidden className="pointer-events-none absolute inset-0 translate-x-1.5 translate-y-1.5 border border-line/45 tone-bg-90" />}
+        {layers >= 2 && <span aria-hidden className="pointer-events-none absolute inset-0 translate-x-0.5 translate-y-0.5 border border-line/65 tone-bg-95" />}
         <div className="relative">
           {empty ? (
-            <div className="flex aspect-[5/7] w-full flex-col items-center justify-center border border-dashed border-line/60 bg-black/40 p-1 text-center font-mono text-[9px] uppercase tracking-wider text-faint">
+            <div className="flex aspect-[5/7] w-full flex-col items-center justify-center border border-dashed border-line/60 tone-panel-40 p-1 text-center font-label text-[9px] caps-5 text-faint">
               Empty
             </div>
           ) : (
             <CardBack className="w-full" />
           )}
           {hasDeck && (
-            <span className="absolute bottom-1 right-1 border border-line/70 bg-black/85 px-1 py-0.5 font-mono text-[9.5px] font-bold leading-none text-accent">
+            <span className="absolute bottom-1 right-1 border border-line/70 tone-panel-85 px-1 py-0.5 font-ui text-[9.5px] font-bold leading-none text-accent">
               {isSet ? 'SET' : remaining}
             </span>
           )}
@@ -254,7 +254,7 @@ function TrayCardTile({
           {cardId ? (
             <LiveCard id={cardId} className="w-full" />
           ) : (
-            <div className="flex aspect-[5/7] w-full items-center justify-center border border-line/50 bg-black/50 p-2 text-center font-mono text-[10px] text-dim">
+            <div className="flex aspect-[5/7] w-full items-center justify-center border border-line/50 tone-panel-50 p-2 text-center font-ui text-[10px] text-dim">
               {showName(entry.card)}
             </div>
           )}
@@ -267,7 +267,7 @@ function TrayCardTile({
           className="relative block w-full overflow-hidden text-left transition-transform duration-150 hover:-translate-y-0.5"
         >
           <CardBack className="w-full" />
-          <span className="absolute inset-x-1.5 bottom-2 border border-accent/45 bg-black/80 py-0.5 text-center font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-accent">
+          <span className="absolute inset-x-1.5 bottom-2 border border-accent/45 tone-panel-80 py-0.5 text-center font-label text-[9px] font-semibold caps-16 text-accent">
             Tap to flip
           </span>
         </button>
@@ -280,7 +280,7 @@ function TrayCardTile({
             disabled={disabled}
             onClick={onPlay}
             title="Play this card in chat"
-            className="flex flex-1 items-center justify-center gap-1 border border-accent/50 bg-accent/15 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-wider text-accent hover:bg-accent/25 disabled:opacity-40"
+            className="flex flex-1 items-center justify-center gap-1 border border-accent/50 bg-accent/15 px-1.5 py-0.5 font-label text-[9.5px] font-semibold caps-5 text-accent hover:bg-accent/25 disabled:opacity-40"
           >
             <Play className="h-2.5 w-2.5" />
             Play
@@ -290,7 +290,7 @@ function TrayCardTile({
           type="button"
           onClick={onFlip}
           title={entry.faceUp ? 'Flip face-down' : 'Flip face-up'}
-          className="border border-line/50 bg-black/45 px-1.5 py-0.5 text-dim hover:border-line hover:text-white"
+          className="border border-line/50 tone-well-45 px-1.5 py-0.5 text-dim hover:border-line hover:text-ink"
         >
           {entry.faceUp ? <EyeOff className="h-2.5 w-2.5" /> : <Eye className="h-2.5 w-2.5" />}
         </button>
@@ -299,7 +299,7 @@ function TrayCardTile({
             type="button"
             onClick={onKeep}
             title="Keep in player hand"
-            className="border border-line/50 bg-black/45 px-1.5 py-0.5 text-teal/80 hover:border-teal/60 hover:text-teal"
+            className="border border-line/50 tone-well-45 px-1.5 py-0.5 text-secondary/80 hover:border-secondary/60 hover:text-secondary"
           >
             <ArrowDownToLine className="h-2.5 w-2.5" />
           </button>
@@ -308,7 +308,7 @@ function TrayCardTile({
           type="button"
           onClick={onReturn}
           title="Return to deck / discard"
-          className="border border-line/50 bg-black/45 px-1.5 py-0.5 text-dim hover:border-alert/60 hover:text-alert"
+          className="border border-line/50 tone-well-45 px-1.5 py-0.5 text-dim hover:border-alert/60 hover:text-alert"
         >
           <RotateCcw className="h-2.5 w-2.5" />
         </button>
@@ -338,7 +338,7 @@ function HandTrayList({
 }) {
   const held = useHeldCards(entries)
   if (!hasRef) {
-    return <div className="p-2 font-mono text-[11px] text-dim">Open or focus a chat to connect a player hand.</div>
+    return <div className="p-2 font-ui text-[11px] text-dim">Open or focus a chat to connect a player hand.</div>
   }
   if (!handId) {
     return (
@@ -355,7 +355,7 @@ function HandTrayList({
     )
   }
   if (!held.length) {
-    return <div className="p-2 font-mono text-[11px] text-dim">Hand is empty. Draw cards into the tray and click keep-to-hand.</div>
+    return <div className="p-2 font-ui text-[11px] text-dim">Hand is empty. Draw cards into the tray and click keep-to-hand.</div>
   }
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(5.75rem,1fr))] gap-2">
@@ -412,7 +412,7 @@ function HandTile({
             disabled={disabled}
             onClick={() => onPlayCard(card)}
             title="Play from hand into chat"
-            className="flex flex-1 items-center justify-center gap-1 border border-accent/50 bg-accent/15 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-wider text-accent hover:bg-accent/25 disabled:opacity-40"
+            className="flex flex-1 items-center justify-center gap-1 border border-accent/50 bg-accent/15 px-1.5 py-0.5 font-label text-[9.5px] font-semibold caps-5 text-accent hover:bg-accent/25 disabled:opacity-40"
           >
             <Play className="h-2.5 w-2.5" />
             Play
@@ -421,7 +421,7 @@ function HandTile({
             type="button"
             onClick={() => onMoveToTray(card.name)}
             title="Place 1 copy onto the tray"
-            className="border border-line/50 bg-black/45 px-1.5 py-0.5 text-dim hover:border-line hover:text-white"
+            className="border border-line/50 tone-well-45 px-1.5 py-0.5 text-dim hover:border-line hover:text-ink"
           >
             <Layers className="h-2.5 w-2.5" />
           </button>
@@ -705,17 +705,17 @@ function DeckDrawerBody({ dashboard, widget }: WidgetBodyProps) {
             type="button"
             onClick={returnDiscard}
             title="Click to reclaim discard pile back to deck"
-            className="border border-line/50 bg-black/35 px-1.5 py-0.5 font-mono text-[10px] text-dim hover:border-accent hover:text-accent"
+            className="border border-line/50 tone-well-35 px-1.5 py-0.5 font-ui text-[10px] text-dim hover:border-accent hover:text-accent"
           >
             Discard {state.discard.length}
           </button>
         )}
         <span className="flex-1" />
-        <div className="flex items-center border border-line/50 bg-black/40 p-0.5 font-mono text-[10px] uppercase tracking-wider">
+        <div className="flex items-center border border-line/50 tone-panel-40 p-0.5 font-label text-[10px] caps-5 ">
           <button
             type="button"
             onClick={() => setTab('tray')}
-            className={cn('px-1.5 py-0.5 transition-colors', activeTab === 'tray' ? 'bg-accent/20 text-accent' : 'text-dim hover:text-white')}
+            className={cn('px-1.5 py-0.5 transition-colors', activeTab === 'tray' ? 'bg-accent/20 text-accent' : 'text-dim hover:text-ink')}
           >
             Tray ({state.tray.length})
           </button>
@@ -723,7 +723,7 @@ function DeckDrawerBody({ dashboard, widget }: WidgetBodyProps) {
             <button
               type="button"
               onClick={() => setTab('hand')}
-              className={cn('px-1.5 py-0.5 transition-colors', activeTab === 'hand' ? 'bg-teal/20 text-teal' : 'text-dim hover:text-white')}
+              className={cn('px-1.5 py-0.5 transition-colors', activeTab === 'hand' ? 'bg-secondary/20 text-secondary' : 'text-dim hover:text-ink')}
             >
               Hand ({handCount})
             </button>
@@ -742,11 +742,11 @@ function DeckDrawerBody({ dashboard, widget }: WidgetBodyProps) {
           onReturnMenu={openReturnMenu}
         />
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden border border-line/35 bg-black/25 p-2">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden border border-line/35 tone-panel-25 p-2">
           {activeTab === 'tray' && (
             <>
               {state.tray.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 border-b border-line/30 pb-1 font-mono text-[10px] text-dim">
+                <div className="flex flex-wrap items-center gap-1.5 border-b border-line/30 pb-1 font-ui text-[10px] text-dim">
                   <span>{state.tray.length} drawn</span>
                   <span className="flex-1" />
                   {hasHidden && (
@@ -754,7 +754,7 @@ function DeckDrawerBody({ dashboard, widget }: WidgetBodyProps) {
                       Reveal all
                     </button>
                   )}
-                  <button type="button" onClick={shuffleTray} className="hover:text-white">
+                  <button type="button" onClick={shuffleTray} className="hover:text-ink">
                     Shuffle
                   </button>
                   <button type="button" onClick={returnAllToDeck} className="hover:text-alert">
@@ -785,7 +785,7 @@ function DeckDrawerBody({ dashboard, widget }: WidgetBodyProps) {
                     })}
                   </div>
                 ) : (
-                  <div className="flex h-full min-h-20 flex-col items-center justify-center gap-1 text-center font-mono text-[11px] text-faint">
+                  <div className="flex h-full min-h-20 flex-col items-center justify-center gap-1 text-center font-ui text-[11px] text-faint">
                     <span>Tray is clear</span>
                     <span className="text-[10px]">
                       {sourcePage ? 'Click the deck stack or Draw to deal cards here.' : 'Pick a deck or card set above to start drawing.'}
@@ -817,7 +817,7 @@ function DeckDrawerBody({ dashboard, widget }: WidgetBodyProps) {
       </div>
 
       {sourcePage && (
-        <div className="flex items-center justify-between gap-2 font-mono text-[9.5px] text-faint">
+        <div className="flex items-center justify-between gap-2 font-ui text-[9.5px] text-faint">
           <button type="button" onClick={() => openEntry(isSet ? 'cards.set' : 'cards.deck', sourcePage.id)} className="truncate hover:text-accent">
             Open {showName(sourcePage.title)}
           </button>

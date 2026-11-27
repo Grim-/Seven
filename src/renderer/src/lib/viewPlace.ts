@@ -5,8 +5,10 @@ const useChosen = create<{ values: Record<string, { value: unknown }> }>(() => (
 
 export function setViewPlace<T>(key: string, next: T): void {
   const full = `view.${key}`
+  const prev = useChosen.getState().values[full]?.value ?? usePlaces.getState().places[full]
+  if (Object.is(prev, next)) return
   useChosen.setState((s) => ({ values: { ...s.values, [full]: { value: next } } }))
-  usePlaces.getState().saveImmediate(full, next)
+  usePlaces.getState().save(full, next)
 }
 
 export function peekViewPlace<T>(key: string, fallback: T): T {

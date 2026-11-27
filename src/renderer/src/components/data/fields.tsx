@@ -4,7 +4,7 @@ import { ChipInput, Input, Select, Toggle } from '../ui'
 import { assetUrl, useAsset } from '../../store/data'
 import { cn } from '../../lib/cn'
 
-const CHIP_COLORS = ['text-accent border-accent/40', 'text-cyan border-cyan/40', 'text-teal border-teal/40', 'text-purple border-purple/40', 'text-ok border-ok/40', 'text-alert border-alert/40']
+const CHIP_COLORS = ['text-accent border-accent/40', 'text-secondary-ink border-secondary-ink/40', 'text-secondary border-secondary/40', 'text-tint-purple border-tint-purple/40', 'text-ok border-ok/40', 'text-alert border-alert/40']
 
 export function chipColor(value: string): string {
   let h = 0
@@ -13,7 +13,7 @@ export function chipColor(value: string): string {
 }
 
 export function Chip({ children, tone }: { children: React.ReactNode; tone?: string }) {
-  return <span className={cn('inline-flex h-5 items-center border px-1.5 font-mono text-[10.5px] uppercase tracking-wider', tone ?? 'border-line text-dim')}>{children}</span>
+  return <span className={cn('inline-flex h-5 items-center border px-1.5 font-label text-[10.5px] caps-5 ', tone ?? 'border-line text-dim')}>{children}</span>
 }
 
 export function primaryField(page: Page): FieldDef {
@@ -61,7 +61,7 @@ function AssetInline({ id }: { id: string }) {
   if (!asset) return <span className="text-faint">missing file</span>
   if (asset.kind === 'image') return <img src={assetUrl(asset)} alt={asset.name} className="h-10 max-w-24 border border-line/50 object-cover" />
   return (
-    <span className="inline-flex items-center gap-1 font-mono text-[11.5px] text-white/85">
+    <span className="inline-flex items-center gap-1 font-ui text-[11.5px] text-ink/85">
       <FileIcon className="h-3.5 w-3.5 text-dim" />
       {asset.name}
     </span>
@@ -86,12 +86,12 @@ export function FieldValueView({ field, value }: { field: FieldDef; value: Field
     case 'select':
       return <Chip tone={chipColor(String(value))}>{String(value)}</Chip>
     case 'date':
-      return <span className="font-mono text-[12px]">{formatDate(String(value))}</span>
+      return <span className="font-ui text-[12px]">{formatDate(String(value))}</span>
     case 'number':
-      return <span className="font-mono text-[12.5px]">{String(value)}</span>
+      return <span className="font-ui text-[12.5px]">{String(value)}</span>
     case 'url':
       return (
-        <a href={String(value)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-cyan hover:underline">
+        <a href={String(value)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-secondary-ink hover:underline">
           <span className="max-w-56 truncate">{String(value).replace(/^https?:\/\//, '')}</span>
           <ExternalLink className="h-3 w-3 shrink-0" />
         </a>

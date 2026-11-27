@@ -47,7 +47,7 @@ export function PassphraseForm({ onDone, extra }: { onDone?: () => void; extra?:
         </Button>
         {extra}
       </div>
-      {error && <div className="font-mono text-[11px] text-alert">{error}</div>}
+      {error && <div className="font-ui text-[11px] text-alert">{error}</div>}
     </div>
   )
 }
@@ -71,7 +71,7 @@ export function LockedState({ what }: { what: string }) {
   return (
     <div className="flex h-full min-h-40 flex-col items-center justify-center gap-3 p-6 text-center">
       <Lock className="h-6 w-6 text-accent" />
-      <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-accent">Vault locked</div>
+      <div className="font-label text-[11px] caps-20 text-accent">Vault locked</div>
       <div className="max-w-sm text-[13px] text-dim">{what} are in the vault. Unlock it to see them.</div>
       <Button variant="primary" icon={<LockOpen />} onClick={ask}>
         Unlock
@@ -95,7 +95,7 @@ export function LockButton({ compact }: { compact?: boolean }) {
       <button
         title={status.unlocked ? 'Lock the vault' : 'Unlock the vault'}
         onClick={onClick}
-        className="flex h-full w-9 items-center justify-center text-dim hover:bg-white/5 hover:text-accent [&>svg]:h-4 [&>svg]:w-4"
+        className="flex h-full w-9 items-center justify-center text-dim hover:bg-ink/5 hover:text-accent [&>svg]:h-4 [&>svg]:w-4"
       >
         {status.unlocked ? <LockOpen /> : <Lock />}
       </button>
@@ -115,7 +115,7 @@ export function UnlockCard({ ui }: { ui: UiRequestState }) {
   const decline = () => void engine('ui.respond', { id: ui.id, value: false }).catch(failed('Answer not delivered'))
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex items-center gap-2 text-[14px] leading-snug text-white">
+      <div className="flex items-center gap-2 text-[14px] leading-snug text-ink">
         <Lock className="h-4 w-4 text-accent" />
         {props.reason} The vault is locked.
       </div>
@@ -128,7 +128,7 @@ export function UnlockCard({ ui }: { ui: UiRequestState }) {
           }
         />
       ) : (
-        <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
+        <div className="font-label text-[10.5px] caps-14 text-faint">
           {ui.status === 'answered' ? (ui.answer === true ? 'Unlocked' : 'Left locked') : ui.status === 'pending' ? 'Unlocked' : ui.status}
         </div>
       )}
@@ -144,7 +144,7 @@ function KeyRow({ moduleId, moduleName, name, label, description, set }: { modul
   return (
     <div className="flex items-center gap-2 border-b border-line/30 py-1.5">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] text-white/90">
+        <div className="truncate text-[13px] text-ink/90">
           {moduleName} · {label}
         </div>
         <div className="truncate text-[11px] text-faint">{set ? 'Saved in the vault' : (description ?? 'Not set')}</div>
@@ -205,7 +205,7 @@ export function VaultPanel({ className }: { className?: string }) {
       intro={
         status.configured ? (
           <>
-            Chats, data, boards, attached files, memory and module data are encrypted on disk. It is <span className="text-white">{status.unlocked ? 'unlocked' : 'locked'}</span> and locks again when Seven closes.
+            Chats, data, boards, attached files, memory and module data are encrypted on disk. It is <span className="text-ink">{status.unlocked ? 'unlocked' : 'locked'}</span> and locks again when Seven closes.
           </>
         ) : (
           'Encrypt everything personal in Seven (chats, data, boards, attached files, memory, module data) with a passphrase. Seven can still save new things while locked; reading them needs the passphrase. Settings, agents and model lists stay readable.'
@@ -253,9 +253,9 @@ export function VaultVeil({ agentId }: { agentId: string | null }) {
   const ask = useVault((s) => s.ask)
   if (!locked || !agentId || known) return null
   return (
-    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/40 backdrop-blur-xl">
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-scrim/40 backdrop-blur-[calc(var(--panel-blur)*3)]">
       <Lock className="h-6 w-6 text-accent" />
-      <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-white">This chat's agent is in the vault</div>
+      <div className="font-label text-[11px] caps-18 text-ink">This chat's agent is in the vault</div>
       <Button variant="primary" icon={<LockOpen />} onClick={ask}>
         Unlock
       </Button>

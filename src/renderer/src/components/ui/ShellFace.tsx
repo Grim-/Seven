@@ -62,9 +62,9 @@ function Region({ slot, edit, className, children, inline = false }: { slot: Fac
         e.preventDefault()
         edit.onSlot(slot, e)
       }}
-      className={cn(className, 'cursor-pointer outline outline-1 -outline-offset-1 outline-dashed', edit.picked === slot ? 'outline-solid outline-cyan' : 'outline-line/60 hover:outline-cyan/70', inline && 'inline-flex min-h-4 min-w-10 items-center gap-1 px-1')}
+      className={cn(className, 'cursor-pointer outline outline-1 -outline-offset-1 outline-dashed', edit.picked === slot ? 'outline-solid outline-secondary-ink' : 'outline-line/60 hover:outline-secondary-ink/70', inline && 'inline-flex min-h-4 min-w-10 items-center gap-1 px-1')}
     >
-      {empty ? <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{edit.hint(slot)}</span> : children}
+      {empty ? <span className="font-label text-[10px] caps-12 text-faint">{edit.hint(slot)}</span> : children}
     </Tag>
   )
 }

@@ -63,7 +63,7 @@ function MemoryRow({ agentId, memory }: { agentId: string; memory: Memory }) {
     <div onContextMenu={text === null ? menu : undefined} className={cn('group flex gap-2 border-b border-line/30 py-2', memory.pinned && 'border-l-2 border-l-accent pl-2')}>
       <div className="min-w-0 flex-1">
         {text === null ? (
-          <div role="button" tabIndex={0} onClick={() => setTextState(memory.text)} onKeyDown={(e) => e.key === 'Enter' && setTextState(memory.text)} className="w-full cursor-text text-left text-[13px] text-white/90 hover:text-white">
+          <div role="button" tabIndex={0} onClick={() => setTextState(memory.text)} onKeyDown={(e) => e.key === 'Enter' && setTextState(memory.text)} className="w-full cursor-text text-left text-[13px] text-ink/90 hover:text-ink">
             <Markdown text={memory.text} />
           </div>
         ) : (
@@ -74,11 +74,11 @@ function MemoryRow({ agentId, memory }: { agentId: string; memory: Memory }) {
             </div>
           </div>
         )}
-        <div className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-teal/70">
+        <div className="mt-0.5 font-label text-[10.5px] caps-10 text-secondary/70">
           {memory.pinned ? 'pinned · ' : ''}
           {memory.by === 'user' ? 'by you' : memory.by === 'auto' ? 'picked out automatically' : 'by the agent'} · {when(memory.updatedAt)}
           {memory.sessionId && (
-            <button className="ml-2 text-accent hover:text-white" onClick={() => openChat(memory.sessionId!)}>
+            <button className="ml-2 text-accent hover:text-ink" onClick={() => openChat(memory.sessionId!)}>
               open chat
             </button>
           )}
@@ -139,9 +139,9 @@ function ThoughtItem({ agentId, thought }: { agentId: string; thought: Thought }
     <div onContextMenu={menu} className="border-b border-line/30 py-2">
       <div className="group flex items-baseline gap-2">
         <button onClick={() => setOpen(!open)} className="flex min-w-0 flex-1 items-baseline gap-2 text-left">
-          <span className="shrink-0 font-mono text-[10.5px] uppercase tracking-[0.1em] text-teal/70">{when(thought.at)}</span>
-          <span className="shrink-0 border border-line px-1 font-mono text-[10px] uppercase text-accent">{thought.kind === 'reason' ? (thought.style ?? 'reason') : 'thought'}</span>
-          <span className="min-w-0 flex-1 truncate text-[13px] text-white/90">{thought.conclusion}</span>
+          <span className="shrink-0 font-label text-[10.5px] caps-10 text-secondary/70">{when(thought.at)}</span>
+          <span className="shrink-0 border border-line px-1 font-label text-[10px] caps text-accent">{thought.kind === 'reason' ? (thought.style ?? 'reason') : 'thought'}</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] text-ink/90">{thought.conclusion}</span>
         </button>
         <button title="Delete" className="shrink-0 self-center text-faint opacity-60 hover:text-alert group-hover:opacity-100" onClick={remove}>
           <Trash2 className="h-3.5 w-3.5" />
@@ -150,13 +150,13 @@ function ThoughtItem({ agentId, thought }: { agentId: string; thought: Thought }
       {open && (
         <div className="mt-2 flex flex-col gap-2 pl-2">
           {thought.question && <div className="whitespace-pre-wrap text-[13px] text-accent-soft">{thought.question}</div>}
-          {thought.reasoning && <pre className="whitespace-pre-wrap font-mono text-[12px] text-white/80">{thought.reasoning}</pre>}
+          {thought.reasoning && <pre className="whitespace-pre-wrap font-mono text-[12px] text-ink/80">{thought.reasoning}</pre>}
           <div className="text-[13px]">
             <Markdown text={`**Conclusion:** ${thought.conclusion}`} />
           </div>
-          <div className="flex gap-3 font-mono text-[10.5px] uppercase tracking-[0.12em]">
+          <div className="flex gap-3 font-label text-[10.5px] caps-12 ">
             {thought.sessionId && (
-              <button className="text-accent hover:text-white" onClick={() => openChat(thought.sessionId!)}>
+              <button className="text-accent hover:text-ink" onClick={() => openChat(thought.sessionId!)}>
                 Open chat
               </button>
             )}
@@ -179,7 +179,7 @@ function Thoughts({ agentId }: { agentId: string }) {
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex items-center gap-2">
         <Select value={data.month ?? ''} options={data.months.map((m) => ({ value: m, label: m }))} onChange={(v) => setMonth(v)} className="h-8 w-40 text-[12px]" />
-        <span className="font-mono text-[11px] text-faint">{data.thoughts.length} thoughts</span>
+        <span className="font-data text-[11px] text-faint">{data.thoughts.length} thoughts</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {data.thoughts.map((t) => (
@@ -204,8 +204,8 @@ function JournalItem({ agentId, entry }: { agentId: string; entry: JournalEntry 
     <div onContextMenu={menu} className="border-b border-line/30 py-2">
       <div className="group flex items-baseline gap-2">
         <button onClick={() => setOpen(!open)} className="flex min-w-0 flex-1 items-baseline gap-2 text-left">
-          <span className="shrink-0 font-mono text-[10.5px] uppercase tracking-[0.1em] text-teal/70">{when(entry.at)}</span>
-          <span className="min-w-0 flex-1 truncate text-[13px] text-white/90">{entry.user || '(no message)'}</span>
+          <span className="shrink-0 font-label text-[10.5px] caps-10 text-secondary/70">{when(entry.at)}</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] text-ink/90">{entry.user || '(no message)'}</span>
           <span className="shrink-0 truncate text-[11px] text-faint">{entry.sessionTitle}</span>
         </button>
         <button title="Delete" className="shrink-0 self-center text-faint opacity-60 hover:text-alert group-hover:opacity-100" onClick={remove}>
@@ -217,13 +217,13 @@ function JournalItem({ agentId, entry }: { agentId: string; entry: JournalEntry 
           <div className="text-[13px] text-accent-soft">You: {entry.user}</div>
           {entry.thoughts && (
             <details className="text-[12px] text-dim">
-              <summary className="cursor-pointer font-mono text-[10.5px] uppercase tracking-[0.12em]">Thinking</summary>
+              <summary className="cursor-pointer font-label text-[10.5px] caps-12 ">Thinking</summary>
               <pre className="whitespace-pre-wrap font-mono text-[11.5px]">{entry.thoughts}</pre>
             </details>
           )}
           {entry.tools.map((t, i) => (
             <details key={i} className="text-[12px] text-dim">
-              <summary className="cursor-pointer font-mono text-[11px] text-teal">{t.name}</summary>
+              <summary className="cursor-pointer font-ui text-[11px] text-secondary">{t.name}</summary>
               <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[11px]">{t.result}</pre>
             </details>
           ))}
@@ -231,7 +231,7 @@ function JournalItem({ agentId, entry }: { agentId: string; entry: JournalEntry 
             <Markdown text={entry.reply || '(no reply)'} />
           </div>
           <div>
-            <button className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-accent hover:text-white" onClick={() => openChat(entry.sessionId)}>
+            <button className="font-label text-[10.5px] caps-12 text-accent hover:text-ink" onClick={() => openChat(entry.sessionId)}>
               Open chat
             </button>
           </div>
@@ -250,7 +250,7 @@ function Journal({ agentId }: { agentId: string }) {
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex items-center gap-2">
         <Select value={data.month ?? ''} options={data.months.map((m) => ({ value: m, label: m }))} onChange={(v) => setMonth(v)} className="h-8 w-40 text-[12px]" />
-        <span className="font-mono text-[11px] text-faint">{data.entries.length} turns</span>
+        <span className="font-data text-[11px] text-faint">{data.entries.length} turns</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {data.entries.map((e) => (
@@ -288,12 +288,12 @@ function SearchTab({ agentId }: { agentId: string }) {
         {hits?.length === 0 && <div className="p-3 text-[13px] text-dim">Nothing found.</div>}
         {hits?.map((h) => (
           <div key={h.id} className="border-b border-line/30 py-2">
-            <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.1em]">
+            <div className="flex items-center gap-2 font-label text-[10.5px] caps-10 ">
               <span className="border border-line px-1 text-accent">{h.source}</span>
-              <span className="text-teal/70">{when(h.at)}</span>
+              <span className="text-secondary/70">{when(h.at)}</span>
               {h.similarity !== null && <span className="text-faint">match {(h.similarity * 100).toFixed(0)}%</span>}
             </div>
-            <pre className="mt-1 whitespace-pre-wrap font-sans text-[12.5px] text-white/90">{h.text}</pre>
+            <pre className="mt-1 whitespace-pre-wrap font-body text-[12.5px] text-ink/90">{h.text}</pre>
           </div>
         ))}
       </div>
@@ -325,7 +325,7 @@ export function MindView({ agentId }: { agentId: string }) {
       bodyClassName="flex min-h-0 flex-col gap-3 p-3"
     >
       {overview && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px] uppercase tracking-[0.1em] text-dim">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 font-label text-[11px] caps-10 text-dim">
           <span>
             {overview.memories} memories, {overview.pinned} pinned
           </span>

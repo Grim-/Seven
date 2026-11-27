@@ -18,7 +18,7 @@ function Row({ value, index, duplicate, render, mono, drag, dragOver, onCommit, 
       <span className={cn('flex h-6 w-4 shrink-0 items-center justify-center text-faint', drag.draggable ? 'cursor-grab opacity-0 group-hover:opacity-100' : 'opacity-0')}>
         <GripVertical className="h-3.5 w-3.5" />
       </span>
-      <span className="w-8 shrink-0 text-right font-mono text-[10.5px] text-faint">{index + 1}</span>
+      <span className="w-8 shrink-0 text-right font-data text-[10.5px] text-faint">{index + 1}</span>
       {editing ? (
         <input
           autoFocus
@@ -32,7 +32,7 @@ function Row({ value, index, duplicate, render, mono, drag, dragOver, onCommit, 
               setEditing(false)
             }
           }}
-          className={cn('h-7 min-w-0 flex-1 border border-accent/60 bg-black px-2 text-[13px] text-white outline-none', mono && 'font-mono text-[12.5px]')}
+          className={cn('h-7 min-w-0 flex-1 border border-accent/60 bg-well px-2 text-[13px] text-ink outline-none', mono && 'font-mono text-[12.5px]')}
         />
       ) : (
         <div
@@ -50,7 +50,7 @@ function Row({ value, index, duplicate, render, mono, drag, dragOver, onCommit, 
             }
           }}
           title={duplicate ? 'This value is in the list more than once' : 'Click to edit'}
-          className={cn('min-w-0 flex-1 truncate py-1 text-left text-[13px] text-white/90 hover:text-white cursor-text', mono && 'font-mono text-[12.5px]')}
+          className={cn('min-w-0 flex-1 truncate py-1 text-left text-[13px] text-ink/90 hover:text-ink cursor-text', mono && 'font-mono text-[12.5px]')}
         >
           {render ? render(value) : value}
         </div>
@@ -100,11 +100,11 @@ export function ListEditor({
     if (lines.length) onChange([...values, ...lines])
     setAdding('')
   }
-  const tool = 'flex h-7 items-center gap-1.5 px-2 text-[11.5px] text-dim hover:text-white'
+  const tool = 'flex h-7 items-center gap-1.5 px-2 text-[11.5px] text-dim hover:text-ink'
   return (
-    <div className="flex min-h-0 flex-1 flex-col border border-line/50 bg-black/40">
+    <div className="flex min-h-0 flex-1 flex-col border border-line/50 tone-well-40">
       <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-line/40 px-2 py-1">
-        <span className="mr-1 font-mono text-[11px] text-white">
+        <span className="mr-1 font-ui text-[11px] text-ink">
           {values.length} {label}
         </span>
         {!asText && values.length > 8 && (
@@ -113,7 +113,7 @@ export function ListEditor({
             onChange={(e) => setFilter(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && setFilter('')}
             placeholder="Filter"
-            className="h-6 w-36 border border-line/40 bg-transparent px-2 text-[12px] text-white outline-none placeholder:text-faint focus:border-accent/50"
+            className="h-6 w-36 border border-line/40 bg-transparent px-2 text-[12px] text-ink outline-none placeholder:text-faint focus:border-accent/50"
           />
         )}
         <span className="flex-1" />
@@ -146,7 +146,7 @@ export function ListEditor({
           value={text}
           onChange={(e) => setText(e.target.value)}
           spellCheck={false}
-          className={cn('min-h-0 flex-1 resize-none bg-transparent p-2.5 text-[13px] leading-relaxed text-white outline-none', mono && 'font-mono text-[12.5px]')}
+          className={cn('min-h-0 flex-1 resize-none bg-transparent p-2.5 text-[13px] leading-relaxed text-ink outline-none', mono && 'font-mono text-[12.5px]')}
         />
       ) : (
         <>
@@ -188,7 +188,7 @@ export function ListEditor({
                 }
               }}
               placeholder={`${placeholder} (Enter adds; pasting several lines adds each)`}
-              className={cn('h-7 min-w-0 flex-1 bg-transparent px-1 text-[13px] text-white outline-none placeholder:text-dim/60', mono && 'font-mono text-[12.5px]')}
+              className={cn('h-7 min-w-0 flex-1 bg-transparent px-1 text-[13px] text-ink outline-none placeholder:text-dim/60', mono && 'font-mono text-[12.5px]')}
             />
             {addActions}
           </div>

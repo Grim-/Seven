@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Archive, Eye, EyeOff, FileCode2, FileDown, Frame, ImageIcon, ImagePlus, Images, Layers, Loader2, Lock, LockOpen, Plus, Shield, Trash2 } from 'lucide-react'
 import { sanitizeFileName, type PortabilityEstimate, type PortabilityFormat, type PortabilitySplit, type PortableExportItemSpec, type ProtectionMode } from '@shared/portability'
-import { showName } from '@shared/ids'
+import { showName, toId } from '@shared/ids'
 import type { LibraryHit } from '@shared/types'
 import { AlertBox, Button, Input, Modal, OptionTile, Segmented, Select, Textarea, Toggle } from '../ui'
+import { useViewPlace } from '../../lib/viewPlace'
 import { EntryPicker } from '../library/EntryPicker'
 import { usePicturePick } from '../pictures/usePicturePick'
 import type { PictureOptions } from '../data/PicturePicker'
@@ -57,7 +58,7 @@ const PROTECTION_OPTIONS: { value: ProtectionMode; label: string; hint: string }
 ]
 
 function Label({ children }: { children: ReactNode }) {
-  return <div className="font-mono text-[10.5px] font-bold uppercase tracking-[0.2em] text-accent-soft">{children}</div>
+  return <div className="font-label text-[10.5px] font-bold caps-20 text-accent-soft">{children}</div>
 }
 
 function formatBytes(bytes: number): string {
@@ -97,7 +98,7 @@ function CardStage({
 }) {
   const size = bitmap ? (framed ? frameLayout(bitmap.width, bitmap.height) : bitmap) : null
   return (
-    <div className="relative flex min-h-[280px] min-w-0 flex-col border border-line/60 bg-black bg-[radial-gradient(circle_at_12%_8%,color-mix(in_srgb,var(--color-accent)_11%,transparent),transparent_45%),radial-gradient(circle_at_88%_92%,color-mix(in_srgb,var(--color-teal)_11%,transparent),transparent_45%)]">
+    <div className="relative flex min-h-[280px] min-w-0 flex-col border border-line/60 bg-panel bg-[radial-gradient(circle_at_12%_8%,color-mix(in_srgb,var(--color-accent)_11%,transparent),transparent_45%),radial-gradient(circle_at_88%_92%,color-mix(in_srgb,var(--color-teal)_11%,transparent),transparent_45%)]">
       <div className="hud-scan pointer-events-none absolute inset-0" />
       <div className="relative flex min-h-[260px] flex-1 items-center justify-center p-5">
         {bitmap ? (
@@ -106,11 +107,11 @@ function CardStage({
           <Loader2 className="h-6 w-6 animate-spin text-accent" />
         ) : (
           <div className="bracket flex w-full max-w-md flex-col items-center gap-4 border border-dashed border-line px-6 py-8 text-center">
-            <span className="flex h-12 w-12 items-center justify-center border border-accent text-accent shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_30%,transparent)]">
+            <span className="flex h-12 w-12 items-center justify-center border border-accent text-accent shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_calc(30%*var(--glow)),transparent)]">
               <ImagePlus className="h-5 w-5" />
             </span>
             <div>
-              <div className="font-mono text-[11.5px] font-bold uppercase tracking-[0.2em] text-accent">Pick a picture</div>
+              <div className="font-label text-[11.5px] font-bold caps-20 text-accent">Pick a picture</div>
               <div className="mt-1 text-[12px] text-dim">{framed ? 'Any picture works: it gets a Seven card frame and saves as PNG.' : 'Without the frame, only PNG pictures can carry data.'}</div>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
@@ -125,8 +126,8 @@ function CardStage({
         )}
       </div>
       {picture && (
-        <div className="relative flex flex-wrap items-center gap-2 border-t border-line/50 bg-black/70 px-3 py-2">
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-dim">{size ? `${size.width} × ${size.height} px` : '…'}</span>
+        <div className="relative flex flex-wrap items-center gap-2 border-t border-line/50 tone-panel-70 px-3 py-2">
+          <span className="font-label text-[10.5px] caps-16 text-dim">{size ? `${size.width} × ${size.height} px` : '…'}</span>
           {!pngOk && <span className="text-[11.5px] text-alert">Not a PNG — turn frame on or pick a PNG</span>}
           <span className="ml-auto flex gap-1.5">
             <Button size="sm" variant="ghost" icon={<Images />} onClick={pick.fromSeven}>
@@ -156,6 +157,7 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
   const [includeDependencies, setIncludeDependencies] = useState(portabilityPrefs?.includeDependenciesByDefault ?? true)
   const [format, setFormat] = useState<PortabilityFormat>(state.defaultFormat ?? 'bundle')
   const [formatTouched, setFormatTouched] = useState(Boolean(state.defaultFormat))
+  const [prefixKind, setPrefixKind] = useViewPlace('export.prefixKind', false)
   const [splitMode, setSplitMode] = useState<PortabilitySplit>('single')
   const [protection, setProtection] = useState<ProtectionMode>('none')
   const [password, setPassword] = useState('')
@@ -357,10 +359,16 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
 
   const defaultBaseName = useMemo(() => {
     if (mode === 'text') return 'data'
-    if (expandedItems.length === 1 && firstItem) return sanitizeFileName(showName(firstEntryTitle) || firstItem.id)
-    if (activeKinds.length === 1 && firstDesc) return sanitizeFileName(firstDesc.plural.toLowerCase())
+    if (expandedItems.length === 1 && firstItem) {
+      const raw = sanitizeFileName(showName(firstEntryTitle) || firstItem.id)
+      return prefixKind ? `${firstItem.kind}_${toId(raw) || raw}` : raw
+    }
+    if (activeKinds.length === 1 && firstDesc) {
+      const raw = sanitizeFileName(firstDesc.plural.toLowerCase())
+      return prefixKind ? `${firstDesc.kind}_${toId(raw) || raw}` : raw
+    }
     return 'seven-export'
-  }, [activeKinds.length, expandedItems.length, firstDesc, firstEntryTitle, firstItem, mode])
+  }, [activeKinds.length, expandedItems.length, firstDesc, firstEntryTitle, firstItem, mode, prefixKind])
 
   const runExport = async () => {
     if (!ready) return
@@ -417,7 +425,8 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
         outputPath,
         pictureId: format === 'card' ? picture : null,
         framedBase64,
-        framedByKey
+        framedByKey,
+        prefixKind
       })
 
       toast.success(
@@ -441,7 +450,7 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
       bodyClassName="flex min-h-0 flex-1 p-0"
       footer={
         <>
-          <span className="mr-auto self-center font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">
+          <span className="mr-auto self-center font-label text-[10.5px] caps-14 text-faint">
             {estimate
               ? `${estimate.rootCount} ${estimate.rootCount === 1 ? 'entry' : 'entries'}${estimate.dependencyCount ? ` + ${estimate.dependencyCount} linked` : ''}${estimate.assetCount ? ` · ${estimate.assetCount} files` : ''} · ~${formatBytes(format === 'bundle' ? estimate.compressedBytes : estimate.rawBytes)}`
               : estimating
@@ -470,11 +479,11 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
               onChange={(e) => setText(e.target.value)}
               rows={8}
               placeholder="Paste any text or JSON to package and optionally encrypt…"
-              className="font-mono text-[12.5px]"
+              className="font-ui text-[12.5px]"
             />
           ) : (
             <div className="flex flex-col gap-2">
-              <div className="flex flex-col gap-1.5 border border-line/60 bg-black/40 p-2.5">
+              <div className="flex flex-col gap-1.5 border border-line/60 tone-panel-40 p-2.5">
                 {basket.length === 0 ? (
                   <div className="py-3 text-center text-[12.5px] text-dim">Nothing in the export basket yet. Add an entry or a whole kind below.</div>
                 ) : (
@@ -482,11 +491,11 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
                     const d = described[item.kind]
                     const entryTitle = item.id === null ? `All ${d?.plural ?? item.kind} (${d?.entries.length ?? '…'})` : showName(d?.entries.find((e) => e.id === item.id)?.title ?? item.title ?? item.id)
                     return (
-                      <div key={item.key} className="flex items-center gap-2 border border-line/40 bg-black/50 px-2.5 py-1.5">
-                        <span className="shrink-0 bg-accent/90 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-black">
+                      <div key={item.key} className="flex items-center gap-2 border border-line/40 tone-panel-50 px-2.5 py-1.5">
+                        <span className="shrink-0 bg-accent/90 px-1.5 py-0.5 font-label text-[10px] font-bold caps-14 text-on-accent">
                           {d?.label ?? item.kind}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-[13px] text-white">{entryTitle}</span>
+                        <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{entryTitle}</span>
                         <button
                           type="button"
                           title="Remove from basket"
@@ -535,7 +544,7 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
               </div>
 
               {allKindOptions.length > 0 && (
-                <div className="flex flex-col gap-1.5 border border-line/50 bg-black/30 p-3">
+                <div className="flex flex-col gap-1.5 border border-line/50 tone-panel-30 p-3">
                   <Label>Kind options</Label>
                   {allKindOptions.map(({ kind, kindLabel, opt }) => {
                     const checked = kindOptions[kind]?.[opt.id] ?? opt.defaultValue
@@ -558,11 +567,11 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
                 </div>
               )}
 
-              <div className="flex flex-col gap-2 border border-line/50 bg-black/30 p-3">
+              <div className="flex flex-col gap-2 border border-line/50 tone-panel-30 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <Toggle checked={includeDependencies} onChange={setIncludeDependencies} label="Include linked dependencies" />
                   {estimate && (
-                    <span className="font-mono text-[11px] text-teal">
+                    <span className="font-ui text-[11px] text-secondary">
                       {estimate.dependencyCount} linked · {estimate.assetCount} assets
                     </span>
                   )}
@@ -573,12 +582,12 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
                 {includeDependencies && estimate && estimate.dependencies.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1.5 pl-11">
                     {estimate.dependencies.slice(0, 12).map((dep) => (
-                      <span key={`${dep.kind}/${dep.id}`} className="border border-line/50 bg-black/50 px-1.5 py-0.5 font-mono text-[10.5px] text-dim">
+                      <span key={`${dep.kind}/${dep.id}`} className="border border-line/50 tone-panel-50 px-1.5 py-0.5 font-ui text-[10.5px] text-dim">
                         {dep.label}: {showName(dep.title)}
                       </span>
                     ))}
                     {estimate.dependencies.length > 12 && (
-                      <span className="px-1.5 py-0.5 font-mono text-[10.5px] text-faint">+{estimate.dependencies.length - 12} more</span>
+                      <span className="px-1.5 py-0.5 font-ui text-[10.5px] text-faint">+{estimate.dependencies.length - 12} more</span>
                     )}
                   </div>
                 )}
@@ -647,6 +656,13 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
                 />
               </div>
             )}
+            {mode === 'items' && (
+              <Toggle
+                checked={prefixKind}
+                onChange={setPrefixKind}
+                label="Prefix filename with kind (e.g. sheet_valerius)"
+              />
+            )}
           </section>
 
           {mode === 'items' && expandedItems.length > 1 && (
@@ -654,7 +670,7 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
               <Label>Output layout</Label>
               <Segmented value={splitMode} options={SPLIT_OPTIONS} onChange={setSplitMode} />
               <div className="flex items-start gap-2 text-[12px] text-dim">
-                <Layers className="mt-0.5 h-3.5 w-3.5 shrink-0 text-teal" />
+                <Layers className="mt-0.5 h-3.5 w-3.5 shrink-0 text-secondary" />
                 <span>{SPLIT_OPTIONS.find((s) => s.value === splitMode)?.hint}</span>
               </div>
             </section>
@@ -664,14 +680,14 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
             <Label>Protection</Label>
             <Segmented value={protection} options={PROTECTION_OPTIONS} onChange={setProtection} />
             <div className="flex items-start gap-2 text-[12px] text-dim">
-              {protection === 'none' && <LockOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-teal" />}
+              {protection === 'none' && <LockOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-secondary" />}
               {protection === 'password' && <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />}
               {protection === 'vault' && <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />}
               <span>{PROTECTION_OPTIONS.find((p) => p.value === protection)?.hint}</span>
             </div>
 
             {protection === 'password' && (
-              <div className="mt-1 flex flex-col gap-2 border border-line/50 bg-black/40 p-2.5">
+              <div className="mt-1 flex flex-col gap-2 border border-line/50 tone-panel-40 p-2.5">
                 <div className="relative">
                   <Input
                     type={showPassword ? 'text' : 'password'}
@@ -684,7 +700,7 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
                     type="button"
                     title={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dim hover:text-white"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dim hover:text-ink"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>

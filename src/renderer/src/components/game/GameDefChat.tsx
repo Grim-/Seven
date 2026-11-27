@@ -19,9 +19,9 @@ function DefCard({ kind, id, short }: { kind: string; id: string; short: boolean
     .filter(([key]) => def.values[key] !== '' && def.values[key] !== undefined)
     .map(([key, spec]) => [spec.label ?? key, shown(def.values[key])])
   return (
-    <EntryCard title={def.name} tag={type.label} aside={<span className="font-mono text-[11px] text-faint">{def.id}</span>}>
+    <EntryCard title={def.name} tag={type.label} aside={<span className="font-ui text-[11px] text-faint">{def.id}</span>}>
       <Facts rows={short ? rows.slice(0, 4) : rows} />
-      {def.notes && !short && <p className="m-0 whitespace-pre-wrap text-[12.5px] leading-relaxed text-white/80">{def.notes}</p>}
+      {def.notes && !short && <p className="m-0 whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink/80">{def.notes}</p>}
     </EntryCard>
   )
 }

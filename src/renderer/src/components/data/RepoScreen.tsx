@@ -50,7 +50,7 @@ function ValueText({ value }: { value: string }) {
     <>
       {value.split(/(\{[^}]+\})/g).map((part, i) =>
         /^\{[^}]+\}$/.test(part) ? (
-          <span key={i} className="mx-0.5 border border-teal/40 bg-teal/10 px-1 font-mono text-[11.5px] text-teal" title="Rolls from another repo">
+          <span key={i} className="mx-0.5 border border-secondary/40 bg-secondary/10 px-1 font-ui text-[11.5px] text-secondary" title="Rolls from another repo">
             {part.slice(1, -1)}
           </span>
         ) : (
@@ -95,9 +95,9 @@ function Roller({ repo, before }: { repo: RepoEntry; before: () => Promise<void>
     }
   }
   return (
-    <div className="flex w-72 shrink-0 flex-col gap-2 border border-line/50 bg-black/40 p-2.5">
+    <div className="flex w-72 shrink-0 flex-col gap-2 border border-line/50 tone-panel-40 p-2.5">
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Roll</span>
+        <span className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">Roll</span>
         <span className="ml-auto">
           <CountStepper value={count} min={1} max={20} onChange={setCount} />
         </span>
@@ -107,7 +107,7 @@ function Roller({ repo, before }: { repo: RepoEntry; before: () => Promise<void>
       </Button>
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
         {rolled.map((r) => (
-          <div key={r.id} className="group flex items-center gap-1.5 border border-line/40 bg-black/50 px-2 py-1.5 text-[13px] text-white">
+          <div key={r.id} className="group flex items-center gap-1.5 border border-line/40 tone-panel-50 px-2 py-1.5 text-[13px] text-ink">
             <span className="min-w-0 flex-1 break-words">{withReferences(r.text)}</span>
             <button title="Roll this one again" onClick={() => void again(r.id)} className="text-dim opacity-0 hover:text-accent group-hover:opacity-100">
               <RefreshCw className="h-3.5 w-3.5" />
@@ -140,7 +140,7 @@ function Editor({ start, tags, select }: { start: RepoEntry; tags: string[]; sel
         type="button"
         title="Link any entry (spell, card, scene prompt, page, etc.) into this repo"
         onClick={() => setPicking((v) => !v)}
-        className="flex h-7 items-center gap-1 border border-line/50 px-2 font-mono text-[10.5px] uppercase tracking-[0.1em] text-dim hover:border-accent/60 hover:text-accent"
+        className="flex h-7 items-center gap-1 border border-line/50 px-2 font-label text-[10.5px] caps-10 text-dim hover:border-accent/60 hover:text-accent"
       >
         <Link2 className="h-3 w-3" /> Link entry
       </button>
@@ -158,7 +158,7 @@ function Editor({ start, tags, select }: { start: RepoEntry; tags: string[]; sel
     </div>
   )
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 border border-line/60 bg-black/70 p-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 border border-line/60 tone-panel-70 p-3">
       <div className="flex items-center gap-3">
         <Dices className="h-5 w-5 shrink-0 text-accent-soft" />
         <InlineTitle value={showName(repo.title)} onSave={(title) => change({ title })} />
@@ -248,7 +248,7 @@ export function RepoScreen({ id, select }: KindScreenProps) {
     }
   }, [id])
   const tags = [...new Set((repos ?? []).flatMap((r) => r.tags))]
-  if (id && repo === undefined) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (id && repo === undefined) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   if (repo) return <Editor key={repo.id} start={repo} tags={tags} select={select} />
   return (
     <KindShell

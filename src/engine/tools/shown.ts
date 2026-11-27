@@ -2,6 +2,9 @@ import fs from 'node:fs'
 import { data } from '../data/hub'
 import { ToolError, type ToolContext } from './types'
 import { displayPath, resolveInWorkspace } from './workspace'
+import { registerPlaceTarget } from '../data/placeTargets'
+
+registerPlaceTarget({ target: 'show', label: 'Shown files', home: 'Files/Shown', asks: false })
 
 export function canShowPaths(ctx: ToolContext): boolean {
   return Boolean(ctx.workspace) || ctx.folders.length > 0

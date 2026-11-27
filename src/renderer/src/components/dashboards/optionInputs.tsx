@@ -71,7 +71,7 @@ function FieldsInput({ value, fields, onChange }: OptionInputProps) {
             key={f.name}
             type="button"
             onClick={() => onChange(on ? picked.filter((p) => p !== f.name) : [...picked, f.name])}
-            className={cn('h-7 border px-2 font-mono text-[11px] transition-colors', on ? 'border-accent bg-accent/15 text-white' : 'border-line/60 text-dim hover:border-accent hover:text-white')}
+            className={cn('h-7 border px-2 font-ui text-[11px] transition-colors', on ? 'border-accent bg-accent/15 text-ink' : 'border-line/60 text-dim hover:border-accent hover:text-ink')}
           >
             {f.name}
           </button>
@@ -91,7 +91,7 @@ function FilterInput({ value, fields, onChange }: OptionInputProps) {
       {entries.map(([k, v], i) => (
         <div key={i} className="flex items-center gap-2">
           <Select value={k} options={fields.map((f) => ({ value: f.name, label: f.name }))} onChange={(nk) => set(entries.map((e, j) => (j === i ? [nk, e[1]] : e)))} className="w-40" />
-          <span className="font-mono text-[11px] text-faint">=</span>
+          <span className="font-ui text-[11px] text-faint">=</span>
           <Input value={String(v ?? '')} onChange={(e) => set(entries.map((x, j) => (j === i ? [x[0], e.target.value] : x)))} className="flex-1" />
           <button type="button" className="text-dim hover:text-alert" onClick={() => set(entries.filter((_, j) => j !== i))}>
             <X className="h-4 w-4" />

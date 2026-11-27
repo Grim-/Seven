@@ -74,21 +74,21 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
           value={a.attempt}
           placeholder="What is attempted?"
           onChange={(e) => set({ ...a, attempt: e.target.value })}
-          className="h-10 text-[15px] font-semibold text-white"
+          className="h-10 text-[15px] font-semibold text-ink"
         />
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/40 pt-2">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">Ways</span>
+            <span className="font-label text-[10.5px] caps-14 text-faint">Ways</span>
             <Segmented value={a.needs} options={NEEDS} onChange={(needs) => set({ ...a, needs })} />
           </div>
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 text-[11px] text-dim">
-              <span className="font-mono uppercase tracking-[0.1em] text-faint">Takes</span>
+              <span className="font-label caps-10 text-faint">Takes</span>
               <DurationInput value={a.seconds ?? 0} onChange={(seconds) => set({ ...a, seconds })} />
             </label>
             <RollerField value={a.roller ?? 'player'} onChange={(roller) => set({ ...a, roller })} />
             <label className="flex items-center gap-2 text-[11px] text-dim">
-              <span className="font-mono uppercase tracking-[0.1em] text-faint">Preview with</span>
+              <span className="font-label caps-10 text-faint">Preview with</span>
               <SheetSelect value={mine} onChange={setMine} className="h-7 w-36 text-[11.5px]" noneLabel="None (+0)" />
             </label>
           </div>
@@ -99,7 +99,7 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <Eyebrow>Ways to try it (Checks)</Eyebrow>
-          <span className="font-mono text-[11px] text-faint">DC changes update chance in real-time</span>
+          <span className="font-ui text-[11px] text-faint">DC changes update chance in real-time</span>
         </div>
 
         {a.checks.map((c, i) => {
@@ -111,9 +111,9 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
           const showDetails = openDetails[i] || hasCustom
 
           return (
-            <div key={i} className="flex flex-col gap-1.5 border border-line/50 bg-white/[0.02] p-2.5 transition hover:border-line-strong">
+            <div key={i} className="flex flex-col gap-1.5 border border-line/50 bg-ink/[0.02] p-2.5 transition hover:border-line-strong">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-5 text-center font-mono text-xs font-bold text-accent">{i + 1}</span>
+                <span className="w-5 text-center font-ui text-xs font-bold text-accent">{i + 1}</span>
                 <SkillSelect
                   chance
                   targets={targets}
@@ -136,11 +136,11 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
                       }}
                       className="h-7 w-16 text-center text-[12px]"
                     />
-                    <span className="font-mono text-[11px] text-dim">%</span>
+                    <span className="font-ui text-[11px] text-dim">%</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[11px] text-dim">DC</span>
+                    <span className="font-ui text-[11px] text-dim">DC</span>
                     <NumberField
                       value={currentTarget}
                       min={1}
@@ -149,7 +149,7 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
                       onChange={(dc) => setCheck(i, { base: (dc ?? BASE) - 1, difficulty: MIDDLE })}
                       className="h-7 w-14 text-center text-[12px]"
                     />
-                    <span className="w-12 text-center font-mono text-[13px] font-bold text-cyan" title="Chance to pass">
+                    <span className="w-12 text-center font-ui text-[13px] font-bold text-secondary-ink" title="Chance to pass">
                       {Math.round(chance * 100)}%
                     </span>
                   </div>
@@ -158,7 +158,7 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
                 <button
                   type="button"
                   onClick={() => toggleDetails(i)}
-                  className="border border-line/50 px-2 py-0.5 font-mono text-[11px] text-dim transition hover:border-accent hover:text-white"
+                  className="border border-line/50 px-2 py-0.5 font-ui text-[11px] text-dim transition hover:border-accent hover:text-ink"
                 >
                   {showDetails ? 'Hide' : 'Custom outcome'}
                 </button>
@@ -212,8 +212,8 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
         <div className="flex flex-col gap-2 border border-ok/40 bg-ok/[0.05] p-3">
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-ok">On a pass</span>
-            <span className="font-mono text-[10px] uppercase text-ok/70">Success</span>
+            <span className="font-label text-[11px] font-bold caps-14 text-ok">On a pass</span>
+            <span className="font-label text-[10px] caps text-ok/70">Success</span>
           </div>
           <Input
             value={a.pass}
@@ -226,8 +226,8 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
 
         <div className="flex flex-col gap-2 border border-alert/40 bg-alert/[0.05] p-3">
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-alert">On a fail</span>
-            <span className="font-mono text-[10px] uppercase text-alert/70">Failure</span>
+            <span className="font-label text-[11px] font-bold caps-14 text-alert">On a fail</span>
+            <span className="font-label text-[10px] caps text-alert/70">Failure</span>
           </div>
           <Input
             value={a.fail}
@@ -253,8 +253,8 @@ export function ActionForm({ initial, character, where, onKeep, onChange, keepLa
           >
             Roll it
           </Button>
-          <span className="font-mono text-xs text-dim">
-            Best chance: <b className="text-cyan">{Math.round(bestChance * 100)}%</b>
+          <span className="font-ui text-xs text-dim">
+            Best chance: <b className="text-secondary-ink">{Math.round(bestChance * 100)}%</b>
           </span>
         </div>
         {onKeep && (

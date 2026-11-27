@@ -1,6 +1,7 @@
 import { toId } from './ids'
 import { linkFor } from './text'
 import { agentSheets } from './types'
+import { actorLink } from './worldNpcs'
 
 export interface CardSwap {
   gain: string[]
@@ -108,6 +109,6 @@ export function addCards(entries: DeckEntry[], card: string, by: number): DeckEn
 }
 
 export function cardPlayed(name: string, sheet: string | null, said = ''): string {
-  const line = `${sheet ? linkFor('sheet', sheet) : 'The user'} played the card ${linkFor('card', name)}`
+  const line = `${sheet ? actorLink(sheet) : 'The user'} played the card ${linkFor('card', name)}`
   return said.trim() ? `${line}\nWhat they do: "${said.trim()}"` : line
 }

@@ -6,6 +6,8 @@ interface ModelsState {
   list: ModelEntry[]
   params: ParamDef[]
   host: ModelHostState
+  focus: string | null
+  setFocus: (id: string | null) => void
   refresh: () => Promise<void>
   scan: (folders: string[]) => Promise<void>
   add: (path: string) => Promise<ModelEntry>
@@ -22,6 +24,8 @@ export const useModels = create<ModelsState>((set) => ({
   list: [],
   params: [],
   host: { status: 'unloaded', modelId: null, progress: 0, contextSize: null, error: null, restartNeeded: false },
+  focus: null,
+  setFocus: (focus) => set({ focus }),
   refresh: async () => {
     const [list, params, host] = await Promise.all([engine('models.list'), engine('models.params'), engine('models.state')])
     set({ list, params, host })

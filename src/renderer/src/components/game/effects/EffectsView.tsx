@@ -19,8 +19,8 @@ function Nodes({ nodes }: { nodes: EffectNode[] }) {
           </div>
           {n.arms.map((arm, a) =>
             arm.nodes.length ? (
-              <div key={a} className="ml-[0.5em] flex flex-col gap-[0.35em] border-l border-white/12 pl-[0.55em]">
-                <span className={arm.branch.tone === 'pass' ? 'font-mono text-[0.82em] font-semibold uppercase tracking-[0.08em] text-ok' : 'font-mono text-[0.82em] font-semibold uppercase tracking-[0.08em] text-alert'}>{arm.branch.label}</span>
+              <div key={a} className="ml-[0.5em] flex flex-col gap-[0.35em] border-l border-ink/12 pl-[0.55em]">
+                <span className={arm.branch.tone === 'pass' ? 'font-label text-[0.82em] font-semibold caps-8 text-ok' : 'font-label text-[0.82em] font-semibold caps-8 text-alert'}>{arm.branch.label}</span>
                 <Nodes nodes={arm.nodes} />
               </div>
             ) : null
@@ -38,7 +38,7 @@ export function EffectsView({ defs, lanes }: { defs: ComponentDef[]; lanes: Effe
     <div className="flex flex-col gap-[0.75em]">
       {tree.map((l) => (
         <div key={l.lane.event} className="flex flex-col gap-[0.4em]">
-          <span className="font-mono text-[0.82em] font-semibold uppercase tracking-[0.1em] text-dim">{l.lane.label}</span>
+          <span className="font-label text-[0.82em] font-semibold caps-10 text-dim">{l.lane.label}</span>
           <Nodes nodes={l.nodes} />
         </div>
       ))}

@@ -9,9 +9,8 @@ import type { JsonSchema } from '../../engine/tools/schema'
 import type { CollectionRecord, FieldChange, FieldType, Page, ViewRef } from '@shared/types'
 import { FIELD_TYPES, hitDetail, pageKindOf } from '@shared/types'
 import { data } from '../../engine/data/hub'
-import { canSee, entryId, findPage, generatedTitle, insideText, itemsView, kinds, entryView, linkView, partView, resolveEntry, rollEntry, setTags, textView, type KindContext } from '../../engine/library/kinds'
+import { canSee, entryId, findPage, generatedTitle, insideText, itemsView, kinds, entryView, linkView, partView, resolveEntry, rollEntry, hydrateForAgent, setTags, textView, type KindContext } from '../../engine/library/kinds'
 import { tags as tagStore } from '../../engine/library/tags'
-import { resolveIncludes } from '../../engine/library/includes'
 import { ToolError, optStr, str, type ToolContext, type ToolDef, type ToolScope } from '../../engine/tools/types'
 import { savedText } from './output'
 import { canReadPaths, readDisk } from '../read/tools'
@@ -23,6 +22,9 @@ import { SLIDESHOW_TOOLS } from './slideshowTools'
 import { CHARACTER_TOOLS } from './characterTools'
 import { hitId, resolveEntries, thingsFrom } from './things'
 import { INSPECT_SCHEMA } from './schemaTool'
+import { registerPlaceTarget } from '../../engine/data/placeTargets'
+
+registerPlaceTarget({ target: 'draw', label: 'Drawings', home: 'Pictures/Drawings', asks: false })
 
 const VALUE: JsonSchema = { oneOf: [{ type: ['string', 'number', 'boolean', 'null'] }, { type: 'array', items: { type: 'string' } }] }
 const OBJECT: JsonSchema = { type: 'object', properties: {}, additionalProperties: VALUE }
@@ -50,6 +52,7 @@ const find: ToolDef = {
   command: true,
   group: 'core',
   needsWorkspace: false,
+  lookup: true,
   description: 'Search the library. Supports OR / |, -exclude, "exact phrase", #tag, kind lists, field filters (where), and offset pagination. No query lists the newest of each kind.',
   params: {
     type: 'object',
@@ -123,9 +126,16 @@ interface ReadResult {
   view?: ViewRef
   link: boolean
   images?: string[]
+  hydrated?: boolean
 }
 
-async function readThing(kindName: string, raw: string, ctx: ToolContext, kctx: KindContext): Promise<ReadResult> {
+function liveText(text: string, kctx: KindContext, asWritten: boolean): { text: string; hydrated?: boolean } {
+  if (asWritten) return { text }
+  const out = hydrateForAgent(text, kctx, false)
+  return { text: out, hydrated: out !== text }
+}
+
+async function readThing(kindName: string, raw: string, ctx: ToolContext, kctx: KindContext, asWritten = false): Promise<ReadResult> {
   if (kindName === 'disk') {
     if (!canReadPaths(ctx)) throw new ToolError("You can't read files on disk. If you need to, ask the user to give you a workspace or a linked folder, and the Read files tools.")
     const got = await readDisk(ctx, raw)
@@ -136,7 +146,7 @@ async function readThing(kindName: string, raw: string, ctx: ToolContext, kctx: 
     return { kind: 'result', id, text: savedText(id, ctx), link: false }
   }
   const rooted = kindName ? kinds(kctx).find((k) => k.kind === kindName) : undefined
-  if (rooted?.root !== undefined && !toId(raw)) return { kind: rooted.kind, id: rooted.root, text: resolveIncludes(rooted.full(rooted.root, {}, kctx), kctx), link: false }
+  if (rooted?.root !== undefined && !toId(raw)) return { kind: rooted.kind, id: rooted.root, ...liveText(rooted.full(rooted.root, {}, kctx), kctx, asWritten), link: false }
   const { kind, id, trail, path } = resolveEntry(raw, kindName, kctx)
   const name = entryId(kind, id, kind.title(id), kctx)
   const asset = kind.asset?.(id) ?? null
@@ -146,13 +156,15 @@ async function readThing(kindName: string, raw: string, ctx: ToolContext, kctx: 
   if (full !== null) return { kind: kind.kind, id: name, text: full + inside, link: true, images }
   if (kind.readView) {
     const out = kind.readView(id, {}, kctx)
-    return { kind: kind.kind, id: name, text: resolveIncludes(out.text, kctx) + inside, view: out.view, link: true, images }
+    const live = liveText(out.text, kctx, asWritten)
+    return { kind: kind.kind, id: name, text: live.text + inside, hydrated: live.hydrated, view: out.view, link: true, images }
   }
-  return { kind: kind.kind, id: name, text: resolveIncludes(kind.full(id, {}, kctx), kctx) + inside, link: true, images }
+  const live = liveText(kind.full(id, {}, kctx), kctx, asWritten)
+  return { kind: kind.kind, id: name, text: live.text + inside, hydrated: live.hydrated, link: true, images }
 }
 
 function fitRead(got: ReadResult, truncate: boolean, ctx: ToolContext): string {
-  const head = `${got.kind} ${got.id}${got.link ? ` · link ${linkFor(got.kind, got.id)}` : ''}`
+  const head = `${got.kind} ${got.id}${got.link ? ` · link ${linkFor(got.kind, got.id)}` : ''}${got.hydrated ? ' · links are filled in, each followed by its own link; as_written true gives the text as stored, to change it' : ''}`
   const body = got.text
   const count = ctx.budget?.count ?? ((t: string) => Math.ceil(t.length / 3.5))
   if (truncate) {
@@ -180,7 +192,8 @@ function readKinds(scope: ToolScope): string[] {
 const READ_PARAMS = {
   kind: { type: 'string', description: 'The kind of entry; folder lists a folder (id / for the top); disk is a file in your workspace or a linked folder; result is a cut-short tool result' },
   id: { type: 'string', description: 'Its id, e.g. recipes/pancakes, workspace/src/index.ts or t_abc123' },
-  truncate: { type: 'boolean', description: 'true cuts long content short; false gives all of it' }
+  truncate: { type: 'boolean', description: 'true cuts long content short; false gives all of it' },
+  as_written: { type: 'boolean', description: 'true gives the text as stored, links unfilled' }
 } as const
 
 const read: ToolDef = {
@@ -190,6 +203,7 @@ const read: ToolDef = {
   always: true,
   needsWorkspace: false,
   fitsItself: true,
+  lookup: true,
   description: 'Read one thing by its kind and id.',
   params: { type: 'object', properties: READ_PARAMS },
   forAgent: (scope) => ({ params: { type: 'object', properties: { ...READ_PARAMS, kind: { enum: readKinds(scope) } } } }),
@@ -197,7 +211,7 @@ const read: ToolDef = {
     const kctx = { agentId: ctx.agentId }
     const kindName = str(params, 'kind').trim().toLowerCase()
     const raw = typeof params.id === 'string' ? params.id : ''
-    const got = await readThing(kindName, raw, ctx, kctx)
+    const got = await readThing(kindName, raw, ctx, kctx, params.as_written === true)
     return { text: fitRead(got, params.truncate !== false, ctx), view: got.view, images: got.images }
   }
 }
@@ -591,8 +605,8 @@ const sheetWrite: ToolDef = {
       const rawFaction = params.faction.trim()
       if (!rawFaction) factionPatch = null
       else {
-        const found = factions.find(rawFaction)
-        if (!found) throw new ToolError(`No faction "${rawFaction}". Available: ${factions.list().map((f) => f.id).join(', ') || 'none'}.`)
+        const found = factions.find(rawFaction, null)
+        if (!found) throw new ToolError(`No faction "${rawFaction}". Available: ${factions.list(null).map((f) => f.id).join(', ') || 'none'}.`)
         factionPatch = found.id
       }
     }

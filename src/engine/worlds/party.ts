@@ -1,6 +1,7 @@
 import { noteFailure } from '../util/report'
-import { mapArea, placesIn } from '@shared/maps'
-import { PLACE_TYPE_KEY } from '@shared/world'
+import { layerOn, mapArea, mapThingKey, PLACE_THING, placesIn } from '@shared/maps'
+import { PLACE_TYPE_KEY, worldLink } from '@shared/world'
+import { npcActorId, splitNpcRef } from '@shared/worldNpcs'
 import type { GameSave, SaveCreateOptions, SaveLoadoutOverride } from '@shared/game/save'
 import { GameEntity, createComponent } from '@shared/game/core'
 import { Abilities, Ability, Buffs, Classes, Health, Inventory, ensureCharacterDefaults } from '@shared/game/components'
@@ -8,23 +9,43 @@ import { ABILITY_TEMPLATES, BUFF_TEMPLATES, ITEM_TEMPLATES, catalogFrom } from '
 import { renderSentenceTemplate } from '@shared/game/effectWords'
 import { shapeBounds } from '@shared/shapes'
 import { maps } from '../maps/store'
-import { getSheet, setSheetSave, sheetIds, storedGame } from '../library/sheets'
+import { getSheet, setGame, setSheetSave, sheetIds, storedGame } from '../library/sheets'
+import { defaultCharacterGameRecord } from './defaultGame'
 import { almanacs } from '../almanac/store'
 import { gameDefs } from '../../modules/game/store'
 import { triggerActionsStore } from '../triggerActions/store'
 import { triggerActionEffects } from '@shared/game/triggerActions'
+import { npcs } from './npcs'
 import { saves } from './saves'
 import { WorldError, worlds } from './store'
 import { wakeMapSpawners } from './spawners'
 import { assertOutOfCombat } from './battleGate'
 
+function offMaps(stand: GameSave['stand'], sheet: string): GameSave['stand'] {
+  return Object.fromEntries(Object.entries(stand).map(([map, list]) => [map, Object.fromEntries(Object.entries(list).filter(([s]) => s !== sheet))]))
+}
+
 function without(save: GameSave, sheet: string): GameSave {
   const { [sheet]: _gone, ...characters } = save.characters
-  const stand = Object.fromEntries(Object.entries(save.stand).map(([map, list]) => [map, Object.fromEntries(Object.entries(list).filter(([s]) => s !== sheet))]))
-  return { ...save, characters, stand }
+  return { ...save, characters, stand: offMaps(save.stand, sheet) }
 }
 
 export function takeOut(sheet: string): GameSave | null {
+  const npc = splitNpcRef(sheet)
+  if (npc) {
+    const actorId = npcActorId(npc.world, npc.id)
+    const save = saves.current(npc.world)
+    if (!save) return null
+    if (!npcs.hasTemplate(npc.world, npc.id)) return npcs.removeInSave(npc.world, npc.id)
+    const cur = npcs.find(npc.id, npc.world, 'play')
+    if (cur) npcs.updateInSave(npc.world, npc.id, { story: { ...cur.story, where: '' } })
+    const latest = saves.get(save.id)
+    return saves.write({
+      ...latest,
+      ...(latest.party ? { party: latest.party.filter((p) => p !== actorId) } : {}),
+      stand: offMaps(latest.stand, actorId)
+    })
+  }
   const s = getSheet(sheet)
   const save = s.save ? saves.read(s.save) : null
   if (!save) {
@@ -39,6 +60,23 @@ export function takeOut(sheet: string): GameSave | null {
 
 export function bring(id: string, sheet: string, where = ''): GameSave {
   const save = saves.get(id)
+  const npc = splitNpcRef(sheet)
+  if (npc) {
+    const cur = npcs.find(npc.id, npc.world, 'play')
+    if (!cur) return save
+    const prev = save.npcs[npc.id]
+    const prevObj = prev && typeof prev === 'object' ? prev : {}
+    return saves.change(id, (v) => ({
+      ...v,
+      npcs: {
+        ...v.npcs,
+        [npc.id]: {
+          ...prevObj,
+          story: { ...cur.story, where: where || cur.story.where }
+        }
+      }
+    }))
+  }
   const s = getSheet(sheet)
   if (s.save === id) return save
   if (s.save) takeOut(s.id)
@@ -167,7 +205,7 @@ export function createNewWorldSave(world: string, name: string, options?: SaveCr
   const companions = (options?.companions ?? []).map(resolveSheetId).filter((c): c is string => Boolean(c) && c !== player)
   const startingPlace = options?.startingPlace !== undefined ? options.startingPlace : (launch?.startingPlace ?? null)
   const startingTime = options?.startingTime ?? launch?.startingTime ?? 8 * 3600
-  const whereStr = startingPlace ? `@place:${startingPlace}` : ''
+  const whereStr = startingPlace ? worldLink(world, PLACE_TYPE_KEY, startingPlace) : ''
 
   const rawStood = worlds.oldStand(world)
   const stood: typeof rawStood = {}
@@ -200,12 +238,22 @@ export function createNewWorldSave(world: string, name: string, options?: SaveCr
       // Ignore unreadable sheet
     }
   }
+  const worldTemplateNpcs = npcs.list(world, 'template').filter((n) => !n.archetype)
+  for (const wNpc of worldTemplateNpcs) {
+    const actorId = npcActorId(world, wNpc.id)
+    if (wNpc.story.where && placesIn(wNpc.story.where, world, worldPlaces).length) {
+      npcHomeWhere.set(actorId, wNpc.story.where)
+    }
+  }
   if (player) standingSheets.add(player)
   for (const c of companions) standingSheets.add(c)
 
-  // Compute spawn point: center of startingPlace shape on startingMap if drawn, else map center
   const spawnPointFor = (mapId: string, placeKey: string | null, indexOffset: number): { x: number; y: number } => {
     const use = uses.find((u) => u.map === mapId)
+    const explicit = placeKey && use ? use.spawns?.[placeKey] : undefined
+    if (explicit) {
+      return { x: explicit.x + indexOffset * 28, y: explicit.y }
+    }
     const shape = placeKey && use ? use.shapes[placeKey] : undefined
     if (shape) {
       const b = shapeBounds(shape)
@@ -263,6 +311,28 @@ export function createNewWorldSave(world: string, name: string, options?: SaveCr
       }
     } catch (err) {
       noteFailure(err, 'worlds', 'Could not bring a character into the save')
+    }
+  }
+
+  for (const wNpc of worldTemplateNpcs) {
+    const actorId = npcActorId(world, wNpc.id)
+    const isParty = partyList.includes(actorId)
+    if (!isParty && !wNpc.game) continue
+    try {
+      const entity = loadOrInitCharacterEntity(actorId, wNpc.game, catalog, true)
+      saves.change(save.id, (s) => ({
+        ...s,
+        npcs: {
+          ...s.npcs,
+          [wNpc.id]: {
+            ...(s.npcs[wNpc.id] ?? {}),
+            game: entity.toRecord(),
+            story: { ...wNpc.story, where: isParty ? whereStr : wNpc.story.where }
+          }
+        }
+      }))
+    } catch (err) {
+      noteFailure(err, 'worlds', 'Could not initialize a world NPC in the save')
     }
   }
 
@@ -446,19 +516,113 @@ export function adoptOldPlay(world: string): GameSave {
   }))
 }
 
+export function setParty(saveId: string, members: string[]): GameSave {
+  const unique = [...new Set(members.map((m) => m.trim()).filter(Boolean))]
+  return saves.change(saveId, (s) => ({ ...s, party: unique }))
+}
+
+export function addPartyMember(saveId: string, sheet: string, place?: string | null, map?: string | null): GameSave {
+  const save = saves.get(saveId)
+  const npc = splitNpcRef(sheet)
+  const actorId = npc ? npcActorId(npc.world, npc.id) : getSheet(sheet).id
+  if (!npc) {
+    const s = getSheet(actorId)
+    if (!s.game) {
+      const def = defaultCharacterGameRecord(s.title, s.id)
+      if (def) setGame(s.id, def)
+    }
+    if (s.save !== saveId) {
+      bring(saveId, actorId, place ? worldLink(save.world, PLACE_TYPE_KEY, place) : '')
+    }
+  }
+  const latest = saves.get(saveId)
+  const alreadyStanding = Object.values(latest.stand).some((m) => actorId in m)
+  if (!alreadyStanding && (place || map)) {
+    const uses = worlds.mapUses(save.world)
+    const targetMap =
+      map ||
+      (place ? uses.find((u) => Boolean(u.spawns?.[place] || u.shapes[place]))?.map : null) ||
+      uses[0]?.map ||
+      null
+    if (targetMap) {
+      standAt(actorId, saveId, targetMap, place ?? '')
+    }
+  }
+  return saves.change(saveId, (v) => {
+    const current = v.party ?? []
+    return current.includes(actorId) ? v : { ...v, party: [...current, actorId] }
+  })
+}
+
+export function removePartyMember(saveId: string, sheet: string): GameSave {
+  const npc = splitNpcRef(sheet)
+  const actorId = npc ? npcActorId(npc.world, npc.id) : sheet.trim()
+  return saves.change(saveId, (v) => ({
+    ...v,
+    party: (v.party ?? []).filter((p) => p !== actorId)
+  }))
+}
+
+export function travelParty(saveId: string, map: string, place: string): GameSave {
+  const save = saves.get(saveId)
+  assertOutOfCombat(save, 'travel as a party')
+  const members = save.party?.length ? save.party : worlds.exists(save.world) && worlds.meta(save.world).player ? [worlds.meta(save.world).player!] : []
+  let latest = save
+  for (const member of members) {
+    latest = standAt(member, saveId, map, place)
+  }
+  return latest
+}
+
 export function travel(sheet: string, id: string, map: string, place: string): GameSave {
+  assertOutOfCombat(saves.get(id), 'travel between locations')
+  return standAt(sheet, id, map, place)
+}
+
+export function standAt(sheet: string, id: string, map: string, place: string): GameSave {
   const save = saves.get(id)
-  assertOutOfCombat(save, 'travel between locations')
   const uses = worlds.mapUses(save.world)
   const use = uses.find((u) => u.map === map) ?? uses[0]
   if (!use) throw new WorldError(`${worlds.meta(save.world).name} has no map to arrive on.`)
+  if (place && !layerOn(use, mapThingKey(PLACE_THING, place), save.flags)) throw new WorldError(`${String(worlds.entities(save.world, PLACE_TYPE_KEY, false, 'template')[place]?.Name || place)} is closed right now.`)
   const form = place ? use.shapes[place] : undefined
+  const explicitSpawn = place ? use.spawns?.[place] : undefined
   const size = maps.get(use.map)?.size ?? { w: 0, h: 0 }
   const box = form ? shapeBounds(form) : null
-  const at = box ? { x: Math.round(box.x + box.w / 2), y: Math.round(box.y + box.h / 2) } : { x: Math.round(size.w / 2), y: Math.round(size.h / 2) }
+  const at = explicitSpawn ?? (box ? { x: Math.round(box.x + box.w / 2), y: Math.round(box.y + box.h / 2) } : { x: Math.round(size.w / 2), y: Math.round(size.h / 2) })
+  const npc = splitNpcRef(sheet)
+  if (npc) {
+    const actorId = npcActorId(save.world, npc.id)
+    const cur = npcs.get(npc.id, save.world, 'play')
+    const where = place ? worldLink(save.world, PLACE_TYPE_KEY, place) : ''
+    saves.change(id, (v) => {
+      const stand = offMaps(v.stand, actorId)
+      const prev = v.npcs[npc.id]
+      const prevObj = prev && typeof prev === 'object' ? prev : {}
+      return {
+        ...v,
+        npcs: {
+          ...v.npcs,
+          [npc.id]: { ...prevObj, story: { ...cur.story, where } }
+        },
+        stand: { ...stand, [use.map]: { ...(stand[use.map] ?? {}), [actorId]: { at, actions: '', decisions: '' } } }
+      }
+    })
+    saves.select(save.world, id)
+    npcs.emit('changed', save.world)
+    return wakeMapSpawners(save.world, use.map, true) ?? saves.get(id)
+  }
   const s = getSheet(sheet)
-  bring(id, s.id, form ? `@place:${place}` : '')
-  saves.change(id, (v) => ({ ...v, stand: { ...v.stand, [use.map]: { ...(v.stand[use.map] ?? {}), [s.id]: { at, actions: '', decisions: '' } } } }))
+  const where = place ? worldLink(save.world, PLACE_TYPE_KEY, place) : ''
+  bring(id, s.id, where)
+  saves.change(id, (v) => {
+    const stand = offMaps(v.stand, s.id)
+    return {
+      ...v,
+      characters: { ...v.characters, [s.id]: { ...v.characters[s.id], where } },
+      stand: { ...stand, [use.map]: { ...(stand[use.map] ?? {}), [s.id]: { at, actions: '', decisions: '' } } }
+    }
+  })
   saves.select(save.world, id)
   return wakeMapSpawners(save.world, use.map, true) ?? saves.get(id)
 }

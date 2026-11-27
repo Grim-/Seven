@@ -147,7 +147,7 @@ function InlineSelect({ page, record, field }: { page: Page; record: CollectionR
       value={value}
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => void update(page.id, record.id, { [field.name]: e.target.value || null })}
-      className="h-6 max-w-40 border border-line/60 bg-black/60 px-1 text-[12px] text-white/90 hover:border-accent"
+      className="h-6 max-w-40 border border-line/60 tone-well-60 px-1 text-[12px] text-ink/90 hover:border-accent"
     >
       <option value="">—</option>
       {field.options.map((o) => (
@@ -187,7 +187,7 @@ function TableBody({ page, records, fields, compact, onOpen }: BodyProps) {
         <thead>
           <tr className="border-b border-line/60">
             {fields.map((f) => (
-              <th key={f.name} className="whitespace-nowrap px-2.5 py-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent-soft">
+              <th key={f.name} className="whitespace-nowrap px-2.5 py-1.5 font-label text-[10.5px] font-semibold caps-12 text-accent-soft">
                 {f.name}
               </th>
             ))}
@@ -196,9 +196,9 @@ function TableBody({ page, records, fields, compact, onOpen }: BodyProps) {
         </thead>
         <tbody>
           {records.map((r) => (
-            <tr key={r.id} data-record={r.id} onClick={() => onOpen(r)} className="group cursor-pointer border-b border-line/20 hover:bg-white/[0.03]">
+            <tr key={r.id} data-record={r.id} onClick={() => onOpen(r)} className="group cursor-pointer border-b border-line/20 hover:bg-ink/[0.03]">
               {fields.map((f) => (
-                <td key={f.name} className={cn('px-2.5 align-top text-white/90', compact ? 'py-1' : 'py-1.5')}>
+                <td key={f.name} className={cn('px-2.5 align-top text-ink/90', compact ? 'py-1' : 'py-1.5')}>
                   <FieldCell page={page} record={r} field={f} />
                 </td>
               ))}
@@ -220,7 +220,7 @@ function Secondary({ fields: visible, record, skip, page }: { fields: FieldDef[]
     <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-dim">
       {fields.map((f) => (
         <span key={f.name} className="inline-flex items-center gap-1.5">
-          {f.type !== 'select' && f.type !== 'tags' && <span className="font-mono text-[10px] uppercase tracking-wider text-faint">{f.name}</span>}
+          {f.type !== 'select' && f.type !== 'tags' && <span className="font-label text-[10px] caps-5 text-faint">{f.name}</span>}
           {page && f.type === 'select' && f.options.length ? <InlineSelect page={page} record={record} field={f} /> : <FieldValueView field={f} value={record.values[f.name]} />}
         </span>
       ))}
@@ -233,9 +233,9 @@ function ListBody({ page, records, fields, onOpen }: BodyProps) {
   return (
     <ul className="flex flex-col">
       {records.map((r) => (
-        <li key={r.id} data-record={r.id} onClick={() => onOpen(r)} className="group flex cursor-pointer items-start gap-2 border-b border-line/20 px-1 py-1.5 hover:bg-white/[0.03]">
+        <li key={r.id} data-record={r.id} onClick={() => onOpen(r)} className="group flex cursor-pointer items-start gap-2 border-b border-line/20 px-1 py-1.5 hover:bg-ink/[0.03]">
           <div className="min-w-0 flex-1">
-            <div className="text-[13.5px] text-white">
+            <div className="text-[13.5px] text-ink">
               <FieldValueView field={primary} value={r.values[primary.name]} />
             </div>
             <Secondary fields={fields} record={r} skip={[primary.name]} page={page} />
@@ -269,7 +269,7 @@ function ItemTitle({ page, record, field, done }: { page: Page; record: Collecti
             setEditing(false)
           }
         }}
-        className="w-full border-b border-accent/60 bg-transparent text-[13.5px] text-white outline-none"
+        className="w-full border-b border-accent/60 bg-transparent text-[13.5px] text-ink outline-none"
       />
     )
   return (
@@ -280,7 +280,7 @@ function ItemTitle({ page, record, field, done }: { page: Page; record: Collecti
         setText(String(value ?? ''))
         setEditing(true)
       }}
-      className={cn('cursor-text text-[13.5px] text-white', done && 'line-through')}
+      className={cn('cursor-text text-[13.5px] text-ink', done && 'line-through')}
     >
       {isEmpty(value) ? <span className="text-faint">Untitled</span> : <FieldValueView field={field} value={value} />}
     </div>
@@ -308,7 +308,7 @@ function AddItem({ page, field }: { page: Page; field: FieldDef | undefined }) {
         placeholder="Add an item"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && void add()}
-        className="min-w-0 flex-1 bg-transparent text-[13.5px] text-white outline-none placeholder:text-faint"
+        className="min-w-0 flex-1 bg-transparent text-[13.5px] text-ink outline-none placeholder:text-faint"
       />
     </li>
   )
@@ -353,7 +353,7 @@ function ChecklistBody({ page, records, fields, options, onOpen }: BodyProps) {
             }}
             onDrop={() => drop(r.id)}
             className={cn(
-              'group flex items-start gap-2.5 border-b border-line/20 px-1 py-1.5 hover:bg-white/[0.03]',
+              'group flex items-start gap-2.5 border-b border-line/20 px-1 py-1.5 hover:bg-ink/[0.03]',
               over === r.id && dragging !== r.id && 'border-t-2 border-t-accent',
               dragging === r.id && 'opacity-40'
             )}
@@ -388,10 +388,10 @@ function CardsBody({ page, records, fields, compact, onOpen }: BodyProps) {
   return (
     <div className={cn('grid gap-2', compact ? 'grid-cols-[repeat(auto-fill,minmax(170px,1fr))]' : 'grid-cols-[repeat(auto-fill,minmax(220px,1fr))]')}>
       {records.map((r) => (
-        <div key={r.id} data-record={r.id} onClick={() => onOpen(r)} className="notch-sm group cursor-pointer border border-line/60 bg-black/50 p-2.5 hover:border-accent">
+        <div key={r.id} data-record={r.id} onClick={() => onOpen(r)} className="notch-sm group cursor-pointer border border-line/60 tone-well-50 p-2.5 hover:border-accent">
           <div className="mb-1.5 flex items-start gap-2">
             {check && <Tick checked={isDone(check, r.values[check.name])} onClick={() => void update(page.id, r.id, { [check.name]: toggled(check, r.values[check.name]) })} />}
-            <div className="min-w-0 flex-1 text-[13.5px] font-semibold text-white">
+            <div className="min-w-0 flex-1 text-[13.5px] font-semibold text-ink">
               <FieldValueView field={primary} value={r.values[primary.name]} />
             </div>
             <RemoveButton page={page} record={r} />
@@ -401,8 +401,8 @@ function CardsBody({ page, records, fields, compact, onOpen }: BodyProps) {
               .filter((f) => f.name !== primary.name && f.name !== check?.name && (!isEmpty(r.values[f.name]) || (f.type === 'select' && f.options.length > 0)))
               .map((f) => (
                 <div key={f.name} className="flex items-start gap-2 text-[12px]">
-                  <span className="w-16 shrink-0 truncate font-mono text-[10px] uppercase tracking-wider text-faint">{f.name}</span>
-                  <span className="min-w-0 flex-1 text-white/85">
+                  <span className="w-16 shrink-0 truncate font-label text-[10px] caps-5 text-faint">{f.name}</span>
+                  <span className="min-w-0 flex-1 text-ink/85">
                     <FieldCell page={page} record={r} field={f} />
                   </span>
                 </div>
@@ -439,11 +439,11 @@ function BoardBody({ page, records, fields, options, onOpen }: BodyProps) {
               const id = e.dataTransfer.getData('text/seven-record')
               if (id) void update(page.id, id, { [group.name]: col || null })
             }}
-            className={cn('flex w-56 shrink-0 flex-col gap-1.5 border bg-black/40 p-2', over === col ? 'border-accent' : 'border-line/40')}
+            className={cn('flex w-56 shrink-0 flex-col gap-1.5 border tone-panel-40 p-2', over === col ? 'border-accent' : 'border-line/40')}
           >
             <div className="flex items-center justify-between">
               {col ? <Chip tone={chipColor(col)}>{col}</Chip> : <Chip>None</Chip>}
-              <span className="font-mono text-[10.5px] text-faint">{items.length}</span>
+              <span className="font-ui text-[10.5px] text-faint">{items.length}</span>
             </div>
             {items.map((r) => (
               <div
@@ -453,7 +453,7 @@ function BoardBody({ page, records, fields, options, onOpen }: BodyProps) {
                 onClick={() => onOpen(r)}
                 className="cursor-grab border border-line/50 bg-card px-2 py-1.5 hover:border-accent active:cursor-grabbing"
               >
-                <div className="text-[13px] text-white">
+                <div className="text-[13px] text-ink">
                   <FieldValueView field={primary} value={r.values[primary.name]} />
                 </div>
                 <Secondary fields={fields} record={r} skip={[primary.name, group.name]} />
@@ -524,7 +524,7 @@ export function ViewSwitcher({ value, onChange, compact = false }: { value: Coll
         value={value}
         options={COLLECTION_VIEWS.map((v) => ({ value: v, label: VIEW_LABELS[v] }))}
         onChange={(v) => onChange(v as CollectionViewKind)}
-        className="h-7 w-28 font-mono text-[11px] uppercase tracking-wider"
+        className="h-7 w-28 font-label text-[11px] caps-5 "
       />
     )
   return <ShellTabs value={value} options={COLLECTION_VIEWS.map((v) => ({ value: v, label: VIEW_LABELS[v] }))} onChange={onChange} />
@@ -547,19 +547,19 @@ export function LiveCollection({
   const [view, setView] = useState<CollectionViewKind>(initialView)
   const [showAll, setShowAll] = useState(false)
   const [adding, setAdding] = useState(false)
-  if (page === undefined) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (page === undefined) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   if (!page) return <EmptyState title="Deleted">This page no longer exists.</EmptyState>
   const partial = recordIds !== null && recordIds.length < page.records.length
   const subset = partial && !showAll ? recordIds : null
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.1em] text-white">{page.title}</span>
-        <span className="font-mono text-[11px] text-faint">
+        <span className="font-label text-[12px] font-semibold caps-10 text-ink">{page.title}</span>
+        <span className="font-ui text-[11px] text-faint">
           {subset ? `${subset.length} of ${page.records.length}` : `${page.records.length} item${page.records.length === 1 ? '' : 's'}`}
         </span>
         {partial && (
-          <button className="font-mono text-[10.5px] uppercase tracking-wider text-accent hover:text-white" onClick={() => setShowAll(!showAll)}>
+          <button className="font-label text-[10.5px] caps-5 text-accent hover:text-ink" onClick={() => setShowAll(!showAll)}>
             {showAll ? 'Show these' : 'Show all'}
           </button>
         )}

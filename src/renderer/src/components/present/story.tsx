@@ -76,7 +76,7 @@ export function Portrait({
   if (agent) return <AgentAvatar agent={agent} size={size} pose={mood} />
   if (sheetId) return <CharacterAvatar sheetId={sheetId} size={size} openOnClick />
   if (image) return <AssetMedia id={image} className="h-full w-full" />
-  return <div className="flex h-full w-full items-center justify-center bg-black/60 font-mono text-[40px] font-bold text-accent/80">{name.slice(0, 1).toUpperCase() || '?'}</div>
+  return <div className="flex h-full w-full items-center justify-center tone-panel-60 font-ui text-[40px] font-bold text-accent/80">{name.slice(0, 1).toUpperCase() || '?'}</div>
 }
 
 function Dialogue({ fields, draft, stage }: PresentationProps) {
@@ -99,10 +99,10 @@ function Dialogue({ fields, draft, stage }: PresentationProps) {
         e.stopPropagation()
         openMenu(e, name || 'Dialogue', portraitSizeMenuItems(avatarSize))
       }}
-      className="group/dlg my-2 border border-accent border-l-[3px] bg-black/80 shadow-[0_0_14px_color-mix(in_srgb,var(--color-accent)_18%,transparent)]"
+      className="group/dlg my-2 border border-accent border-l-[3px] tone-panel-80 shadow-[0_0_14px_color-mix(in_srgb,var(--color-accent)_calc(18%*var(--glow)),transparent)]"
     >
       <div className="flex gap-3 p-3">
-        <div className="group/portrait relative shrink-0 overflow-hidden border border-line-strong bg-black/40" style={{ width: size, height: size }}>
+        <div className="group/portrait relative shrink-0 overflow-hidden border border-line-strong tone-panel-40" style={{ width: size, height: size }}>
           <Portrait agent={agent} sheetId={matchedSheet} image={image} name={name} mood={moodOf(fields.mood)} size={size} />
           {!stage && (
             <PortraitSizeStepper
@@ -114,7 +114,7 @@ function Dialogue({ fields, draft, stage }: PresentationProps) {
         <div className="min-w-0 flex-1">
           {(name || !stage) && (
             <div className="mb-1.5 flex items-center justify-between gap-2 border-b border-line/50 pb-1">
-              <div className={cn('font-mono font-bold uppercase tracking-[0.18em] text-accent', stage ? 'text-[16px]' : 'text-[12px]')}>{name || 'DIALOGUE'}</div>
+              <div className={cn('font-label font-bold caps-18 text-accent', stage ? 'text-[16px]' : 'text-[12px]')}>{name || 'DIALOGUE'}</div>
               {!stage && (
                 <div className="opacity-0 transition-opacity group-hover/dlg:opacity-100">
                   <PortraitSizeStepper avatarSize={avatarSize} />
@@ -122,7 +122,7 @@ function Dialogue({ fields, draft, stage }: PresentationProps) {
               )}
             </div>
           )}
-          <div className={cn('whitespace-pre-wrap leading-relaxed text-white', stage ? 'text-[20px]' : 'text-[14.5px]')}>
+          <div className={cn('whitespace-pre-wrap leading-relaxed text-ink', stage ? 'text-[20px]' : 'text-[14.5px]')}>
             {highlightQuotes(shown)}
             {(draft || typing) && <span className="ml-0.5 inline-block h-[1em] w-2 animate-blink bg-accent align-middle" />}
           </div>
@@ -147,7 +147,7 @@ function ComicPanel({ panel, index, stage, animate }: { panel: PanelFields; inde
   const speech = str(panel.speech)
   return (
     <div
-      className="relative aspect-[4/3] overflow-hidden border-[3px] border-black bg-[radial-gradient(circle,#2a2a2a_1px,transparent_1.5px)] bg-[length:7px_7px] bg-[#151515]"
+      className="relative aspect-[4/3] overflow-hidden border-[3px] border-shade bg-[radial-gradient(circle,#2a2a2a_1px,transparent_1.5px)] bg-[length:7px_7px] bg-[#151515]"
       style={animate ? { animation: `comic-in 0.5s ease-out ${index * (stage ? 0.7 : 0.25)}s both` } : undefined}
     >
       {image ? (
@@ -158,13 +158,13 @@ function ComicPanel({ panel, index, stage, animate }: { panel: PanelFields; inde
         </div>
       ) : null}
       {caption && (
-        <div className={cn('absolute left-1.5 top-1.5 max-w-[80%] border-2 border-black bg-[#fff2a8] px-2 py-1 font-bold uppercase leading-snug text-black', stage ? 'text-[15px]' : 'text-[11.5px]')}>{caption}</div>
+        <div className={cn('absolute left-1.5 top-1.5 max-w-[80%] border-2 border-shade bg-[#fff2a8] px-2 py-1 font-bold caps leading-snug text-on-accent', stage ? 'text-[15px]' : 'text-[11.5px]')}>{caption}</div>
       )}
       {speech && (
-        <div className={cn('absolute bottom-2.5 right-2.5 max-w-[78%] rounded-[18px] border-2 border-black bg-white px-3 py-1.5 font-semibold leading-snug text-black', stage ? 'text-[17px]' : 'text-[13px]')}>
+        <div className={cn('absolute bottom-2.5 right-2.5 max-w-[78%] rounded-[18px] border-2 border-shade bg-page px-3 py-1.5 font-semibold leading-snug text-on-accent', stage ? 'text-[17px]' : 'text-[13px]')}>
           {speech}
-          <span className="absolute -bottom-[9px] left-5 h-0 w-0 border-x-[7px] border-t-[9px] border-x-transparent border-t-black" />
-          <span className="absolute -bottom-[5.5px] left-[22px] h-0 w-0 border-x-[5px] border-t-[7px] border-x-transparent border-t-white" />
+          <span className="absolute -bottom-[9px] left-5 h-0 w-0 border-x-[7px] border-t-[9px] border-x-transparent border-t-shade" />
+          <span className="absolute -bottom-[5.5px] left-[22px] h-0 w-0 border-x-[5px] border-t-[7px] border-x-transparent border-t-ink" />
         </div>
       )}
     </div>
@@ -176,8 +176,8 @@ function Comic({ fields, draft, stage }: PresentationProps) {
   const cols = panels.length <= 1 ? 1 : panels.length === 2 || panels.length === 4 ? 2 : 3
   const title = str(fields.title)
   return (
-    <div className="border-[3px] border-black bg-[#f4f0e6] p-2 shadow-[0_6px_18px_rgba(0,0,0,0.6)]">
-      {title && <div className={cn('mb-2 font-black uppercase italic tracking-wide text-black', stage ? 'text-[26px]' : 'text-[17px]')}>{title}</div>}
+    <div className="border-[3px] border-shade bg-[#f4f0e6] p-2 shadow-[0_6px_18px_color-mix(in_srgb,var(--color-shade)_60%,transparent)]">
+      {title && <div className={cn('mb-2 font-black caps-2.5 italic text-on-accent', stage ? 'text-[26px]' : 'text-[17px]')}>{title}</div>}
       <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
         {panels.map((p, i) => (
           <ComicPanel key={i} panel={p} index={i} stage={stage} animate={!draft} />
@@ -195,17 +195,17 @@ function Reveal({ fields, draft, stage }: PresentationProps) {
   const title = str(fields.title)
   const text = str(fields.text)
   return (
-    <div className={cn('relative overflow-hidden border border-line/60 bg-black', stage ? 'p-8' : 'p-5')} onClick={() => !draft && setRun(run + 1)}>
+    <div className={cn('relative overflow-hidden border border-line/60 bg-panel', stage ? 'p-8' : 'p-5')} onClick={() => !draft && setRun(run + 1)}>
       <div key={run} className="flex flex-col items-center gap-4 text-center" style={draft ? undefined : { animation: `reveal-${transition} ${seconds}s cubic-bezier(0.2, 0.7, 0.2, 1) both` }}>
         {image && <AreaMedia id={image} className={cn('block w-auto border border-line/50', stage ? 'max-h-[55vh]' : 'max-h-72')} />}
-        {title && <div className={cn('font-black uppercase tracking-[0.08em] text-accent [text-shadow:0_0_18px_color-mix(in_srgb,var(--color-accent)_55%,transparent)]', stage ? 'text-[44px] leading-tight' : 'text-[26px]')}>{title}</div>}
+        {title && <div className={cn('font-black caps-8 text-accent [text-shadow:0_0_18px_color-mix(in_srgb,var(--color-accent)_55%,transparent)]', stage ? 'text-[44px] leading-tight' : 'text-[26px]')}>{title}</div>}
         {text && (
           <div className={cn('max-w-2xl text-left', stage && 'text-[17px]')}>
             <Markdown text={text} />
           </div>
         )}
       </div>
-      {!draft && transition === 'flash' && <div key={`f${run}`} className="pointer-events-none absolute inset-0 bg-white" style={{ animation: `reveal-flash-cover ${Math.min(1.2, seconds)}s ease-out both` }} />}
+      {!draft && transition === 'flash' && <div key={`f${run}`} className="pointer-events-none absolute inset-0 bg-page" style={{ animation: `reveal-flash-cover ${Math.min(1.2, seconds)}s ease-out both` }} />}
     </div>
   )
 }
@@ -225,13 +225,13 @@ function Choices({ fields, draft }: PresentationProps) {
   const questions = (Array.isArray(fields.questions) ? fields.questions : []).filter((q): q is ChoiceQuestion => !!q && typeof q === 'object')
   const answers = (Array.isArray(fields.answers) ? fields.answers : []) as ChoiceAnswer[]
   return (
-    <div className="notch-sm flex flex-col gap-3 border border-line border-l-2 border-l-accent bg-black/60 p-3.5">
+    <div className="notch-sm flex flex-col gap-3 border border-line border-l-2 border-l-accent tone-panel-60 p-3.5">
       {questions.map((q, i) => {
         const options = Array.isArray(q.options) ? q.options.filter((o): o is string => typeof o === 'string') : []
         const answer = answers[i]
         return (
           <div key={i} className="flex flex-col gap-2">
-            <div className="text-[14px] text-white">{str(q.question)}</div>
+            <div className="text-[14px] text-ink">{str(q.question)}</div>
             <div className="flex flex-wrap gap-1.5">
               {options.map((o) => (
                 <span key={o} className={cn('border px-2.5 py-1 text-[12.5px]', answer?.choices.includes(o) ? 'border-accent bg-accent/15 text-accent' : 'border-line/60 text-dim')}>

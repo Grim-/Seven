@@ -59,10 +59,13 @@ export interface ToolDef {
   description: string
   params: JsonObjectSchema
   needsWorkspace: boolean
+  needsCharacter?: boolean
   maxRepeats?: number
   activity?: (params: Record<string, unknown>) => string
   always?: boolean
   fitsItself?: boolean
+  lookup?: boolean
+  reasoning?: boolean
   forAgent?: (scope: ToolScope) => Pick<ToolDef, 'params'>
   command?: boolean
   permission?: ToolPermission

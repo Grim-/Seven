@@ -78,10 +78,10 @@ export function MapObjectGraphicPicker({
   const isDataUrl = image.startsWith('data:')
 
   return (
-    <div className="flex flex-col gap-2 font-mono text-[11px]">
+    <div className="flex flex-col gap-2 font-ui text-[11px]">
       <div className="flex items-center gap-3">
         {/* Sprite Preview Box */}
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center border border-line bg-black/60 p-1">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center border border-line tone-panel-60 p-1">
           {image ? (
             isDataUrl ? (
               <img src={image} alt="Sprite preview" className="h-full w-full object-contain [image-rendering:pixelated]" />

@@ -66,12 +66,12 @@ function AbilitiesPanel({ comp, entity, catalog, changed }: PanelProps<Abilities
           </Button>
         </div>
       }
-      bodyClassName="p-3"
+      bodyClassName="p-2.5"
     >
       {comp.known.length === 0 ? (
-        <span className="font-mono text-[11.5px] text-faint">No innate attacks or abilities learned yet.</span>
+        <span className="font-ui text-[11.5px] text-faint">No innate attacks or abilities learned yet.</span>
       ) : (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {comp.known.map((a) => {
             const label = String(a.params.label || a.id)
             const cost = Object.entries(a.cost)
@@ -94,7 +94,7 @@ function AbilitiesPanel({ comp, entity, catalog, changed }: PanelProps<Abilities
                     e.currentTarget,
                     label,
                     <div className="flex flex-col gap-1.5">
-                      <span className="font-mono text-[10.5px] text-dim">
+                      <span className="font-ui text-[10.5px] text-dim">
                         {cost || 'Free action'}
                         {range > 0 ? ` · Reach ${range} ft` : ''}
                       </span>
@@ -105,16 +105,14 @@ function AbilitiesPanel({ comp, entity, catalog, changed }: PanelProps<Abilities
                 }
                 onMouseLeave={() => hideTip('component')}
                 className={cn(
-                  'group flex items-start gap-2.5 border bg-[#06090e] p-2.5 transition-colors',
-                  suppressed || classSuppressed ? 'border-line/35 opacity-60' : `${visual.border} hover:border-cyan/60`
+                  'group flex items-start gap-2 border tone-panel-40 p-2 transition-colors',
+                  suppressed || classSuppressed ? 'border-line/30 opacity-60' : 'border-line/45 hover:border-tint-cyan/60'
                 )}
               >
-                <div className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border', visual.border, visual.bg)}>
-                  <Icon className={cn('h-4 w-4', visual.color)} />
-                </div>
+                <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', visual.color)} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="truncate text-[13px] font-semibold text-white">{label}</span>
+                    <span className="truncate text-[12.5px] font-semibold text-ink">{label}</span>
                     {srcClass && (
                       <StatusBadge tone={classSuppressed ? 'warn' : 'idle'}>{srcClass}</StatusBadge>
                     )}
@@ -124,16 +122,11 @@ function AbilitiesPanel({ comp, entity, catalog, changed }: PanelProps<Abilities
                       </StatusBadge>
                     )}
                   </div>
-                  <div className="mt-0.5 truncate font-mono text-[11px] text-dim">
+                  <div className="mt-0.5 truncate font-ui text-[11px] text-dim">
                     {rows.map((r) => r.value).slice(0, 2).join(' · ') || 'Custom action'}
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
-                    <span className="border border-line/40 bg-black/50 px-1.5 py-0.5 text-white/80">
-                      {cost || 'Free'}
-                    </span>
-                    {range > 0 && (
-                      <span className="border border-line/40 bg-black/50 px-1.5 py-0.5 text-dim">{range} ft</span>
-                    )}
+                    {' · '}
+                    <span className="text-ink/75">{cost || 'Free'}</span>
+                    {range > 0 ? ` · ${range} ft` : ''}
                   </div>
                 </div>
                 <Button

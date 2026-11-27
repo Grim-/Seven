@@ -10,7 +10,7 @@ export function NavButton({ label, title, active, lit, onClick, children }: { la
       onClick={onClick}
       className={cn(
         'relative flex h-full w-10 items-center justify-center transition-colors phone:w-11 [&>svg]:h-4 [&>svg]:w-4 phone:[&>svg]:h-5 phone:[&>svg]:w-5',
-        active ? 'bg-accent/[0.07] text-accent' : lit ? 'text-accent hover:bg-white/[0.03]' : 'text-dim hover:bg-white/[0.03] hover:text-white'
+        active ? 'bg-accent/[0.07] text-accent' : lit ? 'text-accent hover:bg-ink/[0.03]' : 'text-dim hover:bg-ink/[0.03] hover:text-ink'
       )}
     >
       {children}

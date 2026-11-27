@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Download, X } from 'lucide-react'
-import type { CompanionRole, DownloadBundleFile, HubFile, HubModel } from '@shared/types'
+import type { CompanionRole, DownloadBundleFile, HubFamily, HubFile, HubModel, ModelKind } from '@shared/types'
 import { AlertBox, Button, Fold, SecretField, Select, SettingCard, SettingRow } from '../ui'
 import { pickFolder } from '../ui/FileField'
 import { filesKey, useHub } from '../../store/hub'
@@ -52,6 +52,26 @@ function roleForPath(file: string): CompanionRole {
   if (/lora/i.test(lower)) return 'lora'
   if (/diffusion_models/i.test(lower) || /\.(gguf|safetensors|sft|ckpt)$/i.test(lower)) return 'model'
   return 'other'
+}
+
+const ROLE_TO_KIND: Partial<Record<CompanionRole, ModelKind>> = {
+  vae: 'vae',
+  tae: 'vae',
+  clipL: 'text_encoder',
+  clipG: 'text_encoder',
+  t5xxl: 'text_encoder',
+  llm: 'text_encoder',
+  llmVision: 'projector',
+  lora: 'lora'
+}
+
+function expectedKindForFile(family: HubFamily, bucket: RepoBucket, file: string): ModelKind | undefined {
+  if (bucket === 'lora') return 'lora'
+  const role = roleForPath(file)
+  if (ROLE_TO_KIND[role]) return ROLE_TO_KIND[role]
+  if (family === 'image-gguf' || family === 'diffusion' || family === 'image-packs') return 'image'
+  if (bucket === 'modular' && /diffusion_models/i.test(file)) return 'image'
+  return undefined
 }
 
 function canonicalTargetForRepoFile(slug: string, file: string, role: CompanionRole): string {
@@ -137,13 +157,16 @@ export function HubRepo({ repo, model }: { repo: string; model: HubModel | null 
         targetRel: canonicalTargetForRepoFile(slug, f.file, role)
       }
     })
+    const primary = selectedFiles.find((f) => roleForPath(f.file) === 'model') ?? selectedFiles[0]
+    const expectedKind = primary ? expectedKindForFile(family, classifyRepoPath(primary.file), primary.file) : undefined
     void engine('downloads.start', {
       repo,
       file: selectionKey,
       name: entries.length === 1 ? selectedFiles[0].name : `${slug} (${entries.length} selected files)`,
       folder: folder ?? '',
       total: selectedBytes,
-      files: entries
+      files: entries,
+      ...(expectedKind ? { expectedKind } : {})
     })
       .then(() => setSelected(new Set()))
       .catch(failed('Could not start selected file downloads'))
@@ -188,7 +211,7 @@ export function HubRepo({ repo, model }: { repo: string; model: HubModel | null 
         )}
 
         {selectedFiles.length > 0 && (
-          <div className="flex items-center gap-2 border border-line border-l-2 border-l-accent bg-accent/5 px-3.5 py-2 text-[12.5px] text-white">
+          <div className="flex items-center gap-2 border border-line border-l-2 border-l-accent bg-accent/5 px-3.5 py-2 text-[12.5px] text-ink">
             <span className="flex-1">
               {selectedFiles.length} {selectedFiles.length === 1 ? 'file' : 'files'} selected ({formatBytes(selectedBytes)})
             </span>
@@ -211,6 +234,7 @@ export function HubRepo({ repo, model }: { repo: string; model: HubModel | null 
                 folder={folder}
                 stats={stats}
                 allowCompanions={allowCompanions}
+                expectedKind={expectedKindForFile(family, 'standalone', f.file)}
                 selected={selected.has(f.file)}
                 onToggleSelect={() => toggleSelect(f.file)}
               />
@@ -228,6 +252,7 @@ export function HubRepo({ repo, model }: { repo: string; model: HubModel | null 
                 folder={folder}
                 stats={stats}
                 allowCompanions
+                expectedKind={expectedKindForFile(family, 'modular', f.file)}
                 selected={selected.has(f.file)}
                 onToggleSelect={() => toggleSelect(f.file)}
               />
@@ -246,6 +271,7 @@ export function HubRepo({ repo, model }: { repo: string; model: HubModel | null 
                   folder={folder}
                   stats={stats}
                   allowCompanions
+                  expectedKind="lora"
                   selected={selected.has(f.file)}
                   onToggleSelect={() => toggleSelect(f.file)}
                 />
@@ -258,7 +284,7 @@ export function HubRepo({ repo, model }: { repo: string; model: HubModel | null 
           <Fold label="Diffusers PyTorch / OpenVINO internals (not directly loaded by sd-server)" count={grouped.diffusers.length}>
             <SettingCard title="Diffusers Internal Shards" count={grouped.diffusers.length}>
               <div className="px-3.5 py-2 text-[12px] text-faint">
-                These subfolders come from Python Diffusers / OpenVINO exports and cannot be loaded directly by <span className="font-mono">sd-server</span>. Prefer single checkpoints above, modular <span className="font-mono">diffusion_models/</span> weights, or curated <span className="font-mono">sd-server Packs</span>.
+                These subfolders come from Python Diffusers / OpenVINO exports and cannot be loaded directly by <span className="font-ui">sd-server</span>. Prefer single checkpoints above, modular <span className="font-ui">diffusion_models/</span> weights, or curated <span className="font-ui">sd-server Packs</span>.
               </div>
               {grouped.diffusers.map((f) => (
                 <HubFileRow key={f.file} repo={repo} file={f} folder={folder} stats={stats} allowCompanions />
@@ -281,7 +307,7 @@ export function HubRepo({ repo, model }: { repo: string; model: HubModel | null 
         )}
         <SettingCard title="Save to">
           <SettingRow wide label="Model folder" hint={folders.length ? 'Files save cleanly and appear automatically when done.' : 'Add a model folder under Folders in Models first.'}>
-            <Select value={folder ?? ''} options={folders.map((f) => ({ value: f, label: f }))} onChange={setFolder} className="w-full font-mono text-[12px]" />
+            <Select value={folder ?? ''} options={folders.map((f) => ({ value: f, label: f }))} onChange={setFolder} className="w-full font-ui text-[12px]" />
           </SettingRow>
         </SettingCard>
         <SettingCard title="Access">

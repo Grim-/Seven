@@ -7,12 +7,9 @@
   "needsWorkspace": false,
   "permission": "custom",
   "toolPermissions": {
-    "recall": "none",
+    "agent_recall": "none",
     "think": "none",
     "reason": "none",
-    "remember": "custom",
-    "set_relationship": "custom",
-    "forget": "ask",
-    "remove_relationship": "ask"
+    "agent_remember": "custom"
   }
 }

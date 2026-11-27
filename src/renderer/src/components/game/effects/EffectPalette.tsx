@@ -23,8 +23,8 @@ export function EffectPalette({ choices, onPick, onClose }: { choices: PieceChoi
   return (
     <div className="flex min-h-0 flex-col">
       <div className="flex items-center gap-2 border-b border-line/50 px-3 py-2">
-        <span className="flex-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-accent-soft">Add an effect</span>
-        <button type="button" title="Close" onClick={onClose} className="text-dim hover:text-white">
+        <span className="flex-1 font-label text-[10.5px] font-bold caps-16 text-accent-soft">Add an effect</span>
+        <button type="button" title="Close" onClick={onClose} className="text-dim hover:text-ink">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -40,7 +40,7 @@ export function EffectPalette({ choices, onPick, onClose }: { choices: PieceChoi
                 setAt(0)
               }}
               style={{ ['--tone' as string]: g.tone }}
-              className={cn('flex items-center gap-2 whitespace-nowrap border-l-2 px-3 py-2 text-left text-[12.5px]', !q && g.id === group ? 'border-l-[var(--tone)] bg-white/[0.03] text-white' : 'border-l-transparent text-dim hover:text-white')}
+              className={cn('flex items-center gap-2 whitespace-nowrap border-l-2 px-3 py-2 text-left text-[12.5px]', !q && g.id === group ? 'border-l-[var(--tone)] bg-ink/[0.03] text-ink' : 'border-l-transparent text-dim hover:text-ink')}
             >
               <i className="h-2 w-2 bg-[var(--tone)]" />
               {g.label}
@@ -57,9 +57,9 @@ export function EffectPalette({ choices, onPick, onClose }: { choices: PieceChoi
               setAt(0)
             }}
             onKeyDown={keys}
-            className="mb-1 h-8 border border-line/60 bg-black/40 px-2.5 text-[13px] text-white outline-none placeholder:text-faint focus:border-accent/70"
+            className="mb-1 h-8 border border-line/60 tone-well-40 px-2.5 text-[13px] text-ink outline-none placeholder:text-faint focus:border-accent/70"
           />
-          <div className="flex max-h-[22rem] flex-col gap-1 overflow-y-auto">
+          <div className="flex h-[22rem] flex-col gap-1 overflow-y-auto phone:h-auto phone:max-h-[50vh]">
             {shown.map((c) => {
               const why = c.fits === true ? null : c.fits
               return (
@@ -73,11 +73,11 @@ export function EffectPalette({ choices, onPick, onClose }: { choices: PieceChoi
                 >
                   <NamedIcon name={c.Class.ICON} className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[var(--tone)]" />
                   <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="text-[13.5px] leading-6 text-white/85">
+                    <span className="text-[13.5px] leading-6 text-ink/85">
                       <EffectSentence def={newPiece(c.Class.type)} />
                     </span>
                     <span className="text-[12px] text-dim">{c.Class.DESCRIPTION}</span>
-                    {why && <span className="font-mono text-[11px] text-alert">Can't go here: {why}.</span>}
+                    {why && <span className="font-ui text-[11px] text-alert">Can't go here: {why}.</span>}
                   </span>
                 </button>
               )

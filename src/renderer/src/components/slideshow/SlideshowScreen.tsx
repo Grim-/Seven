@@ -53,7 +53,7 @@ const CAPTIONS = [
 export function SlideshowScreen({ id }: KindScreenProps) {
   const show = useSlideshow(id)
   if (!id) return null
-  if (show === undefined) return <div className="font-mono text-[11px] text-dim">Loading…</div>
+  if (show === undefined) return <div className="font-ui text-[11px] text-dim">Loading…</div>
   if (!show) return <EmptyState title="Gone">This slideshow no longer exists.</EmptyState>
   const { id: showId, title, updatedAt: _updatedAt, ...data } = show
   return <SlideshowEditor key={showId} id={showId} title={title} source={data} />

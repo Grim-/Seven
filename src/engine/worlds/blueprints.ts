@@ -3,7 +3,9 @@ import type { GameSave } from '@shared/game/save'
 import type { Point } from '@shared/shapes'
 import type { Template, EntityRecord } from '@shared/game/core/GameEntity'
 import { spawn, type Catalog } from '@shared/game/core'
+import { splitNpcRef } from '@shared/worldNpcs'
 import { spawnCreature } from './creatures'
+import { stampNpcs } from './npcStamp'
 import { WorldError } from './store'
 import { contribute } from '../modules/contributions'
 
@@ -74,5 +76,8 @@ export function blueprintCreature(source: string, id: string, name: string): Ent
 }
 
 export function spawnBlueprint(world: string, map: string, source: string, id: string, name: string, faction: string, at: Point): GameSave {
+  if (source === 'world-npc' || !source.trim() || splitNpcRef(id) || /^@?npc:/i.test(id)) {
+    return stampNpcs({ world, target: id, source: source || null, name: name || null, faction: faction || null, map, at }).save
+  }
   return spawnCreature(world, map, blueprintCreature(source, id, name), faction, at)
 }

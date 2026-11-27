@@ -57,7 +57,7 @@ export function CompendiumImporter({ kind, onClose }: { kind: CompendiumKind; on
     >
       <div className="flex flex-col gap-2">
         <div className="text-[12.5px] text-dim">A JSON list in Seven's shape (name, facts, text) or the 5e-database shape. Entries with the same name as one you have, or an SRD one, replace it.</div>
-        <Textarea value={text} onChange={(e) => edit(e.target.value)} rows={10} placeholder={EXAMPLE} className="font-mono text-[12px]" />
+        <Textarea value={text} onChange={(e) => edit(e.target.value)} rows={10} placeholder={EXAMPLE} className="font-ui text-[12px]" />
         <div className="flex items-center gap-2">
           <Button size="sm" variant="ghost" icon={<FileUp />} onClick={() => file.current?.click()}>
             Load a file
@@ -66,7 +66,7 @@ export function CompendiumImporter({ kind, onClose }: { kind: CompendiumKind; on
         </div>
         {error && <div className="text-[12.5px] text-alert">{error}</div>}
         {preview && (
-          <div className="flex flex-col gap-1 border border-line/40 bg-black/40 px-3 py-2 text-[12.5px]">
+          <div className="flex flex-col gap-1 border border-line/40 tone-panel-40 px-3 py-2 text-[12.5px]">
             <span className="text-ok">{preview.added.length} new{preview.added.length ? `: ${preview.added.slice(0, 12).join(', ')}${preview.added.length > 12 ? '…' : ''}` : ''}</span>
             <span className={preview.replaced.length ? 'text-accent' : 'text-dim'}>{preview.replaced.length} replaced{preview.replaced.length ? `: ${preview.replaced.slice(0, 12).join(', ')}${preview.replaced.length > 12 ? '…' : ''}` : ''}</span>
           </div>

@@ -1,4 +1,5 @@
 import { Application, Container, Culler } from 'pixi.js'
+import 'pixi.js/unsafe-eval'
 import { AssetManager, type ImageSource } from './AssetManager'
 import { Camera } from './Camera'
 import { Input } from './Input'

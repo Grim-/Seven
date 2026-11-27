@@ -12,7 +12,7 @@ function time(s: number): string {
 
 function Controls({ size = 'h-3.5 w-3.5', buttonClass }: { size?: string; buttonClass?: string }) {
   const playing = usePlayer((s) => s.playing)
-  const btn = cn('flex items-center justify-center text-dim hover:text-white', buttonClass)
+  const btn = cn('flex items-center justify-center text-dim hover:text-ink', buttonClass)
   return (
     <>
       <button title="Previous" onClick={previous} className={btn}>
@@ -37,7 +37,7 @@ export function MiniPlayer({ layout = 'bar' }: { layout?: 'bar' | 'menu' }) {
   if (layout === 'menu') {
     return (
       <div className="flex flex-col gap-2">
-        <div className="truncate text-[12px] normal-case text-white" title={current.name}>
+        <div className="truncate text-[12px] normal-case text-ink" title={current.name}>
           {current.name}
         </div>
         <div className="flex items-center gap-2">
@@ -48,7 +48,7 @@ export function MiniPlayer({ layout = 'bar' }: { layout?: 'bar' | 'menu' }) {
   }
   return (
     <div className="flex items-center gap-1.5 normal-case">
-      <span className="max-w-40 truncate text-white/80" title={current.name}>
+      <span className="max-w-40 truncate text-ink/80" title={current.name}>
         {current.name}
       </span>
       <Controls size="h-3 w-3" />
@@ -64,11 +64,11 @@ export function PlayerGlance() {
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden">
       <div className="min-w-0">
-        <div className="truncate text-[15px] font-semibold text-white">{current?.name ?? 'Nothing playing'}</div>
-        <div className="font-mono text-[10.5px] text-faint">{current ? `${index + 1} of ${queue.length}` : `${audio.length} audio files · add tracks or play audio from Data`}</div>
+        <div className="truncate text-[15px] font-semibold text-ink">{current?.name ?? 'Nothing playing'}</div>
+        <div className="font-ui text-[10.5px] text-faint">{current ? `${index + 1} of ${queue.length}` : `${audio.length} audio files · add tracks or play audio from Data`}</div>
       </div>
       {current && (
-        <div className="flex items-center gap-2 font-mono text-[10.5px] text-dim">
+        <div className="flex items-center gap-2 font-ui text-[10.5px] text-dim">
           <span>{time(position)}</span>
           <input type="range" min={0} max={Math.max(1, duration)} step={1} value={Math.min(position, duration)} onChange={(e) => seek(Number(e.target.value))} className="h-1 flex-1 cursor-pointer appearance-none bg-line accent-[var(--color-accent)]" />
           <span>{time(duration)}</span>
@@ -85,8 +85,8 @@ export function PlayerGlance() {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {queue.map((t, i) => (
-          <button key={`${t.id}${i}`} onClick={() => jump(i)} className={cn('flex w-full items-center gap-2 border-l-2 px-2 py-1 text-left text-[12.5px]', i === index ? 'border-l-accent bg-accent/10 text-white' : 'border-l-transparent text-white/75 hover:bg-white/[0.03]')}>
-            <span className="w-5 shrink-0 font-mono text-[10px] text-faint">{i + 1}</span>
+          <button key={`${t.id}${i}`} onClick={() => jump(i)} className={cn('flex w-full items-center gap-2 border-l-2 px-2 py-1 text-left text-[12.5px]', i === index ? 'border-l-accent bg-accent/10 text-ink' : 'border-l-transparent text-ink/75 hover:bg-ink/[0.03]')}>
+            <span className="w-5 shrink-0 font-data text-[10px] text-faint">{i + 1}</span>
             <span className="truncate">{t.name}</span>
           </button>
         ))}

@@ -16,7 +16,7 @@ export function AddressPane({ path, tools, className, children }: { path: ReactN
   const slots = useMemo(() => ({ lead, tools: slot }), [lead, slot])
   return (
     <div className={cn('flex min-h-0 flex-1 flex-col', className)}>
-      <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line/40 bg-sidebar/80 px-2 py-1.5">
+      <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line/40 tone-sidebar-80 px-2 py-1.5">
         <div ref={setLead} className="flex items-center gap-0.5 empty:hidden" />
         <div className="flex min-w-0 flex-1 basis-40 items-center gap-2">{path}</div>
         <div ref={setSlot} className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 empty:hidden" />

@@ -22,19 +22,17 @@ export function ChatViewModeButton({ className }: { className?: string }) {
 
   return (
     <Popover
-      title={`Chat view · ${modeKey}`}
+      title={`Chat view: ${activeDef.label} (click to switch · ${modeKey})`}
       trigger={
-        <button
-          type="button"
-          title={`Chat view: ${activeDef.label} (click to switch · ${modeKey})`}
+        <span
           className={cn(
-            'flex h-6 w-fit shrink-0 cursor-pointer items-center gap-1 border border-line/55 bg-black/55 px-1.5 font-mono text-[9.5px] uppercase tracking-wider text-dim transition-colors hover:border-accent/70 hover:text-white',
+            'flex h-6 w-fit shrink-0 cursor-pointer items-center gap-1 border border-line/55 tone-well-55 px-1.5 font-label text-[9.5px] caps-5 text-dim transition-colors hover:border-accent/70 hover:text-ink',
             className
           )}
         >
           <ActiveIcon className="h-3 w-3 text-accent/90" />
           <span>{activeDef.label}</span>
-        </button>
+        </span>
       }
     >
       {(close) => (
@@ -53,13 +51,13 @@ export function ChatViewModeButton({ className }: { className?: string }) {
                 className={cn(
                   'flex items-start gap-2 border px-2 py-1.5 text-left transition-colors',
                   isCurrent
-                    ? 'border-accent/60 bg-accent/10 text-white'
-                    : 'border-transparent text-ink hover:border-line/60 hover:bg-black/45'
+                    ? 'border-accent/60 bg-accent/10 text-ink'
+                    : 'border-transparent text-ink hover:border-line/60 hover:tone-well-45'
                 )}
               >
                 <Icon className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', isCurrent ? 'text-accent' : 'text-dim')} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1 font-mono text-[11px] font-semibold">
+                  <div className="flex items-center justify-between gap-1 font-ui text-[11px] font-semibold">
                     <span>{item.label}</span>
                     {isCurrent && <Check className="h-3 w-3 text-accent" />}
                   </div>

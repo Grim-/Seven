@@ -27,9 +27,21 @@ export function partOf(target: string): string {
 export async function fetchResumable(url: string, target: string, o: ResumableOptions): Promise<void> {
   if (sizeOn(target) === o.size) return
   const part = partOf(target)
-  let from = Math.min(sizeOn(part), o.size)
+  let existingPart = sizeOn(part)
+  if (existingPart > o.size) {
+    fs.rmSync(part, { force: true })
+    o.onBytes(-existingPart)
+    existingPart = 0
+  }
+  let from = existingPart
   if (from < o.size) {
-    const res = await fetch(url, { headers: { ...o.headers, ...(from > 0 ? { Range: `bytes=${from}-` } : {}) }, signal: o.signal })
+    let res = await fetch(url, { headers: { ...o.headers, ...(from > 0 ? { Range: `bytes=${from}-` } : {}) }, signal: o.signal })
+    if (res.status === 416 && from > 0) {
+      fs.rmSync(part, { force: true })
+      o.onBytes(-from)
+      from = 0
+      res = await fetch(url, { headers: { ...o.headers }, signal: o.signal })
+    }
     if (!res.ok || !res.body) throw new Error(`Downloading ${o.what} failed: the server answered ${res.status}.`)
     if (from > 0 && res.status !== 206) {
       o.onBytes(-from)
@@ -44,7 +56,12 @@ export async function fetchResumable(url: string, target: string, o: ResumableOp
     })
     await pipeline(Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]), count, fs.createWriteStream(part, { flags: from > 0 ? 'a' : 'w' }), { signal: o.signal })
   }
-  if (sizeOn(part) !== o.size) throw new Error(`${o.what} came out the wrong size. Try again to resume it.`)
+  const finalSize = sizeOn(part)
+  if (finalSize !== o.size) {
+    if (finalSize > o.size) fs.rmSync(part, { force: true })
+    throw new Error(`${o.what} came out the wrong size (${finalSize} vs expected ${o.size} bytes). Try again to resume it.`)
+  }
+  if (fs.existsSync(target)) fs.rmSync(target, { force: true })
   fs.renameSync(part, target)
 }
 

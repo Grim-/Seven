@@ -16,7 +16,7 @@ function StoryView({ id, large }: { id: string; large: boolean }) {
   if (!list) return <Loading />
   if (!story) return <EmptyState title="Removed">This story no longer exists.</EmptyState>
   return (
-    <EntryCard title={story.id} tag="story" aside={<span className="font-mono text-[11px] uppercase text-faint">{story.status}</span>} className={cn(large && 'text-[15px]')}>
+    <EntryCard title={story.id} tag="story" aside={<span className="font-label text-[11px] caps text-faint">{story.status}</span>} className={cn(large && 'text-[15px]')}>
       <Facts rows={[['Template', story.template], ['Act', String(story.act)], ['Turn', String(story.turn)], ['Last', formatRelative(story.at)]]} />
       {story.note && <div className="text-dim">{story.note}</div>}
     </EntryCard>

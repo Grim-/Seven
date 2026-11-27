@@ -17,6 +17,7 @@ export interface Packing {
   pack(id: string): unknown
   uses?(id: string): EntryRef[]
   unpack(value: unknown, how: Unpack): string
+  placesOwnFiles?: boolean
 }
 
 export type NextName = (name: string, n: number) => string
@@ -96,6 +97,7 @@ interface FolderPack {
 }
 
 export const folderPacking: Packing = {
+  placesOwnFiles: true,
   pack(id) {
     const ids = [id]
     const out: FolderPack = { pages: [{ at: -1, page: packPage(id) }], files: [] }

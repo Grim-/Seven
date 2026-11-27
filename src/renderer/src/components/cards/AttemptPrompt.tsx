@@ -10,7 +10,7 @@ export function AttemptPrompt({ hint, playLabel, onGo, onCancel }: { hint?: stri
   const go = () => ready && onGo(said.trim())
   return (
     <div className="flex w-full min-w-0 flex-col gap-3">
-      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan">What do you do?</span>
+      <span className="font-label text-[10px] font-bold caps-14 text-secondary-ink">What do you do?</span>
       <LinkTextarea
         autoFocus
         rows={4}
@@ -32,7 +32,7 @@ export function AttemptPrompt({ hint, playLabel, onGo, onCancel }: { hint?: stri
         <Button variant="ghost" icon={<X />} onClick={onCancel}>
           Cancel
         </Button>
-        <span className="ml-auto font-mono text-[10px] tracking-[0.12em] text-faint phone:hidden">ENTER · ESC</span>
+        <span className="ml-auto font-ui text-[10px] tracking-[0.12em] text-faint phone:hidden">ENTER · ESC</span>
       </div>
     </div>
   )

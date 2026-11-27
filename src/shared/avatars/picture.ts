@@ -10,7 +10,7 @@ registerAvatarRenderer({
   settings: [
     { name: 'picture', label: 'Picture', type: 'picture', group: 'look', default: '' },
     { name: 'frames', label: 'Frame sequence', type: 'frames', group: 'frames', default: [], hint: 'Optional per-frame media or text captions cycled by frame time.' },
-    { name: 'speed', label: 'Frame time (ms)', type: 'range', group: 'frames', min: 40, max: 2000, step: 10, default: 400 },
+    { name: 'speed', label: 'Frame time (ms)', type: 'range', group: 'frames', min: 40, max: 2000, step: 10, default: 400, onlyWith: { setting: 'frames', atLeast: 2 } },
     { name: 'motion', label: 'Motion', type: 'range', group: 'motion', min: 0, max: 2, step: 0.1, default: 1 },
     { name: 'lean', label: 'Lean toward pointer', type: 'range', group: 'motion', min: 0, max: 8, step: 0.5, default: 2 },
     { name: 'tint', label: 'Mood colour', type: 'range', group: 'look', min: 0, max: 1, step: 0.05, default: 0.4 },

@@ -1,0 +1,10 @@
+@layer components {
+  html[data-look-frame='double-rule'] :is(.panel-box, .widget-frame, .card-deks, .card-play-record) {
+    outline: 1px solid var(--color-line);
+    outline-offset: -4px;
+  }
+
+  html[data-look-frame='double-rule'] :is(.card-deks, .shell-slate, .widget-frame)::after {
+    content: none;
+  }
+}

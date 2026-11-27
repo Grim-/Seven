@@ -1,8 +1,9 @@
 import { cleanElements, type ChatElement } from './chatElements'
 import { toId } from './ids'
+import { cleanHold, holdIsEmpty, type CharacterHold } from './characterHold'
 import { STORY_THREAD_KINDS, STORY_THREAD_STATUSES, type StoryThread, type StoryThreadKind, type StoryThreadStatus } from './story'
 
-export const ALMANAC_ENTRY_KINDS = ['chat', 'combat', 'travel', 'milestone', 'world', 'scene'] as const
+export const ALMANAC_ENTRY_KINDS = ['chat', 'combat', 'travel', 'milestone', 'world', 'scene', 'learned'] as const
 export type AlmanacEntryKind = string
 
 export interface AlmanacWorldTime {
@@ -56,6 +57,34 @@ export interface AlmanacOpening {
   openingActionIds?: string[]
 }
 
+export interface BroadsheetDispatch {
+  id: string
+  headline: string
+  kicker?: string
+  body: string
+  outcome?: string
+  where?: string
+  who: string[]
+  day: number
+  isLead?: boolean
+}
+
+export interface BroadsheetEdition {
+  id: string
+  editionNumber: number
+  title: string
+  subtitle?: string
+  dayFrom: number
+  dayTo: number
+  createdAt: number
+  lead: BroadsheetDispatch | null
+  dispatches: BroadsheetDispatch[]
+  threads: { text: string; kind: string; where?: string; status: string }[]
+  places: string[]
+  figures: string[]
+  masthead?: string
+}
+
 export interface Almanac {
   id: string
   title: string
@@ -67,6 +96,8 @@ export interface Almanac {
   cast: string[]
   threads: StoryThread[]
   entries: AlmanacEntry[]
+  editions?: BroadsheetEdition[]
+  holds?: Record<string, CharacterHold>
   updatedAt: number
 }
 
@@ -247,6 +278,76 @@ export function cleanAlmanacEntry(raw: unknown, index = 0, fallbackTime = 0): Al
   }
 }
 
+function cleanBroadsheetDispatch(raw: unknown, index: number): BroadsheetDispatch | null {
+  const r = rec(raw)
+  const headline = str(r.headline)
+  const body = typeof r.body === 'string' ? r.body.trim() : ''
+  if (!headline && !body) return null
+  return {
+    id: str(r.id) || `disp_${index + 1}`,
+    headline: headline || body.slice(0, 64),
+    ...(str(r.kicker) ? { kicker: str(r.kicker) } : {}),
+    body,
+    ...(str(r.outcome) ? { outcome: str(r.outcome) } : {}),
+    ...(str(r.where) ? { where: str(r.where) } : {}),
+    who: strList(r.who),
+    day: typeof r.day === 'number' && Number.isFinite(r.day) ? Math.max(1, Math.floor(r.day)) : 1,
+    ...(r.isLead === true ? { isLead: true } : {})
+  }
+}
+
+function cleanBroadsheetEdition(raw: unknown, index: number): BroadsheetEdition | null {
+  const r = rec(raw)
+  const id = str(r.id) || `ed_${index + 1}`
+  const title = str(r.title)
+  if (!title) return null
+  const dayFrom = typeof r.dayFrom === 'number' && Number.isFinite(r.dayFrom) ? Math.max(1, Math.floor(r.dayFrom)) : 1
+  const dayTo = typeof r.dayTo === 'number' && Number.isFinite(r.dayTo) ? Math.max(dayFrom, Math.floor(r.dayTo)) : dayFrom
+  const lead = r.lead ? cleanBroadsheetDispatch(r.lead, 0) : null
+  const dispatches = Array.isArray(r.dispatches)
+    ? r.dispatches.map(cleanBroadsheetDispatch).filter((d): d is BroadsheetDispatch => d !== null)
+    : []
+  const threads = Array.isArray(r.threads)
+    ? r.threads
+        .map((t) => {
+          const tr = rec(t)
+          const text = str(tr.text)
+          if (!text) return null
+          return {
+            text,
+            kind: str(tr.kind) || 'arc',
+            ...(str(tr.where) ? { where: str(tr.where) } : {}),
+            status: str(tr.status) || 'active'
+          }
+        })
+        .filter((x): x is { text: string; kind: string; where?: string; status: string } => x !== null)
+    : []
+  return {
+    id,
+    editionNumber: typeof r.editionNumber === 'number' && Number.isFinite(r.editionNumber) ? Math.max(1, Math.floor(r.editionNumber)) : index + 1,
+    title,
+    ...(str(r.subtitle) ? { subtitle: str(r.subtitle) } : {}),
+    dayFrom,
+    dayTo,
+    createdAt: typeof r.createdAt === 'number' && Number.isFinite(r.createdAt) ? r.createdAt : Date.now(),
+    lead,
+    dispatches,
+    threads,
+    places: strList(r.places),
+    figures: strList(r.figures),
+    ...(str(r.masthead) ? { masthead: str(r.masthead) } : {})
+  }
+}
+
+function cleanHolds(raw: unknown): { holds?: Record<string, CharacterHold> } {
+  const holds: Record<string, CharacterHold> = {}
+  for (const [sheet, hold] of Object.entries(rec(raw))) {
+    const clean = cleanHold(hold)
+    if (!holdIsEmpty(clean)) holds[sheet] = clean
+  }
+  return Object.keys(holds).length ? { holds } : {}
+}
+
 export function cleanAlmanac(raw: unknown, fallbackId?: string): Almanac | null {
   const r = rec(raw)
   const title = str(r.title) || str(r.name)
@@ -289,6 +390,9 @@ export function cleanAlmanac(raw: unknown, fallbackId?: string): Almanac | null 
           ...(openingActionIds.length ? { openingActionIds } : {})
         }
       : undefined
+  const editions = Array.isArray(r.editions)
+    ? r.editions.map(cleanBroadsheetEdition).filter((e): e is BroadsheetEdition => e !== null)
+    : []
   return {
     id,
     title,
@@ -300,6 +404,8 @@ export function cleanAlmanac(raw: unknown, fallbackId?: string): Almanac | null 
     cast: strList(r.cast),
     threads,
     entries: sortAlmanacEntries(entries, 'newest'),
+    ...(editions.length ? { editions } : {}),
+    ...cleanHolds(r.holds),
     updatedAt: typeof r.updatedAt === 'number' && Number.isFinite(r.updatedAt) ? r.updatedAt : Date.now()
   }
 }
@@ -429,4 +535,137 @@ export function almanacMarkdown(almanac: Almanac, opts: AlmanacReadOptions = {})
     }
   }
   return head.join('\n')
+}
+
+const LEAD_KIND_WEIGHT: Record<string, number> = {
+  milestone: 4,
+  world: 3,
+  combat: 3,
+  scene: 2,
+  travel: 1,
+  chat: 1
+}
+
+/** Deterministically builds a public BroadsheetEdition for a day range without requiring an agent. */
+export function buildBroadsheetEdition(
+  almanac: Almanac,
+  opts: { dayFrom: number; dayTo: number; editionNumber?: number; title?: string; masthead?: string }
+): BroadsheetEdition {
+  const dayFrom = Math.max(1, Math.floor(Math.min(opts.dayFrom, opts.dayTo)))
+  const dayTo = Math.max(dayFrom, Math.floor(Math.max(opts.dayFrom, opts.dayTo)))
+  const existingMax = (almanac.editions ?? []).reduce((m, e) => Math.max(m, e.editionNumber), 0)
+  const editionNumber = opts.editionNumber ?? existingMax + 1
+
+  const inRange = sortAlmanacEntries(almanac.entries, 'newest').filter(
+    (e) => e.when.day >= dayFrom && e.when.day <= dayTo
+  )
+
+  const toDispatch = (e: AlmanacEntry, isLead = false): BroadsheetDispatch => {
+    const kickerParts = [
+      `Day ${e.when.day} · ${padClock(e.when.hour)}:${padClock(e.when.minute)}`,
+      e.where || null,
+      e.kind && e.kind !== 'scene' ? e.kind.toUpperCase() : null
+    ].filter(Boolean)
+    return {
+      id: e.id,
+      headline: e.title,
+      kicker: kickerParts.join(' · '),
+      body: e.summary || e.notes || '(No public summary recorded.)',
+      ...(e.outcome ? { outcome: e.outcome } : {}),
+      ...(e.where ? { where: e.where } : {}),
+      who: e.who,
+      day: e.when.day,
+      ...(isLead ? { isLead: true } : {})
+    }
+  }
+
+  let lead: BroadsheetDispatch | null = null
+  const dispatches: BroadsheetDispatch[] = []
+
+  if (inRange.length > 0) {
+    let bestIdx = 0
+    let bestScore = -1
+    inRange.forEach((e, idx) => {
+      const score =
+        (e.pinned ? 10 : 0) +
+        (LEAD_KIND_WEIGHT[e.kind] ?? 1) +
+        Math.min(3, Math.floor((e.summary?.length ?? 0) / 80)) +
+        (e.outcome ? 1 : 0)
+      if (score > bestScore) {
+        bestScore = score
+        bestIdx = idx
+      }
+    })
+    lead = toDispatch(inRange[bestIdx], true)
+    inRange.forEach((e, idx) => {
+      if (idx !== bestIdx) dispatches.push(toDispatch(e, false))
+    })
+  }
+
+  const places = [...new Set(inRange.map((e) => e.where).filter(Boolean))]
+  const figures = [...new Set(inRange.flatMap((e) => e.who).filter(Boolean))]
+  const threads = almanac.threads
+    .filter((t) => (t.status ?? (t.done ? 'resolved' : 'active')) !== 'resolved')
+    .slice(0, 6)
+    .map((t) => ({
+      text: t.text,
+      kind: t.kind ?? 'arc',
+      ...(t.where ? { where: t.where } : {}),
+      status: t.status ?? 'active'
+    }))
+
+  const defaultTitle = dayFrom === dayTo ? `Day ${dayFrom} Edition` : `Days ${dayFrom}–${dayTo} Edition`
+  const title = opts.title?.trim() || defaultTitle
+  const subtitle =
+    inRange.length === 0
+      ? `No recorded dispatches for ${dayFrom === dayTo ? `Day ${dayFrom}` : `Days ${dayFrom}–${dayTo}`}`
+      : `${inRange.length} dispatch${inRange.length === 1 ? '' : 'es'}${places.length ? ` · ${places.length} location${places.length === 1 ? '' : 's'}` : ''}${figures.length ? ` · ${figures.length} figure${figures.length === 1 ? '' : 's'}` : ''}`
+
+  return {
+    id: `ed_${Date.now().toString(36)}`,
+    editionNumber,
+    title,
+    subtitle,
+    dayFrom,
+    dayTo,
+    createdAt: Date.now(),
+    lead,
+    dispatches,
+    threads,
+    places,
+    figures,
+    ...(opts.masthead?.trim() ? { masthead: opts.masthead.trim() } : {})
+  }
+}
+
+export function broadsheetEditionMarkdown(almanac: Almanac, edition: BroadsheetEdition): string {
+  const lines: string[] = [
+    `# ${edition.masthead || `${almanac.title} — Broadsheet`}`,
+    `**Edition No. ${edition.editionNumber}** · ${edition.title}${edition.subtitle ? ` (${edition.subtitle})` : ''}`,
+    ''
+  ]
+  if (edition.lead) {
+    lines.push(`## ${edition.lead.headline}`)
+    if (edition.lead.kicker) lines.push(`*${edition.lead.kicker}*`)
+    lines.push(edition.lead.body)
+    if (edition.lead.outcome) lines.push(`> **Outcome:** ${edition.lead.outcome}`)
+    lines.push('')
+  }
+  if (edition.dispatches.length) {
+    lines.push('## Dispatches')
+    for (const d of edition.dispatches) {
+      lines.push(`### ${d.headline}`)
+      if (d.kicker) lines.push(`*${d.kicker}*`)
+      lines.push(d.body)
+      if (d.outcome) lines.push(`*Outcome: ${d.outcome}*`)
+      lines.push('')
+    }
+  }
+  if (edition.threads.length) {
+    lines.push('## Word on the Street')
+    for (const t of edition.threads) {
+      lines.push(`- [${t.kind}] ${t.text}${t.where ? ` (${t.where})` : ''}`)
+    }
+  }
+  return lines.join('\n')
 }

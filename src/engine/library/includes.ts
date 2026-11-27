@@ -28,10 +28,10 @@ export function entryFields(entry: string, ctx: KindContext = USER): string[] {
   }
 }
 
-export function resolveIncludes(text: string, ctx: KindContext = USER): string {
-  return text.replace(referencePattern(), (whole, lead: string, kind: string, ref: string, part: string | undefined) => {
-    if (!part) return whole
+export function resolveIncludes(text: string, ctx: KindContext = USER, cite = false): string {
+  return text.replace(referencePattern(), (whole, lead: string, kind: string, ref: string, action: string | undefined, part: string | undefined) => {
+    if (action || !part || part.toLowerCase() === 'random') return whole
     const found = entryField(`@${kind}:${ref}`, part, ctx)
-    return found === null ? whole : `${lead}${found}`
+    return found === null ? whole : `${lead}${found}${cite ? ` (${whole.slice(lead.length)})` : ''}`
   })
 }

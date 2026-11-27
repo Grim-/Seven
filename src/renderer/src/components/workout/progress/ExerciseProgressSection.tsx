@@ -17,7 +17,7 @@ export function ExerciseProgressSection({ id, unit }: { id: string; unit: string
   return (
     <section className="flex flex-col gap-3 border-t border-line/40 pt-3">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-soft">Progress</span>
+        <span className="font-label text-[10.5px] font-semibold caps-14 text-accent-soft">Progress</span>
         <Segmented value={metric} onChange={setMetric} options={METRICS} />
         <span className="text-[12px] text-dim">{progressSummary(series, metric, unit, target, (w) => names.get(w) ?? '(removed)')}</span>
       </div>

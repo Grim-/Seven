@@ -33,7 +33,7 @@ export function styleFor(agentId: string, sessionId: string | null, asked: strin
     chosen = null
   }
   const sheetStyle = characterMindFor(agentSheets(agent))?.reasoningStyle ?? null
-  const ref = chosen ?? asked ?? sheetStyle ?? agent.reasoningStyle ?? null
+  const ref = chosen ?? sheetStyle ?? agent.reasoningStyle ?? asked ?? null
   const style = ref ? styles.find(ref) : (styles.list()[0] ?? null)
   if (ref && !style)
     throw new ToolError(

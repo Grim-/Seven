@@ -32,12 +32,12 @@ function FileCheck() {
           </Button>
         </div>
         {result && (
-          <div className="flex flex-col gap-1 border border-line/50 bg-black/40 p-2.5 font-mono text-[11.5px]">
+          <div className="flex flex-col gap-1 border border-line/50 tone-panel-40 p-2.5 font-ui text-[11.5px]">
             <span className={result.failed.length ? 'text-alert' : 'text-ok'}>
               {result.checked} files: {result.sealed} encrypted, {result.plain} plain, {result.failed.length} with problems
             </span>
             {result.failed.map((f) => (
-              <span key={f.file} className="break-all text-white/85">
+              <span key={f.file} className="break-all text-ink/85">
                 <span className="text-accent">{f.file}</span>: {f.error}
               </span>
             ))}

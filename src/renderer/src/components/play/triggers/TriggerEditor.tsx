@@ -61,7 +61,7 @@ export function TriggerEditor({ start, world, map = '', onSave }: { start: Trigg
       </section>
       <section className="flex flex-col gap-3 border-t border-line/50 pt-4">
         <div className="flex items-baseline gap-3">
-          <Eyebrow className="text-purple">{type?.label ?? t.type}</Eyebrow>
+          <Eyebrow className="text-tint-purple">{type?.label ?? t.type}</Eyebrow>
           <span className="text-[12px] text-dim">{type?.description}</span>
         </div>
         {ui?.Editor ? <ui.Editor trigger={t} world={world} map={map} onValues={setValues} /> : type && <ParamTokens schema={type.params} values={t.values} onChange={setValues} />}

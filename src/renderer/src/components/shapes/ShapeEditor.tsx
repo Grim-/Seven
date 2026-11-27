@@ -10,6 +10,7 @@ interface Drag {
   start: Point
   origin: ShapeForm
   index?: number
+  made?: Shape
   el: Element
 }
 
@@ -41,6 +42,8 @@ export function ShapeEditor({ size, shapes, onChange, selected, onSelect, drawin
   const drag = useRef<Drag | null>(null)
   const [pending, setPending] = useState<Point[]>([])
   const [cursor, setCursor] = useState<Point | null>(null)
+  const [live, setLive] = useState<Shape | null>(null)
+  const shown = live ? [...shapes.filter((s) => s.id !== live.id), live] : shapes
   const min = Math.min(size.w, size.h) * MIN
 
   useEffect(() => {
@@ -63,6 +66,11 @@ export function ShapeEditor({ size, shapes, onChange, selected, onSelect, drawin
     return { x: clamp(((e.clientX - r.left) / r.width) * size.w, size.w), y: clamp(((e.clientY - r.top) / r.height) * size.h, size.h) }
   }
   const setForm = (id: string, form: ShapeForm) => onChange(shapes.map((s) => (s.id === id ? { ...s, form } : s)))
+  const drawForm = (d: Drag, form: ShapeForm) => {
+    d.made = { ...d.made!, form }
+    setLive(d.made)
+    onChange([...shapes.filter((s) => s.id !== d.id), d.made])
+  }
 
   const begin = (e: PointerEvent, d: Omit<Drag, 'el'>) => {
     e.stopPropagation()
@@ -94,7 +102,7 @@ export function ShapeEditor({ size, shapes, onChange, selected, onSelect, drawin
     }
     const shape: Shape = { id: newId(), label: newLabel, form: boxForm(p, p) }
     onChange([...shapes, shape])
-    begin(e, { mode: 'draw', id: shape.id, start: p, origin: shape.form })
+    begin(e, { mode: 'draw', id: shape.id, start: p, origin: shape.form, made: shape })
   }
 
   const onMove = (e: PointerEvent) => {
@@ -103,7 +111,7 @@ export function ShapeEditor({ size, shapes, onChange, selected, onSelect, drawin
     if (!d) return
     const p = point(e)
     const o = d.origin
-    if (d.mode === 'draw') setForm(d.id, boxForm(d.start, p))
+    if (d.mode === 'draw') drawForm(d, boxForm(d.start, p))
     else if (d.mode === 'move') setForm(d.id, movedForm(o, p.x - d.start.x, p.y - d.start.y, size))
     else if (d.mode === 'size' && o.kind === 'box') setForm(d.id, { ...o, w: Math.max(min, Math.min(p.x - o.x, size.w - o.x)), h: Math.max(min, Math.min(p.y - o.y, size.h - o.y)) })
     else if (d.mode === 'point' && o.kind === 'outline') setForm(d.id, { kind: 'outline', points: o.points.map((q, i) => (i === d.index ? p : q)) })
@@ -114,9 +122,9 @@ export function ShapeEditor({ size, shapes, onChange, selected, onSelect, drawin
     if (!d) return
     if (d.el.hasPointerCapture(e.pointerId)) d.el.releasePointerCapture(e.pointerId)
     drag.current = null
+    setLive(null)
     if (d.mode !== 'draw') return
-    const made = shapes.find((s) => s.id === d.id)
-    if (made && tooSmall(made.form, min)) {
+    if (d.made && tooSmall(d.made.form, min)) {
       onChange(shapes.filter((s) => s.id !== d.id))
       return onDrawn(null)
     }
@@ -138,10 +146,24 @@ export function ShapeEditor({ size, shapes, onChange, selected, onSelect, drawin
       onPointerMove={onMove}
       onPointerUp={onUp}
       onDoubleClick={onDouble}
-      className={cn('relative inline-block select-none', drawing ? 'cursor-crosshair' : passThrough && 'pointer-events-none', className)}
+      onContextMenuCapture={
+        drawing
+          ? (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setPending([])
+              onDrawn(null)
+            }
+          : undefined
+      }
+      className={cn(
+        'relative inline-block select-none',
+        drawing ? 'z-[24] pointer-events-auto cursor-crosshair' : cn('z-[6]', passThrough && 'pointer-events-none'),
+        className
+      )}
     >
       {children}
-      {shapes.map((s) => {
+      {shown.map((s) => {
         const on = s.id === selected
         const b = shapeBounds(s.form)
         return (

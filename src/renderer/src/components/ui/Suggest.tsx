@@ -23,7 +23,7 @@ export function useSuggest(suggestions: string[], query: string, exclude: string
 export function SuggestList({ options, pick, onPick, prefix = '', className }: { options: string[]; pick: number; onPick: (option: string) => void; prefix?: string; className?: string }) {
   if (!options.length) return null
   return (
-    <div className={cn('absolute left-0 top-full z-30 mt-0.5 border border-line bg-black/95 py-0.5 shadow-lg', className)}>
+    <div className={cn('absolute left-0 top-full z-30 mt-0.5 border border-line tone-panel-95 py-0.5 shadow-lg', className)}>
       {options.map((o, i) => (
         <button
           key={o}
@@ -31,7 +31,7 @@ export function SuggestList({ options, pick, onPick, prefix = '', className }: {
             e.preventDefault()
             onPick(o)
           }}
-          className={cn('block w-full truncate px-2.5 py-1 text-left font-mono text-[12px]', i === pick ? 'bg-accent/15 text-white' : 'text-dim hover:text-white')}
+          className={cn('block w-full truncate px-2.5 py-1 text-left font-ui text-[12px]', i === pick ? 'bg-accent/15 text-ink' : 'text-dim hover:text-ink')}
         >
           {prefix}
           {o}

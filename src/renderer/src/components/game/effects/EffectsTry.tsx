@@ -30,8 +30,8 @@ export function EffectsTry({ defs, lanes }: { defs: ComponentDef[]; lanes: Effec
         Roll it
       </Button>
       {aimed && !aimed.game && <span className="text-[12px] text-alert">{aimed.title} has no Game sheet, so the effects can’t touch them.</span>}
-      <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-faint">What the agent is told · nothing is saved</span>
-      <div className="min-h-[3.5rem] border-l-2 border-cyan bg-cyan/[0.05] px-2.5 py-2 font-mono text-[12px] leading-relaxed text-white/85">
+      <span className="font-label text-[9.5px] font-bold caps-16 text-faint">What the agent is told · nothing is saved</span>
+      <div className="min-h-[3.5rem] border-l-2 border-tint-cyan bg-tint-cyan/[0.05] px-2.5 py-2 font-ui text-[12px] leading-relaxed text-ink/85">
         {told === null ? <span className="text-faint">Roll it to see the line each effect reports.</span> : told.length ? told.map((l, i) => <div key={i}>{l}</div>) : <span className="text-faint">Nothing happened.</span>}
       </div>
     </section>

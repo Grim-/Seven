@@ -44,17 +44,17 @@ export function ClockHud({
 
   return (
     <div
-      className={`pointer-events-auto absolute top-2.5 z-20 flex items-stretch border border-line/60 bg-black/90 transition-all duration-300 ease-out ${
+      className={`pointer-events-auto absolute top-2.5 z-20 flex items-stretch border border-line/60 tone-panel-90 transition-all duration-300 ease-out ${
         offsetRight ? 'right-[360px]' : 'right-3'
       }`}
     >
       <div className="flex items-center gap-2 py-0.5 pl-2 pr-2.5" title={view.label}>
         <SkyArc dayPart={view.dayPart} />
         <div className="flex flex-col leading-tight">
-          <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-dim">
+          <span className="font-label text-[9px] caps-14 text-dim">
             Day {calendar.day}
           </span>
-          <span className="font-mono text-[16px] font-bold text-white">
+          <span className="font-ui text-[16px] font-bold text-ink">
             {two(calendar.hour)}:{two(calendar.minute)}
           </span>
         </div>
@@ -63,7 +63,7 @@ export function ClockHud({
         <Popover
           title="Wait"
           disabled={!controls}
-          triggerClassName="flex h-7 min-w-8 items-center justify-center border border-transparent px-1 text-dim hover:bg-white/5 hover:text-white"
+          triggerClassName="flex h-7 min-w-8 items-center justify-center border border-transparent px-1 text-dim hover:bg-ink/5 hover:text-ink"
           trigger={<Hourglass className="h-3.5 w-3.5" />}
           className="notch-sm flex flex-col gap-2.5 p-3"
         >
@@ -79,7 +79,7 @@ export function ClockHud({
                       controls?.pass(w.seconds, 'wait')
                       close()
                     }}
-                    className="border border-line/60 px-2.5 py-1 font-mono text-[12px] text-dim hover:border-dim hover:text-white"
+                    className="border border-line/60 px-2.5 py-1 font-ui text-[12px] text-dim hover:border-dim hover:text-ink"
                   >
                     {w.label}
                   </button>

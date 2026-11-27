@@ -20,7 +20,7 @@ export function ShellGallery({ items, adds, bind, scale }: ShellViewProps) {
               <span className="shell-clip relative block aspect-[4/3] w-full overflow-hidden">
                 {item.thumb}
                 {(item.tag || item.subtitle) && (
-                  <span className="pointer-events-none absolute bottom-1 left-1.5 max-w-[calc(100%-0.75rem)] truncate border border-cyan/40 bg-black/85 px-1 py-0.5 font-mono text-[9px] font-semibold tracking-[0.12em] text-cyan opacity-0 transition-opacity group-hover:opacity-100">
+                  <span className="pointer-events-none absolute bottom-1 left-1.5 max-w-[calc(100%-0.75rem)] truncate border border-secondary-ink/40 tone-panel-85 px-1 py-0.5 font-label text-[9px] font-semibold tracking-[0.12em] text-secondary-ink opacity-0 transition-opacity group-hover:opacity-100">
                     {[item.tag, item.subtitle].filter(Boolean).join(' // ')}
                   </span>
                 )}
@@ -30,10 +30,10 @@ export function ShellGallery({ items, adds, bind, scale }: ShellViewProps) {
                 {item.tile ?? <span className="flex h-full w-full items-center justify-center [&_svg]:h-[42%] [&_svg]:w-[42%]">{item.icon}</span>}
               </span>
             )}
-            <span className="shell-holo-name mt-2 truncate font-mono text-[11.5px] font-semibold uppercase tracking-[0.08em] text-white">
+            <span className="shell-holo-name mt-2 truncate font-ui text-[11.5px] font-semibold caps-8 text-ink">
               <span className={b.picked ? 'shell-cursor' : undefined}>{item.title}</span>
             </span>
-            {!item.thumb && item.subtitle && <span className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{item.subtitle}</span>}
+            {!item.thumb && item.subtitle && <span className="mt-0.5 truncate font-label text-[10px] caps-12 text-faint">{item.subtitle}</span>}
           </Pressable>
         )
       })}

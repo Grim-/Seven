@@ -1,14 +1,15 @@
 import type { EffectTargetRef } from '@shared/effects'
 import { toId } from '@shared/ids'
 import { moduleList, type ModuleEntry } from '@shared/moduleList'
-import { linkFor } from '@shared/text'
 import { agentSheets, chatPlayer, type AgentProfile } from '@shared/types'
+import { actorLink } from '@shared/worldNpcs'
 import { agentAccess } from '../agents/access'
 import { getSheet, sheetIds } from '../library/sheets'
 import { moduleIsOn } from '../modules/isOn'
 import { ToolError, type ToolContext } from '../tools/types'
 import { ifMissing } from '../util/report'
 import { worlds } from '../worlds/store'
+import { bindingOrNull } from '../worlds/ops'
 
 export interface PlayTargetCandidate {
   id: string
@@ -37,7 +38,7 @@ function sheetCandidate(id: string): PlayTargetCandidate {
   return {
     id: `sheet:${sheet.id}`,
     name: sheet.title,
-    link: linkFor('sheet', sheet.title),
+    link: actorLink(sheet.id),
     ref: { sheet: sheet.id },
     sheetId: sheet.id,
     hittable: Boolean(sheet.game)
@@ -93,7 +94,7 @@ export function resolveCardParticipants(
 ): { agent: AgentProfile; world: string | null; playerSheet: string | null; caster: PlayTargetCandidate; target: PlayTargetCandidate } {
   const agent = ctx.agentId ? agentAccess.get(ctx.agentId) : null
   if (!agent) throw new ToolError('Only an agent can play a card here.')
-  const world = agent.world?.worldId ?? null
+  const world = bindingOrNull(agent.id)?.worldId ?? null
   const worldPlayer = world ? ifMissing(() => worlds.meta(world).player, null) : null
   const playerSheet = chatPlayer(agent, worldPlayer)
   const caster = casterFor(agent)

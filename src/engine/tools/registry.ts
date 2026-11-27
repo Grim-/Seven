@@ -1,18 +1,22 @@
 import { currentToolName } from '@shared/toolnames'
-import type { AgentProfile } from '@shared/types'
+import { agentSheets, type AgentProfile } from '@shared/types'
 import type { ToolDef } from './types'
 import { modules } from '../modules/registry'
 import { linkedFolders } from '../folders/store'
 import { toolsets } from '../toolsets/store'
 import { hiddenActions } from '../library/kinds'
 
-export function toolsFor(agent: Pick<AgentProfile, 'id' | 'modules' | 'workspace' | 'toolsets' | 'offTools'>): ToolDef[] {
+export function toolsFor(
+  agent: Pick<AgentProfile, 'id' | 'modules' | 'workspace' | 'toolsets' | 'offTools' | 'sheet' | 'sheets'>,
+  hasCharacterOverride = false
+): ToolDef[] {
   const all = modules.tools()
   const picked = toolsets.toolNames(agent.toolsets)
   const files = Boolean(agent.workspace) || linkedFolders.forAgent(agent.id).length > 0
+  const hasCharacter = hasCharacterOverride || agentSheets(agent).length > 0
   const hidden = hiddenActions(agent.id)
   for (const name of agent.offTools ?? []) hidden.add(currentToolName(name))
-  const fits = (t: ToolDef) => (!t.needsWorkspace || files) && !hidden.has(t.name)
+  const fits = (t: ToolDef) => (!t.needsWorkspace || files) && (!t.needsCharacter || hasCharacter) && !hidden.has(t.name)
   const chosen = all.filter((t) => !t.always && (agent.modules.includes(t.group) || picked.has(t.name)) && fits(t))
   const list = chosen.length ? [...chosen, ...all.filter((t) => t.always && fits(t))] : []
   const scope = { agentId: agent.id, files: files && list.some((t) => t.group === 'read') }

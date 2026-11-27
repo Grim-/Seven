@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Import } from 'lucide-react'
-import { Button, Field, Modal, Toggle } from '../ui'
-import { FolderInput } from './FolderInput'
+import { Button, Modal } from '../ui'
+import { SaveLocationFields, type SaveLocation } from './SaveLocationFields'
 import { importInto, nextPlacing, usePlacing } from '../../lib/dropFiles'
 import { useObjectUrl } from '../../lib/useObjectUrl'
 import type { DroppedFile } from '../../lib/useFileDrop'
@@ -17,11 +17,10 @@ function Thumb({ file }: { file: File }) {
 function PlacePictures({ dropped }: { dropped: DroppedFile[] }) {
   const prefs = useApp((s) => s.settings?.droppedPictures)
   const updateSettings = useApp((s) => s.updateSettings)
-  const [folder, setFolder] = useState(prefs?.folder ?? '')
-  const [always, setAlways] = useState(false)
+  const [value, setValue] = useState<SaveLocation>({ folder: prefs?.folder ?? '', remember: false, tags: [] })
   const go = () => {
-    if (always) void updateSettings({ droppedPictures: { ask: false, folder: folder.trim() } })
-    void importInto(dropped, folder)
+    if (value.remember) void updateSettings({ droppedPictures: { ask: false, folder: value.folder.trim() } })
+    void importInto(dropped, value.folder)
     nextPlacing()
   }
   return (
@@ -46,15 +45,15 @@ function PlacePictures({ dropped }: { dropped: DroppedFile[] }) {
           {dropped.slice(0, SHOWN).map((d) => (
             <Thumb key={d.path} file={d.file} />
           ))}
-          {dropped.length > SHOWN && <span className="font-mono text-[11px] text-faint">+{dropped.length - SHOWN} more</span>}
+          {dropped.length > SHOWN && <span className="font-ui text-[11px] text-faint">+{dropped.length - SHOWN} more</span>}
         </div>
-        <Field label="Folder" hint="Made if it doesn't exist. Leave it empty for the top level.">
-          <FolderInput value={folder} onChange={setFolder} />
-        </Field>
-        <div className="flex flex-col gap-1">
-          <Toggle checked={always} onChange={setAlways} label="Put dropped pictures here from now on without asking" />
-          <span className="text-[11.5px] text-faint">Hold Shift while dropping to see this again. Change it in Settings.</span>
-        </div>
+        <SaveLocationFields
+          value={value}
+          onChange={setValue}
+          withTags={false}
+          rememberLabel="Put dropped pictures here from now on without asking"
+          hint="Hold Shift while dropping to see this again. Change it in Settings."
+        />
       </div>
     </Modal>
   )

@@ -4,7 +4,7 @@ import { Button, NumberField, SliderNumber } from '../ui'
 import { failed } from '../../lib/notify'
 import { pickMapPicture } from './addImageLayer'
 
-const LABEL = 'font-mono text-[10.5px] uppercase tracking-[0.12em] text-faint'
+const LABEL = 'font-label text-[10.5px] caps-12 text-faint'
 const FIELD = 'h-7 text-[12px]'
 
 export function PictureFields<T extends LayerBase & PictureLayer>({ layer, onChange }: { layer: T; onChange: (next: T) => void }) {

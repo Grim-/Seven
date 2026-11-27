@@ -81,9 +81,9 @@ function InSave({ sheet }: { sheet: CharacterSheet }) {
       () => void engine('saves.takeOut', { sheet: sheet.id }).catch(failed('Could not take them out'))
     )
   return (
-    <div className="mx-auto mt-3 flex w-full max-w-[1360px] items-center gap-2 border border-purple/40 bg-purple/[0.05] px-4 py-2 text-[13px]">
+    <div className="mx-auto mt-3 flex w-full max-w-[1360px] items-center gap-2 border border-tint-purple/40 bg-tint-purple/[0.05] px-4 py-2 text-[13px]">
       <span className="text-dim">Playing in</span>
-      <span className="font-semibold text-white">{save?.name ?? sheet.save}</span>
+      <span className="font-semibold text-ink">{save?.name ?? sheet.save}</span>
       {world && <span className="text-dim">· {world.name}</span>}
       <span className="flex-1" />
       <Button size="sm" variant="ghost" icon={<DoorOpen />} onClick={takeOut}>
@@ -148,9 +148,9 @@ function InGame({
   )
 
   return (
-    <div className="mx-auto flex w-full max-w-[1360px] flex-col gap-3 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/40 pb-2">
-        <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-dim">
+    <div className="mx-auto flex w-full max-w-[1360px] flex-col gap-2.5 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/40 pb-1.5">
+        <div className="flex items-center gap-2 font-label text-[11px] caps-14 text-dim">
           <span>{entity.name}</span>
           <span>·</span>
           <span>{entity.comps.length} components</span>
@@ -165,14 +165,14 @@ function InGame({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
-        <div className="flex flex-col gap-3">{headerComps.map(renderPanel)}</div>
+      <div className="grid grid-cols-1 items-start gap-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <div className="flex flex-col gap-2.5">{headerComps.map(renderPanel)}</div>
         <VitalsPanel entity={entity} catalog={catalog} changed={changed} />
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-        <div className="flex min-w-0 flex-col gap-3">{leftComps.map(renderPanel)}</div>
-        <div className="flex min-w-0 flex-col gap-3">
+      <div className="grid grid-cols-1 items-start gap-2.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <div className="flex min-w-0 flex-col gap-2.5">{leftComps.map(renderPanel)}</div>
+        <div className="flex min-w-0 flex-col gap-2.5">
           {rightComps.map(renderPanel)}
           {extraComps.map(renderPanel)}
         </div>

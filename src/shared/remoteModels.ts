@@ -75,7 +75,7 @@ export interface RemotePreset {
   keySourceUrl?: string
   summary: string
   requirements: readonly string[]
-  suggestedModels: readonly { id: string; context: number }[]
+  suggestedModels: readonly { id: string; context: number; category?: RemoteModelCategory }[]
 }
 
 export const REMOTE_PRESETS: readonly RemotePreset[] = [
@@ -94,15 +94,17 @@ export const REMOTE_PRESETS: readonly RemotePreset[] = [
     summary: 'Connects directly to Google’s native Gemini v1beta API (not via the beta OpenAI bridge) using an API key sent in request headers.',
     requirements: [
       'A Gemini API key (starts with AIza...) from Google AI Studio — never your Google password.',
-      'A current Gemini model ID (click Fetch list after pasting your key to browse all models enabled on your project; Google restricts 2.5 models on newer keys).',
-      'Internet access to generativelanguage.googleapis.com over HTTPS.'
+      'A current Gemini model ID (click Fetch list after pasting your key to browse chat and image models enabled on your project).',
+      'For image generation, pick a Gemini image model (e.g. gemini-2.5-flash-image or gemini-nano-banana-2.1) and set Use for to Image generation.'
     ],
     suggestedModels: [
-      { id: 'gemini-3.8-flash', context: 1048576 },
-      { id: 'gemini-3.6-flash', context: 1048576 },
-      { id: 'gemini-3.5-flash-lite', context: 1048576 },
-      { id: 'gemini-3.1-pro-preview', context: 1048576 },
-      { id: 'gemini-3-flash-preview', context: 1048576 }
+      { id: 'gemini-3.8-flash', context: 1048576, category: 'chat' },
+      { id: 'gemini-3.6-flash', context: 1048576, category: 'chat' },
+      { id: 'gemini-3.5-flash-lite', context: 1048576, category: 'chat' },
+      { id: 'gemini-3.1-pro-preview', context: 1048576, category: 'chat' },
+      { id: 'gemini-3-flash-preview', context: 1048576, category: 'chat' },
+      { id: 'gemini-2.5-flash-image', context: 65536, category: 'image' },
+      { id: 'gemini-nano-banana-2.1', context: 65536, category: 'image' }
     ]
   },
   {
@@ -117,16 +119,19 @@ export const REMOTE_PRESETS: readonly RemotePreset[] = [
     keyRequired: true,
     keySourceLabel: 'OpenAI API Platform (platform.openai.com/api-keys)',
     keySourceUrl: 'https://platform.openai.com/api-keys',
-    summary: 'Official OpenAI Chat Completions API with streaming tools and vision.',
+    summary: 'Official OpenAI Chat Completions & Images API (GPT chat models, gpt-image-1, and DALL-E).',
     requirements: [
       'An OpenAI API key (sk-...) with billing enabled.',
-      'An OpenAI model ID (e.g. gpt-4.1-mini, gpt-4.1, o4-mini).',
+      'For chat: gpt-4.1-mini, gpt-4.1, o4-mini. For image generation: gpt-image-1, gpt-image-1-mini, or dall-e-3.',
       'Leave Address blank for api.openai.com.'
     ],
     suggestedModels: [
-      { id: 'gpt-4.1-mini', context: 128000 },
-      { id: 'gpt-4.1', context: 128000 },
-      { id: 'o4-mini', context: 200000 }
+      { id: 'gpt-4.1-mini', context: 128000, category: 'chat' },
+      { id: 'gpt-4.1', context: 128000, category: 'chat' },
+      { id: 'o4-mini', context: 200000, category: 'reasoning' },
+      { id: 'gpt-image-1', context: 32768, category: 'image' },
+      { id: 'gpt-image-1-mini', context: 32768, category: 'image' },
+      { id: 'dall-e-3', context: 32768, category: 'image' }
     ]
   },
   {
@@ -148,9 +153,9 @@ export const REMOTE_PRESETS: readonly RemotePreset[] = [
       'Leave Address blank for api.anthropic.com.'
     ],
     suggestedModels: [
-      { id: 'claude-sonnet-4-5', context: 200000 },
-      { id: 'claude-opus-4-1', context: 200000 },
-      { id: 'claude-haiku-4-5', context: 200000 }
+      { id: 'claude-sonnet-4-5', context: 200000, category: 'chat' },
+      { id: 'claude-opus-4-1', context: 200000, category: 'chat' },
+      { id: 'claude-haiku-4-5', context: 200000, category: 'chat' }
     ]
   },
   {
@@ -165,16 +170,19 @@ export const REMOTE_PRESETS: readonly RemotePreset[] = [
     keyRequired: true,
     keySourceLabel: 'OpenRouter Keys (openrouter.ai/keys)',
     keySourceUrl: 'https://openrouter.ai/keys',
-    summary: 'Access hundreds of cloud models under one OpenAI-compatible API key.',
+    summary: 'Access hundreds of cloud chat and image models (Gemini Image, Flux, GPT Image) under one API key.',
     requirements: [
       'An OpenRouter API key (sk-or-...).',
       'Address set to https://openrouter.ai/api/v1.',
-      'Model slug like openai/gpt-4.1 or google/gemini-2.5-flash.'
+      'For image generation, pick an image-output model (e.g. google/gemini-2.5-flash-image-preview or black-forest-labs/flux.2-pro) — Seven routes it through OpenRouter chat modalities automatically.'
     ],
     suggestedModels: [
-      { id: 'google/gemini-2.5-flash', context: 1048576 },
-      { id: 'anthropic/claude-sonnet-4', context: 200000 },
-      { id: 'openai/gpt-4.1-mini', context: 128000 }
+      { id: 'google/gemini-2.5-flash', context: 1048576, category: 'chat' },
+      { id: 'anthropic/claude-sonnet-4', context: 200000, category: 'chat' },
+      { id: 'openai/gpt-4.1-mini', context: 128000, category: 'chat' },
+      { id: 'google/gemini-2.5-flash-image-preview', context: 65536, category: 'image' },
+      { id: 'black-forest-labs/flux.2-pro', context: 32768, category: 'image' },
+      { id: 'openai/gpt-5-image', context: 65536, category: 'image' }
     ]
   },
   {
@@ -259,7 +267,13 @@ export function presetForSpec(api: RemoteApi, baseUrl: string | null | undefined
 export function classifyRemoteModel(id: string, thinking?: boolean): RemoteModelCategory {
   const lower = id.toLowerCase()
   if (/(tts|native-audio|live|transcribe|audio)/.test(lower)) return 'audio'
-  if (/(image|imagen|dall-e|gpt-image|flux|stable[-_]?diffusion|sdxl|sd3|banana|veo|omni)/.test(lower)) return 'image'
+  if (
+    /(image|imagen|dall-e|gpt-image|flux|stable[-_]?diffusion|sdxl|sd3|banana|veo|omni|ideogram|recraft|seedream|midjourney|riverflow|black-forest-labs|playground-v|kandinsky|kolors|hidream|cogview)/.test(
+      lower
+    )
+  ) {
+    return 'image'
+  }
   if (thinking || /(^|-)o[1-9]|thinking|deep-research|\br1\b/.test(lower)) return 'reasoning'
   if (/embed|aqa|bisect|robotics/.test(lower)) return 'other'
   return 'chat'
@@ -268,7 +282,8 @@ export function classifyRemoteModel(id: string, thinking?: boolean): RemoteModel
 export function isImageModel(entry: { remote?: { model: string; category?: RemoteModelCategory } | null; info?: { kind?: string } | null }): boolean {
   if (entry.info?.kind === 'image') return true
   if (!entry.remote) return false
-  return entry.remote.category === 'image' || classifyRemoteModel(entry.remote.model) === 'image'
+  if (entry.remote.category) return entry.remote.category === 'image'
+  return classifyRemoteModel(entry.remote.model) === 'image'
 }
 
 const CATEGORY_RANK: Record<RemoteModelCategory, number> = {

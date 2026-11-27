@@ -32,7 +32,7 @@ let quitting = false
 
 function ensureAppWindow(show: boolean): BrowserWindow {
   if (appWindow && !appWindow.isDestroyed()) return appWindow
-  const win = createAppWindow({ show, onEvent: broadcast })
+  const win = createAppWindow({ show, onEvent: broadcast, startColors: settings.get().startColors })
   win.on('close', (event) => {
     if (quitting) return
     event.preventDefault()

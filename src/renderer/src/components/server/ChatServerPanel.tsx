@@ -42,7 +42,7 @@ export function ChatServerPanel({ status, onChange }: { status: ServerStatus; on
       </div>
       {chat && (
         <Fold label="Command line">
-          <div className="px-3.5 pb-3 font-mono text-[11.5px] text-white/85">{chat.args.join(' ')}</div>
+          <div className="px-3.5 pb-3 font-ui text-[11.5px] text-ink/85">{chat.args.join(' ')}</div>
         </Fold>
       )}
       <Fold label="Log" count={chat?.log.length ?? 0}>

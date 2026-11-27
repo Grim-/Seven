@@ -31,14 +31,14 @@ export function GridTable({ id, columns, empty, children }: { id?: string; colum
     <Template.Provider value={template}>
       <div className="flex w-full min-w-0 flex-col overflow-x-auto">
         <div className="min-w-full w-max">
-          <div style={{ gridTemplateColumns: template }} className="grid w-full gap-x-3 border-b border-line/30 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+          <div style={{ gridTemplateColumns: template }} className="grid w-full gap-x-3 border-b border-line/30 px-3.5 py-1.5 font-label text-[10px] caps-12 text-faint">
             {columns.map((c, idx) => (
               <div key={c.label || idx} ref={setHeaderRef(idx)} className={cn('relative flex min-w-0 items-center pr-2', c.right && 'justify-end')}>
                 {c.onSort ? (
                   <button
                     type="button"
                     onClick={c.onSort}
-                    className={cn('truncate leading-tight uppercase hover:text-white', c.right && 'text-right', c.sorted && 'text-accent')}
+                    className={cn('truncate leading-tight caps hover:text-ink', c.right && 'text-right', c.sorted && 'text-accent')}
                     title={`Sort by ${c.label}`}
                   >
                     {c.label}
@@ -79,7 +79,7 @@ export function GridTable({ id, columns, empty, children }: { id?: string; colum
 
 export function GridRow({ onClick, onContextMenu, selected, onBlur, children }: { onClick?: () => void; onContextMenu?: (e: MouseEvent<HTMLElement>) => void; selected?: boolean; onBlur?: (e: FocusEvent<HTMLDivElement>) => void; children: ReactNode }) {
   const template = useContext(Template)
-  const className = cn('grid w-full items-center gap-x-3 border-b border-line/20 px-3.5 py-1.5 text-left', onClick && 'hover:bg-white/[0.03]', selected && 'bg-accent/10')
+  const className = cn('grid w-full items-center gap-x-3 border-b border-line/20 px-3.5 py-1.5 text-left', onClick && 'hover:bg-ink/[0.03]', selected && 'bg-accent/10')
   if (onClick)
     return (
       <button onClick={onClick} onContextMenu={onContextMenu} style={{ gridTemplateColumns: template }} className={className}>

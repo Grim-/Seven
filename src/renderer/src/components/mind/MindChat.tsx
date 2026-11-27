@@ -16,7 +16,7 @@ export function MindChat({ id }: EntrySurfaceProps) {
   const { memories, agent, sorted, pinned } = useMind(id)
   if (!memories) return <Loading />
   return (
-    <EntryCard title={`${agent?.name ?? 'Agent'}'s mind`} tag="mind" aside={<span className="font-mono text-[11px] text-faint">{memories.length} memories · {pinned} pinned</span>}>
+    <EntryCard title={`${agent?.name ?? 'Agent'}'s mind`} tag="mind" aside={<span className="font-ui text-[11px] text-faint">{memories.length} memories · {pinned} pinned</span>}>
       <Lines
         items={sorted.slice(0, 6).map((m) => (
           <span key={m.id} className="min-w-0">

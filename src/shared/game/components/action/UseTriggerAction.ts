@@ -1,6 +1,6 @@
 import { REUSE, type EffectGroup } from '../../effectGroups'
-import { registerComponent, type TooltipRow } from '../../core'
-import { ActionPiece, type ActionEvent } from '../Action'
+import { registerComponent, type Component, type GameEntity, type TooltipRow } from '../../core'
+import { Action, ActionPiece, type ActionEvent } from '../Action'
 import { USE_TRIGGER_ACTION } from './storedPiece'
 
 export class UseTriggerAction extends ActionPiece {
@@ -13,6 +13,10 @@ export class UseTriggerAction extends ActionPiece {
   static readonly SENTENCE: string = 'Do {action} to the {who}'
   static readonly GROUP: EffectGroup | null = REUSE
   static readonly ICON: string = 'Link'
+
+  canApply(host: Component | GameEntity): true | string {
+    return host instanceof Action ? true : 'this piece belongs inside an ability, item, reaction, or world event'
+  }
 
   tooltipRows(): TooltipRow[] {
     return [{ label: 'Does', value: String(this.params.action) || 'nothing' }]

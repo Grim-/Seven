@@ -84,7 +84,7 @@ export function InstallWizard({ state, progress, open, onClose }: { state: Insta
       {step === 0 && (
         <div className="flex flex-col gap-2 text-[13px] leading-relaxed">
           <p>{state.about}</p>
-          <p className="text-white/70">Releases come from {state.source}. You pick the release, the build and the folder; nothing is downloaded until you press Install.</p>
+          <p className="text-ink/70">Releases come from {state.source}. You pick the release, the build and the folder; nothing is downloaded until you press Install.</p>
         </div>
       )}
       {step === 1 && <ReleaseStep state={state} tag={tag} build={build} onTag={pickTag} onBuild={setBuild} />}

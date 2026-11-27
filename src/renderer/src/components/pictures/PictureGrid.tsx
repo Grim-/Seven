@@ -31,14 +31,14 @@ export function PictureGrid({ ids, min = '8rem', wide = false, names = false, is
             onClick={() => onPick(id, i)}
             onContextMenu={onMenu ? (e) => onMenu(e, id, i) : undefined}
             className={cn(
-              'group relative overflow-hidden border bg-black',
+              'group relative overflow-hidden border bg-panel',
               wide ? 'aspect-[4/3]' : 'aspect-square',
               isOn?.(id) || reorder?.isOver(i) ? 'border-accent' : 'border-line/50 hover:border-accent/70',
               reorder?.dragging === i && 'opacity-40'
             )}
           >
             <AssetMedia id={id} className="h-full w-full transition-transform group-hover:scale-105" />
-            {names && asset && <span className="absolute inset-x-0 bottom-0 truncate bg-black/70 px-1.5 py-0.5 text-left font-mono text-[10px] text-white/85">{asset.name}</span>}
+            {names && asset && <span className="absolute inset-x-0 bottom-0 truncate tone-panel-70 px-1.5 py-0.5 text-left font-ui text-[10px] text-ink/85">{asset.name}</span>}
           </button>
         )
       })}

@@ -20,7 +20,7 @@ export function toolParts(turn: TurnGroup): ToolPart[] {
 }
 
 function userText(message: ChatMessage): string {
-  return message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')
+  return message.modelText ?? message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')
 }
 
 export function modelResultOf(part: ToolPart): string {

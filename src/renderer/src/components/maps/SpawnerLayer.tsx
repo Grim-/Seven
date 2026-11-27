@@ -49,17 +49,17 @@ function SpawnerToken({
 
   const borderClass =
     spawner.disposition === 'friendly'
-      ? 'border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.4)]'
+      ? 'border-tint-green shadow-[0_0_12px_color-mix(in_srgb,var(--color-tint-green)_calc(40%*var(--glow)),transparent)]'
       : spawner.disposition === 'neutral'
-      ? 'border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.4)]'
-      : 'border-alert shadow-[0_0_12px_rgba(239,68,68,0.5)]'
+      ? 'border-tint-amber-ink shadow-[0_0_12px_color-mix(in_srgb,var(--color-tint-amber-ink)_calc(40%*var(--glow)),transparent)]'
+      : 'border-alert shadow-[0_0_12px_color-mix(in_srgb,var(--color-alert)_calc(50%*var(--glow)),transparent)]'
 
   return (
     <>
       {/* PROXIMITY DETECTION RADIUS CIRCLE */}
       {spawner.spawnWhen === 'proximity' && selected && (
         <div
-          className="pointer-events-none absolute rounded-full border-2 border-dashed border-cyan/60 bg-cyan/5 transition-all"
+          className="pointer-events-none absolute rounded-full border-2 border-dashed border-secondary-ink/60 bg-secondary-ink/5 transition-all"
           style={{
             left: posX - radius,
             top: posY - radius,
@@ -67,7 +67,7 @@ function SpawnerToken({
             height: radius * 2
           }}
         >
-          <span className="absolute top-1 left-1/2 -translate-x-1/2 bg-black/85 px-1.5 py-0.5 font-mono text-[9px] text-cyan uppercase font-bold border border-cyan/40">
+          <span className="absolute top-1 left-1/2 -translate-x-1/2 tone-panel-85 px-1.5 py-0.5 font-label text-[9px] text-secondary-ink caps font-bold border border-secondary-ink/40">
             Ambush Radius: {radius}px
           </span>
         </div>
@@ -102,33 +102,33 @@ function SpawnerToken({
         {/* TOKEN CIRCLE */}
         <div
           className={cn(
-            'relative h-11 w-11 rounded-full border-2 bg-black/90 flex items-center justify-center transition-all',
+            'relative h-11 w-11 rounded-full border-2 tone-well-90 flex items-center justify-center transition-all',
             borderClass,
-            selected && 'ring-2 ring-white ring-offset-1 ring-offset-black scale-105'
+            selected && 'ring-2 ring-ink ring-offset-1 ring-offset-shade scale-105'
           )}
         >
           <Skull
             className={cn(
               'h-5 w-5',
               spawner.disposition === 'friendly'
-                ? 'text-emerald-400'
+                ? 'text-tint-green-ink'
                 : spawner.disposition === 'neutral'
-                ? 'text-amber-400'
+                ? 'text-tint-amber-ink'
                 : 'text-alert'
             )}
           />
           {spawner.facing !== undefined && spawner.facing !== 0 && (
-            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_4px_white]" />
+            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-ink rounded-full shadow-[0_0_4px_var(--color-ink)]" />
           )}
         </div>
 
         {/* LABEL PILL */}
         <div
           style={{ transform: `rotate(-${spawner.facing ?? 0}deg)` }}
-          className="mt-1 flex items-center gap-1 bg-black/90 border border-line px-1.5 py-0.5 font-mono text-[10px] text-white whitespace-nowrap shadow-md pointer-events-none"
+          className="mt-1 flex items-center gap-1 tone-panel-90 border border-line px-1.5 py-0.5 font-ui text-[10px] text-ink whitespace-nowrap shadow-md pointer-events-none"
         >
           <span className="font-bold truncate max-w-[120px]">{spawner.name}</span>
-          {spawner.spawnWhen === 'proximity' && <Compass className="h-2.5 w-2.5 text-cyan" />}
+          {spawner.spawnWhen === 'proximity' && <Compass className="h-2.5 w-2.5 text-secondary-ink" />}
         </div>
       </div>
     </>

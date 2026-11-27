@@ -1,10 +1,11 @@
 import { useMemo } from 'react'
 import type { StoredMapObject } from '@shared/game/mapObjects'
-import { Field, Input, Segmented, TagInput, Textarea } from '../ui'
+import { Field, Input, Segmented, TagInput } from '../ui'
 import { MapObjectGraphicPicker } from '../game/MapObjectGraphicPicker'
 import { EntrySelect } from '../game/EntrySelect'
 import { ObjectPlayManager } from '../maps/ObjectPlayManager'
 import { mapObjectImageContext, useRegisterImageContext } from '../../lib/imagePromptContext'
+import { LinkTextarea } from '../data/LinkTextarea'
 
 interface Props {
   value: StoredMapObject
@@ -18,7 +19,7 @@ export function StoredMapObjectEditor({ value, onChange }: Props) {
   )
   useRegisterImageContext(objectContext)
   return (
-    <div className="flex flex-col gap-4 font-mono select-none">
+    <div className="flex flex-col gap-4 font-ui select-none">
       {/* NAME & COLLISION */}
       <div className="grid grid-cols-2 gap-3">
         <Field label="NAME">
@@ -43,8 +44,8 @@ export function StoredMapObjectEditor({ value, onChange }: Props) {
       </div>
 
       {/* GRAPHIC / SPRITE PICKER */}
-      <div className="border border-line/40 bg-black/30 p-3">
-        <div className="mb-2 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan">
+      <div className="border border-line/40 tone-panel-30 p-3">
+        <div className="mb-2 font-label text-[10px] font-bold caps-5 text-secondary-ink">
           SPRITE GRAPHIC
         </div>
         <MapObjectGraphicPicker
@@ -68,7 +69,7 @@ export function StoredMapObjectEditor({ value, onChange }: Props) {
       </Field>
 
       {/* INTERACTIVE ACTIONS & DECISIONS */}
-      <div className="border border-line/40 bg-black/30 p-3">
+      <div className="border border-line/40 tone-panel-30 p-3">
         <ObjectPlayManager
           actionsText={value.actions}
           decisionsText={value.decisions}
@@ -79,11 +80,11 @@ export function StoredMapObjectEditor({ value, onChange }: Props) {
 
       {/* DESCRIPTION */}
       <Field label="DESCRIPTION">
-        <Textarea
+        <LinkTextarea rolls={false}
           value={value.description}
           placeholder="Object notes, lore, or inspection description..."
           rows={2}
-          onChange={(e) => onChange({ ...value, description: e.target.value })}
+          onValue={(v) => onChange({ ...value, description: v })}
         />
       </Field>
 

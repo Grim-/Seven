@@ -103,7 +103,7 @@ export function JsonImporter({ initial = 'workouts', onClose }: { initial?: Impo
         />
         <div className="text-[12.5px] text-dim">
           Paste JSON written by an LLM, or load a .json file. {kind.about}{' '}
-          <button className="text-accent hover:text-white" onClick={() => void kind.format().then((f) => copyText(f, 'Copied', kind.copied))}>
+          <button className="text-accent hover:text-ink" onClick={() => void kind.format().then((f) => copyText(f, 'Copied', kind.copied))}>
             Copy the format for an LLM
           </button>
         </div>

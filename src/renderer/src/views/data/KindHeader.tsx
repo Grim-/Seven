@@ -32,10 +32,10 @@ export function KindHeader({ section, selected, select, lead, canBack, onBack }:
       {lead}
       {onBack && <Button size="sm" variant="ghost" icon={<ArrowLeft />} title="Back" disabled={!canBack} onClick={onBack} />}
       <KindIcon name={section.icon} className="h-5 w-5 shrink-0 text-accent" />
-      <button onClick={home} onContextMenu={(e) => kindMenuAt(e, section, select)} className="font-mono text-[13px] font-bold uppercase tracking-[0.2em] text-white hover:text-accent">
+      <button onClick={home} onContextMenu={(e) => kindMenuAt(e, section, select)} className="font-label text-[13px] font-bold caps-20 text-ink hover:text-accent">
         {under ?? section.plural}
       </button>
-      {inEntry ? <ChevronRight className="h-4 w-4 text-faint" /> : <span className="font-mono text-[11px] text-faint">{section.count}</span>}
+      {inEntry ? <ChevronRight className="h-4 w-4 text-faint" /> : <span className="font-ui text-[11px] text-faint">{section.count}</span>}
       {!inEntry && <span className="min-w-0 flex-1 truncate text-[12px] text-dim">{section.description}</span>}
       {inEntry && <span className="flex min-w-0 flex-1">{Trail && <Trail id={selected.id} />}</span>}
       <FavouriteButton pin={pin} size="sm" className="text-faint" />

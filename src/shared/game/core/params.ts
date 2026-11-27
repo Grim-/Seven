@@ -13,12 +13,17 @@ export type ParamKind =
   | 'components'
   | 'storedAction'
   | 'entry'
+  | 'worldEvent'
   | 'signal'
   | 'gameTag'
   | 'storyFlag'
   | 'conditions'
   | 'classRewards'
   | 'clutchTriggers'
+  | 'worldPlace'
+  | 'worldFaction'
+  | 'worldSpawner'
+  | 'mapLayer'
 
 export interface ParamSpec {
   kind: ParamKind

@@ -40,18 +40,18 @@ export function MinMaxSlider({
 
   return (
     <div className={cn('flex flex-col gap-1 select-none', className)}>
-      <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-dim">
+      <div className="flex items-center justify-between font-label text-[10px] caps-5 text-dim">
         <span>{label}</span>
-        <span className="text-cyan font-bold">
+        <span className="text-secondary-ink font-bold">
           {minVal} – {maxVal}{unit ? ` ${unit}` : ''}
         </span>
       </div>
       <div className="relative flex h-5 w-full items-center">
         {/* Track Background */}
-        <div className="absolute inset-x-0 h-1 border border-line/40 bg-black/60" />
+        <div className="absolute inset-x-0 h-1 border border-line/40 tone-well-60" />
         {/* Active Range Track */}
         <div
-          className="absolute h-1 bg-accent/80 shadow-[0_0_6px_rgba(255,201,25,0.4)]"
+          className="absolute h-1 bg-accent/80 shadow-[0_0_6px_color-mix(in_srgb,var(--color-accent)_calc(40%*var(--glow)),transparent)]"
           style={{
             left: `${minPercent}%`,
             width: `${Math.max(0, maxPercent - minPercent)}%`
@@ -73,8 +73,8 @@ export function MinMaxSlider({
             [&::-webkit-slider-thumb]:border
             [&::-webkit-slider-thumb]:border-line
             [&::-webkit-slider-thumb]:bg-accent
-            [&::-webkit-slider-thumb]:shadow-[0_0_4px_rgba(255,201,25,0.6)]
-            [&::-webkit-slider-thumb]:hover:bg-white
+            [&::-webkit-slider-thumb]:shadow-[0_0_4px_color-mix(in_srgb,var(--color-accent)_calc(60%*var(--glow)),transparent)]
+            [&::-webkit-slider-thumb]:hover:bg-ink
             [&::-webkit-slider-thumb]:cursor-ew-resize
             [&::-moz-range-thumb]:pointer-events-auto
             [&::-moz-range-thumb]:h-3.5
@@ -101,8 +101,8 @@ export function MinMaxSlider({
             [&::-webkit-slider-thumb]:border
             [&::-webkit-slider-thumb]:border-line
             [&::-webkit-slider-thumb]:bg-accent
-            [&::-webkit-slider-thumb]:shadow-[0_0_4px_rgba(255,201,25,0.6)]
-            [&::-webkit-slider-thumb]:hover:bg-white
+            [&::-webkit-slider-thumb]:shadow-[0_0_4px_color-mix(in_srgb,var(--color-accent)_calc(60%*var(--glow)),transparent)]
+            [&::-webkit-slider-thumb]:hover:bg-ink
             [&::-webkit-slider-thumb]:cursor-ew-resize
             [&::-moz-range-thumb]:pointer-events-auto
             [&::-moz-range-thumb]:h-3.5

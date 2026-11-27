@@ -85,9 +85,9 @@ export function DecideView({
   if (done)
     return (
       <DecisionCardFrame tag="Decision" note="you picked" question={p.question} status={status}>
-        <OptionRow mark={<Check className="h-3.5 w-3.5" />} text={done.option} picked aside={<span className="font-mono text-[11px] text-dim">{optionRollLabel(done.roll)}</span>} />
-        {done.overridden && <span className="font-mono text-[11px] text-accent">You chose the rolling character</span>}
-        {done.check && (done.check.forced ? <span className="font-mono text-[12px] text-dim">You made it {done.check.passed ? 'pass' : 'fail'}.</span> : <RollRow roll={done.check} />)}
+        <OptionRow mark={<Check className="h-3.5 w-3.5" />} text={done.option} picked aside={<span className="font-ui text-[11px] text-dim">{optionRollLabel(done.roll)}</span>} />
+        {done.overridden && <span className="font-ui text-[11px] text-accent">You chose the rolling character</span>}
+        {done.check && (done.check.forced ? <span className="font-ui text-[12px] text-dim">You made it {done.check.passed ? 'pass' : 'fail'}.</span> : <RollRow roll={done.check} />)}
       </DecisionCardFrame>
     )
 
@@ -101,9 +101,9 @@ export function DecideView({
           picked={picked === i}
           onClick={open ? () => pick(i) : undefined}
           aside={
-            <span className="flex items-baseline gap-3 font-mono text-[11px]">
+            <span className="flex items-baseline gap-3 font-ui text-[11px]">
               <span className="text-dim">{optionRollLabel(o.roll)}</span>
-              <span className="w-10 text-right font-bold text-white">{chance(o.roll)}</span>
+              <span className="w-10 text-right font-bold text-ink">{chance(o.roll)}</span>
             </span>
           }
         />
@@ -121,7 +121,7 @@ export function DecideView({
           <div className="flex flex-wrap items-center gap-2">
             <OptionRollFields roll={roll} targets={targets} onChange={setRoll} />
             <span className="flex-1" />
-            {roll.type !== 'none' && <span className="font-mono text-[18px] font-bold text-accent">{chance(roll)}</span>}
+            {roll.type !== 'none' && <span className="font-ui text-[18px] font-bold text-accent">{chance(roll)}</span>}
           </div>
           {roll.type === 'check' && (
             <WhoRolls

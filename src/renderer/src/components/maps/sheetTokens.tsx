@@ -3,6 +3,7 @@ import { parseActions } from '@shared/actions'
 import { parseDecisions } from '@shared/decisions'
 import { smallestAt } from '@shared/shapes'
 import { showName } from '@shared/ids'
+import { actorLink } from '@shared/worldNpcs'
 import { defaultDialogueTree } from '@shared/game/dialogue'
 import type { MenuItem } from '../ui'
 import { engine } from '../../lib/ipc'
@@ -12,7 +13,7 @@ import { actionItems, decisionItems, newPlayItems } from '../play/playHolder'
 import { useDialogue } from '../play/dialogue/dialogueStore'
 import { useGameState } from '../play/state/gameStateStore'
 import { registerTokenSourceUi, type TokenContext } from '../../registries/tokenSources'
-import { characterItems, setWhere } from './placeActions'
+import { characterItems, syncTokenLocation } from './placeActions'
 
 function engageItem(ctx: TokenContext): MenuItem {
   const t = ctx.token
@@ -31,7 +32,7 @@ function otherItems(ctx: TokenContext): MenuItem[] {
   return [
     {
       label: `Talk to ${showName(v.name)}`,
-      icon: <MessageSquarePlus className="h-4 w-4 text-cyan" />,
+      icon: <MessageSquarePlus className="h-4 w-4 text-secondary-ink" />,
       onSelect: () =>
         ctx.approach(() => {
           if (ctx.onSelect) ctx.onSelect(v.sheet)
@@ -58,7 +59,7 @@ registerTokenSourceUi('sheet', {
     const isSelf = Boolean(ctx.player && v.sheet === ctx.player)
     return [
       ...(!isSelf ? otherItems(ctx) : []),
-      ...(!isSelf ? [{ label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(`@sheet:${v.sheet}`, v.agent ? [v.agent] : []) }] : []),
+      ...(!isSelf ? [{ label: 'Continue here', icon: <MessageSquarePlus />, children: startChatItems(actorLink(v.sheet), v.agent ? [v.agent] : []) }] : []),
       ...parseActions(ctx.standing.actions).map((a, i) => withApproach(ctx, actionItems(ctx.holder, a, i)[0], a.attempt)),
       ...parseDecisions(ctx.standing.decisions).map((d, i) => withApproach(ctx, decisionItems(ctx.holder, d, i, null)[0], d.question)),
       ...(ctx.editing ? newPlayItems(ctx.holder) : []),
@@ -67,7 +68,6 @@ registerTokenSourceUi('sheet', {
   },
   pick: (ctx, e) => (ctx.onSelect ? ctx.onSelect(ctx.token.visitor.sheet) : ctx.openMenu(e)),
   moved: (ctx, at) => {
-    const place = smallestAt(ctx.use.shapes, at)
-    if (place) void setWhere(ctx.token.visitor.sheet, place).catch(failed('Could not move them'))
+    void syncTokenLocation(ctx.token.visitor.sheet, ctx.world, ctx.use, at).catch(failed('Could not update character location'))
   }
 })

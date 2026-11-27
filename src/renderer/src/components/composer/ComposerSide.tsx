@@ -23,7 +23,7 @@ export function ComposerSide({ onAdd }: { onAdd: (texts: string[]) => void }) {
   const [tab, setTab] = useViewPlace<SideTab>('composer.tab', 'library')
   const cards = useTypePages(CARD_TYPE)
   return (
-    <div className="flex min-h-0 flex-col gap-2 border border-line/40 bg-black/40 p-2">
+    <div className="flex min-h-0 flex-col gap-2 border border-line/40 tone-panel-40 p-2">
       <ShellTabs value={tab} options={TABS} onChange={setTab} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === 'library' && <EntryPicker inline kind={null} title="Put on the paper" onPick={(hit) => onAdd([entryLink(hit.kind, hit.id)])} onClose={() => undefined} />}

@@ -26,22 +26,22 @@ export const VN_BEAT = 'vn_beat'
 
 const TONE_CLASS: Record<string, string> = {
   accent: 'border-accent/60 [--vn-tone:var(--color-accent)]',
-  cyan: 'border-cyan/60 [--vn-tone:var(--color-cyan)]',
-  purple: 'border-purple/60 [--vn-tone:var(--color-purple)]',
-  teal: 'border-teal/60 [--vn-tone:var(--color-teal)]',
+  cyan: 'border-secondary-ink/60 [--vn-tone:var(--color-cyan)]',
+  purple: 'border-tint-purple/60 [--vn-tone:var(--color-purple)]',
+  teal: 'border-secondary/60 [--vn-tone:var(--color-teal)]',
   alert: 'border-alert/60 [--vn-tone:var(--color-alert)]'
 }
 
 const EXPRESSION_CLASS: Record<string, string> = {
-  calm: 'border-teal/50 bg-teal/15 text-teal',
-  happy: 'border-teal/50 bg-teal/15 text-teal',
-  amused: 'border-teal/50 bg-teal/15 text-teal',
+  calm: 'border-secondary/50 bg-secondary/15 text-secondary',
+  happy: 'border-secondary/50 bg-secondary/15 text-secondary',
+  amused: 'border-secondary/50 bg-secondary/15 text-secondary',
   smirking: 'border-accent/50 bg-accent/15 text-accent',
   confident: 'border-accent/50 bg-accent/15 text-accent',
-  curious: 'border-cyan/50 bg-cyan/15 text-cyan',
-  whisper: 'border-purple/50 bg-purple/15 text-purple',
-  mysterious: 'border-purple/50 bg-purple/15 text-purple',
-  sad: 'border-purple/50 bg-purple/15 text-purple',
+  curious: 'border-secondary-ink/50 bg-secondary-ink/15 text-secondary-ink',
+  whisper: 'border-tint-purple/50 bg-tint-purple/15 text-tint-purple',
+  mysterious: 'border-tint-purple/50 bg-tint-purple/15 text-tint-purple',
+  sad: 'border-tint-purple/50 bg-tint-purple/15 text-tint-purple',
   angry: 'border-alert/60 bg-alert/20 text-alert',
   alarmed: 'border-alert/60 bg-alert/20 text-alert',
   shocked: 'border-alert/60 bg-alert/20 text-alert'
@@ -145,23 +145,23 @@ export function VnBeatView({ data, messageId }: ChatElementProps) {
 
   return (
     <div ref={anchor} onContextMenu={handleContextMenu} className="my-1.5 flex flex-col gap-2">
-      {scene && (scene.startsWith('@place:') ? <ScenePlaceBanner placeRef={scene} /> : (
-        <div className="flex items-center gap-2 border border-line/50 bg-black/75 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan">
+      {scene && ((scene.startsWith('@place:') || (scene.startsWith('@world:') && scene.includes('/place/'))) ? <ScenePlaceBanner placeRef={scene} /> : (
+        <div className="flex items-center gap-2 border border-line/50 tone-panel-75 px-3 py-1 font-label text-[10px] caps-18 text-secondary-ink">
           <Sparkles className="h-3 w-3 shrink-0" />
           <span className="truncate">{scene}</span>
         </div>
       ))}
 
       {cgImage && (
-        <div className="relative overflow-hidden border border-line/60 bg-black/80">
+        <div className="relative overflow-hidden border border-line/60 tone-panel-80">
           <AssetMedia id={cgImage} className="max-h-64 w-full object-cover" usedBy={`vn:${speaker || messageId}`} />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/85 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-scrim/85 to-transparent" />
         </div>
       )}
 
       <div
         className={cn(
-          'notch-sm relative flex items-stretch gap-3.5 overflow-hidden border bg-gradient-to-b from-[#0b1019]/95 via-[#070a10]/95 to-black/95 p-3 shadow-[0_10px_30px_rgba(0,0,0,0.55)]',
+          'notch-sm relative flex items-stretch gap-3.5 overflow-hidden border bg-gradient-to-b from-surface/95 via-surface/95 to-scrim/95 p-3 shadow-[0_10px_30px_color-mix(in_srgb,var(--color-shade)_55%,transparent)]',
           side === 'right' && 'flex-row-reverse',
           TONE_CLASS[tone]
         )}
@@ -169,7 +169,7 @@ export function VnBeatView({ data, messageId }: ChatElementProps) {
         {(speaker || customImage) && (
           <div className="flex shrink-0 flex-col items-center gap-1">
             {customImage ? (
-              <div style={{ width: portraitSize, height: Math.round(portraitSize * 1.2) }} className="relative overflow-hidden border border-accent/55 bg-black/70">
+              <div style={{ width: portraitSize, height: Math.round(portraitSize * 1.2) }} className="relative overflow-hidden border border-accent/55 tone-panel-70">
                 <AssetMedia id={customImage} className="h-full w-full object-cover" usedBy={`vn:${speaker}`} />
               </div>
             ) : (
@@ -197,23 +197,23 @@ export function VnBeatView({ data, messageId }: ChatElementProps) {
                   type="button"
                   disabled={!inspectKind}
                   onClick={() => inspectKind && setInspecting((v) => !v)}
-                  className="font-mono text-[11.5px] font-bold uppercase tracking-[0.2em] text-accent enabled:hover:text-white enabled:cursor-pointer"
+                  className="font-label text-[11.5px] font-bold caps-20 text-accent enabled:hover:text-ink enabled:cursor-pointer"
                 >
                   {speaker}
                 </button>
               ) : (
-                <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.2em] text-dim">NARRATION</span>
+                <span className="font-label text-[10.5px] font-bold caps-20 text-dim">Narration</span>
               )}
-              {title && <span className="font-mono text-[10px] uppercase tracking-wider text-dim">· {title}</span>}
+              {title && <span className="font-label text-[10px] caps-5 text-dim">· {title}</span>}
               {expression && (
-                <span className={cn('border px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em]', exprStyle)}>
+                <span className={cn('border px-1.5 py-0.5 font-label text-[9.5px] font-semibold caps-14 ', exprStyle)}>
                   {expression}
                 </span>
               )}
               {matchedSheet && <SpeakerStatusStrip sheetId={matchedSheet} />}
             </div>
             {lines.length > 0 && (
-              <div className="flex items-center gap-1 font-mono text-[10px]">
+              <div className="flex items-center gap-1 font-ui text-[10px]">
                 {!showAll && (
                   <button
                     type="button"
@@ -229,8 +229,8 @@ export function VnBeatView({ data, messageId }: ChatElementProps) {
                     type="button"
                     onClick={() => setShowAll((v) => !v)}
                     className={cn(
-                      'flex h-5 items-center gap-1 border px-1.5 uppercase tracking-wider',
-                      showAll ? 'border-accent/60 bg-accent/15 text-accent' : 'border-line/50 text-dim hover:text-white'
+                      'flex h-5 items-center gap-1 border px-1.5 caps-5 ',
+                      showAll ? 'border-accent/60 bg-accent/15 text-accent' : 'border-line/50 text-dim hover:text-ink'
                     )}
                   >
                     {showAll ? 'Step' : 'All'}
@@ -243,7 +243,7 @@ export function VnBeatView({ data, messageId }: ChatElementProps) {
           <div
             onClick={handleBoxClick}
             className={cn(
-              'min-h-[3.4rem] text-[15px] leading-[1.7] text-white/95 [&_em]:font-mono [&_em]:text-[13px] [&_em]:not-italic [&_em]:text-cyan/85',
+              'min-h-[3.4rem] text-[15px] leading-[1.7] text-ink/95 [&_em]:font-ui [&_em]:text-[13px] [&_em]:not-italic [&_em]:text-secondary-ink/85',
               !showAll && (typing || clampedStep < lines.length - 1) && 'cursor-pointer'
             )}
           >
@@ -262,7 +262,7 @@ export function VnBeatView({ data, messageId }: ChatElementProps) {
           </div>
 
           {!showAll && lines.length > 1 && (
-            <div className="flex items-center justify-between border-t border-line/30 pt-1.5 font-mono text-[10px] text-dim">
+            <div className="flex items-center justify-between border-t border-line/30 pt-1.5 font-ui text-[10px] text-dim">
               <div className="flex items-center gap-1">
                 {lines.map((_, i) => (
                   <button

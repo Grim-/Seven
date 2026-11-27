@@ -93,12 +93,12 @@ export function WorldActions({ world }: Props) {
   const where = worldWhere(null, [], world.id, world.player)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 font-mono select-none">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 font-ui select-none">
       {/* HEADER & TABS */}
       <div className="flex items-center justify-between border-b border-line pb-2.5">
         <div className="flex items-center gap-3">
-          <Swords className="h-4 w-4 text-cyan" />
-          <span className="text-[12px] font-bold uppercase tracking-wider text-white">
+          <Swords className="h-4 w-4 text-secondary-ink" />
+          <span className="text-[12px] font-bold caps-5 text-ink">
             WORLD ACTIONS &amp; DECISIONS
           </span>
           <ShellTabs
@@ -123,10 +123,10 @@ export function WorldActions({ world }: Props) {
             {allActions.map(({ action: a, source }, idx) => (
               <div
                 key={idx}
-                className="flex flex-col justify-between border border-line/60 bg-black/60 p-3 hover:border-line"
+                className="flex flex-col justify-between border border-line/60 tone-well-60 p-3 hover:border-line"
               >
                 <div>
-                  <div className="text-[13px] font-bold text-white truncate">
+                  <div className="text-[13px] font-bold text-ink truncate">
                     {a.attempt}
                   </div>
                   <div className="mt-0.5 text-[10px] text-faint truncate">
@@ -137,7 +137,7 @@ export function WorldActions({ world }: Props) {
                   <div className="mt-2 flex flex-col gap-1 text-[11px] text-dim">
                     {a.checks.map((c, i) => (
                       <div key={i} className="flex items-center gap-1.5">
-                        <span className="text-cyan">{c.against ?? 'Check'}:</span>
+                        <span className="text-secondary-ink">{c.against ?? 'Check'}:</span>
                         <span>DC {c.base ?? 10}</span>
                       </div>
                     ))}
@@ -187,10 +187,10 @@ export function WorldActions({ world }: Props) {
             {allDecisions.map(({ decision: d, source }, idx) => (
               <div
                 key={idx}
-                className="flex flex-col justify-between border border-line/60 bg-black/60 p-3 hover:border-line"
+                className="flex flex-col justify-between border border-line/60 tone-well-60 p-3 hover:border-line"
               >
                 <div>
-                  <div className="text-[13px] font-bold text-white truncate">
+                  <div className="text-[13px] font-bold text-ink truncate">
                     {d.question}
                   </div>
                   <div className="mt-0.5 text-[10px] text-faint truncate">

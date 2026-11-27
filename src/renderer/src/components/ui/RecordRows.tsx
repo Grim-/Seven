@@ -16,11 +16,11 @@ export function RecordRows<T extends object>({ rows, columns, blank, onChange, a
   const toggle = (i: number) => setOpen((s) => (s.has(i) ? new Set([...s].filter((x) => x !== i)) : new Set([...s, i])))
   const set = (i: number, key: keyof T, value: unknown) => onChange(rows.map((r, j) => (j === i ? { ...r, [key]: value } : r)))
   const grid = { gridTemplateColumns: `${detail ? '1rem ' : ''}${columns.map((c) => c.width ?? (c.kind === 'check' ? '3rem' : c.kind === 'number' ? '4.5rem' : 'minmax(0,1fr)')).join(' ')} 1.75rem` }
-  const cell = dense ? 'h-7 min-w-0 border border-transparent bg-transparent px-1.5 text-[13px] text-white outline-none hover:border-line/40 focus:border-accent/60' : 'h-8 min-w-0 border border-line/40 bg-black/40 px-2 text-[13px] text-white outline-none focus:border-accent/60'
+  const cell = dense ? 'h-7 min-w-0 border border-transparent bg-transparent px-1.5 text-[13px] text-ink outline-none hover:border-line/40 focus:border-accent/60' : 'h-8 min-w-0 border border-line/40 tone-well-40 px-2 text-[13px] text-ink outline-none focus:border-accent/60'
   return (
     <div className="flex flex-col gap-1">
       {rows.length > 0 && (
-        <div className="grid gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-faint" style={grid}>
+        <div className="grid gap-1.5 font-label text-[10px] caps-14 text-faint" style={grid}>
           {detail && <span />}
           {columns.map((c) => (
             <span key={c.key} className={c.kind === 'check' ? 'text-center' : undefined}>
@@ -45,8 +45,8 @@ export function RecordRows<T extends object>({ rows, columns, blank, onChange, a
                 ))}
               {columns.map((c) => {
                 const value = row[c.key] as unknown
-                if (c.kind === 'check') return <input key={c.key} type="checkbox" checked={value === true} onChange={(e) => set(i, c.key, e.target.checked)} className="mx-auto mt-2 h-4 w-4 accent-[rgb(255,201,25)]" />
-                if (c.kind === 'number') return <input key={c.key} type="number" value={Number(value) || 0} onChange={(e) => set(i, c.key, Math.round(Number(e.target.value)) || 0)} className={cn(cell, 'font-mono')} />
+                if (c.kind === 'check') return <input key={c.key} type="checkbox" checked={value === true} onChange={(e) => set(i, c.key, e.target.checked)} className="mx-auto mt-2 h-4 w-4 accent-[var(--color-accent)]" />
+                if (c.kind === 'number') return <input key={c.key} type="number" value={Number(value) || 0} onChange={(e) => set(i, c.key, Math.round(Number(e.target.value)) || 0)} className={cn(cell, 'font-data')} />
                 if (c.kind === 'long') return <MarkdownEditor key={c.key} compact value={String(value ?? '')} placeholder={c.placeholder} onValue={(text) => set(i, c.key, text)} className="min-w-0" />
                 return <input key={c.key} value={String(value ?? '')} placeholder={c.placeholder} onChange={(e) => set(i, c.key, e.target.value)} className={cell} />
               })}

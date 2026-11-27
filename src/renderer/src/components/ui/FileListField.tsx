@@ -10,7 +10,7 @@ export function FileListField({ items, onChange, filters, min = -4, max = 4, ste
     <div className="flex w-full flex-col gap-1">
       {items.map((f, i) => (
         <div key={`${f.path}-${i}`} className="flex items-center gap-1.5">
-          <span title={f.path} className="min-w-0 flex-1 truncate font-mono text-[12px] text-white">
+          <span title={f.path} className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink">
             {fileName(f.path)}
           </span>
           <NumberField value={f.scale} min={min} max={max} step={step} onChange={(v) => v !== undefined && change(i, { scale: v })} className="h-7 w-20 text-[12px]" />

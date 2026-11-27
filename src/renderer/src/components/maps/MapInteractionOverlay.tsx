@@ -2,6 +2,9 @@ import { useState, useRef, useEffect, type PointerEvent } from 'react'
 import type { MapData, TileLayerData } from '@shared/maps'
 import type { Point } from '@shared/shapes'
 import type { MapTool } from './OverlayToolbar'
+import { rgba } from '../../lib/cssColors'
+import { useRoleColours } from '../../lib/skins/useRoleColours'
+import { cn } from '../../lib/cn'
 
 interface MapInteractionOverlayProps {
   map: MapData
@@ -13,6 +16,7 @@ interface MapInteractionOverlayProps {
   onPaintTiles: (layerId: string, tiles: number[]) => void
   onPlaceObject: (at: Point) => void
   onPlaceSpawner?: (at: Point) => void
+  onCancelTool?: () => void
 }
 
 export function MapInteractionOverlay({
@@ -24,9 +28,11 @@ export function MapInteractionOverlay({
   zoom = 1,
   onPaintTiles,
   onPlaceObject,
-  onPlaceSpawner
+  onPlaceSpawner,
+  onCancelTool
 }: MapInteractionOverlayProps) {
   const [hoverTile, setHoverTile] = useState<{ col: number; row: number } | null>(null)
+  const { colours } = useRoleColours()
   const isPainting = useRef(false)
   // Sparse map of index -> new Gid for the active stroke (NO 65k array allocations on mousedown)
   const strokeChanges = useRef<Map<number, number>>(new Map())
@@ -89,15 +95,25 @@ export function MapInteractionOverlay({
 
     ctx.clearRect(px, py, tileW, tileH)
     if (gid > 0) {
-      ctx.fillStyle = 'rgba(102, 252, 241, 0.4)'
+      ctx.fillStyle = rgba(colours.cyan, 0.4)
       ctx.fillRect(px, py, tileW, tileH)
-      ctx.strokeStyle = '#66fcf1'
+      ctx.strokeStyle = colours.cyan
       ctx.lineWidth = 1
       ctx.strokeRect(px + 0.5, py + 0.5, tileW - 1, tileH - 1)
     }
   }
 
   const handlePointerDown = (e: PointerEvent) => {
+    if (e.button === 2) {
+      e.preventDefault()
+      e.stopPropagation()
+      isPainting.current = false
+      strokeChanges.current.clear()
+      const pCtx = previewCanvas.current?.getContext('2d')
+      if (pCtx) pCtx.clearRect(0, 0, map.size.w, map.size.h)
+      onCancelTool?.()
+      return
+    }
     if (e.button !== 0) return
     e.currentTarget.setPointerCapture(e.pointerId)
     const { col, row, point } = getTileCoords(e)
@@ -160,6 +176,11 @@ export function MapInteractionOverlay({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerLeave}
+      onContextMenuCapture={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onCancelTool?.()
+      }}
       className="absolute inset-0 z-10 cursor-crosshair select-none touch-none"
       style={{ width: map.size.w, height: map.size.h }}
     >
@@ -174,15 +195,12 @@ export function MapInteractionOverlay({
       {/* Hover Brush Indicator */}
       {hoverTile && (tool === 'paint' || tool === 'erase') && (
         <div
-          className="pointer-events-none absolute border"
+          className={cn('pointer-events-none absolute border', tool === 'erase' ? 'border-alert/90 bg-alert/20' : 'border-cyan/90 bg-cyan/20')}
           style={{
             left: (hoverTile.col - offset) * tileW,
             top: (hoverTile.row - offset) * tileH,
             width: brushSize * tileW,
-            height: brushSize * tileH,
-            borderColor: tool === 'erase' ? 'rgba(255, 74, 110, 0.9)' : 'rgba(102, 252, 241, 0.9)',
-            backgroundColor:
-              tool === 'erase' ? 'rgba(255, 74, 110, 0.2)' : 'rgba(102, 252, 241, 0.2)'
+            height: brushSize * tileH
           }}
         />
       )}

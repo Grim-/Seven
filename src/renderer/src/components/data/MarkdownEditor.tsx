@@ -6,7 +6,7 @@ import { Markdown } from '@tiptap/markdown'
 import { TableKit } from '@tiptap/extension-table'
 import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { Placeholder } from '@tiptap/extensions'
-import { ComposerHints, useReferenceHints, type Hint } from '../chat/Commands'
+import { FloatingHints, useReferenceHints, type Hint } from '../chat/Commands'
 import { cn } from '../../lib/cn'
 import { AddressTools } from '../ui'
 import { useRolls } from './useRolls'
@@ -48,6 +48,7 @@ function prefixOf(editor: Editor): Before | null {
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function MarkdownEditor({ value, onValue, onSave, onBlur, placeholder, autoFocus, compact = false, rolls = false, className, title, bar = false }, ref) {
   const emitted = useRef(value)
+  const area = useRef<HTMLDivElement>(null)
   const roll = useRolls(rolls, value, onValue)
   const onValueRef = useRef((markdown: string) => {
     onValue(markdown)
@@ -160,8 +161,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
   return (
     <div className={cn('seven-md-editor flex min-h-0 flex-col', compact ? 'seven-md-compact gap-1' : 'seven-md-doc', className)}>
       {!compact && !bar && title && <div className="seven-screen-tab">{title}</div>}
-      <div className={cn('flex min-h-0 flex-1 flex-col', !compact && !bar && 'seven-screen')}>
-        <ComposerHints hints={hints} selected={current} onSelect={setPick} inline />
+      <div ref={area} className={cn('flex min-h-0 flex-1 flex-col', !compact && !bar && 'seven-screen')}>
+        <FloatingHints anchor={area} hints={hints} selected={current} onSelect={setPick} onClose={() => keyState.current.hide()} />
         {!compact &&
           (bar ? (
             <AddressTools>
@@ -170,7 +171,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function M
           ) : (
             <EditorCommandBar editor={editor} />
           ))}
-        <div onClick={(e) => e.target === e.currentTarget && editor?.commands.focus('end')} className={cn('min-h-0 flex-1 cursor-text', compact ? 'border border-line/40 bg-black/40 focus-within:border-accent/60' : 'seven-doc-bg overflow-y-auto')}>
+        <div onClick={(e) => e.target === e.currentTarget && editor?.commands.focus('end')} className={cn('min-h-0 flex-1 cursor-text', compact ? 'border border-line/40 tone-panel-40 focus-within:border-accent/60' : 'seven-doc-bg overflow-y-auto')}>
           <EditorContent editor={editor} />
         </div>
       </div>

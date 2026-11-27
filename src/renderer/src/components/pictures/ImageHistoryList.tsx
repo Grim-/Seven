@@ -5,7 +5,7 @@ import { useData } from '../../store/data'
 import { formatRelative } from '../../lib/format'
 import { showInData } from '../../lib/library'
 import { copyText } from '../../lib/notify'
-import { Button, Input, StatusBadge } from '../ui'
+import { Button, Input, StatusBadge, openMenu } from '../ui'
 import { AssetMedia } from './AssetMedia'
 
 export function ImageHistoryList({
@@ -22,7 +22,7 @@ export function ImageHistoryList({
   onLoad: (entry: ImageHistoryEntry) => void
   onEditAsset?: (assetId: string) => void
   onUseAsset?: (assetId: string) => void
-  onRemove: (id: string) => void
+  onRemove: (id: string, deleteAsset?: boolean) => void
   onClear?: () => void
 }) {
   const assets = useData((s) => s.assets)
@@ -76,30 +76,30 @@ export function ImageHistoryList({
                 className={
                   active
                     ? 'flex gap-3 border border-accent/60 bg-accent/5 p-2.5'
-                    : 'flex gap-3 border border-line/60 bg-black/35 p-2.5 hover:border-line-hover'
+                    : 'flex gap-3 border border-line/60 tone-well-35 p-2.5 hover:border-line-hover'
                 }
               >
                 <button
                   type="button"
                   disabled={!exists}
                   onClick={() => exists && onEditAsset?.(entry.assetId)}
-                  className="h-20 w-20 shrink-0 overflow-hidden border border-line/60 bg-black/60"
+                  className="h-20 w-20 shrink-0 overflow-hidden border border-line/60 tone-panel-60"
                   title={exists ? 'Preview / edit image' : 'Image file removed from Files'}
                 >
                   {exists ? (
                     <AssetMedia id={entry.assetId} className="h-full w-full object-cover" />
                   ) : (
-                    <span className="flex h-full w-full items-center justify-center px-1 text-center font-mono text-[10px] text-faint">
+                    <span className="flex h-full w-full items-center justify-center px-1 text-center font-ui text-[10px] text-faint">
                       Missing
                     </span>
                   )}
                 </button>
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10.5px] text-dim">
+                  <div className="flex flex-wrap items-center gap-1.5 font-ui text-[10.5px] text-dim">
                     <StatusBadge tone={entry.kind === 'edit' ? 'busy' : 'idle'}>
                       {entry.kind === 'edit' ? 'Edit' : 'Generate'}
                     </StatusBadge>
-                    <span className="text-white">{entry.modelName}</span>
+                    <span className="text-ink">{entry.modelName}</span>
                     <span>· {`${entry.width}×${entry.height}`}</span>
                     <span>· {entry.steps} steps</span>
                     <span>· CFG {entry.cfgScale}</span>
@@ -109,9 +109,9 @@ export function ImageHistoryList({
                     )}
                     <span className="ml-auto text-faint">{formatRelative(entry.createdAt)}</span>
                   </div>
-                  <p className="line-clamp-3 whitespace-pre-wrap text-[12.5px] leading-snug text-white">{entry.prompt}</p>
+                  <p className="line-clamp-3 whitespace-pre-wrap text-[12.5px] leading-snug text-ink">{entry.prompt}</p>
                   {entry.negativePrompt && (
-                    <p className="line-clamp-1 font-mono text-[11px] text-dim">Negative: {entry.negativePrompt}</p>
+                    <p className="line-clamp-1 font-ui text-[11px] text-dim">Negative: {entry.negativePrompt}</p>
                   )}
                   <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                     <Button size="sm" variant="badge" icon={<RotateCcw />} onClick={() => onLoad(entry)}>
@@ -135,7 +135,20 @@ export function ImageHistoryList({
                         Files
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" icon={<Trash2 />} className="ml-auto" onClick={() => onRemove(entry.id)} title="Remove from history" />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<Trash2 />}
+                      className="ml-auto"
+                      onClick={(e) => {
+                        if (!exists) return onRemove(entry.id, false)
+                        openMenu(e, 'Delete prompt', [
+                          { label: 'Remove prompt only', icon: <Trash2 />, onSelect: () => onRemove(entry.id, false) },
+                          { label: 'Delete prompt & image', icon: <Trash2 />, danger: true, onSelect: () => onRemove(entry.id, true) }
+                        ])
+                      }}
+                      title="Remove from history"
+                    />
                   </div>
                 </div>
               </div>

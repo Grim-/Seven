@@ -1,6 +1,6 @@
 import { Footprints, LogOut, UserPlus, Skull } from 'lucide-react'
 import type { PlaceVisitor, Standing, TokenVisitor, WorldMapUse } from '@shared/maps'
-import { smallestAt, type Point } from '@shared/shapes'
+import type { Point } from '@shared/shapes'
 import type { WorldEntity } from '@shared/world'
 import { showName } from '@shared/ids'
 import { openMenu, type MenuEvent, type MenuItem } from '../ui'
@@ -11,7 +11,7 @@ import { useLibraryData } from '../../lib/useLive'
 import { closePlay, showPlay, worldWhere } from '../play/playStore'
 import type { PlayHolder } from '../play/playHolder'
 import { tokenSourceUi, type TokenContext } from '../../registries/tokenSources'
-import { setWhere } from './placeActions'
+import { syncTokenLocation } from './placeActions'
 import { bringHere } from '../play/bringHere'
 import type { MapToken, TokenHandlers } from './TokenLayer'
 
@@ -38,8 +38,7 @@ export function useMapTokens({ world, use, places, player, editing, save, onSele
     save({ ...use, stand: next ? { ...rest, [token]: next } : rest })
   }
   const settle = (sheet: string, at: Point) => {
-    const place = smallestAt(use.shapes, at)
-    if (place) void setWhere(sheet, place).catch(failed('Could not move them'))
+    void syncTokenLocation(sheet, world, use, at).catch(failed('Could not update character location'))
   }
   const holder = (v: PlaceVisitor): PlayHolder => {
     const standing = use.stand[v.sheet] ?? NONE
@@ -67,7 +66,7 @@ export function useMapTokens({ world, use, places, player, editing, save, onSele
     onSelect
   })
   const items = (t: MapToken): MenuItem[] => [
-    ...(onWalk && t.visitor.sheet !== player ? [{ label: 'Move here', icon: <Footprints className="h-4 w-4 text-cyan" />, onSelect: () => onWalk(t.at) }] : []),
+    ...(onWalk && t.visitor.sheet !== player ? [{ label: 'Move here', icon: <Footprints className="h-4 w-4 text-secondary-ink" />, onSelect: () => onWalk(t.at) }] : []),
     ...(tokenSourceUi(t.visitor.source)?.items(context(t)) ?? []),
     ...(editing ? [{ label: 'Take off this map', icon: <LogOut />, danger: true, onSelect: () => setStanding(t.visitor.token, null) }] : [])
   ]

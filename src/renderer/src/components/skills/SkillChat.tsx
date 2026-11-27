@@ -40,7 +40,7 @@ export function SkillWidget({ id }: EntrySurfaceProps) {
   if (!skill) return <Loading />
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[13px] text-white">{skill.title}</span>
+      <span className="text-[13px] text-ink">{skill.title}</span>
       <span className="text-[12.5px] text-dim">{skill.when || skill.description}</span>
     </div>
   )

@@ -4,9 +4,6 @@ import { modules } from '../modules/registry'
 
 export const CHECK_IN = 'check_in'
 
-const LOOKUPS = new Set(['recall', 'find', 'read_kind'])
-const REASONING = new Set(['think', 'reason'])
-
 function toolNames(m: ChatMessage): string[] {
   return m.parts.flatMap((p) => (p.type === 'tool' && p.name !== CHECK_IN && p.status === 'done' ? [p.name] : []))
 }
@@ -35,21 +32,23 @@ export function checkInText(messages: ChatMessage[], tools: ToolDef[], every: nu
   }
 
   const facts: string[] = []
-  if (has('remember')) {
-    const saved = recent.flat().filter((n) => n === 'remember').length
-    const since = turnsSince(turns, (n) => n === 'remember')
+  if (has('agent_remember')) {
+    const saved = recent.flat().filter((n) => n === 'agent_remember').length
+    const since = turnsSince(turns, (n) => n === 'agent_remember')
     if (saved >= 3) facts.push(`You saved ${saved} memories in the last ${every} turns. Only keep what will matter in a future chat.`)
     else if (since === null) facts.push(`You haven't saved a memory in this chat yet (${turns.length} turns).`)
     else if (since >= every) facts.push(`You last saved a memory ${since} turns ago.`)
   }
-  if ([...LOOKUPS].some(has)) {
-    const since = turnsSince(turns, (n) => LOOKUPS.has(n))
+  const lookups = new Set(tools.filter((t) => t.lookup).map((t) => t.name))
+  if (lookups.size) {
+    const since = turnsSince(turns, (n) => lookups.has(n))
     if (since === null)
       facts.push(`You haven't looked anything up in your memory or the library in this chat yet (${turns.length} turns).`)
     else if (since >= every)
       facts.push(`You haven't looked anything up in your memory or the library in ${since} turns.`)
   }
-  if ([...REASONING].some(has) && !recent.flat().some((n) => REASONING.has(n))) facts.push(`You didn't think or reason in any of the last ${every} turns.`)
+  const reasoning = new Set(tools.filter((t) => t.reasoning).map((t) => t.name))
+  if (reasoning.size && !recent.flat().some((n) => reasoning.has(n))) facts.push(`You didn't think or reason in any of the last ${every} turns.`)
   const counts = new Map<string, number>()
 
   for (const name of recent.flat())

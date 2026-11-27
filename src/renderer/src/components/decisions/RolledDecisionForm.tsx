@@ -32,7 +32,7 @@ export function RolledDecisionForm({ where }: { where: PlayWhere }) {
         <PickOptionsEditor options={options} onChange={setOptions} rolls={false} />
       </Field>
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {filled.length > 0 && filled.length !== die && <span className="font-mono text-[11px] text-alert">{filled.length} written; a d{die} needs {die}.</span>}
+        {filled.length > 0 && filled.length !== die && <span className="font-ui text-[11px] text-alert">{filled.length} written; a d{die} needs {die}.</span>}
         {filled.length ? (
           <Button size="sm" variant="primary" icon={<Dices />} disabled={!question.trim() || filled.length !== die} onClick={show}>
             Show

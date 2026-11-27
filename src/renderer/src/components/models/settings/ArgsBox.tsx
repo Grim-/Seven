@@ -28,9 +28,9 @@ export function ArgsBox({ config, params, onChange }: { config: ModelConfig; par
           onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
           placeholder="-ngl 99 -c 16384 -fa on --temp 0.6"
           spellCheck={false}
-          className="h-8 font-mono text-[12px]"
+          className="h-8 font-ui text-[12px]"
         />
-        {unknown.length > 0 && <span className="font-mono text-[11px] text-alert">Not supported here: {unknown.join('  ')}</span>}
+        {unknown.length > 0 && <span className="font-ui text-[11px] text-alert">Not supported here: {unknown.join('  ')}</span>}
       </div>
     </SettingRow>
   )

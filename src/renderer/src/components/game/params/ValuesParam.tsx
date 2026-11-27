@@ -12,7 +12,7 @@ function valuesOf(value: unknown): Values {
 function ValueRows({ values, names, onChange }: { values: Values; names?: Map<string, string>; onChange: (next: Values) => void }) {
   return Object.entries(values).map(([key, n]) => (
     <div key={key} className="flex items-center gap-2">
-      <span className="min-w-0 flex-1 truncate text-[13px] text-white/90" title={key}>
+      <span className="min-w-0 flex-1 truncate text-[13px] text-ink/90" title={key}>
         {names?.get(key) ?? key}
       </span>
       <CountStepper value={n} min={-999} onChange={(v) => onChange({ ...values, [key]: v })} />
@@ -25,7 +25,7 @@ function AddKey({ placeholder, onAdd }: { placeholder: string; onAdd: (key: stri
   return (
     <Input
       placeholder={placeholder}
-      className="h-8 font-mono text-[12.5px]"
+      className="h-8 font-ui text-[12.5px]"
       onKeyDown={(e) => {
         const key = e.currentTarget.value.trim()
         if (e.key !== 'Enter' || !key) return

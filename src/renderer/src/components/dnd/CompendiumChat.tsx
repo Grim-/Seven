@@ -21,7 +21,7 @@ function EntryView({ kind, id, short }: { kind: string; id: string; short: boole
   if (!got) return <Loading />
   const e = got.entry
   return (
-    <EntryCard title={e.name} tag={compendiumInfo(kind)?.label ?? kind} aside={<span className="font-mono text-[11px] text-faint">{e.source}</span>}>
+    <EntryCard title={e.name} tag={compendiumInfo(kind)?.label ?? kind} aside={<span className="font-ui text-[11px] text-faint">{e.source}</span>}>
       <Facts rows={factRows(kind, e.facts, short ? 4 : 99)} />
       {e.text && (
         <div className={short ? 'max-h-40 overflow-hidden' : ''}>

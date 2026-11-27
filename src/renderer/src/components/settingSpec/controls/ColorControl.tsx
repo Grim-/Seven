@@ -10,7 +10,7 @@ function ColorControl({ spec, value, onChange }: SettingControlProps) {
       <div className="flex flex-wrap items-center gap-1.5">
         {spec.themed &&
           THEME_COLORS.map((c) => (
-            <button key={c.value} type="button" onClick={() => onChange(c.value)} className={cn('h-6 border px-1.5 font-mono text-[10px] uppercase', text === c.value ? 'border-white text-white' : 'border-line text-dim')}>
+            <button key={c.value} type="button" onClick={() => onChange(c.value)} className={cn('h-6 border px-1.5 font-label text-[10px] caps', text === c.value ? 'border-ink text-ink' : 'border-line text-dim')}>
               {c.label}
             </button>
           ))}

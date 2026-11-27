@@ -10,6 +10,7 @@ import { kindUi, noteKindFamilies } from '../registries/kinds'
 import { openChat as openConversation } from './conversation'
 import { recordOpenedEntry } from './recentData'
 import { useWindows } from '../store/windows'
+import { create } from 'zustand'
 
 const EVENTS: EventName[] = [
   'page.changed',
@@ -35,6 +36,8 @@ const EVENTS: EventName[] = [
   'decisions.changed',
   'storyActions.changed',
   'factions.changed',
+  'npcs.changed',
+  'knowledge.changed',
   'mapObjects.changed',
   'triggerActions.changed',
   'maps.changed',
@@ -55,14 +58,31 @@ export function onLibraryChange(fn: () => void): () => void {
   }
 }
 
-export function useLibrary(query: string, perKind: number, skip: string[] = [], only: string[] | null = null): { sections: LibrarySection[] | null; reload: () => void } {
-  const [sections, setSections] = useState<LibrarySection[] | null>(null)
+const kept = new Map<string, LibrarySection[]>()
+const stale = new Set<string>()
+let watching = false
+
+function watchKept(): void {
+  if (watching) return
+  watching = true
+  onLibraryChange(() => {
+    for (const key of kept.keys()) stale.add(key)
+  })
+}
+
+export function useLibrary(query: string, perKind: number, skip: string[] = [], only: string[] | null = null, enabled = true): { sections: LibrarySection[] | null; reload: () => void } {
+  const key = query ? null : JSON.stringify([perKind, skip, only])
+  const [sections, setSections] = useState<LibrarySection[] | null>(() => (key ? (kept.get(key) ?? null) : null))
   const latest = useRef(0)
   const load = () => {
     const n = ++latest.current
     void engine('library.overview', { query, perKind, skip, ...(only ? { kinds: only } : {}) })
       .then((s) => {
         noteKindFamilies(s)
+        if (key) {
+          kept.set(key, s)
+          stale.delete(key)
+        }
         if (n === latest.current) setSections(s)
       })
       .catch((err: unknown) => {
@@ -71,10 +91,14 @@ export function useLibrary(query: string, perKind: number, skip: string[] = [], 
       })
   }
   useEffect(() => {
-    load()
+    if (!enabled) return
+    watchKept()
+    const have = key ? kept.get(key) : undefined
+    if (have) setSections(have)
+    if (!have || stale.has(key!)) load()
     return onLibraryChange(load)
-  }, [query, perKind, skip.join('\n'), only?.join('\n')])
-  return { sections, reload: load }
+  }, [query, perKind, skip.join('\n'), only?.join('\n'), enabled])
+  return { sections: enabled ? sections : null, reload: load }
 }
 
 function pascal(name: string): string {
@@ -103,6 +127,26 @@ export function openEntry(kind: string, id: string): void {
   const ui = kindUi(kind)
   if (ui.open) return ui.open(id)
   showInData({ kind, id })
+}
+
+const usePendingPart = create<{ at: { kind: string; id: string; part: string } | null }>(() => ({ at: null }))
+
+export function opensAt(kind: string, part: string): boolean {
+  return kindUi(kind).opensAt?.(part) ?? false
+}
+
+export function openEntryAt(kind: string, id: string, part: string): void {
+  usePendingPart.setState({ at: { kind, id, part } })
+  openEntry(kind, id)
+}
+
+export function useOpenedAt(kind: string, id: string, apply: (part: string) => void): void {
+  const at = usePendingPart((s) => (s.at && s.at.kind === kind && s.at.id === id ? s.at : null))
+  useEffect(() => {
+    if (!at) return
+    apply(at.part)
+    usePendingPart.setState((s) => (s.at === at ? { at: null } : s))
+  }, [at])
 }
 
 export function openChat(id: string): void {

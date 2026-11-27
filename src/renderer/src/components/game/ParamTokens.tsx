@@ -17,7 +17,7 @@ export function ParamTokens({ schema, values, onChange, title }: { schema: Param
   const blocks = entries.filter(([, spec]) => shownInline(spec))
   const label = (key: string, spec: ParamSpec) =>
     same(paramLabel(key, spec), title) ? null : (
-      <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-dim" title={spec.description}>
+      <span className="font-label text-[10.5px] caps-12 text-dim" title={spec.description}>
         {paramLabel(key, spec)}
       </span>
     )

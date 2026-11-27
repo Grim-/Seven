@@ -11,7 +11,7 @@ export function PictureField({ value, onChange, options = {}, large = false, cle
   return (
     <div className={cn('flex gap-2', large ? 'flex-col' : 'items-center')}>
       {(value || large) && (
-        <div className={cn('shrink-0 overflow-hidden border border-line/60 bg-black/50', large ? 'flex aspect-[4/3] w-full items-center justify-center' : 'h-10 w-10')}>
+        <div className={cn('shrink-0 overflow-hidden border border-line/60 tone-panel-50', large ? 'flex aspect-[4/3] w-full items-center justify-center' : 'h-10 w-10')}>
           {value ? <AssetMedia id={value} className="h-full w-full" /> : <span className="text-[12px] text-faint">No picture yet</span>}
         </div>
       )}

@@ -14,8 +14,8 @@ import {
 import type { CreatureDisposition, CreatureSpawner } from '@shared/maps'
 import { smallestAt, type Point } from '@shared/shapes'
 import { rollDie } from '@shared/storyRolls'
+import { actorLink, npcActorId, splitNpcRef } from '@shared/worldNpcs'
 import {
-  creatureTarget,
   dropLostConcentration,
   gameCatalog,
   sheetTarget,
@@ -26,6 +26,7 @@ import { findSheet, getSheet } from '../library/sheets'
 import { maps } from '../maps/store'
 import { ToolError } from '../tools/types'
 import { noteFailure } from '../util/report'
+import { npcs } from './npcs'
 import { saveInPlay } from './playLayer'
 import { saves } from './saves'
 import { worlds } from './store'
@@ -67,8 +68,8 @@ function appendBattleLog(logs: BattleLogEntry[], entry: BattleLogEntry): BattleL
   return [...logs.slice(-(BATTLE_LOG_LIMIT - 1)), entry]
 }
 
-function factionMap(): Map<string, StoredFaction> {
-  return new Map(factions.list().map((f) => [f.id, f]))
+function factionMap(worldId?: string | null): Map<string, StoredFaction> {
+  return new Map(factions.list(worldId, 'play').map((f) => [f.id, f]))
 }
 
 function stanceBetween(byId: Map<string, StoredFaction>, fromId: string, toId: string): FactionStance {
@@ -128,13 +129,16 @@ export function withBattleWorld<T>(
   const idByUid = new Map<string, string>()
   const pendingMoves = new Map<string, { map: string; at: Point }>()
 
-  const register = (id: string, kind: 'sheet' | 'creature') => {
+  const register = (id: string) => {
     if (targets.has(id)) return
     try {
-      const resolved = kind === 'sheet' ? sheetTarget(id, cat) : creatureTarget(id, worldId, cat)
-      if (kind === 'sheet') resolved.entity.link = `@sheet:${id}`
+      const candidate = splitNpcRef(id) ? id : (findSheet(id, worldId) ?? npcActorId(worldId, id))
+      const resolvedId = findSheet(candidate, worldId) ?? id
+      const resolved = sheetTarget(resolvedId, cat)
+      resolved.entity.link = actorLink(resolvedId)
       targets.set(id, resolved)
       entitiesById.set(id, resolved.entity)
+      if (resolvedId !== id) entitiesById.set(resolvedId, resolved.entity)
       entitiesByUid.set(resolved.entity.uid, resolved.entity)
       idByUid.set(resolved.entity.uid, id)
     } catch (err) {
@@ -142,9 +146,9 @@ export function withBattleWorld<T>(
     }
   }
 
-  for (const p of currentBattle?.queue ?? []) register(p.id, p.kind)
-  for (const id of extraIds.sheets ?? []) register(id, 'sheet')
-  for (const id of extraIds.creatures ?? []) register(id, 'creature')
+  for (const p of currentBattle?.queue ?? []) register(p.id)
+  for (const id of extraIds.sheets ?? []) register(id)
+  for (const id of extraIds.creatures ?? []) register(id)
 
   const lookup: EntityLookup = {
     find: (uid) => entitiesByUid.get(uid) ?? entitiesById.get(uid) ?? null,
@@ -191,21 +195,18 @@ export function withBattleWorld<T>(
     // Evaluate concentration loss across all live entities before persisting
     dropLostConcentration(all)
 
-    // Persist mutated entities (sheets sync dnd.hp automatically in sheetTarget.persist)
+    // Persist mutated entities (sheets and world NPCs sync automatically via sheetTarget.persist)
     for (const [id, target] of targets) {
-      if (currentBattle?.queue.some((p) => p.id === id && p.kind === 'sheet') || extraIds.sheets?.includes(id)) {
+      if (
+        currentBattle?.queue.some((p) => p.id === id) ||
+        extraIds.sheets?.includes(id) ||
+        extraIds.creatures?.includes(id)
+      ) {
         target.persist()
       }
     }
 
     const latest = saveInPlay(worldId, true) ?? initialSave
-    const updatedCreatures = latest.creatures.map((c) => {
-      const mounted = entitiesById.get(c.uid)
-      if (!mounted) return c
-      const next = mounted.toRecord()
-      return { ...c, ...next }
-    })
-
     let updatedStand = latest.stand
     if (pendingMoves.size > 0) {
       updatedStand = { ...latest.stand }
@@ -241,7 +242,6 @@ export function withBattleWorld<T>(
     saves.write({
       ...latest,
       stand: updatedStand,
-      creatures: updatedCreatures,
       battle: currentBattle
     })
 
@@ -298,11 +298,11 @@ export function startBattle(opts: {
   const standMap = save.stand[opts.map] ?? {}
   const cat = gameCatalog()
   const timeDef = clockOf(save)
-  const byId = factionMap()
+  const byId = factionMap(opts.world)
 
   const explicitParty = save.party?.length ? save.party : [opts.initiatorId]
   const partySheets = explicitParty.filter((id) => Boolean(standMap[id]) || id === opts.initiatorId)
-  if (!partySheets.includes(opts.initiatorId) && findSheet(opts.initiatorId)) {
+  if (!partySheets.includes(opts.initiatorId) && findSheet(opts.initiatorId, opts.world)) {
     partySheets.unshift(opts.initiatorId)
   }
   const partyFactions = partySheets.map((id) => getSheet(id).faction ?? '').filter(Boolean)
@@ -313,8 +313,7 @@ export function startBattle(opts: {
 
   const targetSet = new Set(opts.targetIds)
   const sheetIdsToMount = new Set<string>(partySheets)
-  const creatureIdsToMount = new Set<string>()
-  const candidateMeta = new Map<string, { kind: 'sheet' | 'creature'; faction: string; side: BattleSide }>()
+  const candidateMeta = new Map<string, { kind: 'sheet'; faction: string; side: BattleSide }>()
 
   for (const sheetId of partySheets) {
     const s = getSheet(sheetId)
@@ -332,28 +331,18 @@ export function startBattle(opts: {
   for (const [tokenId, st] of Object.entries(standMap)) {
     if (candidateMeta.has(tokenId)) continue
     const explicit = targetSet.has(tokenId)
-    const creature = save.creatures.find((c) => c.uid === tokenId)
-    if (creature) {
-      const cEnt = GameEntity.fromRecord(creature, cat)
-      if (cEnt.comp(Health)?.isDead) continue
-      const side = resolveSideFor(partyFactions, creature.faction, creature.disposition, byId, explicit)
-      if (!withinEncounter(st.at, explicit, spawnerRadiusFor(mapData.spawners, save, tokenId))) continue
-      if (side === 'hostile' || explicit) {
-        creatureIdsToMount.add(tokenId)
-        candidateMeta.set(tokenId, { kind: 'creature', faction: creature.faction, side: explicit ? 'hostile' : side! })
-      }
-      continue
-    }
-
-    if (tokenId in save.characters) continue
-    const resolvedId = findSheet(tokenId)
+    const resolvedId = findSheet(tokenId, opts.world)
     if (!resolvedId) continue
+    if (tokenId in save.characters && partySheets.includes(tokenId)) continue
     const sheet = getSheet(resolvedId)
-    const side = resolveSideFor(partyFactions, sheet.faction ?? '', undefined, byId, explicit)
-    if (!withinEncounter(st.at, explicit)) continue
+    if (sheet.game && GameEntity.fromRecord(sheet.game, cat).comp(Health)?.isDead) continue
+    const npcRef = splitNpcRef(resolvedId)
+    const disp = npcRef ? npcs.find(npcRef.id, opts.world, 'play')?.disposition : undefined
+    const side = resolveSideFor(partyFactions, sheet.faction ?? '', disp, byId, explicit)
+    if (!withinEncounter(st.at, explicit, spawnerRadiusFor(mapData.spawners, save, tokenId))) continue
     if (side === 'hostile' || side === 'ally' || explicit) {
-      sheetIdsToMount.add(resolvedId)
-      candidateMeta.set(resolvedId, { kind: 'sheet', faction: sheet.faction ?? '', side: explicit ? 'hostile' : side! })
+      sheetIdsToMount.add(tokenId)
+      candidateMeta.set(tokenId, { kind: 'sheet', faction: sheet.faction ?? '', side: explicit ? 'hostile' : side! })
     }
   }
 
@@ -420,7 +409,7 @@ export function startBattle(opts: {
       for (const p of rolled) ctx.entity(p.id)?.emit('OnBattleStart', { battle: battle.id })
       firstEntity?.emit('OnTurnStart', { round: 1 })
     },
-    { sheets: [...sheetIdsToMount], creatures: [...creatureIdsToMount] }
+    { sheets: [...sheetIdsToMount] }
   )
 
   return saveInPlay(opts.world, false)!
@@ -430,8 +419,7 @@ export function startBattle(opts: {
 export function joinBattle(worldId: string, entries: { id: string; kind: 'sheet' | 'creature'; side?: BattleSide }[]): GameSave {
   const save = saveInPlay(worldId, true)
   if (!save?.battle || save.battle.status !== 'active') throw new ToolError('No active battle to join.')
-  const sheets = entries.filter((e) => e.kind === 'sheet').map((e) => e.id)
-  const creatures = entries.filter((e) => e.kind === 'creature').map((e) => e.id)
+  const sheets = entries.map((e) => e.id)
 
   withBattleWorld(
     worldId,
@@ -440,22 +428,22 @@ export function joinBattle(worldId: string, entries: { id: string; kind: 'sheet'
       if (!battle) return
       const existing = new Set(battle.queue.map((p) => p.id))
       const added: BattleParticipant[] = []
-      const byId = factionMap()
+      const byId = factionMap(worldId)
       const partyFactions = battle.queue.filter((p) => p.side === 'party').map((p) => p.faction).filter(Boolean)
 
       for (const entry of entries) {
         if (existing.has(entry.id)) continue
         const entity = ctx.entity(entry.id)
         if (!entity || entity.comp(Health)?.isDead) continue
-        const faction =
-          entry.kind === 'creature'
-            ? (ctx.save.creatures.find((c) => c.uid === entry.id)?.faction ?? '')
-            : (getSheet(entry.id).faction ?? '')
-        const disp = entry.kind === 'creature' ? ctx.save.creatures.find((c) => c.uid === entry.id)?.disposition : undefined
+        const resolvedId = findSheet(entry.id, worldId) ?? entry.id
+        const sheet = findSheet(resolvedId, worldId) ? getSheet(resolvedId) : null
+        const faction = sheet?.faction ?? ''
+        const npcRef = splitNpcRef(resolvedId)
+        const disp = npcRef ? npcs.find(npcRef.id, worldId, 'play')?.disposition : undefined
         const side = entry.side ?? resolveSideFor(partyFactions, faction, disp, byId, false) ?? 'hostile'
         const participant: BattleParticipant = {
           id: entry.id,
-          kind: entry.kind,
+          kind: 'sheet',
           faction,
           side,
           initiative: rollInitiativeValue(entity, ctx.catalog, ctx.timeDef)
@@ -468,7 +456,7 @@ export function joinBattle(worldId: string, entries: { id: string; kind: 'sheet'
         ctx.setBattle({ ...battle, queue: [...battle.queue, ...added] })
       }
     },
-    { sheets, creatures }
+    { sheets }
   )
 
   return saveInPlay(worldId, false)!
@@ -661,7 +649,7 @@ export function fleeBattle(worldId: string): GameSave {
   return saveInPlay(worldId, false)!
 }
 
-/** Clears completed battle state from GameSave and removes defeated creatures from the save/map. */
+/** Clears completed battle state from GameSave and removes defeated non-party NPC tokens from the map. */
 export function endBattle(worldId: string): GameSave {
   const save = saveInPlay(worldId, true)
   if (!save) throw new ToolError('This world has no save in play.')
@@ -669,23 +657,34 @@ export function endBattle(worldId: string): GameSave {
   if (!battle) return save
   const cat = gameCatalog()
 
-  const deadCreatures = new Set<string>()
+  const deadTokens = new Set<string>()
+  const deadTransientNpcs = new Set<string>()
   for (const p of battle.queue) {
-    if (p.kind !== 'creature') continue
-    const rec = save.creatures.find((c) => c.uid === p.id)
-    if (!rec) continue
-    if (GameEntity.fromRecord(rec, cat).comp(Health)?.isDead) deadCreatures.add(p.id)
+    if (save.party?.includes(p.id) || p.side === 'party') continue
+    const npcRef = splitNpcRef(p.id)
+    if (!npcRef) continue
+    const found = npcs.find(npcRef.id, worldId, 'play')
+    if (!found?.game) continue
+    if (GameEntity.fromRecord(found.game, cat).comp(Health)?.isDead) {
+      deadTokens.add(p.id)
+      if (!npcs.hasTemplate(worldId, npcRef.id)) deadTransientNpcs.add(npcRef.id)
+    }
   }
 
-  return saves.write({
+  const nextNpcs = { ...save.npcs }
+  for (const npcId of deadTransientNpcs) delete nextNpcs[npcId]
+
+  const written = saves.write({
     ...save,
-    creatures: save.creatures.filter((c) => !deadCreatures.has(c.uid)),
+    npcs: nextNpcs,
     stand: Object.fromEntries(
       Object.entries(save.stand).map(([m, list]) => [
         m,
-        Object.fromEntries(Object.entries(list).filter(([tok]) => !deadCreatures.has(tok)))
+        Object.fromEntries(Object.entries(list).filter(([tok]) => !deadTokens.has(tok)))
       ])
     ),
     battle: null
   })
+  if (deadTransientNpcs.size) npcs.emit('changed', worldId)
+  return written
 }

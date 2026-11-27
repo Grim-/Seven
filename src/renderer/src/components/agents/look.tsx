@@ -66,7 +66,7 @@ export function AgentAvatar({
       {bubbles.length > 0 && (
         <span className="pointer-events-none absolute inset-0 z-20 flex items-start justify-end">
           {bubbles.slice(-3).map((b) => (
-            <span key={b.id} className="animate-bubble -mr-1 -mt-1 leading-none drop-shadow-[0_0_4px_rgba(0,0,0,0.9)]" style={{ fontSize: Math.max(12, Math.round(size * 0.5)) }}>
+            <span key={b.id} className="animate-bubble -mr-1 -mt-1 leading-none drop-shadow-[0_0_4px_color-mix(in_srgb,var(--color-shade)_90%,transparent)]" style={{ fontSize: Math.max(12, Math.round(size * 0.5)) }}>
               {b.emoji}
             </span>
           ))}
@@ -86,7 +86,7 @@ export function AgentAvatar({
   const characterBadge = hasSheet && (
     <span
       className={cn(
-        'pointer-events-none absolute -bottom-1 -right-1 z-20 flex items-center justify-center overflow-hidden border border-accent bg-black shadow-[0_0_6px_rgba(0,0,0,0.9)]',
+        'pointer-events-none absolute -bottom-1 -right-1 z-20 flex items-center justify-center overflow-hidden border border-accent bg-panel shadow-[0_0_6px_color-mix(in_srgb,var(--color-shade)_90%,transparent)]',
         size < 20 ? 'h-1.5 w-1.5 -bottom-0.5 -right-0.5 border-none bg-accent' : ''
       )}
       title={
@@ -106,13 +106,13 @@ export function AgentAvatar({
     >
       {size >= 20 && (
         count > 1 ? (
-          <span className="flex h-full w-full items-center justify-center px-0.5 font-mono text-[7px] font-bold uppercase leading-none tracking-tight text-accent">
+          <span className="flex h-full w-full items-center justify-center px-0.5 font-label text-[7px] font-bold caps leading-none tracking-tight text-accent">
             {count}C
           </span>
         ) : validSheet?.image ? (
           <AssetMedia id={validSheet.image} className="h-full w-full object-cover" />
         ) : (
-          <span className="flex h-full w-full items-center justify-center px-1 font-mono text-[7px] font-bold uppercase leading-none tracking-tight text-accent">
+          <span className="flex h-full w-full items-center justify-center px-1 font-label text-[7px] font-bold caps leading-none tracking-tight text-accent">
             CHR
           </span>
         )
@@ -133,7 +133,7 @@ export function AgentAvatar({
         target={vfxTargets}
         style={style}
         title={playedSummary}
-        className={cn('relative inline-block shrink-0 overflow-visible border border-accent/60 bg-black', hasSheet && 'border-accent', className)}
+        className={cn('relative inline-block shrink-0 overflow-visible border border-accent/60 bg-panel', hasSheet && 'border-accent', className)}
       >
         <span className="absolute inset-0 overflow-hidden">
           <AvatarArt avatar={avatar} sessionId={sessionId ?? null} pose={pose} />
@@ -150,7 +150,7 @@ export function AgentAvatar({
       style={{ ...style, fontSize: Math.max(9, Math.round(size * 0.45)) }}
       title={playedSummary}
       className={cn(
-        'relative inline-flex shrink-0 items-center justify-center border border-accent/60 bg-accent/10 font-mono font-bold uppercase text-accent',
+        'relative inline-flex shrink-0 items-center justify-center border border-accent/60 bg-accent/10 font-label font-bold caps text-accent',
         hasSheet && 'border-accent',
         className
       )}

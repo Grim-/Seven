@@ -28,7 +28,10 @@ export interface DecodedPayload {
   about: CarryAbout
   body: EncodedPayloadBody
   fileData: Map<string, Buffer>
+  missing?: string[]
 }
+
+export type LooseFile = (meta: PortableFileMeta) => Buffer | null
 
 export interface PeekHeader {
   version: 1 | 2 | 3
@@ -39,6 +42,7 @@ export interface PeekHeader {
   wrongVaultKey: boolean
   body: EncodedPayloadBody | null
   fileData: Map<string, Buffer> | null
+  missing?: string[]
 }
 
 interface ChunkFrontV1 {
@@ -321,17 +325,28 @@ export function isPortableJsonEnvelope(raw: unknown): raw is PortableJsonEnvelop
   )
 }
 
-export function peekJsonEnvelope(env: PortableJsonEnvelope): PeekHeader {
+function jsonFiles(env: PortableJsonEnvelope, loose: LooseFile | null): { fileData: Map<string, Buffer>; files: PortableFileMeta[]; missing: string[] } {
+  const fileData = new Map<string, Buffer>()
+  const files: PortableFileMeta[] = []
+  const missing: string[] = []
+  for (const f of env.files ?? []) {
+    const inline = 'data' in f && typeof f.data === 'string' && f.data ? Buffer.from(f.data, 'base64') : null
+    const buf = inline?.length ? inline : loose?.(f) ?? null
+    if (!buf) {
+      missing.push(f.path ?? f.name)
+      continue
+    }
+    fileData.set(f.id, buf)
+    files.push({ id: f.id, name: f.name, size: buf.length })
+  }
+  return { fileData, files, missing }
+}
+
+export function peekJsonEnvelope(env: PortableJsonEnvelope, loose: LooseFile | null = null): PeekHeader {
   const protection: ProtectionMode = env.protection ?? 'none'
   const savedAt = typeof env.savedAt === 'number' ? env.savedAt : Date.now()
   if (protection === 'none' && Array.isArray(env.entries)) {
-    const fileData = new Map<string, Buffer>()
-    const files: PortableFileMeta[] = []
-    for (const f of env.files ?? []) {
-      const buf = 'data' in f && typeof f.data === 'string' ? Buffer.from(f.data, 'base64') : Buffer.alloc(0)
-      fileData.set(f.id, buf)
-      files.push({ id: f.id, name: f.name, size: buf.length })
-    }
+    const { fileData, files, missing } = jsonFiles(env, loose)
     return {
       version: 3,
       protection: 'none',
@@ -340,31 +355,27 @@ export function peekJsonEnvelope(env: PortableJsonEnvelope): PeekHeader {
       locked: false,
       wrongVaultKey: false,
       body: { entries: env.entries, text: env.text ?? null, files },
-      fileData
+      fileData,
+      missing
     }
   }
   const payload = Buffer.from(String(env.payload ?? ''), 'base64')
   return tryAutoDecrypt(3, protection, savedAt, undefined, payload)
 }
 
-export function decodeJsonEnvelope(env: PortableJsonEnvelope, password?: string): DecodedPayload {
+export function decodeJsonEnvelope(env: PortableJsonEnvelope, password?: string, loose: LooseFile | null = null): DecodedPayload {
   const protection: ProtectionMode = env.protection ?? 'none'
   const savedAt = typeof env.savedAt === 'number' ? env.savedAt : Date.now()
   if (protection === 'none' && Array.isArray(env.entries)) {
-    const fileData = new Map<string, Buffer>()
-    const files: PortableFileMeta[] = []
-    for (const f of env.files ?? []) {
-      const buf = 'data' in f && typeof f.data === 'string' ? Buffer.from(f.data, 'base64') : Buffer.alloc(0)
-      fileData.set(f.id, buf)
-      files.push({ id: f.id, name: f.name, size: buf.length })
-    }
+    const { fileData, files, missing } = jsonFiles(env, loose)
     return {
       version: 3,
       protection: 'none',
       savedAt,
       about: env.about,
       body: { entries: env.entries, text: env.text ?? null, files },
-      fileData
+      fileData,
+      missing
     }
   }
   const payload = Buffer.from(String(env.payload ?? ''), 'base64')

@@ -4,6 +4,8 @@ export interface AnimatedColors {
   accent: string
   secondary: string
   base: string
+  ink: string
+  surface: string
 }
 
 const FRAME_MS = 1000 / 30

@@ -1,20 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { SettingsBrowser, ViewHeader } from '../components/ui'
+import { SettingsBrowser, ViewHeader, flashSetting } from '../components/ui'
 import { SETTINGS_GROUPS, settingsMatch, settingsSections } from '../registries/settings'
 import { registerCoreSettings } from './settings/sections'
 import { useViewPlace } from '../lib/viewPlace'
 
 registerCoreSettings()
-
-function flashSetting(root: HTMLElement | null, query: string): void {
-  const q = query.trim().toLowerCase()
-  if (!root || !q) return
-  const row = [...root.querySelectorAll<HTMLElement>('[data-setting]')].find((el) => el.dataset.setting?.toLowerCase().includes(q))
-  if (!row) return
-  row.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  row.dataset.flash = 'true'
-  setTimeout(() => (row.dataset.flash = 'false'), 900)
-}
 
 export function SettingsView() {
   const sections = settingsSections()

@@ -57,11 +57,11 @@ function StateSpritePreview({ imageId }: { imageId?: string }) {
   const src = isDataUri ? imageId : asset ? assetUrl(asset) : imageId
 
   if (!src) {
-    return <div className="h-9 w-9 shrink-0 border border-line/40 bg-black/60 flex items-center justify-center text-[9px] text-faint">Base</div>
+    return <div className="h-9 w-9 shrink-0 border border-line/40 tone-well-60 flex items-center justify-center text-[9px] text-faint">Base</div>
   }
 
   return (
-    <div className="h-9 w-9 shrink-0 border border-line bg-black/80 p-0.5 flex items-center justify-center overflow-hidden">
+    <div className="h-9 w-9 shrink-0 border border-line tone-well-80 p-0.5 flex items-center justify-center overflow-hidden">
       <img src={src} alt="State Sprite" className="max-h-full max-w-full object-contain" />
     </div>
   )
@@ -135,12 +135,12 @@ export function ObjectPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col font-mono select-none bg-black/95 text-[12px]">
+    <div className="flex min-h-0 flex-1 flex-col font-ui select-none tone-panel-95 text-[12px]">
       {/* HEADER BAR */}
-      <div className="flex items-center justify-between border-b border-line px-3 py-2.5 bg-black/80">
+      <div className="flex items-center justify-between border-b border-line px-3 py-2.5 tone-panel-80">
         <div className="flex items-center gap-2 min-w-0">
-          <Layers className="h-4 w-4 text-cyan shrink-0" />
-          <span className="font-bold uppercase tracking-wider text-white truncate max-w-[200px]">
+          <Layers className="h-4 w-4 text-secondary-ink shrink-0" />
+          <span className="font-bold caps-5 text-ink truncate max-w-[200px]">
             {object.name || 'Map Prop'}
           </span>
         </div>
@@ -149,7 +149,7 @@ export function ObjectPanel({
             <button
               type="button"
               onClick={onToggleExpand}
-              className="text-dim hover:text-white p-1 transition-colors"
+              className="text-dim hover:text-ink p-1 transition-colors"
               title={isExpanded ? 'Collapse panel (360px)' : 'Expand panel (680px)'}
             >
               {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
@@ -158,7 +158,7 @@ export function ObjectPanel({
           <button
             type="button"
             onClick={onClose}
-            className="text-dim hover:text-white p-1 transition-colors"
+            className="text-dim hover:text-ink p-1 transition-colors"
             title="Close Panel"
           >
             <X className="h-4 w-4" />
@@ -197,8 +197,8 @@ export function ObjectPanel({
             {/* BASE COLLISION & PASSABILITY */}
             <div className="flex flex-col gap-1.5 border-t border-line/40 pt-2.5">
               <div className="flex items-center gap-1.5 text-faint">
-                <Shield className="h-3 w-3 text-cyan" />
-                <span className="text-[10px] uppercase tracking-wider">Base Collision / Passability</span>
+                <Shield className="h-3 w-3 text-secondary-ink" />
+                <span className="text-[10px] caps-5 ">Base Collision / Passability</span>
               </div>
               <Segmented
                 value={object.collision ?? 'solid'}
@@ -214,7 +214,7 @@ export function ObjectPanel({
 
             {/* QUICK TRANSFORMS & LAYERING */}
             <div className="flex flex-col gap-1.5 border-t border-line/40 pt-2.5">
-              <span className="text-[10px] uppercase tracking-wider text-faint">Arrangement</span>
+              <span className="text-[10px] caps-5 text-faint">Arrangement</span>
               <div className="grid grid-cols-3 gap-1">
                 <Button size="sm" variant="ghost" icon={<RotateCw className="h-3 w-3" />} onClick={rotate90} title="Rotate 90 degrees clockwise">
                   +90°
@@ -239,7 +239,7 @@ export function ObjectPanel({
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="text-[11px] font-bold text-white uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-ink caps-5 ">
                   State Variations
                 </span>
                 <span className="text-[10px] text-dim">
@@ -252,7 +252,7 @@ export function ObjectPanel({
             </div>
 
             {states.length === 0 ? (
-              <div className="flex flex-col items-center justify-center border border-dashed border-line/60 bg-black/40 p-6 text-center text-dim text-[11px] gap-2">
+              <div className="flex flex-col items-center justify-center border border-dashed border-line/60 tone-panel-40 p-6 text-center text-dim text-[11px] gap-2">
                 <span>No state variations configured.</span>
                 <span className="text-[10px] text-faint max-w-[280px]">
                   Add states to change this object's sprite (e.g. opened chest, burning torch, fallen log) or collision based on world flags.
@@ -266,12 +266,12 @@ export function ObjectPanel({
                 {states.map((rule, idx) => (
                   <div
                     key={rule.id}
-                    className="border border-line/60 bg-black/60 p-2.5 flex flex-col gap-2.5 transition-colors hover:border-line"
+                    className="border border-line/60 tone-well-60 p-2.5 flex flex-col gap-2.5 transition-colors hover:border-line"
                   >
                     {/* RULE HEADER */}
                     <div className="flex items-center justify-between border-b border-line/40 pb-1.5">
                       <div className="flex items-center gap-1.5">
-                        <span className="bg-cyan/20 border border-cyan/40 px-1.5 py-0.5 text-[9px] font-bold text-cyan">
+                        <span className="bg-secondary-ink/20 border border-secondary-ink/40 px-1.5 py-0.5 text-[9px] font-bold text-secondary-ink">
                           #{idx + 1}
                         </span>
                         <input
@@ -279,7 +279,7 @@ export function ObjectPanel({
                           value={rule.name ?? ''}
                           placeholder={`State ${idx + 1}`}
                           onChange={(e) => handleUpdateRule(rule.id, { name: e.target.value })}
-                          className="bg-transparent border-b border-transparent focus:border-cyan text-[11px] font-bold text-white px-1 outline-none max-w-[140px]"
+                          className="bg-transparent border-b border-transparent focus:border-secondary-ink text-[11px] font-bold text-ink px-1 outline-none max-w-[140px]"
                         />
                       </div>
                       <div className="flex items-center gap-1">
@@ -287,7 +287,7 @@ export function ObjectPanel({
                           type="button"
                           disabled={idx === 0}
                           onClick={() => handleMoveRule(idx, 'up')}
-                          className="p-1 text-dim hover:text-white disabled:opacity-20 transition-colors"
+                          className="p-1 text-dim hover:text-ink disabled:opacity-20 transition-colors"
                           title="Move Up (Higher Priority)"
                         >
                           <ArrowUp className="h-3.5 w-3.5" />
@@ -296,7 +296,7 @@ export function ObjectPanel({
                           type="button"
                           disabled={idx === states.length - 1}
                           onClick={() => handleMoveRule(idx, 'down')}
-                          className="p-1 text-dim hover:text-white disabled:opacity-20 transition-colors"
+                          className="p-1 text-dim hover:text-ink disabled:opacity-20 transition-colors"
                           title="Move Down (Lower Priority)"
                         >
                           <ArrowDown className="h-3.5 w-3.5" />
@@ -314,8 +314,8 @@ export function ObjectPanel({
 
                     {/* FLAG CONDITION */}
                     <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center gap-1 text-[10px] text-faint uppercase tracking-wider">
-                        <Flag className="h-3 w-3 text-cyan" /> Triggering World Flag:
+                      <div className="flex items-center gap-1 text-[10px] text-faint caps-5 ">
+                        <Flag className="h-3 w-3 text-secondary-ink" /> Triggering World Flag:
                       </div>
                       <FlagSelect
                         world={world}
@@ -351,7 +351,7 @@ export function ObjectPanel({
 
                     {/* STATE OVERRIDES (Sprite, Collision, Opacity, Hidden) */}
                     <div className="border-t border-line/30 pt-2 flex flex-col gap-2">
-                      <span className="text-[10px] uppercase tracking-wider text-faint">
+                      <span className="text-[10px] caps-5 text-faint">
                         State Overrides
                       </span>
 
@@ -382,7 +382,7 @@ export function ObjectPanel({
 
                       {/* Collision Override */}
                       <div className="flex flex-col gap-1">
-                        <span className="text-[9.5px] uppercase text-dim">Collision Override:</span>
+                        <span className="text-[9.5px] caps text-dim">Collision Override:</span>
                         <Segmented
                           value={rule.collision ?? object.collision ?? 'solid'}
                           options={[
@@ -396,7 +396,7 @@ export function ObjectPanel({
 
                       {/* Opacity & Visibility */}
                       <div className="grid grid-cols-[60px_1fr] items-center gap-2 pt-1">
-                        <span className="text-[10px] uppercase text-faint">Opacity</span>
+                        <span className="text-[10px] caps text-faint">Opacity</span>
                         <SliderNumber
                           value={rule.opacity ?? 1}
                           min={0}
@@ -417,7 +417,7 @@ export function ObjectPanel({
         {/* TAB 3: ACTIONS & DECISIONS */}
         {activeTab === 'logic' && (
           <div className="flex flex-col gap-3">
-            <div className="border border-cyan/30 bg-cyan/5 p-2 text-[11px] text-cyan leading-relaxed">
+            <div className="border border-secondary-ink/30 bg-secondary-ink/5 p-2 text-[11px] text-secondary-ink leading-relaxed">
               Actions and decisions configured here are saved directly to this map object and travel with it into any world.
             </div>
             <ObjectPlayManager

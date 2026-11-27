@@ -30,13 +30,13 @@ export function VoicePicker({ value, onChange, inherit }: { value: VoiceRef | nu
           <label className="flex items-center gap-2 text-[12px] text-dim">
             Speed
             <Slider value={Math.round(value.rate * 100)} min={50} max={200} step={5} onChange={(v) => set({ rate: v / 100 })} />
-            <span className="w-10 font-mono text-white">{value.rate.toFixed(2)}</span>
+            <span className="w-10 font-ui text-ink">{value.rate.toFixed(2)}</span>
           </label>
           {value.id.startsWith('system:') && (
             <label className="flex items-center gap-2 text-[12px] text-dim">
               Pitch
               <Slider value={Math.round(value.pitch * 100)} min={50} max={200} step={5} onChange={(v) => set({ pitch: v / 100 })} />
-              <span className="w-10 font-mono text-white">{value.pitch.toFixed(2)}</span>
+              <span className="w-10 font-ui text-ink">{value.pitch.toFixed(2)}</span>
             </label>
           )}
         </div>
