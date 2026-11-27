@@ -104,7 +104,7 @@ function RegionPartChat({ worldId, itemKey }: WorldPartSurfaceProps) {
 
 function FactionPartChat({ worldId, itemKey }: WorldPartSurfaceProps) {
   const worlds = useLive(() => engine('worlds.list'), 'worlds.changed')
-  const factions: StoredFaction[] | undefined = useLive(
+  const factions: StoredFaction[] | null | undefined = useLive(
     () => engine('factions.list', { world: worldId, layer: 'play' }),
     ['factions.changed', 'saves.changed'],
     [worldId]

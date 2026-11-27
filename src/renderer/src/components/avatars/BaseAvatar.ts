@@ -22,7 +22,7 @@ export abstract class BaseAvatar extends Animated<SettingValues> {
   private output: HTMLCanvasElement | null = null
 
   constructor(avatar: Avatar, source: SignalSource) {
-    super({ accent: '', secondary: '', base: '' }, avatar.settings)
+    super({ accent: '', secondary: '', base: '', ink: '', surface: '' }, avatar.settings)
     this.avatar = avatar
     this.info = avatarRendererInfo(avatar.renderer)
     this.source = source

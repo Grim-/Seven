@@ -6,9 +6,9 @@ export interface SectionProps {
   defaults: ThemeInput
 }
 
-export function withKey<K extends string, V>(record: Partial<Record<K, V>>, key: K, value: V | null | undefined): Partial<Record<K, V>> {
+export function withKey<T extends object, K extends keyof T>(record: T, key: K, value: T[K] | null | undefined): T {
   const next = { ...record }
-  if (value === null || value === undefined) delete next[key]
+  if (value === null || value === undefined) delete (next as Record<PropertyKey, unknown>)[key]
   else next[key] = value
   return next
 }

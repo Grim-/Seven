@@ -23,6 +23,7 @@ import { onLibraryChange } from '../../lib/library'
 import { openSevenLink } from '../../lib/links'
 import { failed } from '../../lib/notify'
 import { useDashboards } from '../../store/dashboards'
+import { useSessions } from '../../store/sessions'
 import { askText, Button, openMenu, Popover, Select } from '../ui'
 import { AddPicker } from '../dashboards/AddPicker'
 import { BoardTabletop } from '../dashboards/BoardTabletop'
@@ -414,8 +415,9 @@ export function ChatTabletop({
   const [creatorSplitPct, setCreatorSplitPct] = useState(50)
   const splitDragRef = useRef<{ startX: number; origPct: number; containerW: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const sessionWorldId = useSessions((s) => s.list.find((x) => x.id === sessionId)?.scene?.worldId ?? null)
   const worlds = useLive(() => engine('worlds.list'), 'worlds.changed') ?? []
-  const activeWorld = worlds.find((w) => w.id === agent?.world?.worldId) ?? worlds[0] ?? null
+  const activeWorld = worlds.find((w) => w.id === sessionWorldId) ?? worlds[0] ?? null
   const ensuringRef = useRef(false)
 
   useEffect(() => {

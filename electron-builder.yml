@@ -17,6 +17,7 @@ asarUnpack:
   - '**/node_modules/@vscode/ripgrep/bin/**/*'
 win:
   executableName: seven
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:
@@ -26,7 +27,11 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
 mac:
+  icon: build/icon.icns
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.

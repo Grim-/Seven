@@ -178,7 +178,7 @@ function PlaceHereSection({
 }
 
 export interface AtlasTarget {
-  isRegion: boolean
+  kind: 'place' | 'region'
   key: string
 }
 

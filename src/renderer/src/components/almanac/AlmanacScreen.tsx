@@ -1106,11 +1106,11 @@ export function AlmanacScreen({ id }: KindScreenProps) {
                   <span className="font-label text-[10px] font-bold caps-5  text-dim">
                     Tone &amp; Core Stakes
                   </span>
-                  <InlineEdit
+                  <LinkInlineEdit
                     value={almanac.opening?.tone ?? ''}
                     placeholder="e.g. Gritty noir intrigue · High-stakes frontier survival"
                     onSave={(tone) => saveOpeningPatch({ tone })}
-                    className="border border-line/40 tone-panel-45 px-2.5 py-1.5 h-22.5 text-[13px] text-ink"
+                    className="border border-line/40 tone-panel-45 px-2.5 py-1.5 text-[13px] h-22.5 text-ink"
                   />
                 </div>
               </div>

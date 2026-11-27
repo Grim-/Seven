@@ -78,7 +78,7 @@ export function ThemeStage({ id }: EntrySurfaceProps) {
   )
 }
 
-export function ThemeThumb({ id }: EntrySurfaceProps) {
+export function ThemeThumb({ id }: { id: string; large?: boolean }) {
   const theme = useThemeEntry(id)
   return theme ? <ThemePreview theme={theme} className="h-full w-full" /> : null
 }

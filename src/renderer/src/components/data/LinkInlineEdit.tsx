@@ -27,7 +27,7 @@ export function LinkInlineEdit(props: Omit<ComponentProps<typeof InlineEdit>, 'e
             }
             if (e.key === 'Escape') cancel()
           }}
-          className="min-h-0 resize-none"
+          className="min-h-0 h-22.5 resize-none"
         />
       )}
     />

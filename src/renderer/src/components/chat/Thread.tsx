@@ -314,7 +314,8 @@ function UserMessage({ messageId }: { messageId: string }) {
   const entrance = useEntrance(messageId)
   const cover = useTextCover(messageId)
   const text = useAuiState((s) => s.message.content.map((p) => (p.type === 'text' ? p.text : '')).join(''))
-  const worldPlayer = useWorldPlayer(agent?.world?.worldId ?? null)
+  const sessionWorldId = useSessions((s) => (conv.sessionId ? (s.list.find((x) => x.id === conv.sessionId)?.scene?.worldId ?? null) : null))
+  const worldPlayer = useWorldPlayer(sessionWorldId)
   const player = worldPlayer || agent?.player || null
   const preview = useEntryPreview(player ? `@sheet:${player}` : '')
   const valid = preview && !('missing' in preview) ? preview : null
@@ -540,7 +541,8 @@ function Composer({ running, placeholder }: { running: boolean; placeholder: str
  const hints = hidden === keys ? [] : all
  const pick = Math.min(selected, Math.max(0, hints.length - 1))
  const agent = useContext(AgentRef)
- const worldPlayer = useWorldPlayer(agent?.world?.worldId ?? null)
+ const sessionWorldId = useSessions((s) => (conv.sessionId ? (s.list.find((x) => x.id === conv.sessionId)?.scene?.worldId ?? null) : null))
+ const worldPlayer = useWorldPlayer(sessionWorldId)
  const player = worldPlayer || agent?.player || null
  const append = (text: string) => aui.composer.setText(current.trim() ? `${current.trimEnd()} ${text}` : text)
  const request = usePlayRequests((s) => s.byChat[conv.key])

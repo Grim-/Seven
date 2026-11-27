@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
-import { assetUrl } from '../../../store/data'
+import { assetUrl, useAsset } from '../../../store/data'
 import type { Sides } from './SidesField'
 
 export function SliceView({ asset, slice, onChange }: { asset: string; slice: Sides; onChange: (next: Sides) => void }) {
+  const meta = useAsset(asset)
   const svg = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState<{ w: number; h: number } | null>(null)
   const drag = (side: number) => (e: React.PointerEvent) => {
@@ -34,7 +35,9 @@ export function SliceView({ asset, slice, onChange }: { asset: string; slice: Si
     : []
   return (
     <div className="relative w-full max-w-72 select-none border border-line/60">
-      <img src={assetUrl(asset)} alt="" draggable={false} className="block w-full" onLoad={(e) => setSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
+      {meta && (
+        <img src={assetUrl(meta)} alt="" draggable={false} className="block w-full" onLoad={(e) => setSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
+      )}
       {size && (
         <svg ref={svg} viewBox={`0 0 ${size.w} ${size.h}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible">
           {lines.map(({ cursor, ...l }, side) => (

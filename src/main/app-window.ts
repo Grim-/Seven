@@ -4,6 +4,7 @@ import { is } from '@electron-toolkit/utils'
 import { Channel, type EventMessage } from '@shared/protocol'
 import { defaultBounds, keepWindowState, loadWindowState } from './windowState'
 import { startColorsArg, type StartColors } from '@shared/startColors'
+import icon from '../../build/icon.png?asset'
 
 export type RendererMode = 'app'
 
@@ -33,6 +34,7 @@ export function createAppWindow(options: { show: boolean; onEvent: (message: Eve
     show: false,
     frame: false,
     backgroundColor: options.startColors?.ground ?? '#090a0d',
+    icon,
     title: 'Seven',
     webPreferences: { preload, sandbox: false, plugins: true, webviewTag: true, additionalArguments: options.startColors ? [startColorsArg(options.startColors)] : [] }
   })

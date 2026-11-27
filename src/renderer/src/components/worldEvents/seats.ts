@@ -10,7 +10,7 @@ export interface TableSeat {
 }
 
 export function seatsOf(ev: WorldEvent): TableSeat[] {
-  return ev.participants.flatMap((p) => {
+  return ev.participants.flatMap((p): TableSeat[] => {
     const faction = p.factionId || (p.kind === 'faction' ? p.refId ?? null : null) || null
     const base = { faction, role: p.role, power: p.power }
     if (p.kind === 'faction' && p.characters?.length)
