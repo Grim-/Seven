@@ -203,6 +203,7 @@ export const worldKind: Kind = {
       }
     ]
   },
+  exportEntries: () => worlds.list().map((w) => ({ kind: 'world', id: w.id, title: w.name, at: w.updatedAt })),
   ...worldPacking(),
   label: 'World',
   textParts: ['record'],

@@ -1,6 +1,6 @@
 import type { CarryAbout, CarryMode, CarrySource } from './carry'
 
-export type PortabilityFormat = 'card' | 'json' | 'bundle'
+export type PortabilityFormat = 'markdown' | 'card' | 'json' | 'bundle'
 export type PortabilitySplit = 'single' | 'kind' | 'entry'
 export type ProtectionMode = 'none' | 'password' | 'vault'
 
@@ -183,6 +183,7 @@ export interface PortableImportResolution {
 export interface PortableImportRequest {
   source: PortableSource
   targetKind?: string | null
+  targetWorld?: string | null
   password?: string
   resolutions?: PortableImportResolution[]
   defaultMode?: PortableConflictResolution
@@ -191,6 +192,23 @@ export interface PortableImportRequest {
   pictureFolder?: string | null
   folder?: string | null
   tags?: string[]
+}
+
+export type WorldTransferCategory = 'faction' | 'region' | 'place' | 'knowledge' | 'event' | 'npc' | 'record'
+
+export interface WorldTransferItem {
+  ref: string
+  segment: string
+  category: WorldTransferCategory
+  groupLabel: string
+  key: string
+  title: string
+  subtitle: string
+}
+
+export interface CopyWorldItemsResult {
+  copied: { ref: string; title: string; segment: string }[]
+  skipped: { ref: string; reason: string }[]
 }
 
 export interface PortableImportEntryResult {

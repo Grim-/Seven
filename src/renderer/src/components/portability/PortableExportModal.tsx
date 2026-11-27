@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Archive, Eye, EyeOff, FileCode2, FileDown, Frame, ImageIcon, ImagePlus, Images, Layers, Loader2, Lock, LockOpen, Plus, Shield, Trash2 } from 'lucide-react'
+import { Archive, Check, Copy, Eye, EyeOff, FileCode2, FileDown, FileText, Frame, ImageIcon, ImagePlus, Images, Layers, Loader2, Lock, LockOpen, Plus, Shield, Trash2 } from 'lucide-react'
 import { sanitizeFileName, type PortabilityEstimate, type PortabilityFormat, type PortabilitySplit, type PortableExportItemSpec, type ProtectionMode } from '@shared/portability'
 import { showName, toId } from '@shared/ids'
 import type { LibraryHit } from '@shared/types'
@@ -40,9 +40,10 @@ interface KindDescriptor {
 }
 
 const FORMAT_OPTIONS: { value: PortabilityFormat; label: string; hint: string }[] = [
+  { value: 'markdown', label: 'Markdown', hint: 'Plain Markdown — copy straight to clipboard or save as .md' },
   { value: 'card', label: 'Card (.png)', hint: 'Embeds data inside a PNG picture card' },
-  { value: 'json', label: 'JSON (.json)', hint: 'Readable JSON envelope file' },
-  { value: 'bundle', label: 'Bundle (.sevenpack)', hint: 'Compressed archive with attachments' }
+  { value: 'json', label: 'JSON', hint: 'Readable JSON envelope file' },
+  { value: 'bundle', label: 'Bundle', hint: 'Compressed .sevenpack archive with attachments' }
 ]
 
 const SPLIT_OPTIONS: { value: PortabilitySplit; label: string; hint: string }[] = [
@@ -179,6 +180,9 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
   const [estimate, setEstimate] = useState<PortabilityEstimate | null>(null)
   const [estimating, setEstimating] = useState(false)
   const [estimateError, setEstimateError] = useState<string | null>(null)
+  const [markdownData, setMarkdownData] = useState<{ markdown: string; count: number; skipped: number } | null>(null)
+  const [markdownLoading, setMarkdownLoading] = useState(false)
+  const [copiedMarkdown, setCopiedMarkdown] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const activeKinds = useMemo(() => [...new Set(basket.map((b) => b.kind))], [basket])
@@ -296,6 +300,47 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
     }
   }, [expandedItems, format, formatTouched, includeDependencies, mode, state.defaultFormat, text])
 
+  useEffect(() => {
+    if (format !== 'markdown') {
+      setMarkdownData(null)
+      setMarkdownLoading(false)
+      return
+    }
+    if (mode === 'items' && !expandedItems.length) {
+      setMarkdownData(null)
+      return
+    }
+    if (mode === 'text' && !text.trim()) {
+      setMarkdownData(null)
+      return
+    }
+    let live = true
+    setMarkdownLoading(true)
+    const timer = setTimeout(() => {
+      void engine('portability.markdown', {
+        items: mode === 'items' ? expandedItems : [],
+        text: mode === 'text' ? text : null,
+        includeDependencies
+      })
+        .then((res) => {
+          if (live) setMarkdownData(res)
+        })
+        .catch((err) => {
+          if (live) {
+            setMarkdownData(null)
+            setEstimateError(errorText(err))
+          }
+        })
+        .finally(() => {
+          if (live) setMarkdownLoading(false)
+        })
+    }, 120)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [expandedItems, format, includeDependencies, mode, text])
+
   const effectiveSplit: PortabilitySplit = mode === 'text' || expandedItems.length <= 1 ? 'single' : splitMode
 
   const firstItem = expandedItems[0]
@@ -341,11 +386,25 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
   }
 
   const pngOk = framed || mime === PNG
-  const passwordValid = protection !== 'password' || (password.length >= 1 && password === confirmPassword)
-  const vaultValid = protection !== 'vault' || vault.configured
+  const isMarkdown = format === 'markdown'
+  const passwordValid = isMarkdown || protection !== 'password' || (password.length >= 1 && password === confirmPassword)
+  const vaultValid = isMarkdown || protection !== 'vault' || vault.configured
   const hasPayload = mode === 'text' ? Boolean(text.trim()) : expandedItems.length > 0
+  const markdownReady = !isMarkdown || Boolean(markdownData?.markdown.trim())
   const cardReady = format !== 'card' || Boolean(picture && bitmap && pngOk)
-  const ready = hasPayload && cardReady && passwordValid && vaultValid && !busy && !estimateError
+  const ready = hasPayload && cardReady && markdownReady && passwordValid && vaultValid && !busy && !estimateError
+
+  const copyMarkdown = async () => {
+    if (!markdownData?.markdown.trim()) return
+    try {
+      await main('clipboard.write', { text: markdownData.markdown })
+      setCopiedMarkdown(true)
+      toast.success('Markdown copied', `${markdownData.markdown.length.toLocaleString()} characters`)
+      setTimeout(() => setCopiedMarkdown(false), 1800)
+    } catch (err) {
+      failed('Could not copy markdown')(err)
+    }
+  }
 
   const allKindOptions = useMemo(() => {
     const out: { kind: string; kindLabel: string; opt: KindDescriptor['options'][number] }[] = []
@@ -372,7 +431,14 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
 
   const runExport = async () => {
     if (!ready) return
-    const ext = format === 'card' ? '.png' : format === 'bundle' ? '.sevenpack' : '.json'
+    const ext =
+      format === 'markdown'
+        ? '.md'
+        : format === 'card'
+          ? '.png'
+          : format === 'bundle'
+            ? '.sevenpack'
+            : '.json'
     const outputPath = effectiveSplit === 'single' ? await main('dialog.savePath', { name: `${defaultBaseName}${ext}` }) : await main('dialog.openFolder')
     if (!outputPath) return
 
@@ -451,17 +517,29 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
       footer={
         <>
           <span className="mr-auto self-center font-label text-[10.5px] caps-14 text-faint">
-            {estimate
-              ? `${estimate.rootCount} ${estimate.rootCount === 1 ? 'entry' : 'entries'}${estimate.dependencyCount ? ` + ${estimate.dependencyCount} linked` : ''}${estimate.assetCount ? ` · ${estimate.assetCount} files` : ''} · ~${formatBytes(format === 'bundle' ? estimate.compressedBytes : estimate.rawBytes)}`
-              : estimating
-                ? 'Estimating size…'
-                : 'Choose items to export'}
+            {isMarkdown && markdownData
+              ? `${markdownData.count} ${markdownData.count === 1 ? 'entry' : 'entries'} · ${markdownData.markdown.length.toLocaleString()} chars`
+              : estimate
+                ? `${estimate.rootCount} ${estimate.rootCount === 1 ? 'entry' : 'entries'}${estimate.dependencyCount ? ` + ${estimate.dependencyCount} linked` : ''}${estimate.assetCount ? ` · ${estimate.assetCount} files` : ''} · ~${formatBytes(format === 'bundle' ? estimate.compressedBytes : estimate.rawBytes)}`
+                : estimating || markdownLoading
+                  ? 'Estimating size…'
+                  : 'Choose items to export'}
           </span>
           <Button variant="ghost" onClick={closePortableExport}>
             Cancel
           </Button>
+          {isMarkdown && (
+            <Button
+              variant="secondary"
+              icon={copiedMarkdown ? <Check /> : <Copy />}
+              disabled={!markdownData?.markdown.trim() || markdownLoading}
+              onClick={() => void copyMarkdown()}
+            >
+              {copiedMarkdown ? 'Copied' : 'Copy markdown'}
+            </Button>
+          )}
           <Button variant="primary" icon={busy ? <Loader2 className="animate-spin" /> : <FileDown />} disabled={!ready} onClick={() => void runExport()}>
-            {effectiveSplit === 'single' ? 'Save export…' : 'Choose folder…'}
+            {effectiveSplit === 'single' ? (isMarkdown ? 'Save .md…' : 'Save export…') : 'Choose folder…'}
           </Button>
         </>
       }
@@ -626,6 +704,52 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
           {format === 'card' && (
             <CardStage bitmap={bitmap} picture={picture} framed={framed} pngOk={pngOk} info={info} pick={pick} canvasRef={canvasRef} />
           )}
+
+          {format === 'markdown' && (
+            <div className="flex min-h-[260px] min-w-0 flex-1 flex-col border border-line/60 tone-panel-40">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/50 tone-panel-60 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-3.5 w-3.5 text-accent" />
+                  <span className="font-label text-[10.5px] font-bold caps-18 text-accent-soft">Markdown preview</span>
+                  {markdownData && (
+                    <span className="font-ui text-[11px] text-dim">
+                      {markdownData.markdown.length.toLocaleString()} chars · {markdownData.markdown ? markdownData.markdown.split('\n').length.toLocaleString() : 0} lines
+                      {markdownData.skipped > 0 ? ` · ${markdownData.skipped} skipped` : ''}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={copiedMarkdown ? <Check /> : <Copy />}
+                  disabled={!markdownData?.markdown.trim() || markdownLoading}
+                  onClick={() => void copyMarkdown()}
+                >
+                  {copiedMarkdown ? 'Copied' : 'Copy markdown'}
+                </Button>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col p-3">
+                {markdownLoading ? (
+                  <div className="flex flex-1 items-center justify-center gap-2 py-8 text-[12px] text-dim">
+                    <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                    Rendering Markdown…
+                  </div>
+                ) : markdownData?.markdown.trim() ? (
+                  <Textarea
+                    value={markdownData.markdown}
+                    readOnly
+                    rows={12}
+                    mono
+                    className="min-h-[220px] flex-1 text-[12px] leading-relaxed"
+                  />
+                ) : (
+                  <div className="py-8 text-center text-[12px] text-faint">
+                    Select an entry or enter text above to preview its Markdown.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto border-l border-line/60 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-accent)_7%,transparent),transparent_45%)] p-4 tablet:border-l-0 tablet:border-t">
@@ -640,6 +764,7 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
               }}
             />
             <div className="flex items-start gap-2 text-[12px] text-dim">
+              {format === 'markdown' && <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />}
               {format === 'card' && <ImageIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />}
               {format === 'json' && <FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />}
               {format === 'bundle' && <Archive className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />}
@@ -676,51 +801,58 @@ export function PortableExportModal({ state }: { state: PortableExportState }) {
             </section>
           )}
 
-          <section className="flex flex-col gap-2">
-            <Label>Protection</Label>
-            <Segmented value={protection} options={PROTECTION_OPTIONS} onChange={setProtection} />
-            <div className="flex items-start gap-2 text-[12px] text-dim">
-              {protection === 'none' && <LockOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-secondary" />}
-              {protection === 'password' && <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />}
-              {protection === 'vault' && <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />}
-              <span>{PROTECTION_OPTIONS.find((p) => p.value === protection)?.hint}</span>
-            </div>
+          {isMarkdown ? (
+            <section className="flex flex-col gap-1.5 border border-line/50 tone-panel-40 p-3 text-[12px] text-dim">
+              <Label>Plain Markdown</Label>
+              <p>Markdown exports are unencrypted plain text—ready to paste into another app or save as a `.md` file.</p>
+            </section>
+          ) : (
+            <section className="flex flex-col gap-2">
+              <Label>Protection</Label>
+              <Segmented value={protection} options={PROTECTION_OPTIONS} onChange={setProtection} />
+              <div className="flex items-start gap-2 text-[12px] text-dim">
+                {protection === 'none' && <LockOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-secondary" />}
+                {protection === 'password' && <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />}
+                {protection === 'vault' && <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />}
+                <span>{PROTECTION_OPTIONS.find((p) => p.value === protection)?.hint}</span>
+              </div>
 
-            {protection === 'password' && (
-              <div className="mt-1 flex flex-col gap-2 border border-line/50 tone-panel-40 p-2.5">
-                <div className="relative">
+              {protection === 'password' && (
+                <div className="mt-1 flex flex-col gap-2 border border-line/50 tone-panel-40 p-2.5">
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Encryption password"
+                      className="pr-9"
+                    />
+                    <button
+                      type="button"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dim hover:text-ink"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   <Input
                     type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Encryption password"
-                    className="pr-9"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm password"
                   />
-                  <button
-                    type="button"
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dim hover:text-ink"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                  {password && confirmPassword && password !== confirmPassword && (
+                    <div className="text-[11.5px] text-alert">Passwords do not match.</div>
+                  )}
                 </div>
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm password"
-                />
-                {password && confirmPassword && password !== confirmPassword && (
-                  <div className="text-[11.5px] text-alert">Passwords do not match.</div>
-                )}
-              </div>
-            )}
+              )}
 
-            {protection === 'vault' && !vault.configured && (
-              <AlertBox>Your local vault is not set up yet. Configure a vault in Settings, or choose Password protection for sharing.</AlertBox>
-            )}
-          </section>
+              {protection === 'vault' && !vault.configured && (
+                <AlertBox>Your local vault is not set up yet. Configure a vault in Settings, or choose Password protection for sharing.</AlertBox>
+              )}
+            </section>
+          )}
         </aside>
       </div>
     </Modal>

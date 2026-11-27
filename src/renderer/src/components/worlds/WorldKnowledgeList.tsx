@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, Pin, Plus, Trash2 } from 'lucide-react'
+import { ArrowRightLeft, ExternalLink, Pin, Plus, Trash2 } from 'lucide-react'
 import { WORLD_LINK_KIND, worldLink, type WorldMeta } from '@shared/world'
 import { KNOWLEDGE_SEGMENT, blankKnowledge, knowledgePart, type WorldKnowledge } from '@shared/worldKnowledge'
 import { showName } from '@shared/ids'
@@ -15,6 +15,8 @@ import { CopyLinkButton } from '../data/CopyLinkButton'
 import { LinkFaceList } from '../entries/LinkFaces'
 import { AssetMedia } from '../pictures/AssetMedia'
 import { Button, EmptyState, Eyebrow, SearchBox, Segmented, Toggle, confirmDelete, openMenu, type MenuItem } from '../ui'
+import { openBringFromWorld, openCopyToWorld } from './CopyToWorldModal'
+import { useWorlds } from './useWorlds'
 import { KnowledgeEditor } from './KnowledgeEditor'
 
 type LoreFilter = 'all' | 'pinned' | 'global' | 'local'
@@ -27,6 +29,7 @@ export function WorldKnowledgeList({
   mode?: 'player' | 'editor'
 }) {
   const isPlayerMode = mode === 'player'
+  const allWorlds = useWorlds()
   const list = useLive(() => engine('knowledge.list', { world: world.id }), 'knowledge.changed', [world.id]) ?? []
 
   const [query, setQuery] = useState('')
@@ -101,6 +104,11 @@ export function WorldKnowledgeList({
 
   const actions = (k: WorldKnowledge): MenuItem[] => [
     { label: 'Open in Data', icon: <ExternalLink />, onSelect: () => openEntry(WORLD_LINK_KIND, knowledgePart(world.id, k.id)) },
+    {
+      label: 'Copy to another world…',
+      icon: <ArrowRightLeft />,
+      onSelect: () => openCopyToWorld({ entries: [{ ref: knowledgePart(world.id, k.id), title: k.name }], sourceWorld: world.id })
+    },
     ...(!isPlayerMode
       ? [{ label: 'Delete', icon: <Trash2 />, danger: true, onSelect: () => remove(k) }]
       : [])
@@ -124,9 +132,20 @@ export function WorldKnowledgeList({
               <span className="font-data text-[11px] text-faint">({list.length})</span>
             </div>
             {!isPlayerMode && (
-              <Button size="sm" variant="primary" icon={<Plus />} onClick={startNew}>
-                New
-              </Button>
+              <div className="flex items-center gap-1">
+                {allWorlds.length > 1 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<ArrowRightLeft />}
+                    title="Copy lore from another world"
+                    onClick={() => openBringFromWorld({ targetWorld: world.id, initialCategory: 'knowledge' })}
+                  />
+                )}
+                <Button size="sm" variant="primary" icon={<Plus />} onClick={startNew}>
+                  New
+                </Button>
+              </div>
             )}
           </div>
           <SearchBox value={query} onChange={setQuery} placeholder="Search lore, magic, history…" />

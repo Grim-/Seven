@@ -51,7 +51,7 @@ export function exportMenu(entry: string, carry: CarryTarget['title'] | null): M
       : undefined
   return [
     {
-      label: 'Export (Card / JSON / Bundle)…',
+      label: 'Export (Markdown / Card / JSON / Bundle)…',
       icon: <Archive />,
       onSelect: () => openPortableExport({ items: portableItem, defaultFormat: carry ? 'card' : 'bundle' })
     },
@@ -63,7 +63,7 @@ export function exportMenu(entry: string, carry: CarryTarget['title'] | null): M
 export function exportKindMenu(kind: string, label: string): MenuItem[] {
   return [
     {
-      label: `Export all ${label.toLowerCase()} (Card / JSON / Bundle)…`,
+      label: `Export all ${label.toLowerCase()} (Markdown / Card / JSON / Bundle)…`,
       icon: <Archive />,
       onSelect: () => openPortableExport({ kind })
     },

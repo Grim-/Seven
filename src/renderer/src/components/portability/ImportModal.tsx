@@ -17,6 +17,7 @@ import { nextPortableArrival, updatePortableArrival, type PortableArrival } from
 import { IMPORT_TARGET } from '@shared/saveFolders'
 import { SaveLocationFields, type SaveLocation } from '../files/SaveLocationFields'
 import { rememberPlace } from '../../lib/savePlace'
+import { useWorlds } from '../worlds/useWorlds'
 
 function sourceFileName(arrival: PortableArrival): string {
   const src = arrival.peek.source
@@ -70,6 +71,19 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
   const [busy, setBusy] = useState(false)
   const [shownText, setShownText] = useState<string | null>(null)
   const [where, setWhere] = useState<SaveLocation | null>(null)
+  const worlds = useWorlds()
+  const [targetWorld, setTargetWorld] = useState<string>('')
+
+  const needsTargetWorld = useMemo(
+    () =>
+      peek.items.some((i) => i.kind === 'world' && i.id.includes('/') && i.importable && resolutions[i.index] !== 'skip') &&
+      !peek.items.some((i) => i.kind === 'world' && !i.id.includes('/') && resolutions[i.index] !== 'skip'),
+    [peek.items, resolutions]
+  )
+
+  useEffect(() => {
+    if (!targetWorld && worlds.length > 0) setTargetWorld(worlds[0].id)
+  }, [targetWorld, worlds])
 
   useEffect(() => {
     void engine('saveFolders.answer', { target: IMPORT_TARGET })
@@ -84,6 +98,7 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
   const savedDate = new Date(peek.savedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
   const fromFilesAsset = 'asset' in peek.source
   const canKeepPicture = peek.hasPicture && !fromFilesAsset
+  const hasLooseFiles = peek.fileCount > 0
   const hasRawJsonFallback = Boolean(peek.error && !peek.locked && (peek.container === 'json' || peek.container === 'raw-json') && importableSections.length > 0)
 
   const conflicts = useMemo(() => peek.items.filter((i) => i.importable && !i.missingModule && i.exists), [peek.items])
@@ -208,6 +223,7 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
       const result = await engine('portability.import', {
         source: peek.source,
         targetKind: chosenTargetKind || null,
+        targetWorld: needsTargetWorld ? (targetWorld || null) : null,
         password: unlockedPassword ?? undefined,
         resolutions: resolutionList,
         keepPicture: canKeepPicture && !dropped ? keepPicture : false,
@@ -468,8 +484,28 @@ export function ImportModal({ arrival }: { arrival: PortableArrival }) {
           </div>
         )}
 
-        {where && !peek.locked && shownText === null && peek.items.length > 0 && (
-          <SaveLocationFields value={where} onChange={setWhere} rememberLabel="Put imports here from now on" hint="Each import gets its own folder inside this one. Change it in Settings." />
+        {needsTargetWorld && !peek.locked && shownText === null && (
+          <div className="flex flex-col gap-1.5 border border-line/60 tone-panel-40 p-3">
+            <div className="font-label text-[10.5px] font-bold caps-18 text-accent-soft">Destination world</div>
+            {worlds.length > 0 ? (
+              <Select
+                value={targetWorld}
+                onChange={setTargetWorld}
+                options={worlds.map((w) => ({ value: w.id, label: w.name }))}
+              />
+            ) : (
+              <AlertBox>Create a world first before importing world factions, places, lore, events, or NPCs.</AlertBox>
+            )}
+          </div>
+        )}
+
+        {where && hasLooseFiles && !peek.locked && shownText === null && peek.items.length > 0 && (
+          <SaveLocationFields
+            value={where}
+            onChange={setWhere}
+            rememberLabel="Put imported files here from now on"
+            hint="Attached files and assets from this import go in a folder here. Pages and character sheets go straight into your library."
+          />
         )}
 
         {canKeepPicture && !peek.locked && shownText === null && (

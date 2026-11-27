@@ -1,6 +1,7 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import {
   ArrowRight,
+  ArrowRightLeft,
   Crosshair,
   Eye,
   Layers,
@@ -55,6 +56,7 @@ import { PlaceEvents } from '../worldEvents/PlaceEvents'
 import { CreateOrBringCastModal } from './cast/CreateOrBringCastModal'
 import { WorldPlacePick } from './WorldPlacePick'
 import { WorldRegionPick } from './WorldRegionPick'
+import { openCopyToWorld } from './CopyToWorldModal'
 
 function PlaceHereSection({
   world,
@@ -931,6 +933,13 @@ export function AtlasInspector({
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<ArrowRightLeft />}
+            title={`Copy "${title}" to another world`}
+            onClick={() => openCopyToWorld({ entries: [{ ref: entryPath, title }], sourceWorld: world })}
+          />
           <Button
             size="sm"
             variant="ghost"

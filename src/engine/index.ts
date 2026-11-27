@@ -99,6 +99,7 @@ import { boardView } from './present/places'
 import { backdrops } from './backdrops'
 import { clearStats, summarize } from './turnstats'
 import { worlds } from './worlds/store'
+import { copyWorldItems, listWorldTransferables } from './worlds/transfer'
 import { importMap } from './maps/importMap'
 import { ensureDefaultMapTileset } from './maps/defaultTileset'
 import { maps } from './maps/store'
@@ -143,7 +144,7 @@ import path from 'node:path'
 import { board } from './board/store'
 import { errorCode } from '@shared/errors'
 import { carryDescribe, carryOpen, carryPeek, carrySave } from './carry'
-import { portabilityDescribeKind, portabilityEstimate, portabilityExport, portabilityImport, portabilityPeek } from './portability'
+import { portabilityDescribeKind, portabilityEstimate, portabilityExport, portabilityImport, portabilityMarkdown, portabilityPeek } from './portability'
 import { agentFolders, liveFolder, removeFolderTree } from './agents/folders'
 import { currentActor } from './timeline/actor'
 import { compendium } from '../modules/dnd/compendium'
@@ -803,6 +804,8 @@ const handlers: Handlers = {
   'worlds.editPost': ({ id, index, message }) => worlds.editPost(id, index, message),
   'worlds.flags': ({ id }) => worlds.flags(id),
   'worlds.setFlag': ({ id, key, value }) => worlds.setFlag(id, key, value),
+  'worlds.listTransferables': ({ world }) => listWorldTransferables(world),
+  'worlds.copyItems': ({ entries, targetWorld, replace }) => copyWorldItems(entries, targetWorld, { replace }),
   'npcs.list': (args) => npcs.list(args?.world ?? null, args?.layer ?? 'play'),
   'npcs.get': ({ id, world, layer }) => npcs.get(id, world ?? null, layer ?? 'play'),
   'npcs.save': ({ world, npc, previousId }) => npcs.saveTemplate(world, npc, previousId ?? null),
@@ -1356,6 +1359,7 @@ const handlers: Handlers = {
   'carry.open': ({ source, mode }) => carryOpen(source, mode),
   'portability.describeKind': ({ kind }) => portabilityDescribeKind(kind),
   'portability.estimate': (input) => portabilityEstimate(input),
+  'portability.markdown': (input) => portabilityMarkdown(input),
   'portability.export': (input) => portabilityExport(input),
   'portability.peek': (input) => portabilityPeek(input),
   'portability.import': (input) => portabilityImport(input),

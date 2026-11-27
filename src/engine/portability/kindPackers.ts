@@ -12,9 +12,9 @@ import { agentAccess } from '../agents/access'
 import { maps } from '../maps/store'
 import { worlds } from '../worlds/store'
 import { knowledge } from '../worlds/knowledge'
-import type { WorldKnowledge } from '@shared/worldKnowledge'
+import { KNOWLEDGE_SEGMENT, knowledgePart, type WorldKnowledge } from '@shared/worldKnowledge'
 import { worldEvents } from '../worlds/events'
-import type { WorldEvent } from '@shared/game/worldEvents'
+import { EVENT_SEGMENT, eventLink, type WorldEvent } from '@shared/game/worldEvents'
 import { factions } from '../factions/store'
 import type { StoredFaction } from '@shared/game/factions'
 import { npcs } from '../worlds/npcs'
@@ -461,6 +461,41 @@ interface WorldPack {
   saves?: ReturnType<typeof saves.list>
 }
 
+const FACTION_SEGMENT = 'faction'
+
+function collectFactionRefs(f: StoredFaction, out: EntryRef[], seen: Set<string>): void {
+  if (f.leaderSheet && !splitNpcRef(f.leaderSheet)) pushRef(out, seen, 'sheet', f.leaderSheet)
+  for (const m of f.members ?? []) {
+    if (!splitNpcRef(m)) pushRef(out, seen, 'sheet', m)
+  }
+}
+
+function collectWorldEventRefs(ev: WorldEvent, out: EntryRef[], seen: Set<string>): void {
+  if (ev.scope?.level === 'map' && ev.scope.refId) pushRef(out, seen, 'map', ev.scope.refId)
+  for (const o of ev.outcomes ?? []) {
+    for (const aId of o.triggerActionIds ?? []) pushRef(out, seen, 'trigger_action', aId)
+    collectComponentListRefs(o.effects, out, seen)
+  }
+}
+
+function remapWorldEvent(ev: WorldEvent, targetWorld: string, entry: Unpack['entry']): WorldEvent {
+  return {
+    ...ev,
+    worldId: targetWorld,
+    scope:
+      ev.scope?.level === 'map' && ev.scope.refId
+        ? { ...ev.scope, refId: entry(ev.scope.refId, 'map') }
+        : ev.scope?.refId?.includes('/')
+          ? { ...ev.scope, refId: `${targetWorld}/${ev.scope.refId.split('/').pop()}` }
+          : ev.scope,
+    outcomes: (ev.outcomes ?? []).map((o) => ({
+      ...o,
+      triggerActionIds: (o.triggerActionIds ?? []).map((aId) => entry(aId, 'trigger_action')),
+      effects: swapComponentListRefs(o.effects ?? [], entry) as typeof o.effects
+    }))
+  }
+}
+
 export function worldPacking(): Packing {
   return {
     pack(id, opts?: Record<string, unknown>) {
@@ -470,10 +505,24 @@ export function worldPacking(): Packing {
         return { worldId: npcRef.world, segment: NPC_SEGMENT, key: npc.id, npc }
       }
       if (id.includes('/')) {
-        const [w, tk, key] = id.split('/')
-        const ent = worlds.get(w, tk, key, true, 'template')
+        const [w, segment, ...rest] = id.split('/')
+        const key = rest.join('/')
+        if (!w || !segment || !key) throw new Error(`Record ${id} not found`)
+        if (segment === FACTION_SEGMENT) {
+          const faction = factions.get(key, w, 'template')
+          return { worldId: w, segment: FACTION_SEGMENT, key: faction.id, faction }
+        }
+        if (segment === KNOWLEDGE_SEGMENT) {
+          const entry = knowledge.get(w, key)
+          return { worldId: w, segment: KNOWLEDGE_SEGMENT, key: entry.id, knowledge: entry }
+        }
+        if (segment === EVENT_SEGMENT) {
+          const event = worldEvents.get(key, w)
+          return { worldId: w, segment: EVENT_SEGMENT, key: event.id, event }
+        }
+        const ent = worlds.get(w, segment, key, true, 'template')
         if (!ent) throw new Error(`Record ${id} not found`)
-        return { worldId: w, typeKey: tk, key, name: String(ent.Name ?? key), entity: ent }
+        return { worldId: w, typeKey: segment, key, name: String(ent.Name ?? key), entity: ent }
       }
       const meta = worlds.meta(id)
       const schema = worlds.schema(id)
@@ -519,7 +568,41 @@ export function worldPacking(): Packing {
         }
         return out
       }
-      if (id.includes('/')) return []
+      if (id.includes('/')) {
+        const [w, segment, ...rest] = id.split('/')
+        const key = rest.join('/')
+        const out: EntryRef[] = []
+        const seen = new Set<string>()
+        if (!w || !segment || !key) return out
+        if (segment === FACTION_SEGMENT) {
+          const f = factions.find(key, w, 'template')
+          if (f) collectFactionRefs(f, out, seen)
+        } else if (segment === EVENT_SEGMENT) {
+          const ev = worldEvents.find(key, w)
+          if (ev) collectWorldEventRefs(ev, out, seen)
+        } else if (segment === REGION_TYPE_KEY && worlds.exists(w)) {
+          const regions = worlds.entities(w, REGION_TYPE_KEY, true, 'template')
+          for (const [rKey, r] of Object.entries(regions)) {
+            if (rKey !== key && r.Parent === key) pushRef(out, seen, 'world', `${w}/${REGION_TYPE_KEY}/${rKey}`)
+          }
+          const places = worlds.entities(w, PLACE_TYPE_KEY, true, 'template')
+          for (const [pKey, p] of Object.entries(places)) {
+            if (p.Region === key) pushRef(out, seen, 'world', `${w}/${PLACE_TYPE_KEY}/${pKey}`)
+          }
+        } else if (segment === PLACE_TYPE_KEY && worlds.exists(w)) {
+          const places = worlds.entities(w, PLACE_TYPE_KEY, true, 'template')
+          const p = places[key]
+          if (p && typeof p.Files === 'string') {
+            for (const r of refsIn(p.Files)) {
+              if (r.kind === 'sheet' || r.kind === 'page' || r.kind === 'agent') pushRef(out, seen, r.kind, r.ref)
+            }
+          }
+          for (const [cKey, child] of Object.entries(places)) {
+            if (cKey !== key && child.Inside === key) pushRef(out, seen, 'world', `${w}/${PLACE_TYPE_KEY}/${cKey}`)
+          }
+        }
+        return out
+      }
       const out: EntryRef[] = []
       const seen = new Set<string>()
       const meta = worlds.meta(id)
@@ -533,6 +616,8 @@ export function worldPacking(): Packing {
           }
         }
       }
+      for (const f of factions.list(id, 'template')) collectFactionRefs(f, out, seen)
+      for (const ev of worldEvents.listDefinitions(id)) collectWorldEventRefs(ev, out, seen)
       for (const npc of npcs.list(id, 'template')) {
         if (npc.image) pushRef(out, seen, 'asset', npc.image)
         if (npc.lootTableId) pushRef(out, seen, 'loot_table', npc.lootTableId)
@@ -555,16 +640,56 @@ export function worldPacking(): Packing {
     },
     unpack(value, how) {
       if (!isObj(value)) throw new Error('The world in this bundle is damaged')
+      const targetWorldOf = () => {
+        const fromReplace = how.replace?.split('/')[0]
+        if (fromReplace && worlds.exists(fromReplace)) return fromReplace
+        if (how.targetWorld && worlds.exists(how.targetWorld)) return how.targetWorld
+        return worlds.list()[0]?.id
+      }
+      const remapActor = (worldId: string, actorRef: string): string => {
+        const split = splitNpcRef(actorRef)
+        if (split) return npcActorId(worldId, split.id)
+        return how.entry(actorRef, 'sheet')
+      }
       if (value.segment === NPC_SEGMENT && isObj(value.npc)) {
-        const targetWorld = how.replace?.split('/')[0] ?? worlds.list()[0]?.id
+        const targetWorld = targetWorldOf()
         if (!targetWorld) throw new Error('Create or select a world first to import a world NPC.')
         const rawNpc = value.npc as Record<string, unknown>
         const image = typeof rawNpc.image === 'string' && rawNpc.image ? how.entry(rawNpc.image, 'asset') : null
         const saved = npcs.saveTemplate(targetWorld, { ...rawNpc, image })
         return npcActorId(targetWorld, saved.id)
       }
+      if (value.segment === FACTION_SEGMENT && isObj(value.faction)) {
+        const targetWorld = targetWorldOf()
+        if (!targetWorld) throw new Error('Create or select a world first to import a faction.')
+        const f = value.faction as unknown as StoredFaction
+        const saved = factions.save(
+          {
+            ...f,
+            ...(f.leaderSheet ? { leaderSheet: remapActor(targetWorld, f.leaderSheet) } : {}),
+            ...(f.members?.length ? { members: f.members.map((m) => remapActor(targetWorld, m)) } : {})
+          },
+          targetWorld,
+          how.replace?.split('/')[2] ?? null
+        )
+        return `${targetWorld}/${FACTION_SEGMENT}/${saved.id}`
+      }
+      if (value.segment === KNOWLEDGE_SEGMENT && isObj(value.knowledge)) {
+        const targetWorld = targetWorldOf()
+        if (!targetWorld) throw new Error('Create or select a world first to import world knowledge.')
+        const k = value.knowledge as unknown as WorldKnowledge
+        const saved = knowledge.save(targetWorld, k, how.replace?.split('/')[2] ?? null)
+        return knowledgePart(targetWorld, saved.id)
+      }
+      if (value.segment === EVENT_SEGMENT && isObj(value.event)) {
+        const targetWorld = targetWorldOf()
+        if (!targetWorld) throw new Error('Create or select a world first to import a world event.')
+        const ev = value.event as unknown as WorldEvent
+        const saved = worldEvents.save(remapWorldEvent(ev, targetWorld, how.entry), how.replace?.split('/')[2] ?? null)
+        return eventLink(targetWorld, saved.id)
+      }
       if (typeof value.typeKey === 'string' && typeof value.key === 'string' && isObj(value.entity)) {
-        const targetWorld = how.replace?.split('/')[0] ?? worlds.list()[0]?.id
+        const targetWorld = targetWorldOf()
         if (!targetWorld) throw new Error('Create or select a world first to import a single world record.')
         worlds.put(targetWorld, value.typeKey, value.key, value.entity as WorldEntity, 'template')
         return `${targetWorld}/${value.typeKey}/${value.key}`
@@ -576,11 +701,7 @@ export function worldPacking(): Packing {
         ? worlds.saveSchema(how.replace, raw.schema)
         : worlds.create(name, raw.schema)
       if (how.replace && worlds.exists(target.id)) worlds.rename(target.id, name)
-      const remapActorId = (actorRef: string): string => {
-        const split = splitNpcRef(actorRef)
-        if (split) return npcActorId(target.id, split.id)
-        return how.entry(actorRef, 'sheet')
-      }
+      const remapActorId = (actorRef: string): string => remapActor(target.id, actorRef)
       if (raw.player) worlds.setPlayer(target.id, remapActorId(raw.player))
       if (raw.tags?.length) worlds.setTags(target.id, raw.tags)
       if (raw.flags && Object.keys(raw.flags).length) worlds.setFlags(target.id, raw.flags)
@@ -621,21 +742,7 @@ export function worldPacking(): Packing {
         )
       }
       for (const ev of Array.isArray(raw.events) ? raw.events : []) {
-        worldEvents.save({
-          ...ev,
-          worldId: target.id,
-          scope:
-            ev.scope?.level === 'map' && ev.scope.refId
-              ? { ...ev.scope, refId: how.entry(ev.scope.refId, 'map') }
-              : ev.scope?.refId?.includes('/')
-                ? { ...ev.scope, refId: `${target.id}/${ev.scope.refId.split('/').pop()}` }
-                : ev.scope,
-          outcomes: (ev.outcomes ?? []).map((o) => ({
-            ...o,
-            triggerActionIds: (o.triggerActionIds ?? []).map((aId) => how.entry(aId, 'trigger_action')),
-            effects: swapComponentListRefs(o.effects ?? [], how.entry) as typeof o.effects
-          }))
-        })
+        worldEvents.save(remapWorldEvent(ev, target.id, how.entry))
       }
       if (Array.isArray(raw.board)) {
         for (const post of raw.board) {

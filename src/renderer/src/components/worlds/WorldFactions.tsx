@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type PointerEvent } from 'react'
-import { Maximize2, Minimize2, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ArrowRightLeft, Maximize2, Minimize2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import type { WorldMeta } from '@shared/world'
 import {
   blankStoredFaction,
@@ -21,6 +21,8 @@ import { Chip, withReferences } from '../chat/References'
 import { CopyLinkButton } from '../data/CopyLinkButton'
 import { factionMonogram, WorldDiplomacyMatrix } from '../factions/FactionMatrix'
 import { StoredFactionEditor } from '../factions/StoredFactionEditor'
+import { openBringFromWorld, openCopyToWorld } from './CopyToWorldModal'
+import { useWorlds } from './useWorlds'
 import { Button, EmptyState, Eyebrow, Modal, SearchBox, confirmDelete } from '../ui'
 
 const MIN_DRAWER = 340
@@ -37,6 +39,7 @@ export function WorldFactions({
 }) {
   const isPlayerMode = mode === 'player'
   const layer = isPlayerMode ? 'play' : 'template'
+  const allWorlds = useWorlds()
 
   const factions =
     useLive(
@@ -169,6 +172,17 @@ export function WorldFactions({
             <SearchBox value={query} onChange={setQuery} placeholder="Filter factions, traits…" className="w-52" />
             {!isPlayerMode && (
               <>
+                {allWorlds.length > 1 && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<ArrowRightLeft />}
+                    onClick={() => openBringFromWorld({ targetWorld: world.id, initialCategory: 'faction' })}
+                    title="Copy factions from another world"
+                  >
+                    From world…
+                  </Button>
+                )}
                 {factions.length === 0 && (
                   <Button size="sm" variant="secondary" onClick={handleSeedStarters}>
                     Add Starter Set
@@ -427,6 +441,18 @@ export function WorldFactions({
                   >
                     Edit
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<ArrowRightLeft />}
+                    title={`Copy ${activeFaction.name} to another world`}
+                    onClick={() =>
+                      openCopyToWorld({
+                        entries: [{ ref: `${world.id}/faction/${activeFaction.id}`, title: activeFaction.name }],
+                        sourceWorld: world.id
+                      })
+                    }
+                  />
                   <Button
                     size="sm"
                     variant="ghost"

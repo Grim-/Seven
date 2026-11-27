@@ -20,8 +20,10 @@ import { data } from '../data/hub'
 import { secure } from '../util/secure'
 import { writeUserFile } from '../util/fs'
 import { USER, kindNamed, type Kind } from '../library/kinds'
+import { resolveIncludes } from '../library/includes'
 import { assetsIn, freeName, swapAssets } from '../library/packing'
 import { fileArrived, freshFiles } from '../data/filing'
+import { placeIn } from '../data/placement'
 import { isPng } from '../carry/png'
 import {
   decodeBundleArchive,
@@ -60,7 +62,7 @@ export interface PortableKindSummary {
 export function portabilityDescribeKind(kindName: string): PortableKindSummary {
   const k = kindNamed(kindName)
   if (!k) throw new Error(`Unknown kind "${kindName}".`)
-  const hits = k.search('', 10_000, USER).filter((h) => !k.isGenerated?.(h.id))
+  const hits = (k.exportEntries ? k.exportEntries() : k.search('', 10_000, USER)).filter((h) => !k.isGenerated?.(h.id))
   return {
     kind: k.kind,
     label: k.label,
@@ -81,6 +83,47 @@ export function portabilityEstimate(input: {
   format: PortableExportRequest['format']
 }) {
   return estimatePortableBundle(input)
+}
+
+function renderEntryMarkdown(k: Kind, id: string): string | null {
+  if (!k.exportable) return null
+  const own = k.export?.(id, USER)
+  const raw = own?.markdown?.trim() ? own.markdown : k.card(id, USER)
+  const resolved = resolveIncludes(raw).trim()
+  return resolved || null
+}
+
+export function portabilityMarkdown(input: {
+  items: PortableExportItemSpec[]
+  text?: string | null
+  includeDependencies: boolean
+}): { markdown: string; count: number; skipped: number } {
+  if (!input.items.length) {
+    const clean = input.text ?? ''
+    return { markdown: clean, count: clean.trim() ? 1 : 0, skipped: 0 }
+  }
+  const ordered: { kind: string; id: string }[] = input.includeDependencies
+    ? (() => {
+        const bundle = collectPortableBundle(input.items, true)
+        const roots = bundle.entries.filter((e) => !e.isDependency)
+        const deps = bundle.entries.filter((e) => e.isDependency)
+        return [...roots, ...deps].map((e) => ({ kind: e.kind, id: e.id }))
+      })()
+    : input.items.map((i) => ({ kind: i.kind, id: i.id }))
+
+  const sections: string[] = []
+  let skipped = 0
+  for (const item of ordered) {
+    const k = kindNamed(item.kind)
+    if (!k) {
+      skipped += 1
+      continue
+    }
+    const md = renderEntryMarkdown(k, item.id)
+    if (md) sections.push(md)
+    else skipped += 1
+  }
+  return { markdown: sections.join('\n\n---\n\n'), count: sections.length, skipped }
 }
 
 function resolvePicturePng(pictureId?: string | null, framedBase64?: string | null): Buffer {
@@ -156,13 +199,38 @@ export function portabilityExport(req: PortableExportRequest): PortableExportRes
   if (textOnly && !req.text?.trim()) {
     throw new Error('Select at least one entry or enter text to export.')
   }
-  if (req.protection === 'password' && !req.password) {
+  if (req.format !== 'markdown' && req.protection === 'password' && !req.password) {
     throw new Error('Enter a password to protect this export.')
   }
 
-  const ext = req.format === 'card' ? '.png' : req.format === 'bundle' ? '.sevenpack' : '.json'
+  const ext =
+    req.format === 'markdown'
+      ? '.md'
+      : req.format === 'card'
+        ? '.png'
+        : req.format === 'bundle'
+          ? '.sevenpack'
+          : '.json'
 
   if (textOnly || req.splitMode === 'single' || req.format === 'bundle') {
+    if (req.format === 'markdown') {
+      const rendered = portabilityMarkdown({
+        items: req.items,
+        text: req.text,
+        includeDependencies: req.includeDependencies
+      })
+      if (!rendered.markdown.trim()) throw new Error('The selected items cannot be exported as Markdown.')
+      const buf = Buffer.from(rendered.markdown, 'utf8')
+      const outPath = req.outputPath.toLowerCase().endsWith(ext) ? req.outputPath : `${req.outputPath}${ext}`
+      writeUserFile(outPath, buf)
+      return {
+        files: [outPath],
+        entryCount: req.items.length,
+        dependencyCount: Math.max(0, rendered.count - req.items.length),
+        assetCount: 0,
+        bytes: buf.length
+      }
+    }
     const collected = req.items.length ? collectPortableBundle(req.items, req.includeDependencies) : null
     const entries = collected?.entries ?? []
     const files = collected?.files ?? []
@@ -220,6 +288,20 @@ export function portabilityExport(req: PortableExportRequest): PortableExportRes
         })
 
   for (const g of groups) {
+    if (req.format === 'markdown') {
+      const rendered = portabilityMarkdown({
+        items: g.items,
+        includeDependencies: req.includeDependencies
+      })
+      if (!rendered.markdown.trim()) continue
+      const buf = Buffer.from(rendered.markdown, 'utf8')
+      const target = uniqueOutputFile(dir, g.subDir, g.fileBase, ext, usedPaths)
+      writeUserFile(target, buf)
+      writtenFiles.push(target)
+      totalBytes += buf.length
+      depCount += Math.max(0, rendered.count - g.items.length)
+      continue
+    }
     const collected = collectPortableBundle(g.items, req.includeDependencies)
     for (const f of collected.files) seenAssetIds.add(f.meta.id)
     depCount += collected.entries.filter((e) => e.isDependency).length
@@ -599,7 +681,7 @@ export async function portabilityImport(req: PortableImportRequest): Promise<Por
   }
 
   const place = new ImportPlace(req.folder, decoded.about?.title || sourceTitle(req.source, ext) || 'Import')
-  if (req.keepPicture && isPng(bytes)) pictureAssetId = keepPicture(place)
+  if (req.keepPicture && isPng(bytes)) pictureAssetId = keepPicture(null)
   const assetIds = new Map<string, string>()
   const fresh = freshFiles()
   const arrived: { from: string; id: string; parent: string | null }[] = []
@@ -612,12 +694,8 @@ export async function portabilityImport(req: PortableImportRequest): Promise<Por
 
   const resolutionMap = new Map((req.resolutions ?? []).map((r) => [r.index, r.mode]))
   const made: { kind: string; old: string; id: string }[] = []
-  const landed = new Map<number, { kind: Kind; id: string; folder: string }>()
+  const landed = new Map<number, { kind: Kind; id: string; title: string }>()
   const values = decoded.body.entries.map((e) => e.value)
-  const owners = new Set(decoded.body.files.flatMap((f) => {
-    const users = usersOf(f.id, values)
-    return users.length === 1 ? users : []
-  }))
   const imported: PortableImportEntryResult[] = []
   const skipped: { title: string; reason: string }[] = []
   const canonical = (name: string) => kindNamed(name)?.kind ?? name
@@ -642,10 +720,9 @@ export async function portabilityImport(req: PortableImportRequest): Promise<Por
     }
     const replace = mode === 'replace' ? existingId : null
     const swappedValue = swapAssets(e.value, assetIds)
-    const own = `${folderName(k.plural)}/${folderName(e.title)}`
-    const parent = replace || !k.pageTypes?.length ? null : place.folder(owners.has(index) && !k.placesOwnFiles ? own : folderName(k.plural))
-    const newId = k.unpack(swappedValue, { replace, parent, entry: entryResolver })
-    landed.set(index, { kind: k, id: newId, folder: own })
+    const parent = replace || !k.pageTypes?.length || k.placesOwnFiles ? null : placeIn(k.kind, null)
+    const newId = k.unpack(swappedValue, { replace, parent, targetWorld: req.targetWorld ?? null, entry: entryResolver })
+    landed.set(index, { kind: k, id: newId, title: e.title })
     made.push({ kind: e.kind, old: e.id, id: newId })
     const effectiveMode = replace ? 'replace' : 'copy'
     imported.push({ kind: e.kind, id: newId, title: k.title(newId), mode: effectiveMode })
@@ -679,7 +756,7 @@ function sourceTitle(source: PortableImportRequest['source'], ext: string): stri
 function placeArrived(
   arrived: { from: string; id: string; parent: string | null }[],
   values: unknown[],
-  landed: Map<number, { kind: Kind; id: string; folder: string }>,
+  landed: Map<number, { kind: Kind; id: string; title: string }>,
   place: ImportPlace,
   pictureFolder: string | null | undefined
 ): void {
@@ -692,11 +769,15 @@ function placeArrived(
     }
     const users = usersOf(file.from, values).filter((i) => landed.has(i))
     const only = users.length === 1 ? landed.get(users[0]) : undefined
-    if (!only) {
-      data.assets.move(file.id, place.folder(users.length ? 'Shared' : 'Files'))
+    if (landed.size <= 1) {
+      data.assets.move(file.id, place.folder())
       continue
     }
-    data.assets.move(file.id, place.folder(only.folder))
+    if (!only) {
+      data.assets.move(file.id, place.folder(users.length ? 'Shared' : ''))
+      continue
+    }
+    data.assets.move(file.id, place.folder(folderName(only.title)))
   }
 }
 

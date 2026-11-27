@@ -2,6 +2,7 @@ import type { SaveFolder, SaveFolderAnswer, SaveFolderRow } from './saveFolders'
 import type { ConversionBackupResult, ConversionChoices, ConversionRunResult, PendingConversion } from './conversions'
 import type { CarryAbout, CarryMode, CarryOpened, CarrySource, CarrySummary } from './carry'
 import type {
+  CopyWorldItemsResult,
   PortabilityEstimate,
   PortabilityFormat,
   PortableExportItemSpec,
@@ -10,7 +11,8 @@ import type {
   PortableImportRequest,
   PortableImportResult,
   PortablePeekResult,
-  PortableSource
+  PortableSource,
+  WorldTransferItem
 } from './portability'
 import type { DndStats } from './dnd'
 import type { ExportChoice, ExportInfo } from './exporting'
@@ -356,6 +358,8 @@ export interface EngineRequests {
   'worlds.editPost': Req<{ id: string; index: number; message: string | null }, WorldPost[]>
   'worlds.flags': Req<{ id: string }, Record<string, string | number | boolean>>
   'worlds.setFlag': Req<{ id: string; key: string; value: string | number | boolean | null }, Record<string, string | number | boolean>>
+  'worlds.listTransferables': Req<{ world: string }, WorldTransferItem[]>
+  'worlds.copyItems': Req<{ entries: string[]; targetWorld: string; replace?: boolean }, CopyWorldItemsResult>
   'factions.list': Req<{ world?: string | null; layer?: 'template' | 'play' } | void, StoredFaction[]>
   'factions.get': Req<{ id: string; world?: string | null; layer?: 'template' | 'play' }, StoredFaction | null>
   'factions.save': Req<{ faction: StoredFaction; world?: string | null; previousId?: string | null }, StoredFaction>
@@ -637,6 +641,10 @@ export interface EngineRequests {
   'portability.estimate': Req<
     { items: PortableExportItemSpec[]; text?: string | null; includeDependencies: boolean; format: PortabilityFormat },
     PortabilityEstimate
+  >
+  'portability.markdown': Req<
+    { items: PortableExportItemSpec[]; text?: string | null; includeDependencies: boolean },
+    { markdown: string; count: number; skipped: number }
   >
   'portability.export': Req<PortableExportRequest, PortableExportResult>
   'portability.peek': Req<{ sources: PortableSource[]; targetKind?: string | null; password?: string }, PortablePeekResult[]>

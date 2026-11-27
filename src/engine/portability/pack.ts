@@ -40,8 +40,9 @@ export function collectPortableBundle(specs: PortableExportItemSpec[], includeDe
     if (includeDependencies) {
       for (const ref of k.uses?.(id, options) ?? []) {
         const dep = kindNamed(ref.kind)
-        if (dep?.pack && dep.resolve(ref.id, USER)) {
-          visit(dep, ref.id, false)
+        const resolved = dep?.pack ? dep.resolve(ref.id, USER) : null
+        if (dep && resolved) {
+          visit(dep, resolved, false)
         }
       }
     }
@@ -189,7 +190,7 @@ export function estimatePortableBundle(args: {
   const bundleRecommendedKinds = [...new Set(estimateItems.filter((i) => i.preferBundle).map((i) => i.label))]
 
   const warnings: string[] = []
-  if (bundleRecommendedKinds.length && args.format !== 'bundle') {
+  if (args.format !== 'markdown' && bundleRecommendedKinds.length && args.format !== 'bundle') {
     warnings.push(`${bundleRecommendedKinds.join(', ')} include heavy maps or assets; Archive Bundle (.sevenpack) is strongly recommended.`)
   }
   if (args.format === 'json' && exceedsJsonWarn) {

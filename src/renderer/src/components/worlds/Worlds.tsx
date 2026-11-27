@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
-import { ExternalLink, Play, Plus, Tag, Trash2, Unlink } from 'lucide-react'
+import { ArrowRightLeft, ExternalLink, Play, Plus, Tag, Trash2, Unlink } from 'lucide-react'
 import { PLACE_TYPE_KEY, REGION_TYPE_KEY, inspectSchema, type WorldMeta, type WorldSchema } from '@shared/world'
 import { NPC_SEGMENT, type WorldNpc } from '@shared/worldNpcs'
 import { EVENT_SEGMENT } from '@shared/game/worldEvents'
-import { engine, on } from '../../lib/ipc'
+import { engine } from '../../lib/ipc'
 import { openEntry } from '../../lib/library'
 import { toast } from '../../store/toasts'
 import { errorText } from '../../lib/format'
@@ -36,6 +36,9 @@ import { WorldPartyScreen } from './WorldPartyScreen'
 import { WorldAlmanacTab } from './WorldAlmanacTab'
 import { WorldCastStage } from './cast/WorldCastStage'
 import { WorldFactions } from './WorldFactions'
+import { openBringFromWorld } from './CopyToWorldModal'
+import { useWorlds } from './useWorlds'
+export { useWorlds }
 import { WorldFlags } from './WorldFlags'
 import { WorldActions } from './WorldActions'
 import { WorldTriggers } from './WorldTriggers'
@@ -55,7 +58,6 @@ import { useLive } from '../../lib/useLive'
 import { checkConversions } from '../../store/conversions'
 import { setWhere } from '../maps/placeActions'
 import { failed } from '../../lib/notify'
-import { noteFailure } from '../../store/problems'
 import { entryMenuAt } from '../../views/data/entryMenu'
 
 type WorldMode = 'player' | 'editor'
@@ -85,19 +87,6 @@ const EDITOR_ROUTES: { owns: string; tab: EditorTabId }[] = [
   { owns: NPC_SEGMENT, tab: 'cast' },
   { owns: 'knowledge', tab: 'lore' }
 ]
-
-export function useWorlds(): WorldMeta[] {
-  const [list, setList] = useState<WorldMeta[]>([])
-  useEffect(() => {
-    const load = () =>
-      void engine('worlds.list')
-        .then(setList)
-        .catch(noteFailure('worlds', 'Could not list the worlds'))
-    load()
-    return on('worlds.changed', load)
-  }, [])
-  return list
-}
 
 function SchemaJson({ world }: { world: WorldMeta }) {
   const valid = (t: string) => {
@@ -615,6 +604,17 @@ function WorldWorkspace({
       <Button size="sm" variant="ghost" icon={<Plus />} onClick={onCreateWorld} title="Create new world">
         World
       </Button>
+      {mode === 'editor' && worlds.length > 1 && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<ArrowRightLeft />}
+          onClick={() => openBringFromWorld({ targetWorld: world.id })}
+          title="Copy factions, regions, places, lore, events, NPCs, or custom records from another world"
+        >
+          From world…
+        </Button>
+      )}
       <CopyLinkButton kind="world" id={world.id} />
 
       {/* ACTIVE PLAYER CHARACTER DOCK */}

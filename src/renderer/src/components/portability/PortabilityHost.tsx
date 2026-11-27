@@ -1,6 +1,7 @@
 import { usePortability } from './portabilityStore'
 import { PortableExportModal } from './PortableExportModal'
 import { ImportModal } from './ImportModal'
+import { WorldTransferHost } from '../worlds/CopyToWorldModal'
 
 export function PortabilityHost() {
   const exporting = usePortability((s) => s.exporting)
@@ -9,6 +10,7 @@ export function PortabilityHost() {
     <>
       {exporting && <PortableExportModal state={exporting} />}
       {arrival && <ImportModal key={arrival.id} arrival={arrival} />}
+      <WorldTransferHost />
     </>
   )
 }

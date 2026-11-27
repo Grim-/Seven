@@ -141,6 +141,7 @@ export interface Kind {
   inKindList?: boolean
   actionsStayWhenHidden?: boolean
   portability?: KindPortabilityMeta
+  exportEntries?(): KindHit[]
   pack?(id: string, options?: Record<string, unknown>): unknown
   uses?(id: string, options?: Record<string, unknown>): EntryRef[]
   unpack?(value: unknown, how: Unpack): string

@@ -1,4 +1,4 @@
-import { CopyPlus, Dices, Download, FolderOpen, Hash, Link, MessageSquarePlus, MessageSquareQuote, PanelRight, Pencil, Plus, RefreshCw, Trash2, Upload, X } from 'lucide-react'
+import { ArrowRightLeft, CopyPlus, Dices, Download, FolderOpen, Hash, Link, MessageSquarePlus, MessageSquareQuote, PanelRight, Pencil, Plus, RefreshCw, Trash2, Upload, X } from 'lucide-react'
 import type { LibraryHit, LibrarySection } from '@shared/types'
 import { showName } from '@shared/ids'
 import { askConfirm, askText, openMenu, type MenuItem, confirmDelete } from '../../components/ui'
@@ -7,6 +7,7 @@ import { engine } from '../../lib/ipc'
 import { errorText } from '../../lib/format'
 import { exportKindMenu, exportMenu } from '../../lib/exporting'
 import { openPortableExport, openPortableImportFromFiles } from '../../components/portability/portabilityStore'
+import { openCopyToWorld } from '../../components/worlds/CopyToWorldModal'
 import { toast } from '../../store/toasts'
 import { rebuildIndex, type DataSelection, entryLink, entryRef } from '../../store/data'
 import { useApp } from '../../store/app'
@@ -310,6 +311,12 @@ export function entryActions(section: LibrarySection, hit: LibraryHit, ctx: { op
           ctx.select(made)
           toast.success('Duplicated', showName(hit.title))
         }, failed('Could not duplicate'))
+    })
+  if (section.kind === 'world' && hit.id.split('/').length >= 3)
+    items.push({
+      label: 'Copy to another world…',
+      icon: <ArrowRightLeft />,
+      onSelect: () => openCopyToWorld({ entries: [{ ref: hit.id, title: hit.title }] })
     })
   if (own.length) items.push({ label: '', separator: true }, ...own)
   if (section.exportable) items.push({ label: '', separator: true }, ...exportMenu(entry, section.carriable ? showName(hit.title) : null))

@@ -10,6 +10,7 @@ export interface EntryRef {
 export interface Unpack {
   replace: string | null
   parent: string | null
+  targetWorld?: string | null
   entry(id: string, kind?: string): string
 }
 
