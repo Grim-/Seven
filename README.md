@@ -1,21 +1,18 @@
-# Seven
-
-NOTE: This is a pre-release version, while mostly working and stable and tested, there might be bugs and other problems, I welcome feedback and idea's how to improve Seven to provide a richer writing and roleplay experience.
-
+# Seven 1.1.0
 
 Note: Note: Seven makes use of agentic coding, but I would not call it vibe coded I have been a developer long before the advent of LLM's, and have applied the best practices, patterns and designs that I could reasonably apply to keep Seven modular and flexible, pains (oh great pain..) has been taken to ensure the important parts of the app have been reviewed, all of the app has been personally test by me.
 
 However this does not mean there may not be issues and I am happy to address these but I am full time carer developing this for my own use, as such I welcome any help or additions, please use the discussions tab if you want to help in anyway or have suggestions.
 
 
-Note: Note: Note: This is partially LLM wrote page but I'd hazard to say only 20% where I struggle with formatting.
+Note: Note: Note: This is partially LLM wrote page but I'd hazard to say only 20% where I struggle with formatting.  I welcome feedback and idea's how to improve Seven to provide a richer writing and roleplay experience.
 
 
 NOTE: WARNING: You are advised to use the edit_file tool with care, attempts have been to limit what destructive calls and box it into a workspace folder, however if enabled, a clever agent can find a way to mess up, further  all tool calls *should* require permission every single time for anything outside of seven, this module is disabled by default and not recommended unless you're really sure.
 
 
 ## Known Issues
-
+- None right now?
 
 ## On with the good stuff
 
